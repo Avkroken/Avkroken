@@ -1,6 +1,6 @@
 # Avkroken
 
-Avkrokens privata samlade applikationsrepository.
+Avkrokens samlade applikationsrepository.
 
 ## Applikationer
 
