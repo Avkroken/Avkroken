@@ -7,8 +7,10 @@ import {
 
 const baseEnv = {
   GITHUB_OAUTH_CLIENT_ID: "github-client",
-  GITHUB_OAUTH_CLIENT_SECRET: "github-client-secret",
-  JOBB_ALLOWED_GITHUB_IDS: "123",
+  GITHUB_OAUTH_CLIENT_SECRET: "client-secret-placeholder",
+  GITHUB_OAUTH_ALLOWED_IDS: {
+    get: async () => "123",
+  },
 };
 
 function cookiePair(setCookie: string, name: string): string {
@@ -219,7 +221,7 @@ describe("GitHub OAuth", () => {
         new Request("https://jobb.denied.se/", {
           headers: { Cookie: sessionCookie },
         }),
-        { ...baseEnv, JOBB_ALLOWED_GITHUB_IDS: "456" },
+        { ...baseEnv, GITHUB_OAUTH_ALLOWED_IDS: "456" },
       ),
     ).resolves.toBeNull();
   });
