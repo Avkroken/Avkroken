@@ -1,0 +1,35 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+
+# Krösa-Maja OIDC is the only dashboard authentication path.
+# Production Krösa-Maja OIDC client.
+# Registration is server-side in Krösa-Maja; never invent or commit these values.
+# The registered redirect URI is https://jobb.denied.se/auth/callback.
+# Localhost is intentionally not registered as a production redirect URI.
+# KROSA_MAJA_OIDC_CLIENT_ID="issued-by-krosa-maja"
+# Local development only; production uses a Cloudflare Secrets Store binding.
+# KROSA_MAJA_OIDC_CLIENT_SECRET="issued-by-krosa-maja"
+
+PUBLIC_BASE_URL="https://jobb.example.com"
+
+# Turnstile protects user-triggered dashboard actions.
+# In production TURNSTILE_SECRET must be stored as a Worker secret, not in Git.
+TURNSTILE_SECRET="replace-with-turnstile-secret"
+TURNSTILE_HOSTNAMES="localhost,127.0.0.1"
+
+# StudentConsulting runtime credentials
+STUDENTCONSULTING_EMAIL="user@example.com"
+STUDENTCONSULTING_PASSWORD="replace-me"
+STUDENTCONSULTING_AUTOSUBMIT="false"
+
+# Suitability policy. Autonomous applications fail closed until include terms exist.
+JOB_INCLUDE_TERMS="supporttekniker,it-support,helpdesk"
+JOB_EXCLUDE_TERMS="chef,senior"
+JOB_ALLOWED_LOCATIONS="Stockholm,Uppsala"
+JOB_ALLOWED_COUNTRIES="SE"
+
+# BankID notification. Cloudflare Email Service binding must be configured for email.
+NOTIFY_EMAIL_TO="user@example.com"
+NOTIFY_EMAIL_FROM="jobb@example.com"
+
+# Optional generic HTTPS webhook for another notification channel.
+# NOTIFY_WEBHOOK_URL="https://example.com/hooks/bankid"
