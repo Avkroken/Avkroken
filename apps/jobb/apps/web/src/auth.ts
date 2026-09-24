@@ -1,26 +1,26 @@
 import { renderErrorPage } from "./auth-ui";
 import {
-  authenticatedOidcSubject,
-  oidcConfigurationState,
-  type OidcAuthEnv,
-} from "./oidc-auth";
+  authenticatedGitHubUserId,
+  githubAuthConfigurationState,
+  type GitHubAuthEnv,
+} from "./github-auth";
 
-export type DashboardAuthEnv = OidcAuthEnv;
+export type DashboardAuthEnv = GitHubAuthEnv;
 
 export type DashboardAuthMode =
-  | "oidc"
+  | "github"
   | "misconfigured"
   | "unconfigured";
 
 export function dashboardAuthMode(env: DashboardAuthEnv): DashboardAuthMode {
-  const oidcState = oidcConfigurationState(env);
-  if (oidcState === "ready") return "oidc";
-  if (oidcState === "misconfigured") return "misconfigured";
+  const state = githubAuthConfigurationState(env);
+  if (state === "ready") return "github";
+  if (state === "misconfigured") return "misconfigured";
   return "unconfigured";
 }
 
 export function dashboardAuthConfigured(env: DashboardAuthEnv): boolean {
-  return dashboardAuthMode(env) === "oidc";
+  return dashboardAuthMode(env) === "github";
 }
 
 export async function authorizeDashboardRequest(
@@ -28,7 +28,7 @@ export async function authorizeDashboardRequest(
   env: DashboardAuthEnv,
 ): Promise<Response | null> {
   const mode = dashboardAuthMode(env);
-  if (mode !== "oidc") {
+  if (mode !== "github") {
     const acceptsHtml =
       request.headers.get("accept")?.includes("text/html") ?? false;
     if (request.method === "GET" && acceptsHtml) {
@@ -37,7 +37,7 @@ export async function authorizeDashboardRequest(
         eyebrow: "Säker inloggning",
         title: "Autentisering är inte redo",
         message:
-          "Jobbs Krösa-Maja-konfiguration är inte komplett. Tjänsten är låst tills OIDC-konfigurationen är verifierad.",
+          "Jobbs GitHub OAuth-konfiguration är inte komplett. Tjänsten är låst tills klienten, allowlisten och klienthemligheten är verifierade.",
         code: "auth_unavailable",
         primaryHref: "/login",
         primaryLabel: "Till inloggningen",
@@ -53,16 +53,17 @@ export async function authorizeDashboardRequest(
   }
 
   try {
-    const subject = await authenticatedOidcSubject(request, env);
-    if (subject) return null;
+    const userId = await authenticatedGitHubUserId(request, env);
+    if (userId) return null;
   } catch (error) {
-    console.error("Krösa-Maja dashboard session validation failed", {
+    console.error("GitHub dashboard session validation failed", {
       error: error instanceof Error ? error.message : String(error),
     });
   }
 
   const url = new URL(request.url);
-  const acceptsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+  const acceptsHtml =
+    request.headers.get("accept")?.includes("text/html") ?? false;
   if (
     request.method === "GET" &&
     (url.pathname === "/" || acceptsHtml)
