@@ -41,11 +41,11 @@ describe("dashboard auth mode", () => {
     expect(dashboardAuthConfigured({})).toBe(false);
   });
 
-  it("does not recognize legacy Krösa-Maja OIDC variables", () => {
+  it("does not recognize legacy Basic Auth variables", () => {
     expect(
       dashboardAuthMode({
-        KROSA_MAJA_OIDC_CLIENT_ID: "legacy",
-        KROSA_MAJA_OIDC_CLIENT_SECRET: "legacy",
+        DASHBOARD_USERNAME: "operator",
+        DASHBOARD_PASSWORD: "secret",
       } as never),
     ).toBe("unconfigured");
   });
