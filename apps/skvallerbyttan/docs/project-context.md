@@ -44,7 +44,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 ## GitHub integrationer
 
 - **Gamnacken GitHub App:** Avkrokens canonical provideridentitet för read-only GitHub-observationer i Skvallerbyttan. En separat Skvallerbyttan GitHub App ska inte användas.
-- **Krösa-Maja:** OAuth login för människan.
+- **GitHub OAuth:** interaktiv login går direkt mot GitHub med state, PKCE S256 och numerisk GitHub-ID-allowlist.
 - **GitHub organization webhook:** canonical event-ingress för Activity, security ledger och cache invalidation; Custom Property-definitioner/värden används som governance freshness-signaler när de levereras.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till live Worker-tjänsten `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
