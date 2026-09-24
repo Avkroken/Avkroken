@@ -38,6 +38,7 @@ jobs:
         working-directory: apps/portal
         run: |
           npm install --ignore-scripts --no-audit --no-fund
+          npm test
           npx wrangler deploy --dry-run --config wrangler.jsonc
 
   skvallerbyttan:
