@@ -16,7 +16,7 @@ Gemensamma organisationsstandarder finns i `../../docs/organization/`. De ska in
 - Arbeta från aktuell `main` i separat arbetsgren.
 - Månadsgränsen är exakt tio verifierade lämpliga ansökningar; osäkra providerresultat ska faila stängt.
 - BankID/e-identifikation är user-controlled och får inte automatiseras som signering.
-- Krösa-Maja är dashboardens OIDC-provider enligt repositoryts implementation.
+- GitHub OAuth är dashboardens enda interaktiva login-provider; numeriskt GitHub-ID allowlistas och provider-token får inte bli lokal sessionsstate.
 - Browser Run är integrationsgräns för browserbaserade providerflöden; sprid inte browserimplementation in i domänlogiken.
 - D1 är canonical run/application state; R2 evidence är stöddata.
 - Kör minst `pnpm typecheck` och `pnpm test` före merge.
