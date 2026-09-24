@@ -23,7 +23,7 @@ export type GitHubSecretValue = string | SecretsStoreSecretBinding;
 export interface GitHubAuthEnv {
   GITHUB_OAUTH_CLIENT_ID?: string;
   GITHUB_OAUTH_CLIENT_SECRET?: GitHubSecretValue;
-  JOBB_ALLOWED_GITHUB_IDS?: string;
+  GITHUB_OAUTH_ALLOWED_IDS?: GitHubSecretValue;
 }
 
 interface LoginState {
@@ -50,14 +50,11 @@ export function githubAuthConfigurationState(
   env: GitHubAuthEnv,
 ): "inactive" | "ready" | "misconfigured" {
   const clientId = env.GITHUB_OAUTH_CLIENT_ID?.trim() ?? "";
-  const secretConfigured =
-    typeof env.GITHUB_OAUTH_CLIENT_SECRET === "string"
-      ? Boolean(env.GITHUB_OAUTH_CLIENT_SECRET.trim())
-      : Boolean(env.GITHUB_OAUTH_CLIENT_SECRET);
-  const allowed = allowedIds(env);
+  const secretConfigured = secretValueConfigured(env.GITHUB_OAUTH_CLIENT_SECRET);
+  const allowlistConfigured = secretValueConfigured(env.GITHUB_OAUTH_ALLOWED_IDS);
 
-  if (!clientId && !secretConfigured && allowed.size === 0) return "inactive";
-  return clientId && secretConfigured && allowed.size > 0
+  if (!clientId && !secretConfigured && !allowlistConfigured) return "inactive";
+  return clientId && secretConfigured && allowlistConfigured
     ? "ready"
     : "misconfigured";
 }
@@ -73,10 +70,14 @@ export function sanitizeReturnTo(value: string | null): string {
   }
 }
 
-export async function resolveGitHubClientSecret(
-  env: GitHubAuthEnv,
+function secretValueConfigured(value: GitHubSecretValue | undefined): boolean {
+  return typeof value === "string" ? Boolean(value.trim()) : Boolean(value);
+}
+
+async function resolveRequiredSecretValue(
+  value: GitHubSecretValue | undefined,
+  name: string,
 ): Promise<string> {
-  const value = env.GITHUB_OAUTH_CLIENT_SECRET;
   try {
     const resolved =
       typeof value === "string"
@@ -84,17 +85,42 @@ export async function resolveGitHubClientSecret(
         : value
           ? (await value.get()).trim()
           : "";
-    if (!resolved) throw new Error("GITHUB_OAUTH_CLIENT_SECRET is required");
+    if (!resolved) throw new Error(`${name} is required`);
     return resolved;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "GITHUB_OAUTH_CLIENT_SECRET is required"
-    ) {
+    if (error instanceof Error && error.message === `${name} is required`) {
       throw error;
     }
-    throw new Error("GITHUB_OAUTH_CLIENT_SECRET could not be resolved");
+    throw new Error(`${name} could not be resolved`);
   }
+}
+
+export async function resolveGitHubClientSecret(
+  env: GitHubAuthEnv,
+): Promise<string> {
+  return resolveRequiredSecretValue(
+    env.GITHUB_OAUTH_CLIENT_SECRET,
+    "GITHUB_OAUTH_CLIENT_SECRET",
+  );
+}
+
+export async function resolveGitHubAllowedIds(
+  env: GitHubAuthEnv,
+): Promise<Set<number>> {
+  const raw = await resolveRequiredSecretValue(
+    env.GITHUB_OAUTH_ALLOWED_IDS,
+    "GITHUB_OAUTH_ALLOWED_IDS",
+  );
+  const ids = new Set(
+    raw
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isSafeInteger(value) && value > 0),
+  );
+  if (ids.size === 0) {
+    throw new Error("GITHUB_OAUTH_ALLOWED_IDS must contain at least one numeric GitHub ID");
+  }
+  return ids;
 }
 
 export async function startGitHubLogin(
@@ -189,7 +215,7 @@ export async function handleGitHubCallback(
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       throw new Error("GitHub user id missing");
     }
-    if (!allowedIds(env).has(userId)) {
+    if (!(await resolveGitHubAllowedIds(env)).has(userId)) {
       return redirect("/login?error=forbidden", [
         clearCookie(LOGIN_COOKIE),
         clearCookie(SESSION_COOKIE),
@@ -256,7 +282,7 @@ export async function authenticatedGitHubUserId(
     return null;
   }
 
-  return allowedIds(env).has(session.uid) ? session.uid : null;
+  return (await resolveGitHubAllowedIds(env)).has(session.uid) ? session.uid : null;
 }
 
 export function logoutGitHub(): Response {
@@ -293,7 +319,10 @@ export function classifyGitHubStartFailure(
   error: unknown,
 ): GitHubStartFailure {
   const message = error instanceof Error ? error.message : String(error);
-  if (message.includes("GITHUB_OAUTH_CLIENT_SECRET")) {
+  if (
+    message.includes("GITHUB_OAUTH_CLIENT_SECRET") ||
+    message.includes("GITHUB_OAUTH_ALLOWED_IDS")
+  ) {
     return {
       code: "secret_unavailable",
       status: 503,
@@ -383,15 +412,6 @@ async function revokeGitHubToken(
   } catch {
     // The token is never persisted and is used only for the identity lookup.
   }
-}
-
-function allowedIds(env: GitHubAuthEnv): Set<number> {
-  return new Set(
-    (env.JOBB_ALLOWED_GITHUB_IDS ?? "")
-      .split(",")
-      .map((value) => Number(value.trim()))
-      .filter((value) => Number.isSafeInteger(value) && value > 0),
-  );
 }
 
 async function signPayload(
