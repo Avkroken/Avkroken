@@ -6,7 +6,6 @@ Avkrokens samlade applikationsrepository.
 
 - `apps/portal` — avkroken.denied.se
 - `apps/skvallerbyttan` — observationslager och dashboard
-- `apps/krosa-maja` — autentisering/OAuth
 - `apps/jobb` — Jobb-applikationen
 
 Organisationsgemensam intern dokumentation ligger under `docs/organization`.
