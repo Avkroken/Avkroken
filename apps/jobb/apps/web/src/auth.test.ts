@@ -9,7 +9,7 @@ describe("dashboard auth mode", () => {
     const env = {
       GITHUB_OAUTH_CLIENT_ID: "github-client",
       GITHUB_OAUTH_CLIENT_SECRET: "github-client-secret",
-      JOBB_ALLOWED_GITHUB_IDS: "123",
+      GITHUB_OAUTH_ALLOWED_IDS: "123",
     };
     expect(dashboardAuthMode(env)).toBe("github");
     expect(dashboardAuthConfigured(env)).toBe(true);
@@ -21,7 +21,19 @@ describe("dashboard auth mode", () => {
       GITHUB_OAUTH_CLIENT_SECRET: {
         get: async () => "github-client-secret",
       },
-      JOBB_ALLOWED_GITHUB_IDS: "123",
+      GITHUB_OAUTH_ALLOWED_IDS: "123",
+    };
+    expect(dashboardAuthMode(env)).toBe("github");
+    expect(dashboardAuthConfigured(env)).toBe(true);
+  });
+
+  it("accepts a Secrets Store allowlist binding", () => {
+    const env = {
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      GITHUB_OAUTH_CLIENT_SECRET: "github-client-secret",
+      GITHUB_OAUTH_ALLOWED_IDS: {
+        get: async () => "123",
+      },
     };
     expect(dashboardAuthMode(env)).toBe("github");
     expect(dashboardAuthConfigured(env)).toBe(true);
@@ -30,7 +42,7 @@ describe("dashboard auth mode", () => {
   it("fails closed for a partially configured GitHub client", () => {
     const env = {
       GITHUB_OAUTH_CLIENT_ID: "github-client",
-      JOBB_ALLOWED_GITHUB_IDS: "123",
+      GITHUB_OAUTH_ALLOWED_IDS: "123",
     };
     expect(dashboardAuthMode(env)).toBe("misconfigured");
     expect(dashboardAuthConfigured(env)).toBe(false);
