@@ -18,7 +18,7 @@ Börja i **[dokumentationsöversikten](docs/index.md)**.
 - [Providers](docs/providers.md) — providerbeteende och integrationsgränser
 - [Projektkontext](docs/project-context.md) — aktuell teknisk state
 - [Arkitektur](docs/architecture.md) — runtime, state och trust boundaries
-- [Authentication](docs/authentication.md) — dashboardauth/OIDC
+- [Authentication](docs/authentication.md) — dashboardauth/GitHub OAuth
 - [Discovery](docs/discovery.md) — sök-/discoveryflöde
 - [Drift](docs/operations.md) — verifiering, deployment och incidentkontroller
 
