@@ -50,14 +50,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "24"
-      - name: Validate Krosa-Maja
-        working-directory: apps/krosa-maja
+      - name: Verify Krosa-Maja retirement
+        shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run check
+          set -euo pipefail
+          test ! -e apps/krosa-maja
+          test ! -e .github/workflows/deploy-krosa-maja.yml
+          if grep -R -n -E 'KROSA_MAJA_OIDC|auth\.denied\.se|oidc-auth|apps/krosa-maja' apps .github README.md docs; then
+            echo "::error::Retired Krosa-Maja auth/runtime reference remains."
+            exit 1
+          fi
 
   jobb:
     name: Jobb
