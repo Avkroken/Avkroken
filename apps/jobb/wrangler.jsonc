@@ -9,8 +9,7 @@
   "upload_source_maps": true,
   "vars": {
     "TURNSTILE_HOSTNAMES": "jobb.denied.se",
-    "GITHUB_OAUTH_CLIENT_ID": "Ov23li4Zt1X87R3Sqc7T",
-    "JOBB_ALLOWED_GITHUB_IDS": "36226327"
+    "GITHUB_OAUTH_CLIENT_ID": "Ov23li4Zt1X87R3Sqc7T"
   },
   "observability": {
     "enabled": true,
@@ -36,6 +35,11 @@
       "binding": "GITHUB_OAUTH_CLIENT_SECRET",
       "store_id": "293e79006fa649b8b182ef105a6b46d1",
       "secret_name": "KROSA_MAJA_CLIENT_SECRET"
+    },
+    {
+      "binding": "GITHUB_OAUTH_ALLOWED_IDS",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_ALLOWED_GITHUB_IDS"
     }
   ],
   "d1_databases": [
