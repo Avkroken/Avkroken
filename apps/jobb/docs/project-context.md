@@ -14,7 +14,7 @@ Vid konflikt för repo-specifik teknik gäller följande ordning:
 4. Det här dokumentet.
 5. Äldre pull requests, issues och historik.
 
-Organisationsgemensamma standarder finns i `docs/organization/` i `Avkroken/Avkroken`, men externa GitHub-/Cloudflare-inställningar är inte repo-local current-state och kopieras inte hit. Historik hör hemma i Git.
+Organisationsgemensamma standarder finns i `docs/organization/` i `Avkroken/Avkroken`, men externa GitHub-/Cloudflare-inställningar är inte app-local current-state och kopieras inte hit. Historik hör hemma i Git.
 
 ## Syfte och säkerhetsgräns
 
@@ -36,7 +36,7 @@ Viktiga säkerhetsgränser:
 
 Primär runtime är Cloudflare Worker `jobb` med entrypoint `apps/web/src/index.ts`.
 
-Appens root-`wrangler.jsonc` är deployment-konfigurationen och binder:
+Appens `apps/jobb/wrangler.jsonc` är deployment-konfigurationen och binder:
 
 - Browser Run som `BROWSER`.
 - D1-databasen `jobb` som `DB`.
@@ -202,7 +202,7 @@ Wrangler sätter `observability.redact_query_string=true` innan OIDC aktiveras. 
 
 ## Verifiering och deployment
 
-Repositoryts versionerade verifieringsväg är:
+Appens versionerade verifieringsväg är:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -210,15 +210,15 @@ pnpm typecheck
 pnpm test
 ```
 
-Appens root-`package.json` definierar produktionskommandot:
+`apps/jobb/package.json` definierar produktionskommandot:
 
 ```bash
 pnpm deploy:cloudflare
 ```
 
-Kommandot applicerar remote D1-migrationer och deployar därefter Workern med root-`wrangler.jsonc`.
+Kommandot applicerar remote D1-migrationer och deployar därefter Workern med `apps/jobb/wrangler.jsonc`.
 
-Vilket externt CI/CD-system som eventuellt kör kommandona är inte repo-local current-state och dokumenteras inte här.
+Vilket externt CI/CD-system som eventuellt kör kommandona är inte app-local current-state och dokumenteras inte här.
 
 ## Ändringskontrakt
 
