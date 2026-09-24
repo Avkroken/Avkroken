@@ -45,7 +45,7 @@ jobs:
             local url="https://github.com/login/oauth/authorize?client_id=Ov23li4Zt1X87R3Sqc7T&redirect_uri=$encoded&scope=read%3Auser&state=verification-only&code_challenge=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&code_challenge_method=S256&allow_signup=false"
             curl -sS --max-time 20 -D "/tmp/$label.headers" -o "/tmp/$label.body" "$url" || true
             echo "--- $label ($redirect_uri)"
-            awk 'toupper($1) ~ /^HTTP\\// { code=$2 } END { print "HTTP " code }' "/tmp/$label.headers"
+            awk '$1 ~ /^HTTP/ { code=$2 } END { print "HTTP " code }' "/tmp/$label.headers"
             awk 'BEGIN{IGNORECASE=1} /^(location|content-type):/ {gsub(/\\r/,""); print}' "/tmp/$label.headers" | head -5
             grep -Eio '<title>[^<]{0,160}</title>|redirect_uri[^<]{0,180}|callback[^<]{0,180}|application error|incorrect client credentials|sign in to github' "/tmp/$label.body" | head -10 || true
           }
