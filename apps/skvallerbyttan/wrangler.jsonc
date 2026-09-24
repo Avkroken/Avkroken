@@ -21,9 +21,9 @@
   },
   "vars": {
     "CLOUDFLARE_ACCOUNT_ID": "b74f8c0c6a92f3006483840cf27372fd",
-    "KROSA_MAJA_GITHUB_CLIENT_ID": "Ov23li4Zt1X87R3Sqc7T",
     "SKVALLERBYTTAN_ALLOWED_GITHUB_IDS": "36226327",
-    "SKVALLERBYTTAN_ORG": "Avkroken"
+    "SKVALLERBYTTAN_ORG": "Avkroken",
+    "GITHUB_OAUTH_CLIENT_ID": "Ov23li4Zt1X87R3Sqc7T"
   },
   "secrets_store_secrets": [
     {
@@ -42,7 +42,7 @@
       "secret_name": "CLOUDFLARE_API_TOKEN_R3"
     },
     {
-      "binding": "KROSA_MAJA_CLIENT_SECRET",
+      "binding": "GITHUB_OAUTH_CLIENT_SECRET",
       "store_id": "293e79006fa649b8b182ef105a6b46d1",
       "secret_name": "KROSA_MAJA_CLIENT_SECRET"
     }
