@@ -53,7 +53,7 @@ Betald GitHub Code Security/Secret Protection ska inte antas finnas.
 
 Dependency Review används på publika repositories där stödet finns och dependency snapshots är kompletta och stabila. I det privata `Avkroken/Avkroken` på GitHub Free är GitHubs Dependency Review inte tillgängligt; live-körningen returnerar att Dependency graph + GitHub Advanced Security krävs. Monorepot förlitar sig därför på respektive apps install-/lockfile-validering i CI.
 
-Code scanning/CodeQL används där GitHub exponerar stödet. För det privata `Avkroken/Avkroken` på nuvarande Free-plan finns ingen aktiv ruleset-baserad CodeQL-enforcement. Tidigare CodeQL-resultat från den publika fasen är historik, inte aktuell merge-policy.
+Code scanning/CodeQL används där GitHub exponerar stödet. För det privata `Avkroken/Avkroken` på nuvarande Free-plan finns ingen aktiv ruleset-baserad CodeQL-enforcement. GitHub kan fortfarande visa dynamiska Code Quality/CodeQL-relaterade analyser från repositoryinställningar, men de behandlas som advisory och monorepots mergepolicy får inte bero på dem på nuvarande plan.
 
 ## Auto-assignment och pull_request_target
 
