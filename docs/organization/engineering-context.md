@@ -1,88 +1,62 @@
 # Avkroken engineering context
 
-Det här dokumentet är Avkrokens levande, versionsstyrda tekniska kontext för arbetsgrenar, repository-regler och repo-specifik CI.
+Det här dokumentet är Avkrokens versionsstyrda tekniska kontext för repository-regler och CI.
 
 **Senast verifierad:** 2026-09-24
 
-## Auktoritet och läsordning
+## Auktoritet
 
 Vid konflikt gäller:
 
 1. GitHubs aktiva repository-inställningar och repository-rulesets.
-2. Filer på `main` i berört repository.
+2. Filer på aktuell `main` i berört repository.
 3. Det här dokumentet.
-4. Äldre issues, pull requests, chattar och agentminnen.
+4. Äldre historik.
 
-Repository-specifik kontext hör hemma i respektive repository, normalt i `docs/project-context.md`.
+## Repositorymodell
 
-## GitHub-plan och styrmodell
+`Avkroken/Avkroken` är den samlade interna repositoryytan för:
 
-Avkroken kör GitHub Free och de aktuella repositories är publika.
+- `apps/portal`
+- `apps/skvallerbyttan`
+- `apps/krosa-maja`
+- `apps/jobb`
+- `docs/organization`
 
-Varje repository använder ett eget branch-ruleset för default branch. Organisationens tidigare rulesets och cross-repository required/reusable workflows är inte längre CI-policykällan.
+`Avkroken/.github` ska endast bära GitHub-organisationsprofil och gemensamma publika community-filer. Det är inte längre runtime-, CI- eller intern dokumentationskälla.
 
-Repository-rulesetet ska skydda default branch och kräva de faktiska status checks som repositoryts lokala workflows producerar. Separata rulesets per språk, runtime eller plattform används inte.
+Övriga fristående projekt behåller repository-lokal CI och egna branch-rulesets.
 
-Custom Properties kan behållas som metadata/inventering men binder inte CI-policy.
+## Monorepots ruleset
 
-## Repository-lokal CI
+Default branch skyddas av repository-rulesetet `main` utan bypass actors.
 
-Varje repository äger sina egna workflows under `.github/workflows/`.
+Required checks:
 
-CI som ska blockera merge triggar på `pull_request` mot `main` och, där merge queue stöds, `merge_group`.
+- `Dependency review`
+- `Portal`
+- `Skvallerbyttan`
+- `Krosa-Maja`
+- `Jobb`
+
+CodeQL hanteras separat genom ruleset-regeln **Require code scanning results** med GitHubs default setup.
+
+## CI
+
+Root-workflowen under `.github/workflows/ci.yml` äger monorepots merge gates. Varje app valideras från sin egen katalog och behåller sin runtimekonfiguration där.
 
 Cross-repository `workflow_call` till `Avkroken/.github` används inte.
 
-`Avkroken/.github` är fortsatt central dokumentations- och organisationskontext, men är inte runtime-provider för andra repositories.
+`pull_request_target` får endast användas för metadataautomation och får inte checka ut eller exekvera PR-head-kod.
 
-## Required checks per repository
+## Drift
 
-- Docker-idempotent-update: `Dependency review`, `Python`, `Docker`.
-- Produkter: `Dependency review`, `Node and Cloudflare`, `Python`, `Container security / app`, `Container security / scraper`.
-- Pastebinit: `Dependency review`, `Python 3.10`, `Python 3.14`.
-- Politiker: `Dependency review`, `Node and Cloudflare`, `Python`, `Docker`.
-- Bastion: `Swift package (ubuntu-latest)`, `Swift package (macos-latest)`, `Apple applications`, `Rust`, `.NET tests`, `Windows application`, `Android Gradle`, `Generate dependency graph`.
-- Klarsprak: `Dependency review`, `Node and Cloudflare`.
-- Dumpen: `Dependency review`, `Node and Cloudflare`.
-- Skvallerbyttan: `Dependency review`, `Node and Cloudflare`.
-- .github: `Dependency review`, `Portal`.
-- Jobb: `Dependency review`, `Node and Cloudflare`.
-- Krosa-Maja: `Dependency review`, `Node and Cloudflare`.
+Produktionsdeploy och andra driftmutationer är separata åtgärder och sker inte som bieffekt av vanlig PR-CI.
 
-## GitHub Free och säkerhet
+Skvallerbyttans observationsarkitektur är read-only mot providers.
 
-Betald GitHub Code Security/Secret Protection ska inte antas finnas.
+## Dokumentation
 
-Dependency Review är tillgängligt för publika repositories på GitHub.com och används som lokal PR-check där repositoryts dependency snapshots är kompletta och stabila. Bastion undantas tills dess blandade snapshot-topologi ger en komplett och jämförbar head-snapshot.
+Intern applikations- och driftkontext för monorepot hör hemma i `Avkroken/Avkroken`, inte i det publika `.github`-förrådet.
 
-Code scanning/CodeQL och secret scanning kan användas där de är tillgängliga för publika repositories, men de är inte separata required ruleset-regler i den här baslinjen.
-
-## Auto-assignment och pull_request_target
-
-Auto-assignment är repository-lokal och använder repositoryts eget `GITHUB_TOKEN`.
-
-`pull_request_target` används endast för metadataautomation. Sådana workflows får inte checka ut eller exekvera PR-head-kod.
-
-## Publik dokumentation
-
-`README.md` är kort ingång och `docs/` är canonical source för utförlig publik dokumentation.
-
-Skvallerbyttans GitHub Pages-workflow är repository-lokal. `Avkroken/.github` tillhandahåller inte längre ett centralt Pages-workflow.
-
-Portalens dokumentationsnav, provider-webhooks och Cloudflare Service Bindings påverkas inte av CI-decentraliseringen.
-
-## Operativ heartbeat och watchdog
-
-Skvallerbyttan skickar heartbeat via Cloudflare Service Binding till live Worker-tjänsten `avkroken`, entrypoint `OperationalHeartbeatService`.
-
-Portalen lagrar heartbeat-state i Durable Object `OperationalWatchdog`. Watchdog-cron kör var 10:e minut, heartbeat förväntas var 15:e minut och betraktas som utebliven efter 35 minuter.
-
-Heartbeat innehåller endast tjänstenamn, tidsstämpel, ready-värde och booleska readiness-resultat. Credentials och hemligheter skickas inte.
-
-Cloudflare Email Service-bindingen heter `OPS_EMAIL`. Mottagare och avsändare är icke-hemliga Worker-vars `OPS_NOTIFY_TO` och `OPS_NOTIFY_FROM`.
-
-## Migreringsordning
-
-Den här cleanup-PR:n i `Avkroken/.github` ska mergas sist, efter att repository-lokala workflow-PR:er är mergade och deras required checks har lagts till i respektive `main-protection`.
-
-När det är gjort finns inga executable callers kvar till `Avkroken/.github/.github/workflows/...`.
+Arbetsgrenar följer `{agent}/{feature}/{YYYY-MM-DD}/{HH-mm}-{id}`.
