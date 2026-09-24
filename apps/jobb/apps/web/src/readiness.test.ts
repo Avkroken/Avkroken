@@ -20,7 +20,7 @@ describe("readiness", () => {
     GITHUB_OAUTH_CLIENT_SECRET: {
       get: async () => "github-client-secret",
     },
-    JOBB_ALLOWED_GITHUB_IDS: "123",
+    GITHUB_OAUTH_ALLOWED_IDS: "123",
   };
 
   it("is ready when D1 responds and GitHub OAuth is configured", async () => {
@@ -38,7 +38,24 @@ describe("readiness", () => {
           throw new Error("secret unavailable");
         },
       },
-      JOBB_ALLOWED_GITHUB_IDS: "123",
+      GITHUB_OAUTH_ALLOWED_IDS: "123",
+    });
+
+    expect(result).toEqual({
+      status: "degraded",
+      checks: { database: true, dashboardAuth: false },
+    });
+  });
+
+  it("fails closed when the OAuth allowlist binding is unavailable", async () => {
+    const result = await getReadiness(fakeDb({ ok: 1 }), {
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      GITHUB_OAUTH_CLIENT_SECRET: "client-secret-placeholder",
+      GITHUB_OAUTH_ALLOWED_IDS: {
+        get: async () => {
+          throw new Error("allowlist unavailable");
+        },
+      },
     });
 
     expect(result).toEqual({
@@ -59,7 +76,7 @@ describe("readiness", () => {
   it("fails closed for partial GitHub OAuth configuration", async () => {
     const response = await readinessResponse(fakeDb({ ok: 1 }), {
       GITHUB_OAUTH_CLIENT_ID: "github-client",
-      JOBB_ALLOWED_GITHUB_IDS: "123",
+      GITHUB_OAUTH_ALLOWED_IDS: "123",
     });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
