@@ -1,5 +1,5 @@
 import { dashboardAuthMode, type DashboardAuthEnv } from "./auth";
-import { resolveOidcClientSecret } from "./oidc-auth";
+import { resolveGitHubClientSecret } from "./github-auth";
 
 export interface ReadinessResult {
   status: "ready" | "degraded";
@@ -23,9 +23,9 @@ export async function getReadiness(
 
   const authMode = dashboardAuthMode(env);
   let dashboardAuth = false;
-  if (authMode === "oidc") {
+  if (authMode === "github") {
     try {
-      await resolveOidcClientSecret(env);
+      await resolveGitHubClientSecret(env);
       dashboardAuth = true;
     } catch {
       dashboardAuth = false;
