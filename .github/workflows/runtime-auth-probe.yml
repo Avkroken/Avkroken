@@ -12,35 +12,32 @@ jobs:
     name: Runtime auth probe
     runs-on: ubuntu-latest
     steps:
-      - name: Probe public auth surfaces
+      - name: Classify public auth surfaces
         shell: bash
         run: |
           set -u
 
-          status() {
-            awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$1"
+          request() {
+            local label="$1"
+            local url="$2"
+            curl -sS --max-time 20               -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140 Safari/537.36'               -H 'Accept: text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8'               -D "/tmp/$label.headers" -o "/tmp/$label.body" "$url" || true
+            echo "--- $label"
+            awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print "HTTP " code }' "/tmp/$label.headers"
+            awk 'BEGIN{IGNORECASE=1} /^(server|cf-ray|cf-mitigated|content-type|location):/ {
+              gsub(/\r/,"");
+              if (tolower($1) == "location:") {
+                gsub(/(state|code_challenge)=[^& ]+/, "(redacted)=...");
+              }
+              print
+            }' "/tmp/$label.headers" | head -10
+            grep -Eio '<title>[^<]{0,160}</title>|Just a moment|Access denied|Logga in med GitHub|GitHub OAuth|Krösa-Maja|OIDC' "/tmp/$label.body" | head -12 || true
           }
 
-          echo "::group::Jobb login"
-          curl -sS --max-time 20 -D /tmp/jobb-login.headers -o /tmp/jobb-login.body https://jobb.denied.se/login || true
-          echo "HTTP $(status /tmp/jobb-login.headers)"
-          grep -Eo 'Logga in med GitHub|GitHub OAuth|Krösa-Maja|OIDC' /tmp/jobb-login.body | sort -u || true
-          echo "::endgroup::"
+          request jobb-login https://jobb.denied.se/login
+          request jobb-start https://jobb.denied.se/auth/start
+          request skv-login https://skvallerbyttan.denied.se/login
 
-          echo "::group::Jobb auth start"
-          curl -sS --max-time 20 -D /tmp/jobb-start.headers -o /tmp/jobb-start.body https://jobb.denied.se/auth/start || true
-          echo "HTTP $(status /tmp/jobb-start.headers)"
-          awk 'BEGIN{IGNORECASE=1} /^location:/ {gsub(/\r/,""); print $0}' /tmp/jobb-start.headers | sed -E 's/(state|code_challenge)=[^& ]+/(redacted)=.../g' || true
-          echo "::endgroup::"
-
-          echo "::group::Skvallerbyttan login"
-          curl -sS --max-time 20 -D /tmp/skv-login.headers -o /tmp/skv-login.body https://skvallerbyttan.denied.se/login || true
-          echo "HTTP $(status /tmp/skv-login.headers)"
-          grep -Eo 'Logga in med GitHub|GitHub OAuth|Krösa-Maja|OIDC' /tmp/skv-login.body | sort -u || true
-          echo "::endgroup::"
-
-          echo "::group::Retired issuer"
+          echo "--- retired-issuer"
           curl -sS --max-time 20 -D /tmp/krosa.headers -o /tmp/krosa.body https://auth.denied.se/.well-known/openid-configuration || true
-          echo "HTTP $(status /tmp/krosa.headers)"
+          awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print "HTTP " code }' /tmp/krosa.headers
           grep -Eo '"issuer"[[:space:]]*:[[:space:]]*"[^"]+"' /tmp/krosa.body | head -1 || true
-          echo "::endgroup::"
