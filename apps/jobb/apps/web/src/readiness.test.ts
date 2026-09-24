@@ -15,28 +15,30 @@ function fakeDb(result: { ok: number } | Error): D1Database {
 }
 
 describe("readiness", () => {
-  const oidcAuth = {
-    KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
-    KROSA_MAJA_OIDC_CLIENT_SECRET: {
-      get: async () => "generated-client-secret",
+  const githubAuth = {
+    GITHUB_OAUTH_CLIENT_ID: "github-client",
+    GITHUB_OAUTH_CLIENT_SECRET: {
+      get: async () => "github-client-secret",
     },
+    JOBB_ALLOWED_GITHUB_IDS: "123",
   };
 
-  it("is ready when D1 responds and Krösa-Maja OIDC is configured", async () => {
-    await expect(getReadiness(fakeDb({ ok: 1 }), oidcAuth)).resolves.toEqual({
+  it("is ready when D1 responds and GitHub OAuth is configured", async () => {
+    await expect(getReadiness(fakeDb({ ok: 1 }), githubAuth)).resolves.toEqual({
       status: "ready",
       checks: { database: true, dashboardAuth: true },
     });
   });
 
-  it("fails closed when the OIDC Secrets Store value cannot be resolved", async () => {
+  it("fails closed when the GitHub OAuth secret cannot be resolved", async () => {
     const result = await getReadiness(fakeDb({ ok: 1 }), {
-      KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
-      KROSA_MAJA_OIDC_CLIENT_SECRET: {
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      GITHUB_OAUTH_CLIENT_SECRET: {
         get: async () => {
           throw new Error("secret unavailable");
         },
       },
+      JOBB_ALLOWED_GITHUB_IDS: "123",
     });
 
     expect(result).toEqual({
@@ -48,15 +50,16 @@ describe("readiness", () => {
   it("fails closed when D1 cannot be read", async () => {
     const result = await getReadiness(
       fakeDb(new Error("D1 unavailable")),
-      oidcAuth,
+      githubAuth,
     );
     expect(result.status).toBe("degraded");
     expect(result.checks.database).toBe(false);
   });
 
-  it("fails closed for partial OIDC configuration", async () => {
+  it("fails closed for partial GitHub OAuth configuration", async () => {
     const response = await readinessResponse(fakeDb({ ok: 1 }), {
-      KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      JOBB_ALLOWED_GITHUB_IDS: "123",
     });
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
