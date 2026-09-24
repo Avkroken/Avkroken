@@ -9,7 +9,7 @@
 5. [docs/automation.md](docs/automation.md) och [docs/providers.md](docs/providers.md) — domänspecifika flöden.
 6. [docs/authentication.md](docs/authentication.md) — auth- och credentialgränser.
 
-Gemensamma organisationsstandarder finns i `Avkroken/.github`. De ska inte dupliceras som Jobb-current-state.
+Gemensamma organisationsstandarder finns i `../../docs/organization`. De ska inte dupliceras som Jobb-current-state.
 
 ## Invariants
 
