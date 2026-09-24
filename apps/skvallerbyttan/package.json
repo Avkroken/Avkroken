@@ -11,10 +11,10 @@
     "validate:worker": "wrangler deploy --dry-run"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260918.1",
-    "tsx": "^4.23.13",
+    "@cloudflare/workers-types": "^5.20260921.1",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "wrangler": "4.134.0"
+    "wrangler": "4.136.1"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
