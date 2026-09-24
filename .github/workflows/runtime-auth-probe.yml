@@ -1,0 +1,46 @@
+name: Temporary runtime auth probe
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Runtime auth probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe public auth surfaces
+        shell: bash
+        run: |
+          set -u
+
+          status() {
+            awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' "$1"
+          }
+
+          echo "::group::Jobb login"
+          curl -sS --max-time 20 -D /tmp/jobb-login.headers -o /tmp/jobb-login.body https://jobb.denied.se/login || true
+          echo "HTTP $(status /tmp/jobb-login.headers)"
+          grep -Eo 'Logga in med GitHub|GitHub OAuth|Krösa-Maja|OIDC' /tmp/jobb-login.body | sort -u || true
+          echo "::endgroup::"
+
+          echo "::group::Jobb auth start"
+          curl -sS --max-time 20 -D /tmp/jobb-start.headers -o /tmp/jobb-start.body https://jobb.denied.se/auth/start || true
+          echo "HTTP $(status /tmp/jobb-start.headers)"
+          awk 'BEGIN{IGNORECASE=1} /^location:/ {gsub(/\r/,""); print $0}' /tmp/jobb-start.headers | sed -E 's/(state|code_challenge)=[^& ]+/(redacted)=.../g' || true
+          echo "::endgroup::"
+
+          echo "::group::Skvallerbyttan login"
+          curl -sS --max-time 20 -D /tmp/skv-login.headers -o /tmp/skv-login.body https://skvallerbyttan.denied.se/login || true
+          echo "HTTP $(status /tmp/skv-login.headers)"
+          grep -Eo 'Logga in med GitHub|GitHub OAuth|Krösa-Maja|OIDC' /tmp/skv-login.body | sort -u || true
+          echo "::endgroup::"
+
+          echo "::group::Retired issuer"
+          curl -sS --max-time 20 -D /tmp/krosa.headers -o /tmp/krosa.body https://auth.denied.se/.well-known/openid-configuration || true
+          echo "HTTP $(status /tmp/krosa.headers)"
+          grep -Eo '"issuer"[[:space:]]*:[[:space:]]*"[^"]+"' /tmp/krosa.body | head -1 || true
+          echo "::endgroup::"
