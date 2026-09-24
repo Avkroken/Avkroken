@@ -1,6 +1,6 @@
 # Jobb project context
 
-Det här dokumentet är den repo-specifika, versionsstyrda tekniska kontexten för `Avkroken/Jobb`.
+Det här dokumentet är den repo-specifika, versionsstyrda tekniska kontexten för `apps/jobb` i `Avkroken/Avkroken`.
 
 **Senast verifierad mot repositoryt:** 2026-09-24
 
@@ -8,13 +8,13 @@ Det här dokumentet är den repo-specifika, versionsstyrda tekniska kontexten f�
 
 Vid konflikt för repo-specifik teknik gäller följande ordning:
 
-1. Filer på aktuell `main` i `Avkroken/Jobb`.
+1. Filer på aktuell `main` under `apps/jobb` i `Avkroken/Avkroken`.
 2. Versionerade D1-migrationer och runtimekonfiguration i repositoryt.
 3. Publika upstream-kontrakt för de externa API:er och tjänster implementationen använder.
 4. Det här dokumentet.
 5. Äldre pull requests, issues och historik.
 
-Organisationsgemensamma standarder finns i `Avkroken/.github`, men externa GitHub-/Cloudflare-inställningar är inte repo-local current-state och kopieras inte hit. Historik hör hemma i Git.
+Organisationsgemensamma standarder finns i `docs/organization` i monorepot, men externa GitHub-/Cloudflare-inställningar är inte app-local current-state och kopieras inte hit. Historik hör hemma i Git.
 
 ## Syfte och säkerhetsgräns
 
