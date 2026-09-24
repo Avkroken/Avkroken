@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/skvallerbyttan
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:10"
+      timezone: Europe/Stockholm
+    groups:
+      skvallerbyttan:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /apps/jobb
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "09:00"
+      timezone: Europe/Stockholm
+    open-pull-requests-limit: 3
+    groups:
+      jobb-security:
+        applies-to: security-updates
+        patterns: ["*"]
+      jobb-version:
+        applies-to: version-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Europe/Stockholm
+    groups:
+      actions:
+        update-types: [minor, patch]

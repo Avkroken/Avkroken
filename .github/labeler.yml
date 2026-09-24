@@ -1,0 +1,25 @@
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"
+
+portal:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/portal/**"
+
+skvallerbyttan:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/skvallerbyttan/**"
+
+krosa-maja:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/krosa-maja/**"
+
+jobb:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/jobb/**"

@@ -1,0 +1,409 @@
+import { gamnackenPrivateKey, organization, type Env } from "./env";
+
+const API_VERSION = "2026-03-10";
+const USER_AGENT = "Avkroken-Skvallerbyttan-dashboard";
+
+type InstallationToken = { value: string; expiresAt: number };
+
+export type GitHubBudget = {
+  limit: number | null;
+  remaining: number | null;
+  used: number | null;
+  resetAt: string | null;
+  resource: string | null;
+  retryAfterSeconds: number | null;
+  throttled: boolean;
+  lastStatus: number | null;
+  lastError: string | null;
+  observedAt: string | null;
+};
+
+let budget: GitHubBudget = {
+  limit: null,
+  remaining: null,
+  used: null,
+  resetAt: null,
+  resource: null,
+  retryAfterSeconds: null,
+  throttled: false,
+  lastStatus: null,
+  lastError: null,
+  observedAt: null,
+};
+
+let installationTokenCache: InstallationToken | null = null;
+let installationTokenInFlight: Promise<InstallationToken> | null = null;
+let installationMetadata: GitHubInstallationMetadata = {
+  installationId: null,
+  repositorySelection: null,
+  permissions: {},
+  tokenPermissions: {},
+  observedAt: null,
+};
+
+function permissionMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, string> = {};
+  for (const [key, level] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof level === "string" && level.trim()) result[key] = level.trim();
+  }
+  return result;
+}
+
+export function getGitHubInstallationMetadata(): GitHubInstallationMetadata {
+  return {
+    ...installationMetadata,
+    permissions: { ...installationMetadata.permissions },
+    tokenPermissions: { ...installationMetadata.tokenPermissions },
+  };
+}
+
+export type OptionalResult<T> =
+  | { available: true; value: T; status: number; acceptedPermissions: string | null }
+  | { available: false; value: null; status: number; reason: string; acceptedPermissions: string | null };
+
+export type ListResult<T> = OptionalResult<T[]> & { truncated: boolean };
+
+export type GitHubInstallationMetadata = {
+  installationId: number | null;
+  repositorySelection: string | null;
+  permissions: Record<string, string>;
+  tokenPermissions: Record<string, string>;
+  observedAt: string | null;
+};
+
+export class GitHubApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "GitHubApiError";
+  }
+}
+
+function base64url(input: string | ArrayBuffer): string {
+  const bytes = typeof input === "string" ? new TextEncoder().encode(input) : new Uint8Array(input);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function derLength(length: number): Uint8Array {
+  if (length < 0x80) return Uint8Array.of(length);
+  const bytes: number[] = [];
+  for (let value = length; value > 0; value >>>= 8) bytes.unshift(value & 0xff);
+  return Uint8Array.of(0x80 | bytes.length, ...bytes);
+}
+
+function der(tag: number, value: Uint8Array): Uint8Array {
+  const length = derLength(value.length);
+  return Uint8Array.from([tag, ...length, ...value]);
+}
+
+function pemPkcs8Bytes(pem: string): ArrayBuffer {
+  const pkcs1 = pem.includes("-----BEGIN RSA PRIVATE KEY-----");
+  const body = pem.replace(
+    /-----BEGIN (?:RSA )?PRIVATE KEY-----|-----END (?:RSA )?PRIVATE KEY-----|\s/g,
+    "",
+  );
+  if (!body) throw new Error("GitHub App private key PEM is empty or invalid");
+  const binary = atob(body);
+  const keyBytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  if (!pkcs1) return keyBytes.slice().buffer;
+
+  const version = Uint8Array.of(0x02, 0x01, 0x00);
+  const rsaEncryptionAlgorithm = Uint8Array.of(
+    0x30, 0x0d,
+    0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+    0x05, 0x00,
+  );
+  return der(0x30, Uint8Array.from([
+    ...version,
+    ...rsaEncryptionAlgorithm,
+    ...der(0x04, keyBytes),
+  ])).slice().buffer;
+}
+
+async function appJwt(env: Env): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = base64url(JSON.stringify({
+    iat: now - 60,
+    exp: now + 540,
+    iss: env.GAMNACKEN_GITHUB_APP_CLIENT_ID,
+  }));
+  const unsigned = `${header}.${payload}`;
+  const privateKey = await gamnackenPrivateKey(env);
+  if (!privateKey) throw new Error("Gamnacken GitHub App private key is not configured");
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemPkcs8Bytes(privateKey),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned),
+  );
+  return `${unsigned}.${base64url(signature)}`;
+}
+
+async function mintInstallationToken(env: Env): Promise<InstallationToken> {
+  const jwt = await appJwt(env);
+  const org = organization(env);
+  const installationResponse = await fetch(
+    `https://api.github.com/orgs/${encodeURIComponent(org)}/installation`,
+    {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${jwt}`,
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": USER_AGENT,
+      },
+    },
+  );
+  if (!installationResponse.ok) {
+    throw new Error(
+      `GitHub installation lookup ${installationResponse.status}: ${(await installationResponse.text()).slice(0, 300)}`,
+    );
+  }
+  const installation = await installationResponse.json<{
+    id?: number;
+    permissions?: Record<string, unknown>;
+    repository_selection?: string;
+  }>();
+  if (!Number.isSafeInteger(installation.id) || Number(installation.id) <= 0) {
+    throw new Error("GitHub installation id missing");
+  }
+  installationMetadata = {
+    installationId: Number(installation.id),
+    repositorySelection: typeof installation.repository_selection === "string"
+      ? installation.repository_selection
+      : null,
+    permissions: permissionMap(installation.permissions),
+    tokenPermissions: {},
+    observedAt: new Date().toISOString(),
+  };
+
+  const response = await fetch(
+    `https://api.github.com/app/installations/${installation.id}/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${jwt}`,
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": USER_AGENT,
+      },
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `GitHub installation token ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  const data = await response.json<{
+    token?: string;
+    expires_at?: string;
+    permissions?: Record<string, unknown>;
+  }>();
+  if (!data.token) throw new Error("GitHub installation token missing");
+  const expiresAt = Date.parse(data.expires_at || "");
+  if (!Number.isFinite(expiresAt)) throw new Error("GitHub installation token expiry missing");
+  installationMetadata = {
+    ...installationMetadata,
+    tokenPermissions: permissionMap(data.permissions),
+    observedAt: new Date().toISOString(),
+  };
+  return { value: data.token, expiresAt };
+}
+
+async function installationToken(env: Env): Promise<string> {
+  if (installationTokenCache && installationTokenCache.expiresAt - Date.now() > 120_000) {
+    return installationTokenCache.value;
+  }
+
+  installationTokenInFlight ??= mintInstallationToken(env).finally(() => {
+    installationTokenInFlight = null;
+  });
+  installationTokenCache = await installationTokenInFlight;
+  return installationTokenCache.value;
+}
+
+function numericHeader(response: Response, name: string): number | null {
+  const value = Number(response.headers.get(name));
+  return Number.isFinite(value) ? value : null;
+}
+
+function captureBudget(response: Response): void {
+  const reset = numericHeader(response, "x-ratelimit-reset");
+  const retryAfter = numericHeader(response, "retry-after");
+  const remaining = numericHeader(response, "x-ratelimit-remaining");
+  const throttled = response.status === 429 || (response.status === 403 && remaining === 0);
+  budget = {
+    limit: numericHeader(response, "x-ratelimit-limit"),
+    remaining,
+    used: numericHeader(response, "x-ratelimit-used"),
+    resetAt: reset != null ? new Date(reset * 1000).toISOString() : null,
+    resource: response.headers.get("x-ratelimit-resource"),
+    retryAfterSeconds: retryAfter,
+    throttled,
+    lastStatus: response.status,
+    lastError: throttled ? "rate_limited" : response.ok ? null : `http_${response.status}`,
+    observedAt: new Date().toISOString(),
+  };
+}
+
+export function getGitHubBudget(): GitHubBudget {
+  return { ...budget };
+}
+
+function headers(token: string, additional?: HeadersInit): Headers {
+  const result = new Headers(additional);
+  result.set("Accept", "application/vnd.github+json");
+  result.set("Authorization", `Bearer ${token}`);
+  result.set("X-GitHub-Api-Version", API_VERSION);
+  result.set("User-Agent", USER_AGENT);
+  return result;
+}
+
+export async function githubResponse(
+  env: Env,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const request = async (token: string): Promise<Response> => fetch(`https://api.github.com${path}`, {
+    ...init,
+    headers: headers(token, init.headers),
+  });
+
+  let token = await installationToken(env);
+  let response = await request(token);
+  captureBudget(response);
+  if (response.status === 401) {
+    installationTokenCache = null;
+    token = await installationToken(env);
+    response = await request(token);
+    captureBudget(response);
+  }
+  return response;
+}
+
+export async function githubJson<T>(env: Env, path: string): Promise<T> {
+  const response = await githubResponse(env, path);
+  if (!response.ok) {
+    throw new GitHubApiError(
+      response.status,
+      `GitHub API ${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+  return response.json<T>();
+}
+
+export async function githubOptionalJson<T>(env: Env, path: string): Promise<OptionalResult<T>> {
+  try {
+    const response = await githubResponse(env, path);
+    const acceptedPermissions = response.headers.get("x-accepted-github-permissions")?.trim() || null;
+    if (!response.ok) {
+      return {
+        available: false,
+        value: null,
+        status: response.status,
+        reason: (await response.text()).slice(0, 220) || `GitHub API ${response.status}`,
+        acceptedPermissions,
+      };
+    }
+    return {
+      available: true,
+      value: await response.json<T>(),
+      status: response.status,
+      acceptedPermissions,
+    };
+  } catch (error) {
+    return {
+      available: false,
+      value: null,
+      status: 0,
+      reason: error instanceof Error ? error.message : String(error),
+      acceptedPermissions: null,
+    };
+  }
+}
+
+function nextPath(link: string | null): string | null {
+  if (!link) return null;
+  const next = link.split(",").find((part) => part.includes('rel="next"'));
+  const match = next?.match(/<https:\/\/api\.github\.com([^>]+)>/);
+  return match?.[1] ?? null;
+}
+
+export async function githubListAll<T>(
+  env: Env,
+  initialPath: string,
+  maxPages = 10,
+): Promise<ListResult<T>> {
+  const items: T[] = [];
+  let path: string | null = initialPath;
+  let pages = 0;
+  let acceptedPermissions: string | null = null;
+
+  try {
+    while (path && pages < maxPages) {
+      const response = await githubResponse(env, path);
+      acceptedPermissions = response.headers.get("x-accepted-github-permissions")?.trim()
+        || acceptedPermissions;
+      if (!response.ok) {
+        return {
+          available: false,
+          value: null,
+          status: response.status,
+          reason: (await response.text()).slice(0, 220) || `GitHub API ${response.status}`,
+          acceptedPermissions,
+          truncated: false,
+        };
+      }
+      const page = await response.json<T[]>();
+      items.push(...page);
+      path = nextPath(response.headers.get("link"));
+      pages += 1;
+    }
+  } catch (error) {
+    return {
+      available: false,
+      value: null,
+      status: 0,
+      reason: error instanceof Error ? error.message : String(error),
+      acceptedPermissions,
+      truncated: false,
+    };
+  }
+
+  return {
+    available: true,
+    value: items,
+    status: 200,
+    acceptedPermissions,
+    truncated: path !== null,
+  };
+}
+
+export async function mapLimit<T, R>(
+  values: T[],
+  limit: number,
+  fn: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let cursor = 0;
+
+  async function worker(): Promise<void> {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= values.length) return;
+      results[index] = await fn(values[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, values.length) }, () => worker()));
+  return results;
+}

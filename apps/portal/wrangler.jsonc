@@ -1,0 +1,66 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "avkroken-portal",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-19",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true
+    }
+  },
+  "workers_dev": false,
+  "preview_urls": false,
+  "cache": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "triggers": {
+    "crons": [
+      "*/10 * * * *"
+    ]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "OPS_WATCHDOG",
+        "class_name": "OperationalWatchdog"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-ops-watchdog",
+      "new_sqlite_classes": [
+        "OperationalWatchdog"
+      ]
+    }
+  ],
+  "send_email": [
+    {
+      "name": "OPS_EMAIL",
+      "allowed_sender_addresses": [
+        "noreply@denied.se"
+      ]
+    }
+  ],
+  "vars": {
+    "OPS_NOTIFY_TO": "anders.eriksson@denied.se",
+    "OPS_NOTIFY_FROM": "noreply@denied.se"
+  }
+}

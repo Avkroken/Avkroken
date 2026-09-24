@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AVKROKEN — projekt, verktyg och tjänster.">
+  <meta name="theme-color" content="#050912">
+  <meta name="robots" content="noindex,nofollow">
+  <title>AVKROKEN</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/mobile.css">
+</head>
+<body>
+  <header class="shell topbar">
+    <div class="brand-mini"><span class="brand-dot"></span> AVKROKEN</div>
+    <div class="privacy-pill" id="portal-state">PUBLIC INDEX</div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <a class="logo-wrap" href="/" aria-label="Till startsidan">
+        <img src="/avkroken-login-logo.svg" alt="AVKROKEN">
+      </a>
+      <div class="hero-copy">
+        <div class="eyebrow">CODE · DATA · VISIONS · IDEAS</div>
+        <h1>AVKROKEN</h1>
+        <p>Projekt, tjänster och verktyg byggda och drivna inom Avkroken.</p>
+        <nav class="manifesto" aria-label="Filtrera projekt">
+          <a href="#code" data-focus="code" aria-pressed="false">CODE</a>
+          <a href="#data" data-focus="data" aria-pressed="false">DATA</a>
+          <a href="#visions" data-focus="visions" aria-pressed="false">VISIONS</a>
+          <a href="#ideas" data-focus="ideas" aria-pressed="false">IDEAS</a>
+        </nav>
+      </div>
+    </section>
+
+    <nav class="portal-tabs" aria-label="Portalvy">
+      <button class="portal-tab active" type="button" data-view="projects" aria-selected="true">Projekt</button>
+      <button class="portal-tab" type="button" data-view="docs" aria-selected="false">Dokumentation</button>
+    </nav>
+
+    <section class="view-panel" id="projects-view" data-view-panel="projects" aria-labelledby="public-sites">
+      <div class="section-head">
+        <div>
+          <h2 id="public-sites"><span class="gradient-text">Projekt &amp; tjänster</span></h2>
+        </div>
+        <div class="count" id="site-count">LOADING…</div>
+      </div>
+
+      <div class="grid" id="site-grid">
+        <div class="empty">Läser in projekt…</div>
+      </div>
+    </section>
+
+    <section class="view-panel docs-view" id="docs-view" data-view-panel="docs" aria-labelledby="docs-title" hidden>
+      <div class="section-head">
+        <div>
+          <h2 id="docs-title"><span class="gradient-text">Dokumentation</span></h2>
+          <p>Publik dokumentation hämtas automatiskt från Avkrokens publika GitHub-förråd.</p>
+        </div>
+        <div class="count" id="docs-count">LOADING…</div>
+      </div>
+
+      <div class="docs-shell">
+        <nav class="docs-repo-tabs" id="docs-repo-tabs" aria-label="Förråd"></nav>
+        <div class="docs-toolbar">
+          <nav class="docs-page-tabs" id="docs-page-tabs" aria-label="Dokumentsidor"></nav>
+          <div class="docs-links" id="docs-links"></div>
+        </div>
+        <article class="docs-content" id="docs-content" aria-live="polite">
+          <div class="empty">Läser in dokumentation…</div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell">
+      <span>AVKROKEN · CODE · DATA · VISIONS · IDEAS</span>
+      <span>DENIED.SE</span>
+    </div>
+  </footer>
+
+  <script src="/app.js" defer></script>
+  <script src="/docs.js" defer></script>
+</body>
+</html>

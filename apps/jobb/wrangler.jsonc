@@ -1,0 +1,76 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "jobb",
+  "main": "apps/web/src/index.ts",
+  "compatibility_date": "2026-09-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "upload_source_maps": true,
+  "vars": {
+    "TURNSTILE_HOSTNAMES": "jobb.denied.se",
+    "KROSA_MAJA_OIDC_CLIENT_ID": "KNsCwyqnaDRjMLtQcmhmZdingXTqHhsd"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true
+    }
+  },
+  "browser": {
+    "binding": "BROWSER"
+  },
+  "secrets_store_secrets": [
+    {
+      "binding": "KROSA_MAJA_OIDC_CLIENT_SECRET",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_OIDC_CLIENT_SECRET"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jobb",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "EVIDENCE",
+      "bucket_name": "jobb-evidence"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "jobb-automation",
+      "binding": "JOB_AUTOMATION",
+      "class_name": "JobAutomationWorkflow"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "0 9 10-13 * *"
+    ]
+  },
+  "routes": [
+    {
+      "pattern": "jobb.denied.se",
+      "custom_domain": true
+    }
+  ]
+}
