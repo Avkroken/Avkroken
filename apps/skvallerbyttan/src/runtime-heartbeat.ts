@@ -114,7 +114,7 @@ const defaultProbes: RuntimeReadinessProbes = {
   async secrets(env) {
     const values = await Promise.all([
       gamnackenPrivateKey(env),
-      resolveSecretValue(env.KROSA_MAJA_CLIENT_SECRET),
+      resolveSecretValue(env.GITHUB_OAUTH_CLIENT_SECRET),
       cloudflareApiToken(env, "r1"),
       cloudflareApiToken(env, "r2"),
       cloudflareApiToken(env, "r3"),
