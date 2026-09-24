@@ -4,7 +4,7 @@
 
 ## Lokal verifiering
 
-Från repository root:
+Från `apps/jobb` i monorepot:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -12,7 +12,7 @@ pnpm typecheck
 pnpm test
 ```
 
-Rootskripten kör motsvarande workspacekontroller för projekten under `apps/*` och `packages/*`.
+Appens rootskript kör motsvarande workspacekontroller för projekten under `apps/*` och `packages/*`.
 
 ## Lokal utveckling
 
@@ -30,9 +30,9 @@ Det versionsstyrda produktionskommandot är:
 pnpm deploy:cloudflare
 ```
 
-Enligt root-`package.json` gör kommandot två saker i ordning:
+Enligt `apps/jobb/package.json` gör kommandot två saker i ordning:
 
-1. applicerar D1-migrationer remote via root-`wrangler.jsonc`;
+1. applicerar D1-migrationer remote via `apps/jobb/wrangler.jsonc`;
 2. deployar Workern med samma Wrangler-konfiguration.
 
 Hur ett externt CI/CD-system triggar detta kommando är inte canonical repo-state och ska inte hårdkodas i detta dokument.
@@ -80,7 +80,7 @@ R2-evidence ska vara begränsad till det som behövs för auditability. Probe-st
 
 ## Observability
 
-Root-`wrangler.jsonc` definierar:
+`apps/jobb/wrangler.jsonc` definierar:
 
 - persistent observability,
 - log sampling `0.1`,
@@ -91,4 +91,4 @@ OIDC callback-parametrar kan förekomma i query string; redaction ska därför b
 
 ## Dokumentationsunderhåll
 
-Uppdatera denna fil när repositoryts test-/deployscripts, runtimebindings, migrationsordning eller incidentmodell ändras. Extern live-state ska verifieras i sitt auktoritativa system och inte kopieras in som permanent repo-current-state.
+Uppdatera denna fil när appens test-/deployscripts, runtimebindings, migrationsordning eller incidentmodell ändras. Extern live-state ska verifieras i sitt auktoritativa system och inte kopieras in som permanent app-current-state.

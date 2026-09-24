@@ -1,10 +1,10 @@
 # Deployment och migrering
 
-Det här dokumentet beskriver repositoryts deploybara teknik. Konto-, policy- och credentialvärden som inte behövs för att förstå koden hör inte hemma här.
+Det här dokumentet beskriver appens deploybara teknik. Konto-, policy- och credentialvärden som inte behövs för att förstå koden hör inte hemma här.
 
 ## Förutsättningar
 
-- Node-version enligt repositoryts package/runtimekrav
+- Node-version enligt appens package/runtimekrav
 - Wrangler-autentisering med rätt deploybehörighet
 - nödvändiga Worker secrets/Secrets Store-bindings provisionerade
 - D1-resurs tillgänglig eller möjlig att provisionera genom deployscriptet.
@@ -26,7 +26,7 @@ Känsliga värden ska inte skrivas in direkt i filen.
 
 ## D1 och deployscript
 
-`npm run deploy` kör repositoryts `scripts/deploy.ts`.
+`npm run deploy` kör appens `scripts/deploy.ts`.
 
 Deployflödet ska vara fail-closed:
 
@@ -43,11 +43,11 @@ Ett oklart eller saknat resource-ID ska stoppa deployen i stället för att giss
 
 Migrationer ligger i `migrations/`.
 
-Better Auth-schema genereras/versioneras i repositoryt. Runtime ska inte skapa ett parallellt oversionerat schema.
+Better Auth-schema genereras/versioneras i appkatalogen. Runtime ska inte skapa ett parallellt oversionerat schema.
 
 Vid schemaändring:
 
-1. generera eller skriv migrationen enligt repositoryts modell;
+1. generera eller skriv migrationen enligt appens modell;
 2. verifiera lokalt/med test;
 3. kontrollera deploymentordning;
 4. applicera migration före den Worker-version som kräver den.
@@ -80,4 +80,4 @@ Efter protocoländring ska en testklient verifiera:
 
 Migrera konsumtionsklienter stegvis. En fungerande identitetsväg ska inte tas bort förrän ersättaren är verifierad.
 
-Detta är en klientmigrationsprincip; specifika externa policy-ID:n eller privata runbooks ska dokumenteras utanför detta publika repository.
+Detta är en klientmigrationsprincip; specifika externa policy-ID:n eller privata runbooks ska dokumenteras utanför den versionsstyrda appdokumentationen.

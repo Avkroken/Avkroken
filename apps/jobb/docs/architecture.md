@@ -4,7 +4,7 @@
 
 ## Runtime
 
-Jobb är en Cloudflare Worker-applikation med repositoryts root-`wrangler.jsonc` som deploykonfiguration.
+Jobb är en Cloudflare Worker-applikation med appens `wrangler.jsonc` som deploykonfiguration.
 
 Verifierade bindings och runtimeytor:
 
@@ -80,7 +80,7 @@ Skyddade mutationer använder same-origin-kontroll och `Sec-Fetch-Site` när hea
 
 ## Deployment boundary
 
-Repositoryts deploykontrakt är versionerat i `package.json` och `wrangler.jsonc`.
+Appens deploykontrakt är versionerat i `package.json` och `wrangler.jsonc`.
 
 Rootkommandot:
 
@@ -90,7 +90,7 @@ pnpm deploy:cloudflare
 
 applicerar remote D1-migrationer och kör därefter Wrangler deploy med rootkonfigurationen.
 
-Vilket externt CI/CD-system som eventuellt anropar kommandot är inte repo-local current-state och dokumenteras därför inte här.
+Vilket externt CI/CD-system som eventuellt anropar kommandot är inte app-local current-state och dokumenteras därför inte här.
 
 ## Dokumentationsgräns
 

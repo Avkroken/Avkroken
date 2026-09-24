@@ -87,7 +87,7 @@ Själva credentialvärdena får inte skrivas i repository, loggar eller driftant
 
 ### Runtime secret-sync
 
-`.github/workflows/sync-cloudflare-runtime-secrets.yml` är endast `workflow_dispatch` och delar concurrency-grupp med produktionsdeploy. Före någon Worker-binding skrivs validerar workflowen Skvallerbyttans Client ID och private key mot GitHub som App och mot Avkrokens App-installation. Ett ogiltigt eller mismatchat client-id/private-key-värde stoppar synken före mutation.
+`../../../.github/workflows/sync-skvallerbyttan-runtime-secrets.yml` är endast `workflow_dispatch` och delar concurrency-grupp med produktionsdeploy. Före någon Worker-binding skrivs validerar workflowen Skvallerbyttans Client ID och private key mot GitHub som App och mot Avkrokens App-installation. Ett ogiltigt eller mismatchat client-id/private-key-värde stoppar synken före mutation.
 
 Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den ensam äger på runtime-sidan:
 

@@ -159,17 +159,17 @@ migrations/0005_activity_report_submission.sql
 
 ## Deployment contract
 
-Repositoryts deploybara source of truth är root-`wrangler.jsonc`.
+Appens deploybara source of truth är `apps/jobb/wrangler.jsonc`.
 
-Produktionskommandot är versionerat i root-`package.json`:
+Produktionskommandot är versionerat i `apps/jobb/package.json`:
 
 ```bash
 pnpm deploy:cloudflare
 ```
 
-Det applicerar D1-migrationer mot bindingen `DB` och kör därefter Wrangler deploy med samma rootkonfiguration.
+Det applicerar D1-migrationer mot bindingen `DB` och kör därefter Wrangler deploy med samma appkonfiguration.
 
-Detta dokument beskriver inte vilket externt CI/CD-system som eventuellt triggar kommandot, eftersom sådan live-state inte ägs av repositoryt.
+Detta dokument beskriver inte vilket externt CI/CD-system som eventuellt triggar kommandot, eftersom sådan live-state inte ägs av appens versionsstyrda kontext.
 
 Worker-konfigurationen binder Browser Run, D1, R2, Email, Workflow och Cron och publicerar custom domain `jobb.denied.se`.
 
