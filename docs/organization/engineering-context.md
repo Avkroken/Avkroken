@@ -31,7 +31,7 @@ Custom Properties kan behållas som metadata/inventering men binder inte CI-poli
 
 Varje repository äger sina egna workflows under `.github/workflows/`.
 
-Monorepots canonical CI triggar på `pull_request` mot `main` och `merge_group`. De fem checkarna ska vara gröna före merge även när GitHub Free inte kan enforcea dem på det privata repositoryt.
+Monorepots canonical CI triggar på `pull_request` mot `main` och `merge_group`. De fyra appcheckarna ska vara gröna före merge även när GitHub Free inte kan enforcea dem på det privata repositoryt.
 
 Cross-repository `workflow_call` till `Avkroken/.github` används inte.
 
@@ -45,13 +45,13 @@ Cross-repository `workflow_call` till `Avkroken/.github` används inte.
 - Politiker: `Dependency review`, `Node and Cloudflare`, `Python`, `Docker`.
 - Bastion: `Swift package (ubuntu-latest)`, `Swift package (macos-latest)`, `Apple applications`, `Rust`, `.NET tests`, `Windows application`, `Android Gradle`, `Generate dependency graph`.
 - Klarsprak: `Dependency review`, `Node and Cloudflare`.
-- Avkroken monorepo: `Dependency review`, `Portal`, `Skvallerbyttan`, `Krosa-Maja`, `Jobb` (processkrav på privat Free; inte ruleset-enforced).
+- Avkroken monorepo: `Portal`, `Skvallerbyttan`, `Krosa-Maja`, `Jobb` (processkrav på privat Free; inte ruleset-enforced).
 
 ## GitHub Free och säkerhet
 
 Betald GitHub Code Security/Secret Protection ska inte antas finnas.
 
-Dependency Review är tillgängligt för publika repositories på GitHub.com och används som lokal PR-check där repositoryts dependency snapshots är kompletta och stabila. Bastion undantas tills dess blandade snapshot-topologi ger en komplett och jämförbar head-snapshot.
+Dependency Review används på publika repositories där stödet finns och dependency snapshots är kompletta och stabila. I det privata `Avkroken/Avkroken` på GitHub Free är GitHubs Dependency Review inte tillgängligt; live-körningen returnerar att Dependency graph + GitHub Advanced Security krävs. Monorepot förlitar sig därför på respektive apps install-/lockfile-validering i CI.
 
 Code scanning/CodeQL används där GitHub exponerar stödet. För det privata `Avkroken/Avkroken` på nuvarande Free-plan finns ingen aktiv ruleset-baserad CodeQL-enforcement. Tidigare CodeQL-resultat från den publika fasen är historik, inte aktuell merge-policy.
 
@@ -81,4 +81,4 @@ Cloudflare Email Service-bindingen heter `OPS_EMAIL`. Mottagare och avsändare �
 
 ## Konsolidering
 
-Portal, Skvallerbyttan, Krosa-Maja och Jobb ligger i det privata `Avkroken/Avkroken` under `apps/`. Monorepots repository-lokala CI producerar de fem canonical checkarna. Cross-repository workflow reuse via `Avkroken/.github` används inte.
+Portal, Skvallerbyttan, Krosa-Maja och Jobb ligger i det privata `Avkroken/Avkroken` under `apps/`. Monorepots repository-lokala CI producerar de fyra canonical appcheckarna. Cross-repository workflow reuse via `Avkroken/.github` används inte.
