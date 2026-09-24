@@ -8,7 +8,7 @@ Navigationssida för Jobb.
 | --- | --- |
 | runtime och current-state | [Projektkontext](project-context.md) |
 | komponenter, state och trust boundaries | [Arkitektur](architecture.md) |
-| dashboardauth/OIDC | [Authentication](authentication.md) |
+| dashboardauth/GitHub OAuth | [Authentication](authentication.md) |
 | automation, quota och körningsmodell | [Automation](automation.md) |
 | providerintegrationer | [Providers](providers.md) |
 | discovery/sökning | [Discovery](discovery.md) |
@@ -41,7 +41,7 @@ Läs Providers och Architecture. Separera providerfel från workflow/statefel.
 
 ### Ändra dashboardauth
 
-Läs Authentication och Architecture innan routes/session/OIDC-konfiguration ändras.
+Läs Authentication och Architecture innan routes/session/GitHub OAuth-konfiguration ändras.
 
 ### Ändra Browser Run
 
