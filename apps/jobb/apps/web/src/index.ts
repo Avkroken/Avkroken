@@ -18,12 +18,12 @@ import {
 } from "./dashboard";
 import type { EmailBinding } from "./notifier";
 import {
-  classifyOidcStartFailure,
-  handleOidcCallback,
-  logoutOidc,
-  renderOidcLoginPage,
-  startOidcLogin,
-} from "./oidc-auth";
+  classifyGitHubStartFailure,
+  handleGitHubCallback,
+  logoutGitHub,
+  renderGitHubLoginPage,
+  startGitHubLogin,
+} from "./github-auth";
 import { renderAuthStyles, renderErrorPage } from "./auth-ui";
 import { getIntegrationProbe } from "./probe-storage";
 import { captureAndPersistActivityReportProbe } from "./probe-service";
@@ -84,19 +84,19 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/login") {
-      return renderOidcLoginPage(request, dashboardAuthMode(env));
+      return renderGitHubLoginPage(request, dashboardAuthMode(env));
     }
 
     if (request.method === "GET" && url.pathname === "/auth/start") {
-      if (dashboardAuthMode(env) !== "oidc") {
-        return renderOidcLoginPage(request, dashboardAuthMode(env));
+      if (dashboardAuthMode(env) !== "github") {
+        return renderGitHubLoginPage(request, dashboardAuthMode(env));
       }
       try {
-        return await startOidcLogin(request, env);
+        return await startGitHubLogin(request, env);
       } catch (error) {
-        const failure = classifyOidcStartFailure(error);
+        const failure = classifyGitHubStartFailure(error);
         const referenceId = crypto.randomUUID();
-        console.error("Krösa-Maja OIDC start failed", {
+        console.error("GitHub OAuth start failed", {
           referenceId,
           code: failure.code,
           error: error instanceof Error ? error.message : String(error),
@@ -115,10 +115,10 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/auth/callback") {
-      if (dashboardAuthMode(env) !== "oidc") {
-        return renderOidcLoginPage(request, dashboardAuthMode(env));
+      if (dashboardAuthMode(env) !== "github") {
+        return renderGitHubLoginPage(request, dashboardAuthMode(env));
       }
-      return handleOidcCallback(request, env);
+      return handleGitHubCallback(request, env);
     }
 
     const authFailure = await authorizeDashboardRequest(request, env);
@@ -128,7 +128,7 @@ export default {
     if (mutationFailure) return mutationFailure;
 
     if (request.method === "POST" && url.pathname === "/auth/logout") {
-      return logoutOidc();
+      return logoutGitHub();
     }
 
     if (request.method === "GET" && url.pathname === "/") {
