@@ -5,35 +5,38 @@ import {
 } from "./auth";
 
 describe("dashboard auth mode", () => {
-  it("uses Krösa-Maja only when the OIDC client is complete", () => {
+  it("uses GitHub only when client, secret and allowlist are complete", () => {
     const env = {
-      KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
-      KROSA_MAJA_OIDC_CLIENT_SECRET: "generated-client-secret",
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      GITHUB_OAUTH_CLIENT_SECRET: "github-client-secret",
+      JOBB_ALLOWED_GITHUB_IDS: "123",
     };
-    expect(dashboardAuthMode(env)).toBe("oidc");
+    expect(dashboardAuthMode(env)).toBe("github");
     expect(dashboardAuthConfigured(env)).toBe(true);
   });
 
   it("accepts a Secrets Store client secret binding", () => {
     const env = {
-      KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
-      KROSA_MAJA_OIDC_CLIENT_SECRET: {
-        get: async () => "generated-client-secret",
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      GITHUB_OAUTH_CLIENT_SECRET: {
+        get: async () => "github-client-secret",
       },
+      JOBB_ALLOWED_GITHUB_IDS: "123",
     };
-    expect(dashboardAuthMode(env)).toBe("oidc");
+    expect(dashboardAuthMode(env)).toBe("github");
     expect(dashboardAuthConfigured(env)).toBe(true);
   });
 
-  it("fails closed for a partially configured OIDC client", () => {
+  it("fails closed for a partially configured GitHub client", () => {
     const env = {
-      KROSA_MAJA_OIDC_CLIENT_ID: "jobb-client",
+      GITHUB_OAUTH_CLIENT_ID: "github-client",
+      JOBB_ALLOWED_GITHUB_IDS: "123",
     };
     expect(dashboardAuthMode(env)).toBe("misconfigured");
     expect(dashboardAuthConfigured(env)).toBe(false);
   });
 
-  it("is unconfigured when OIDC is absent", () => {
+  it("is unconfigured when GitHub auth is absent", () => {
     expect(dashboardAuthMode({})).toBe("unconfigured");
     expect(dashboardAuthConfigured({})).toBe(false);
   });

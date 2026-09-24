@@ -131,7 +131,7 @@ Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens if
 
 ## Dashboard och API
 
-Dashboarden på `/` är operativt kontrollplan. Repositoryts implementation använder Krösa-Maja som OIDC-provider och kräver komplett konfiguration för `KROSA_MAJA_OIDC_CLIENT_ID` och `KROSA_MAJA_OIDC_CLIENT_SECRET`; ofullständig konfiguration failar stängt.
+Dashboarden på `/` är operativt kontrollplan. Repositoryts implementation använder GitHub OAuth direkt och kräver komplett konfiguration för `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET` och `JOBB_ALLOWED_GITHUB_IDS`; ofullständig konfiguration failar stängt.
 
 Top-level-vyer:
 
@@ -143,12 +143,12 @@ Top-level-vyer:
 
 Primära endpoints:
 
-- `GET /login` — publik, mobilanpassad login-sida för Krösa-Maja med samma mörka visuella språk som dashboarden.
-- `GET /auth/start` — startar Authorization Code + PKCE mot Krösa-Maja.
-- `GET /auth/callback` — exakt OIDC callback för `jobb.denied.se`.
+- `GET /login` — publik, mobilanpassad GitHub-login-sida med samma mörka visuella språk som dashboarden.
+- `GET /auth/start` — startar GitHub Authorization Code + PKCE S256.
+- `GET /auth/callback` — exakt GitHub OAuth callback `https://jobb.denied.se/auth/callback`.
 - `POST /auth/logout` — rensar den lokala Jobb-sessionen; kräver autentiserad same-origin request.
 - `GET /api/health` — minimal liveness.
-- `GET /api/ready` — minimal readiness; läser `SELECT 1` från D1 och verifierar att dashboard-auth är faktiskt användbar. När OIDC är aktivt läses Secrets Store-bindingen för klienthemligheten, men inga credential-värden returneras och inga externa provideranrop görs.
+- `GET /api/ready` — minimal readiness; läser `SELECT 1` från D1 och verifierar att dashboard-auth är faktiskt användbar. När GitHub OAuth är aktivt läses Secrets Store-bindingen för klienthemligheten, men inga credential-värden returneras och inga externa provideranrop görs.
 - `GET /api/dashboard` — canonical dashboard read model.
 - `GET /api/runs/:id` — read-only run-detail.
 - `POST /api/runs/manual` — manuell Workflow-start.
@@ -159,7 +159,7 @@ Alla skyddade mutationer kräver exakt same-origin `Origin`; inkompatibel `Sec-F
 
 Dashboard-CSP tillåter egna scripts/styles samt Turnstile från `https://challenges.cloudflare.com`; `unsafe-inline` används inte.
 
-Login- och browser-felsidor använder separat same-origin CSS på `/assets/auth.css`, strikt CSP utan inline-script och en gemensam felvy med sanitiserad felkod och korrelations-ID. OIDC-startfel klassas till konfiguration, provider/transport, metadata eller oväntat fel utan att credentials exponeras.
+Login- och browser-felsidor använder separat same-origin CSS på `/assets/auth.css`, strikt CSP utan inline-script och en gemensam felvy med sanitiserad felkod och korrelations-ID. GitHub OAuth-startfel klassas utan att credentials exponeras.
 
 ## Runtime configuration
 
@@ -167,14 +167,15 @@ Hemliga värden ligger i Cloudflare/runtime och får aldrig committas.
 
 Credential-/security-namn:
 
-- `KROSA_MAJA_OIDC_CLIENT_SECRET` — utfärdas av Krösa-Maja för Jobbs konfidentiella webklient; produktion läser värdet via Cloudflare Secrets Store-binding medan lokal utveckling kan använda en vanlig runtime-sträng
+- `GITHUB_OAUTH_CLIENT_SECRET` — GitHub OAuth-klienthemligheten; produktion läser värdet via Cloudflare Secrets Store-binding medan lokal utveckling kan använda en vanlig runtime-sträng
 - `TURNSTILE_SECRET`
 - `STUDENTCONSULTING_EMAIL`
 - `STUDENTCONSULTING_PASSWORD`
 
 Icke-hemliga eller policyrelaterade runtime-värden:
 
-- `KROSA_MAJA_OIDC_CLIENT_ID` — icke-hemligt client ID från Krösa-Majas server-side klientregistrering
+- `GITHUB_OAUTH_CLIENT_ID` — icke-hemligt GitHub OAuth client ID
+- `JOBB_ALLOWED_GITHUB_IDS` — numeriska GitHub-ID:n som får använda dashboarden
 - `TURNSTILE_HOSTNAMES`
 - `STUDENTCONSULTING_AUTOSUBMIT`
 - `JOB_INCLUDE_TERMS`
@@ -190,15 +191,15 @@ Notifiering kan använda Email binding och/eller HTTPS-webhook.
 
 ## Auth, request-säkerhet och privacy
 
-Krösa-Maja (`https://auth.denied.se`) är vald som Jobbs centrala OpenID Connect-provider. Jobb är en konfidentiell webklient med Authorization Code + PKCE S256 och scopes `openid profile email`. Callback är exakt `https://jobb.denied.se/auth/callback`. ID-token valideras mot Krösa-Majas RS256-JWKS inklusive issuer, audience, authorized party, expiry, issued-at, not-before och nonce. Access- och refresh-token lagras inte. Jobb skapar i stället en lokal 12-timmars `__Host-jobb_session` som HMAC-signeras med en HKDF-separerad nyckel härledd från klienthemligheten. Login-state ligger separat i signerad `__Host-jobb_oidc`-cookie med högst tio minuters livstid.
+GitHub är Jobbs externa identity provider. Jobb använder Authorization Code + PKCE S256 med scope `read:user` och exakt callback `https://jobb.denied.se/auth/callback`. Access-tokenen används endast för `GET /user`, numeriskt GitHub-ID kontrolleras mot `JOBB_ALLOWED_GITHUB_IDS`, tokenen persisteras aldrig och revokeras best-effort efter uppslaget. Jobb skapar därefter en lokal 12-timmars `__Host-jobb_session` som HMAC-signeras med en HKDF-separerad nyckel härledd från OAuth-klienthemligheten. Login-state ligger separat i signerad `__Host-jobb_oauth`-cookie med högst tio minuters livstid.
 
-OIDC är fail-closed och enda dashboard-authvägen: komplett OIDC-konfiguration krävs, och saknad eller halvkonfigurerad klient ger fel i auth/readiness. Produktionshemligheten binds från Cloudflare Secrets Store under namnet `KROSA_MAJA_OIDC_CLIENT_SECRET`, medan client ID ligger som icke-hemlig Worker-var. Legacy Basic Auth accepteras inte av koden.
+GitHub OAuth är fail-closed och enda dashboard-authvägen: komplett klient-, secret- och allowlistkonfiguration krävs, och saknad eller halvkonfigurerad konfiguration ger fel i auth/readiness. Produktionshemligheten binds från Cloudflare Secrets Store som `GITHUB_OAUTH_CLIENT_SECRET`; client ID och allowlist ligger som icke-hemliga Worker-vars. Legacy Basic Auth och OIDC-proxy accepteras inte av koden.
 
 Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname.
 
 Dashboardens mutationsendpoints har same-origin-kontroll. UI-responsen sätter CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` och `Cache-Control: no-store`.
 
-Wrangler sätter `observability.redact_query_string=true` innan OIDC aktiveras. Det är ett krav eftersom OIDC-callbacken bär kortlivade `code`/`state` i query-strängen och de inte ska persisteras i Worker-logs/traces.
+Wrangler sätter `observability.redact_query_string=true`. Det är ett krav eftersom OAuth-callbacken bär kortlivade `code`/`state` i query-strängen och de inte ska persisteras i Worker-logs/traces.
 
 ## Verifiering och deployment
 

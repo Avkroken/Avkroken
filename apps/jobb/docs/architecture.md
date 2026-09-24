@@ -16,8 +16,8 @@ Verifierade bindings och runtimeytor:
 - Email-binding `EMAIL`,
 - cron `0 9 10-13 * *`,
 - custom domain `jobb.denied.se`,
-- Krösa-Maja OIDC client ID som icke-hemlig Worker-var,
-- OIDC client secret via Secrets Store-binding.
+- GitHub OAuth client ID och numerisk dashboard-allowlist som icke-hemliga Worker-vars,
+- GitHub OAuth client secret via Secrets Store-binding.
 
 ## Översikt
 
@@ -70,9 +70,9 @@ Ett osäkert providerresultat får inte behandlas som ett säkert misslyckande o
 
 ## Auth boundary
 
-Jobb är downstream OIDC client till Krösa-Maja, inte identity authority.
+Jobb använder GitHub som extern identity provider och är inte själv identity authority.
 
-Authorization Code + PKCE används. Access-/refresh-token ska inte bli application session state; efter validerad OIDC-login används Jobbs lokala signerade session enligt implementationen.
+Authorization Code + PKCE S256 används direkt mot GitHub. Provider-tokenen används endast för identitetsuppslag, persisteras inte och blir aldrig application session state. Efter allowlist-kontroll används Jobbs lokala signerade session enligt implementationen.
 
 ## Request security
 

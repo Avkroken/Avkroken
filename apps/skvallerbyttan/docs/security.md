@@ -16,7 +16,7 @@ GitHub-providerobservationer använder endast read-behörigheter. Administration
 
 ## Interaktiv auth
 
-Dashboarden använder GitHub OAuth via Krösa-Maja:
+Dashboarden använder GitHub OAuth direkt:
 
 - scope `read:user`
 - OAuth state

@@ -1,13 +1,11 @@
 # Copy to .dev.vars for local development. Never commit .dev.vars.
 
-# Krösa-Maja OIDC is the only dashboard authentication path.
-# Production Krösa-Maja OIDC client.
-# Registration is server-side in Krösa-Maja; never invent or commit these values.
-# The registered redirect URI is https://jobb.denied.se/auth/callback.
-# Localhost is intentionally not registered as a production redirect URI.
-# KROSA_MAJA_OIDC_CLIENT_ID="issued-by-krosa-maja"
-# Local development only; production uses a Cloudflare Secrets Store binding.
-# KROSA_MAJA_OIDC_CLIENT_SECRET="issued-by-krosa-maja"
+# GitHub OAuth is the only dashboard authentication path.
+# Reuse the configured OAuth client; never commit its real secret.
+# The production redirect URI is https://jobb.denied.se/auth/callback.
+# GITHUB_OAUTH_CLIENT_ID="replace-with-client-id"
+# GITHUB_OAUTH_CLIENT_SECRET="replace-with-client-secret"
+# JOBB_ALLOWED_GITHUB_IDS="123456"
 
 PUBLIC_BASE_URL="https://jobb.example.com"
 

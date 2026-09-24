@@ -16,17 +16,17 @@ The protected dashboard is the operational control plane for the automation. It 
 
 ### Dashboard authentication
 
-Krösa-Maja (`https://auth.denied.se`) is the canonical and only OpenID Connect provider for Jobb. Jobb is a confidential web client using Authorization Code + PKCE S256 with the exact callback `https://jobb.denied.se/auth/callback` and scopes `openid profile email`.
+Jobb använder GitHub OAuth direkt som enda dashboard-login. Authorization Code-flödet använder state och PKCE S256 med exakt callback `https://jobb.denied.se/auth/callback` och scope `read:user`.
 
-The auth path is deliberately fail-closed:
+Authvägen är fail-closed:
 
-- both `KROSA_MAJA_OIDC_CLIENT_ID` and `KROSA_MAJA_OIDC_CLIENT_SECRET` are required;
-- missing or partial OIDC configuration makes authentication/readiness unavailable;
-- legacy Basic Auth is not accepted;
-- Jobb never stores the provider access/refresh tokens; it validates the ID token and creates a short-lived local signed session.
+- `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET` och `JOBB_ALLOWED_GITHUB_IDS` krävs;
+- saknad eller partiell konfiguration gör auth/readiness unavailable;
+- legacy Basic Auth och OIDC-proxy accepteras inte;
+- GitHub access-token används endast för `GET /user`, persisteras inte och revokeras best-effort;
+- numeriskt GitHub-ID måste finnas i aktuell allowlist innan lokal signerad session skapas.
 
-The Krösa-Maja client must be created server-side through its admin surface; client IDs/secrets are never invented or committed. In production the confidential client secret is read through a Cloudflare Secrets Store binding named `KROSA_MAJA_OIDC_CLIENT_SECRET`. Local development may use a normal string in an ignored `.dev.vars` file. The production binding is added only after the issued secret exists in the store.
-
+I produktion läses client secret via Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`. Client ID och allowlist är icke-hemliga Worker-vars. Real credential values får aldrig committas.
 
 ## Manual mode
 
@@ -78,13 +78,13 @@ Run-level and Arbetsförmedlingen probe errors are also persisted and shown sepa
 Secrets should be configured in Cloudflare, never committed to the public repository.
 
 ```text
-KROSA_MAJA_OIDC_CLIENT_SECRET   # Cloudflare Secrets Store in production; local string only for development
+GITHUB_OAUTH_CLIENT_SECRET      # Cloudflare Secrets Store in production; local string only for development
 TURNSTILE_SECRET
 STUDENTCONSULTING_EMAIL
 STUDENTCONSULTING_PASSWORD
 ```
 
-`KROSA_MAJA_OIDC_CLIENT_ID` is non-secret client configuration issued by Krösa-Maja.
+`GITHUB_OAUTH_CLIENT_ID` and `JOBB_ALLOWED_GITHUB_IDS` are non-secret runtime configuration.
 
 Autonomous application submission additionally requires:
 

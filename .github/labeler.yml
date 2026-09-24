@@ -14,11 +14,6 @@ skvallerbyttan:
       - any-glob-to-any-file:
           - "apps/skvallerbyttan/**"
 
-krosa-maja:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "apps/krosa-maja/**"
-
 jobb:
   - changed-files:
       - any-glob-to-any-file:

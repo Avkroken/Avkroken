@@ -62,17 +62,17 @@ Vid browser/providerfel:
 - undvik blind retry om providern kan ha accepterat submission,
 - kontrollera evidence och providerstate innan ny submission tillåts.
 
-## OIDC
+## GitHub OAuth
 
 Vid loginfel verifiera:
 
-- issuer/discovery från Krösa-Maja,
-- client ID,
+- GitHub OAuth client ID,
 - Secrets Store-binding för client secret,
-- exakt callback,
-- PKCE/state/nonce-validering.
+- att exakt callback `https://jobb.denied.se/auth/callback` är registrerad på OAuth-klienten,
+- `JOBB_ALLOWED_GITHUB_IDS`,
+- PKCE/state-validering och GitHub `/user`-uppslag.
 
-Lägg inte till Basic Auth eller parallell authväg som fallback.
+Lägg inte till Basic Auth, OIDC-proxy eller parallell authväg som fallback.
 
 ## Evidence och privacy
 
@@ -87,7 +87,7 @@ R2-evidence ska vara begränsad till det som behövs för auditability. Probe-st
 - trace sampling `0.01`,
 - `redact_query_string=true`.
 
-OIDC callback-parametrar kan förekomma i query string; redaction ska därför behållas. Credentials, sessionsmaterial och privata providerpayloads får inte läggas i logs.
+OAuth callback-parametrar kan förekomma i query string; redaction ska därför behållas. Credentials, sessionsmaterial och privata providerpayloads får inte läggas i logs.
 
 ## Dokumentationsunderhåll
 

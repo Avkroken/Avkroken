@@ -1,5 +1,21 @@
 # Authentication and credentials
 
+## Dashboard / GitHub OAuth
+
+Dashboarden använder GitHub OAuth direkt. Authorization Code-flödet använder `state` och PKCE S256 med exakt callback `https://jobb.denied.se/auth/callback`.
+
+Efter token exchange används access-tokenen endast för `GET /user`. Numeriskt GitHub-ID kontrolleras mot `JOBB_ALLOWED_GITHUB_IDS`; tokenen persisteras aldrig och revokeras best-effort efter identitetsuppslaget.
+
+Jobb skapar därefter en lokal 12-timmars signerad `__Host-jobb_session`. Login-state ligger i en signerad, kortlivad `__Host-jobb_oauth`-cookie. Sessionen revalideras mot aktuell allowlist vid varje request, så borttagen åtkomst slår igenom utan att vänta på sessionens expiry.
+
+Runtimekontrakt:
+
+- `GITHUB_OAUTH_CLIENT_ID` — icke-hemligt client ID.
+- `GITHUB_OAUTH_CLIENT_SECRET` — Secrets Store-binding eller ignorerad lokal dev-konfiguration.
+- `JOBB_ALLOWED_GITHUB_IDS` — numeriska GitHub-ID:n som får använda dashboarden.
+
+GitHub OAuth-klienthemligheten får inte loggas, returneras eller committas. Basic Auth och parallell OIDC-fallback ska inte införas.
+
 ## StudentConsulting
 
 StudentConsulting credentials are runtime secrets, never repository configuration.

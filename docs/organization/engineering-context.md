@@ -19,19 +19,21 @@ Repository-specifik kontext hör hemma i respektive repository, normalt i `docs/
 
 Avkroken kör GitHub Free.
 
-`Avkroken/Avkroken` är privat. På den aktuella planen är repository-rulesets inte tillgängliga för detta privata repository; GitHubs live API svarar med krav på uppgradering eller publik visibility. Det tidigare `main`-rulesetet är därför inte en aktiv enforcement-yta så länge repositoryt är privat på Free.
+`Avkroken/Avkroken` är publikt och dess repository-ruleset `main` är aktivt utan bypass. Live state verifierades 2026-09-24 efter visibility-bytet.
+
+Rulesetet träffar default branch och kräver pull request, upplösta review-trådar, deletion/non-fast-forward-skydd, required status checks samt separat CodeQL-policy. Required status checks är `Dependency review`, `Portal`, `Skvallerbyttan`, `Krosa-Maja` och `Jobb`. `Krosa-Maja` är efter auth-förenklingen en retirement guard som skyddar mot att den pensionerade identity-providern eller dess OIDC-kontrakt återintroduceras; den är inte längre en deploybar applikation.
 
 Övriga publika fristående repositories kan fortsatt använda repository-rulesets enligt planens stöd.
 
-Organisationens tidigare rulesets och cross-repository required/reusable workflows är inte längre CI-policykällan. I monorepot är PR + CI fortfarande den avsedda arbetsmodellen, men den upprätthålls processmässigt snarare än av branch/ruleset-enforcement på nuvarande plan.
+Organisationens tidigare cross-repository required/reusable workflows är inte CI-policykällan. Monorepots repository-lokala CI och live repository-ruleset är canonical enforcement för `Avkroken/Avkroken`.
 
-Custom Properties kan behållas som metadata/inventering men binder inte CI-policy.
+Custom Properties kan behållas som metadata/inventering men binder inte monorepots CI-policy.
 
 ## Repository-lokal CI
 
 Varje repository äger sina egna workflows under `.github/workflows/`.
 
-Monorepots canonical CI triggar på `pull_request` mot `main` och `merge_group`. De fyra appcheckarna ska vara gröna före merge även när GitHub Free inte kan enforcea dem på det privata repositoryt.
+Monorepots canonical CI triggar på `pull_request` mot `main` och `merge_group`. Portal, Skvallerbyttan och Jobb kör apparnas verifierade gates; `Krosa-Maja` kör retirement guard. Alla required checks är ruleset-enforced på det publika repositoryt.
 
 Cross-repository `workflow_call` till `Avkroken/.github` används inte.
 
@@ -45,15 +47,15 @@ Cross-repository `workflow_call` till `Avkroken/.github` används inte.
 - Politiker: `Dependency review`, `Node and Cloudflare`, `Python`, `Docker`.
 - Bastion: `Swift package (ubuntu-latest)`, `Swift package (macos-latest)`, `Apple applications`, `Rust`, `.NET tests`, `Windows application`, `Android Gradle`, `Generate dependency graph`.
 - Klarsprak: `Dependency review`, `Node and Cloudflare`.
-- Avkroken monorepo: `Portal`, `Skvallerbyttan`, `Krosa-Maja`, `Jobb` (processkrav på privat Free; inte ruleset-enforced).
+- Avkroken monorepo: `Dependency review`, `Portal`, `Skvallerbyttan`, `Krosa-Maja` (retirement guard), `Jobb` samt ruleset-separat CodeQL.
 
 ## GitHub Free och säkerhet
 
 Betald GitHub Code Security/Secret Protection ska inte antas finnas.
 
-Dependency Review används på publika repositories där stödet finns och dependency snapshots är kompletta och stabila. I det privata `Avkroken/Avkroken` på GitHub Free är GitHubs Dependency Review inte tillgängligt; live-körningen returnerar att Dependency graph + GitHub Advanced Security krävs. Monorepot förlitar sig därför på respektive apps install-/lockfile-validering i CI.
+Dependency Review används på publika repositories där stödet finns och dependency snapshots är kompletta och stabila. `Avkroken/Avkroken` är nu publikt och `Dependency review` är en required status check i live ruleset.
 
-Code scanning/CodeQL används där GitHub exponerar stödet. För det privata `Avkroken/Avkroken` på nuvarande Free-plan finns ingen aktiv ruleset-baserad CodeQL-enforcement. GitHub kan fortfarande visa dynamiska Code Quality/CodeQL-relaterade analyser från repositoryinställningar, men de behandlas som advisory och monorepots mergepolicy får inte bero på dem på nuvarande plan.
+Code scanning/CodeQL används där GitHub exponerar stödet. För det publika `Avkroken/Avkroken` innehåller live ruleset en separat CodeQL-regel med security-alert-tröskel `medium_or_higher` och `alerts_threshold=errors`.
 
 ## Auto-assignment och pull_request_target
 
@@ -81,4 +83,4 @@ Cloudflare Email Service-bindingen heter `OPS_EMAIL`. Mottagare och avsändare �
 
 ## Konsolidering
 
-Portal, Skvallerbyttan, Krosa-Maja och Jobb ligger i det privata `Avkroken/Avkroken` under `apps/`. Monorepots repository-lokala CI producerar de fyra canonical appcheckarna. Cross-repository workflow reuse via `Avkroken/.github` används inte.
+Portal, Skvallerbyttan och Jobb ligger i det publika `Avkroken/Avkroken` under `apps/`. Krösa-Maja är pensionerad som separat identity provider; GitHub OAuth används direkt av de skyddade dashboarderna. Monorepots repository-lokala CI producerar tre appchecks plus den ruleset-kompatibla `Krosa-Maja` retirement guarden. Cross-repository workflow reuse via `Avkroken/.github` används inte.

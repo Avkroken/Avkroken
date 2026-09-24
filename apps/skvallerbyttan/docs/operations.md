@@ -38,7 +38,7 @@ Wrangler definierar:
 Icke-hemlig versionsstyrd runtime-konfiguration:
 
 - `CLOUDFLARE_ACCOUNT_ID`
-- `KROSA_MAJA_GITHUB_CLIENT_ID`
+- `GITHUB_OAUTH_CLIENT_ID`
 
 `GAMNACKEN_GITHUB_APP_CLIENT_ID` är icke-hemligt och synkas från GitHub Actions-variable till en Worker runtime-binding tillsammans med Gamnackens App-nyckel.
 
@@ -47,7 +47,7 @@ Cloudflare Secrets Store-bindings:
 - `CLOUDFLARE_API_TOKEN_R1` — Platform / Resource Read
 - `CLOUDFLARE_API_TOKEN_R2` — Analytics / Content / Operations Read
 - `CLOUDFLARE_API_TOKEN_R3` — Security / Identity Read
-- `KROSA_MAJA_CLIENT_SECRET`
+- `GITHUB_OAUTH_CLIENT_SECRET`
 
 Varje bunden Secrets Store-secret ska ha `workers` i sin scope-lista. Bindings hämtar värden asynkront via `get()`; kodvägarna använder inte äldre generiska Cloudflare-token som fallback.
 
@@ -97,7 +97,7 @@ Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den
 
 `SKVALLERBYTTAN_WEBHOOK_SECRET` ingår avsiktligt **inte** i den generella runtime-secret-syncen. GitHub-webhookens secret är ett kopplat provider-/runtimevärde: om endast Worker-sidan skrivs om bryts HMAC-verifieringen för alla GitHub-leveranser. En rotation ska därför göras som en samordnad driftåtgärd där samma värde sätts på GitHub organization webhook och Worker-secretet och därefter verifieras med en signerad leverans som returnerar HTTP 202.
 
-R1/R2/R3 och Krösa-Majas client secret läses direkt från Cloudflare Secrets Store.
+R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets Store.
 
 GitHub organization webhook använder `SKVALLERBYTTAN_WEBHOOK_SECRET`. Gamnacken är read-auth-app och ska inte ha en aktiv App-webhook mot `/webhooks/github`. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
 
@@ -160,7 +160,7 @@ Var 15:e minut gör runtime en intern readiness-probe och levererar resultatet v
 
 - lokal auth-/runtimekonfiguration
 - D1 `SELECT 1`
-- läsbar Gamnacken/Krösa-Maja/R1/R2/R3 credentialkonfiguration
+- läsbar Gamnacken/GitHub OAuth/R1/R2/R3 credentialkonfiguration
 - live GitHub App-anrop via Gamnacken
 - Cloudflare R1-probe via Zones
 - Cloudflare R2-probe via Account

@@ -1,4 +1,4 @@
-export type AuthMode = "oidc" | "misconfigured" | "unconfigured";
+export type AuthMode = "github" | "misconfigured" | "unconfigured";
 
 export interface ErrorPageOptions {
   status: number;
@@ -24,7 +24,7 @@ export function renderAuthLoginPage(
     error === "state"
       ? "Inloggningen kunde inte verifieras. Starta ett nytt inloggningsförsök."
       : error === "oauth"
-        ? "Inloggningen via Krösa-Maja kunde inte slutföras."
+        ? "Inloggningen via GitHub kunde inte slutföras."
         : "";
 
   const status =
@@ -32,10 +32,10 @@ export function renderAuthLoginPage(
 
   let action = "";
   let statusLabel: string;
-  if (mode === "oidc") {
+  if (mode === "github") {
     action =
-      `<a class="primary-action" href="/auth/start?return_to=${encodeURIComponent(returnTo)}"><span class="action-mark" aria-hidden="true">↗</span><span>Logga in med Krösa-Maja</span></a>`;
-    statusLabel = "OIDC · Krösa-Maja";
+      `<a class="primary-action" href="/auth/start?return_to=${encodeURIComponent(returnTo)}"><span class="action-mark" aria-hidden="true">↗</span><span>Logga in med GitHub</span></a>`;
+    statusLabel = "GitHub OAuth · PKCE";
   } else {
     action =
       '<div class="inline-alert" role="alert"><strong>Autentisering är inte komplett konfigurerad.</strong><span>Kontakta tjänsteadministratören.</span></div>';
@@ -57,7 +57,7 @@ export function renderAuthLoginPage(
           <div class="trust-row">
             <span>GitHub-identitet</span>
             <span aria-hidden="true">•</span>
-            <span>Krösa-Maja OIDC</span>
+            <span>GitHub OAuth</span>
             <span aria-hidden="true">•</span>
             <span>PKCE</span>
           </div>
@@ -67,7 +67,7 @@ export function renderAuthLoginPage(
           <div>
             <p class="eyebrow">Säker inloggning</p>
             <h2 id="signin-title">Välkommen tillbaka</h2>
-            <p class="card-copy">Krösa-Maja verifierar din identitet via GitHub och utfärdar en separat session för Jobb.</p>
+            <p class="card-copy">GitHub verifierar din identitet. Jobb använder därefter en lokal signerad session och sparar inte GitHub-tokenen.</p>
           </div>
           ${errorText ? `<div class="inline-alert" role="alert"><strong>Inloggningen avbröts</strong><span>${escapeHtml(errorText)}</span></div>` : ""}
           <div class="actions">
@@ -75,7 +75,7 @@ export function renderAuthLoginPage(
           </div>
           <div class="security-note">
             <span class="shield" aria-hidden="true">◆</span>
-            <p><strong>Ingen GitHub-token sparas av Jobb.</strong><br>Jobb använder endast den verifierade OIDC-identiteten för den lokala sessionen.</p>
+            <p><strong>Ingen GitHub-token sparas av Jobb.</strong><br>Tokenen används endast för identitetsuppslag och revokeras därefter best-effort.</p>
           </div>
         </section>
       </section>
@@ -142,7 +142,7 @@ function pageShell(options: { title: string; body: string }): string {
 <main class="page-shell">
 ${options.body}
 </main>
-<footer class="site-footer"><span>Avkroken</span><span>Identity protected by Krösa-Maja</span></footer>
+<footer class="site-footer"><span>Avkroken</span><span>Identity protected by GitHub OAuth</span></footer>
 </body>
 </html>`;
 }

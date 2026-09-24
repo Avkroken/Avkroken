@@ -10,6 +10,20 @@ permissions:
   contents: read
 
 jobs:
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+        with:
+          base-ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || '' }}
+          head-ref: ${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
+          retry-on-snapshot-warnings: true
+          retry-on-snapshot-warnings-timeout: 300
+
   portal:
     name: Portal
     runs-on: ubuntu-latest
@@ -50,14 +64,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "24"
-      - name: Validate Krosa-Maja
-        working-directory: apps/krosa-maja
+      - name: Verify Krosa-Maja retirement
+        shell: bash
         run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          npm run check
+          set -euo pipefail
+          test ! -e apps/krosa-maja
+          test ! -e .github/workflows/deploy-krosa-maja.yml
+          if grep -R -n -E 'KROSA_MAJA_OIDC|KROSA_MAJA_GITHUB_CLIENT_ID|auth\.denied\.se|oidc-auth|apps/krosa-maja' apps README.md docs .github/labeler.yml; then
+            echo "::error::Retired Krosa-Maja auth/runtime reference remains."
+            exit 1
+          fi
+          if grep -R -n -E '"binding"[[:space:]]*:[[:space:]]*"KROSA_MAJA_CLIENT_SECRET"' apps; then
+            echo "::error::Legacy Krosa-Maja client-secret binding remains."
+            exit 1
+          fi
 
   jobb:
     name: Jobb

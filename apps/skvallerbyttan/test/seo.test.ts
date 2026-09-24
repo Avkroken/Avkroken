@@ -15,8 +15,8 @@ function configuredEnv(): Env {
     ASSETS: { fetch: async () => new Response("asset") },
     GAMNACKEN_GITHUB_APP_CLIENT_ID: "test-skvallerbyttan",
     GAMNACKEN_GITHUB_APP_PRIVATE_KEY: "test-private-key",
-    KROSA_MAJA_GITHUB_CLIENT_ID: "test-krosa-maja",
-    KROSA_MAJA_CLIENT_SECRET: "test-client-secret",
+    GITHUB_OAUTH_CLIENT_ID: "test-krosa-maja",
+    GITHUB_OAUTH_CLIENT_SECRET: "test-client-secret",
     SKVALLERBYTTAN_SESSION_SECRET: "test-session-secret",
     SKVALLERBYTTAN_ALLOWED_GITHUB_IDS: "1",
   };
