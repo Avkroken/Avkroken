@@ -21,7 +21,6 @@ Varje projekt äger sin egen README och `docs/`. Gå via repositoryts README fö
 - [Docker-idempotent-update](https://github.com/Avkroken/Docker-idempotent-update)
 - [Jobb](../../apps/jobb/README.md)
 - [Klarsprak](https://github.com/Avkroken/Klarsprak)
-- [Krosa-Maja](../../apps/krosa-maja/README.md)
 - [Pastebinit](https://github.com/Avkroken/Pastebinit)
 - [Politiker](https://github.com/Avkroken/Politiker)
 - [Produkter](https://github.com/Avkroken/Produkter)
@@ -34,7 +33,7 @@ Varje projekt äger sin egen README och `docs/`. Gå via repositoryts README fö
 Avkroken/Avkroken
   |
   +--> docs/organization     gemensamma standarder
-  +--> apps/*                samlade interna applikationer
+  +--> apps/*                samlade applikationer
   +--> .github/workflows     repository-lokal CI
   |
   +--> fristående repository
