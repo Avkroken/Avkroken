@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("runtime secret sync does not mutate the GitHub webhook secret", async () => {
   const workflow = await readFile(
-    new URL("../.github/workflows/sync-cloudflare-runtime-secrets.yml", import.meta.url),
+    new URL("../../../.github/workflows/sync-skvallerbyttan-runtime-secrets.yml", import.meta.url),
     "utf8",
   );
 
