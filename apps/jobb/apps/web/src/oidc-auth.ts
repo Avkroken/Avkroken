@@ -696,22 +696,3 @@ function safeEqual(left: string, right: string): boolean {
 function unixNow(): number {
   return Math.floor(Date.now() / 1000);
 }
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => {
-    switch (character) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return character;
-    }
-  });
-}
