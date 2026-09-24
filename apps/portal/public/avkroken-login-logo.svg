@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200" role="img" aria-labelledby="title desc">
+  <title id="title">AVKROKEN</title>
+  <desc id="desc">AVKROKEN logo with terminal prompt, branching version-control nodes and digital pixels.</desc>
+
+  <defs>
+    <linearGradient id="ring" x1="150" y1="140" x2="1040" y2="1030" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22E7E8"/>
+      <stop offset="0.34" stop-color="#3197FF"/>
+      <stop offset="0.67" stop-color="#7C4DFF"/>
+      <stop offset="1" stop-color="#D11FD0"/>
+    </linearGradient>
+
+    <linearGradient id="tech" x1="270" y1="300" x2="860" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#55F4E5"/>
+      <stop offset="0.42" stop-color="#2E9BFF"/>
+      <stop offset="0.72" stop-color="#6A5CFF"/>
+      <stop offset="1" stop-color="#C52AE8"/>
+    </linearGradient>
+
+    <linearGradient id="tag" x1="290" y1="0" x2="930" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20D9E1"/>
+      <stop offset="0.48" stop-color="#4E78F4"/>
+      <stop offset="1" stop-color="#D52BCF"/>
+    </linearGradient>
+
+    <radialGradient id="bg" cx="50%" cy="42%" r="68%">
+      <stop offset="0" stop-color="#0B1222"/>
+      <stop offset="0.68" stop-color="#070B13"/>
+      <stop offset="1" stop-color="#05070C"/>
+    </radialGradient>
+
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <circle cx="600" cy="600" r="525" fill="url(#bg)"/>
+  <circle cx="600" cy="600" r="510" fill="none" stroke="url(#ring)" stroke-width="15"/>
+
+  <g fill="none" stroke="url(#tech)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)">
+    <path d="M270 410 L340 460 L270 510"/>
+    <path d="M365 510 H430"/>
+  </g>
+
+  <g fill="none" stroke="url(#tech)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)">
+    <path d="M520 325 V485"/>
+    <path d="M520 350 L630 455"/>
+    <path d="M520 485 L610 585"/>
+    <circle cx="520" cy="325" r="34"/>
+    <circle cx="520" cy="485" r="25"/>
+    <circle cx="630" cy="455" r="34"/>
+    <circle cx="610" cy="585" r="34"/>
+  </g>
+
+  <g fill="url(#tech)" opacity="0.95">
+    <rect x="690" y="355" width="13" height="13" rx="2"/>
+    <rect x="730" y="335" width="16" height="16" rx="2"/>
+    <rect x="772" y="360" width="13" height="13" rx="2"/>
+    <rect x="815" y="330" width="17" height="17" rx="2"/>
+    <rect x="868" y="350" width="13" height="13" rx="2"/>
+    <rect x="914" y="325" width="11" height="11" rx="2"/>
+    <rect x="670" y="405" width="10" height="10" rx="2"/>
+    <rect x="715" y="410" width="15" height="15" rx="2"/>
+    <rect x="758" y="395" width="17" height="17" rx="2"/>
+    <rect x="808" y="416" width="12" height="12" rx="2"/>
+    <rect x="850" y="390" width="15" height="15" rx="2"/>
+    <rect x="905" y="418" width="12" height="12" rx="2"/>
+    <rect x="686" y="460" width="13" height="13" rx="2"/>
+    <rect x="737" y="450" width="11" height="11" rx="2"/>
+    <rect x="782" y="470" width="14" height="14" rx="2"/>
+    <rect x="828" y="448" width="12" height="12" rx="2"/>
+    <rect x="880" y="470" width="15" height="15" rx="2"/>
+    <rect x="934" y="450" width="9" height="9" rx="2"/>
+    <rect x="708" y="520" width="11" height="11" rx="2"/>
+    <rect x="755" y="510" width="15" height="15" rx="2"/>
+    <rect x="803" y="535" width="12" height="12" rx="2"/>
+    <rect x="850" y="515" width="16" height="16" rx="2"/>
+    <rect x="902" y="540" width="10" height="10" rx="2"/>
+    <rect x="745" y="575" width="10" height="10" rx="2"/>
+    <rect x="798" y="575" width="12" height="12" rx="2"/>
+    <rect x="852" y="585" width="11" height="11" rx="2"/>
+  </g>
+
+  <text x="600" y="755" text-anchor="middle" font-family="Inter, Avenir Next, Montserrat, Arial, sans-serif" font-size="108" font-weight="500" letter-spacing="19" fill="#F5F2EC">AVKROKEN</text>
+  <text x="600" y="840" text-anchor="middle" font-family="Inter, Avenir Next, Montserrat, Arial, sans-serif" font-size="28" font-weight="600" letter-spacing="8" fill="url(#tag)">CODE • DATA • VISIONS • IDEAS</text>
+
+  <g fill="none" stroke="url(#tech)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.55">
+    <path d="M555 910 H405"/>
+    <path d="M645 910 H795"/>
+    <path d="M585 895 L565 910 L585 925"/>
+    <path d="M615 895 L635 910 L615 925"/>
+    <path d="M608 890 L592 930"/>
+  </g>
+</svg>

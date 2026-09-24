@@ -1,0 +1,79 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "krosa-maja",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": false,
+  "preview_urls": false,
+  "keep_vars": true,
+  "vars": {
+    "KROSA_MAJA_BASE_URL": "https://auth.denied.se",
+    "KROSA_MAJA_GITHUB_CLIENT_ID": "Ov23li4Zt1X87R3Sqc7T",
+    "KROSA_MAJA_CLOUDFLARE_CLIENT_ID": "0d12628cd0eeaccb5b561b1bacf1b7c4"
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "krosa-maja-auth",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "auth.denied.se",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true
+    }
+  },
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "secrets_store_secrets": [
+    {
+      "binding": "KROSA_MAJA_AUTH_SECRET",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_AUTH_SECRET"
+    },
+    {
+      "binding": "KROSA_MAJA_INTERNAL_ADMIN_SECRET",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_INTERNAL_ADMIN_SECRET"
+    },
+    {
+      "binding": "KROSA_MAJA_CLIENT_SECRET",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_CLIENT_SECRET"
+    },
+    {
+      "binding": "KROSA_MAJA_ALLOWED_GITHUB_IDS",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_ALLOWED_GITHUB_IDS"
+    },
+    {
+      "binding": "KROSA_MAJA_ADMIN_GITHUB_IDS",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_ADMIN_GITHUB_IDS"
+    },
+    {
+      "binding": "KROSA_MAJA_CLOUDFLARE_CLIENT_SECRET",
+      "store_id": "293e79006fa649b8b182ef105a6b46d1",
+      "secret_name": "KROSA_MAJA_CLOUDFLARE_CLIENT_SECRET"
+    }
+  ]
+}
