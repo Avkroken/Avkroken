@@ -1,3 +1,4 @@
+import { isRetiredRepository } from "./repository-policy.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -9,7 +10,6 @@ const DOC_CONTENT_CACHE_SECONDS = 21600;
 const MAX_DOC_DEPTH = 2;
 
 const WATCHED_SERVICES = ["skvallerbyttan"];
-const RETIRED_REPOSITORIES = new Set(["Skvallerbyttan", "Krosa-Maja", "Jobb", "Dumpen"]);
 const HEARTBEAT_EXPECTED_INTERVAL_SECONDS = 15 * 60;
 const HEARTBEAT_STALE_AFTER_SECONDS = 35 * 60;
 
@@ -211,7 +211,7 @@ async function loadDocsCatalog(env) {
     repo &&
     repo.visibility === "public" &&
     repo.archived === false &&
-    !RETIRED_REPOSITORIES.has(repo.name)
+    !isRetiredRepository(repo.name)
   );
   const entries = await Promise.all(repos.map(repo => buildDocsEntry(repo, env)));
   entries.sort((a, b) => a.name.localeCompare(b.name, "sv"));
@@ -340,7 +340,7 @@ async function getPortalSites(env, ctx) {
       repo &&
       repo.visibility === "public" &&
       repo.archived === false &&
-      !RETIRED_REPOSITORIES.has(repo.name) &&
+      !isRetiredRepository(repo.name) &&
       Array.isArray(repo.topics) &&
       hasPortalCategory(repo.topics) &&
       typeof repo.homepage === "string" &&
