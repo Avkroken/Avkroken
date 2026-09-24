@@ -1,5 +1,8 @@
 import { dashboardAuthMode, type DashboardAuthEnv } from "./auth";
-import { resolveGitHubClientSecret } from "./github-auth";
+import {
+  resolveGitHubAllowedIds,
+  resolveGitHubClientSecret,
+} from "./github-auth";
 
 export interface ReadinessResult {
   status: "ready" | "degraded";
@@ -25,7 +28,10 @@ export async function getReadiness(
   let dashboardAuth = false;
   if (authMode === "github") {
     try {
-      await resolveGitHubClientSecret(env);
+      await Promise.all([
+        resolveGitHubClientSecret(env),
+        resolveGitHubAllowedIds(env),
+      ]);
       dashboardAuth = true;
     } catch {
       dashboardAuth = false;
