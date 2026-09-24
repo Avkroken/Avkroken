@@ -2,8 +2,8 @@
 
 ## Läs först
 
-- `Avkroken/.github/docs/engineering-context.md` — central engineering-, CI- och governance-kontext.
-- `Avkroken/.github/docs/documentation-standard.md` — organisationsgemensam dokumentationsmodell.
+- `../../docs/organization/engineering-context.md` — central engineering-, CI- och governance-kontext.
+- `../../docs/organization/documentation-standard.md` — organisationsgemensam dokumentationsmodell.
 - [docs/project-context.md](docs/project-context.md) — repositoryts canonical current-state.
 - [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/security.md) och [docs/operations.md](docs/operations.md) — arkitektur, säkerhetsgränser och drift.
 

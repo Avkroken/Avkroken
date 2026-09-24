@@ -1,6 +1,6 @@
 # Jobb project context
 
-Det här dokumentet är den repo-specifika, versionsstyrda tekniska kontexten för `Avkroken/Jobb`.
+Det här dokumentet är den app-specifika, versionsstyrda tekniska kontexten för `Avkroken/Avkroken` / `apps/jobb`.
 
 **Senast verifierad mot repositoryt:** 2026-09-24
 
@@ -8,13 +8,13 @@ Det här dokumentet är den repo-specifika, versionsstyrda tekniska kontexten f�
 
 Vid konflikt för repo-specifik teknik gäller följande ordning:
 
-1. Filer på aktuell `main` i `Avkroken/Jobb`.
+1. Filer på aktuell `main` i `Avkroken/Avkroken`, under `apps/jobb`.
 2. Versionerade D1-migrationer och runtimekonfiguration i repositoryt.
 3. Publika upstream-kontrakt för de externa API:er och tjänster implementationen använder.
 4. Det här dokumentet.
 5. Äldre pull requests, issues och historik.
 
-Organisationsgemensamma standarder finns i `Avkroken/.github`, men externa GitHub-/Cloudflare-inställningar är inte repo-local current-state och kopieras inte hit. Historik hör hemma i Git.
+Organisationsgemensamma standarder finns i `docs/organization/` i `Avkroken/Avkroken`, men externa GitHub-/Cloudflare-inställningar är inte repo-local current-state och kopieras inte hit. Historik hör hemma i Git.
 
 ## Syfte och säkerhetsgräns
 
@@ -36,7 +36,7 @@ Viktiga säkerhetsgränser:
 
 Primär runtime är Cloudflare Worker `jobb` med entrypoint `apps/web/src/index.ts`.
 
-Repositoryts root-`wrangler.jsonc` är deployment-konfigurationen och binder:
+Appens root-`wrangler.jsonc` är deployment-konfigurationen och binder:
 
 - Browser Run som `BROWSER`.
 - D1-databasen `jobb` som `DB`.
@@ -210,7 +210,7 @@ pnpm typecheck
 pnpm test
 ```
 
-Root-`package.json` definierar produktionskommandot:
+Appens root-`package.json` definierar produktionskommandot:
 
 ```bash
 pnpm deploy:cloudflare

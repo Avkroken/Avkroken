@@ -8,7 +8,7 @@ permalink: /architecture/
 
 ## Mål
 
-Skvallerbyttan är Avkrokens centrala read-only observationslager och eventnav. GitHub och Cloudflare är auktoritativa providers; provider-webhooks terminerar i Skvallerbyttan, som normaliserar deras state, lagrar begränsad historik och exponerar samma canonical underlag till dashboard och auktoriserade maskinklienter. `Avkroken/.github` och `avkroken.denied.se` är den centrala organisations- och frontytan, inte ett separat provider-observationslager.
+Skvallerbyttan är Avkrokens centrala read-only observationslager och eventnav. GitHub och Cloudflare är auktoritativa providers; provider-webhooks terminerar i Skvallerbyttan, som normaliserar deras state, lagrar begränsad historik och exponerar samma canonical underlag till dashboard och auktoriserade maskinklienter. `Avkroken/Avkroken` och `avkroken.denied.se` är den centrala organisations- och frontytan, inte ett separat provider-observationslager.
 
 ```text
 GitHub APIs ───────────────┐
@@ -47,7 +47,7 @@ CF Audit Logs ──────────────┘
 
 Provider-events ska ha **en canonical ingress**: Skvallerbyttan. Fronten på `avkroken.denied.se` ska inte behöva GitHub- eller Cloudflare-webhookhemligheter för att reagera på observerade händelser.
 
-När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen pekar på den namngivna RPC-entrypointen `DocsInvalidationService` i den live Cloudflare-tjänsten `avkroken` (portalens källkod ligger i `Avkroken/.github/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
+När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen pekar på den namngivna RPC-entrypointen `DocsInvalidationService` i den live Cloudflare-tjänsten `avkroken` (portalens källkod ligger i `Avkroken/Avkroken/apps/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
 
 Repository-events signalerar också portalens dokumentationskatalog, inklusive tidigare repositorynamn vid rename. Service-signalen sker före webhook-dedupliceringen så en manuell GitHub-redelivery kan reparera en tidigare misslyckad portalinvalidering utan att dubbellagra Activity-eventet.
 

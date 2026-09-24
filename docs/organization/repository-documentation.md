@@ -1,17 +1,21 @@
 # Repository-integration för dokumentation
 
-Det här dokumentet beskriver hur `Avkroken/.github` och projektrepositories ska fungera tillsammans.
+Det här dokumentet beskriver hur `Avkroken/Avkroken`, den publika `.github`-ytan och fristående projektrepositories ska fungera tillsammans.
 
 ## Ansvarsfördelning
 
-### Avkroken/.github
+### Avkroken/Avkroken
 
-Äger gemensam modell:
+Äger den tekniska gemensamma modellen:
 
 - dokumentationsstandard,
 - central navigation,
 - engineering-kontext,
-- gemensamma GitHub-filer och workflows.
+- monorepots repository-lokala workflows.
+
+### Avkroken/.github
+
+Äger endast GitHubs publika organisationsprofil och community health-filer som ska ärvas av publika repositories.
 
 ### Projektrepository
 
@@ -48,7 +52,7 @@ Små repos kan ha färre filer, men navigation och verifieringsväg ska fortfara
 En läsare ska kunna gå:
 
 ```text
-Avkrokens portal eller .github
+Avkrokens portal eller dokumentationsnav
         |
         v
 repository README
@@ -67,7 +71,7 @@ Samma detalj ska inte kopieras mellan central docs, README, project-context och 
 
 Använd:
 
-- central docs för organisationsgemensamma regler,
+- `docs/organization/` för organisationsgemensamma regler,
 - project docs för implementation,
 - README för orientering,
 - Wiki för navigation/presentation.

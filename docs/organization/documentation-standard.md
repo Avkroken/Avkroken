@@ -105,17 +105,17 @@ För icke-triviala repositories är Wiki rekommenderad presentationsyta när den
 
 GitHub lagrar Wiki i ett separat Git-repository. Därför ska den behandlas som presentationslager ovanpå versionsstyrd projektdokumentation, inte som enda tekniska källa.
 
-## Central nod: Avkroken/.github
+## Central teknisk nod: Avkroken/Avkroken
 
-`Avkroken/.github` äger:
+`Avkroken/Avkroken` äger:
 
-- gemensamma dokumentationsstandarder,
+- gemensamma dokumentationsstandarder under `docs/organization/`,
 - central engineering-kontext,
-- gemensamma community health-filer,
-- återanvändbara workflows,
-- organisationens dokumentationsnav.
+- monorepots applikationsdokumentation,
+- repository-lokala workflows för monorepot,
+- organisationens tekniska dokumentationsnav.
 
-Den ska länka till projektrepositories men inte duplicera deras tekniska innehåll.
+`Avkroken/.github` är separat och hålls minimal för publik organisationsprofil och community health-filer. Den tekniska noden ska länka till fristående projektrepositories men inte duplicera deras implementation.
 
 ## Säkerhet
 
