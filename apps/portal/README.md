@@ -142,9 +142,9 @@ GitHub / Cloudflare
   -> Drift & insyn
 ```
 
-Portalen skapar ingen andra providerklient och använder ingen Skvallerbyttan bearer-token för driftvyn. Den interna RPC-entrypointen returnerar endast en sanerad snapshot med providerstatus, capability-status/freshness/scope coverage och aggregerad observerad aktivitet.
+Portalen skapar ingen andra providerklient och använder ingen Skvallerbyttan bearer-token för driftvyn. Den interna RPC-entrypointen returnerar endast en public-safe snapshot med providerstatus och capability status/dataState/freshness/last-success.
 
-Rå provider-permissions, installationmetadata, felsträngar, actor/resource/repositorydetaljer och recent-eventpayloads lämnar inte Skvallerbyttans observationsgräns.
+Rå provider-permissions, installationmetadata, felsträngar, scope coverage/repositoryantal och Activity/eventvolym lämnar inte Skvallerbyttans skyddade observationsgräns.
 
 ### Skyddad Jobb-data
 
