@@ -147,6 +147,49 @@
     </section>
 
     <section
+      class="portal-route-panel"
+      id="project-detail-view"
+      data-route-panel="project-detail"
+      aria-labelledby="project-detail-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" id="project-detail-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+      </nav>
+
+      <div class="portal-project-detail-hero">
+        <div class="portal-page-head">
+          <div class="portal-kicker" id="project-detail-kind">PROJEKT</div>
+          <h1 id="project-detail-title">Läser in projekt…</h1>
+          <p id="project-detail-description">Hämtar publik projektmetadata.</p>
+        </div>
+
+        <aside class="portal-project-source">
+          <div class="portal-meta-label">CANONICAL</div>
+          <a id="project-detail-source" href="https://github.com/Avkroken" target="_blank" rel="noopener noreferrer">Visa original</a>
+          <p>Repositoryt äger teknisk current-state, Issues, Discussions och releases.</p>
+        </aside>
+      </div>
+
+      <div class="portal-detail-metrics" id="project-detail-metrics" aria-label="Projektmetadata"></div>
+
+      <section class="portal-section" aria-labelledby="project-navigation-title">
+        <div class="portal-section-title">
+          <div>
+            <h2 id="project-navigation-title">Projektområden</h2>
+            <p>Dokumentation läses i Portalen. Övriga länkar går till canonical källa tills motsvarande Portal-adapter finns.</p>
+          </div>
+        </div>
+        <nav class="portal-project-links" id="project-detail-links" aria-label="Projektområden"></nav>
+      </section>
+
+      <div class="portal-placeholder" id="project-detail-source-note">
+        <strong>Källmodell</strong>
+        Projektmetadata kommer från den normaliserade publika project catalog. Operativ state hämtas inte här.
+      </div>
+    </section>
+
+    <section
       class="portal-route-panel docs-view"
       id="docs-view"
       data-route-panel="docs"
