@@ -49,3 +49,12 @@ export function isPortalDocumentRoute(pathname) {
 
   return false;
 }
+
+
+export function protectedRedirectForPath(pathname) {
+  const path = normalizePortalPath(pathname);
+  if (path === "/auth/jobb" || path.startsWith("/auth/jobb/")) {
+    return "https://jobb.denied.se/";
+  }
+  return null;
+}
