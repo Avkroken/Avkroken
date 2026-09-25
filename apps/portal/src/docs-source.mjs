@@ -77,15 +77,22 @@ export function appDocsSource(project) {
 }
 
 export function docsContentLocation(entry, requestedPath) {
-  const path = text(requestedPath, 400);
-  if (!entry || !path || !Array.isArray(entry.pages)) return null;
-  if (!entry.pages.some(page => page?.path === path)) return null;
+  const routePath = text(requestedPath, 400);
+  if (!entry || !routePath || !Array.isArray(entry.pages)) return null;
+  if (!entry.pages.some(page => page?.path === routePath)) return null;
 
   const sourceRepository = text(entry.sourceRepository, 120);
   const ref = text(entry.defaultBranch, 120);
   if (!sourceRepository || !REPOSITORY_NAME.test(sourceRepository) || !ref) return null;
 
-  return { repository: sourceRepository, ref, path };
+  let sourcePath = routePath;
+  if (entry.sourceKind === "app") {
+    const appRoot = text(entry.sourcePath, 240);
+    if (!appRoot || !APP_SOURCE_PATH.test(appRoot)) return null;
+    sourcePath = appRoot + "/" + routePath;
+  }
+
+  return { repository: sourceRepository, ref, path: sourcePath };
 }
 
 export function canonicalDocUrl(entry, requestedPath) {
