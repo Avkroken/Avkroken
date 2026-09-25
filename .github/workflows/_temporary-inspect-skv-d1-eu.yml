@@ -1,0 +1,60 @@
+name: Temporary inspect Skvallerbyttan D1 EU migration
+
+on:
+  push:
+    branches:
+      - chatgpt/d1-eu-migrate/2026-09-25/07-35-skv
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
+      CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
+      SOURCE_DB_ID: 12b0199f-efa2-4f96-b5c5-e3a7f2144125
+      TARGET_DB_ID: 5e30b2a0-e47f-43f9-95cd-fc59fb542073
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Compare source and EU target
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          import crypto from "node:crypto";
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
+          const ids={source:process.env.SOURCE_DB_ID,target:process.env.TARGET_DB_ID};
+          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          async function q(id,sql){
+            const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql})});
+            const b=await r.json();
+            if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false)) throw new Error(`query failed ${r.status}`);
+            return b.result[0].results;
+          }
+          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
+          for(const [label,id] of Object.entries(ids)){
+            const info=await (await fetch(`${base}/${id}`,{headers})).json();
+            if(!info.success) throw new Error(`metadata failed for ${label}`);
+            const schema=await q(id,"SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%' ORDER BY type,name");
+            const tables=schema.filter(x=>x.type==="table").map(x=>x.name);
+            const counts={};
+            for(const t of tables) counts[t]=Number((await q(id,`SELECT COUNT(*) AS n FROM ${qi(t)}`))[0].n);
+            const hash=crypto.createHash("sha256").update(JSON.stringify(schema)).digest("hex");
+            console.log(JSON.stringify({
+              label,
+              name:info.result.name,
+              jurisdiction:info.result.jurisdiction ?? null,
+              read_replication:info.result.read_replication?.mode ?? null,
+              file_size:info.result.file_size ?? null,
+              tables,
+              counts,
+              schema_hash:hash,
+              objects:schema.length
+            }));
+          }
+          NODE
