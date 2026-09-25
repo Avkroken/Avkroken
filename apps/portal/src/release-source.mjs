@@ -45,6 +45,14 @@ export function eligibleReleaseProjects(projects, limit = 24) {
     .slice(0, maximum);
 }
 
+export function findEligibleReleaseProject(projects, slug) {
+  const target = safeText(slug, 120);
+  if (!target) return null;
+
+  return eligibleReleaseProjects(projects, 100)
+    .find(project => project.slug === target) || null;
+}
+
 export function normalizePublicRelease(project, release) {
   if (
     project?.type !== "repository" ||
