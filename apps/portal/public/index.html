@@ -33,6 +33,7 @@
           <a href="/aktivitet" data-portal-route data-nav-view="activity">Aktivitet</a>
         </div>
         <div class="portal-nav-utility">
+          <a href="/sok" data-portal-route data-nav-view="search">Sök</a>
           <a href="/auth" data-portal-route data-nav-view="auth">Auth</a>
           <a href="/om" data-portal-route data-nav-view="about">Om</a>
         </div>
@@ -376,11 +377,37 @@
       <div class="portal-page-head">
         <div class="portal-kicker">SÖK</div>
         <h1 id="search-title">Sök i Avkroken</h1>
-        <p>Global sök får endast indexera publikt tillåtet innehåll. Skyddat material filtreras före indexering.</p>
+        <p>
+          Sök över publikt tillåtna projekt, repositorydokumentation, Wikis och uttryckligen publicerade
+          appdokument. Canonical källa följer med varje resultat.
+        </p>
       </div>
-      <div class="portal-placeholder">
-        <strong>Access-aware sökindex byggs i separat PR.</strong>
-        Ingen publik sökfunktion aktiveras innan indexeringsgränsen är implementerad och testad.
+
+      <form class="portal-search-form" id="portal-search-form" role="search">
+        <label for="portal-search-input">Sökterm</label>
+        <div class="portal-search-controls">
+          <input
+            id="portal-search-input"
+            name="q"
+            type="search"
+            maxlength="120"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Sök dokumentation, Wiki eller projekt…"
+          >
+          <button class="portal-button primary" type="submit">Sök</button>
+        </div>
+      </form>
+
+      <div class="portal-search-meta" id="portal-search-meta" aria-live="polite">
+        Sökindexet laddas först när du söker.
+      </div>
+
+      <div class="portal-search-results" id="portal-search-results" aria-live="polite">
+        <div class="portal-search-empty">
+          <strong>Publik, access-aware sökning.</strong>
+          Skyddad Jobb/Auth-data ingår inte i indexet.
+        </div>
       </div>
     </section>
 
@@ -429,5 +456,6 @@
   <script src="/app.js" defer></script>
   <script src="/shell.js" defer></script>
   <script src="/docs.js" defer></script>
+  <script src="/search.js" defer></script>
 </body>
 </html>
