@@ -191,6 +191,44 @@ Cacheåldern jämförs mot sex timmar, samma horisont som den breda overview-cac
 
 Monorepo-appar får `builds = null` och `buildsPortalUrl = null` och kan inte ärva source-repositoryts CI-status som appdata.
 
+### Observerad repository-Activity
+
+Activity är en separat publiceringsyta ovanpå Skvallerbyttans canonical `observation_events`; Portalen skapar ingen parallell GitHub Events-klient.
+
+```text
+live GitHub public repository list
+       |
+       +--> project-source repository policy
+                 |
+                 v
+GET /api/activity[?project=:slug]
+                 |
+                 v
+SKVALLERBYTTAN_OBSERVATIONS.getPublicActivity(repoNames, days)
+                 |
+       +---------+------------------+
+       |                            |
+       v                            v
+D1 overview cache             D1 observation_events
+public/non-archived          provider=github + repo IN (...)
+       |                            |
+       +-------------+--------------+
+                     v
+          public-safe Activity sanitizer
+                     |
+                     v
+       /aktivitet / /projekt/:slug/aktivitet
+```
+
+Portalen gör först en minimal live `type=public`-listning och väljer endast repositoryprojekt. Global scope är hårt begränsad till 50 repositories; projektscope till exakt ett. Skvallerbyttan kräver därefter att varje begärt repo också finns som publik och icke-arkiverad rad i den cacheade `overview`-state:n.
+
+D1-queryn är fail-closed: en explicit repositorylista som efter validering blir tom ger `1 = 0`, aldrig en organisationsvid query. Queryn läser endast GitHub-event för de valda repositorykortnamnen.
+
+RPC-sanitizern och Portalens egen andra projektion publicerar endast project/repository-identitet, capability, source, coverage, event/action samt occurred/received timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload publiceras inte.
+
+Global Activity inkluderar inte Cloudflare account-/org-events. De har ingen uttrycklig publik servicekoppling och stannar därför i Skvallerbyttans skyddade observationsyta.
+
+Coverage är observationscoverage, inte ett påstående om komplett providerhistorik. `periodComplete` hålls false och UI använder uttryckligen **observerad aktivitet**.
 ### Operativ providerstate
 
 ```text
@@ -224,9 +262,9 @@ RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort
 - provider endpoint/required permission och accepterade permissions;
 - HTTP-statusar, providerfel och rå budgetstate;
 - GitHub App installation-/permissionmetadata;
-- Activity `recent` med actor/resource/repository/action-detaljer.
+- organisationsomfattande Activity/eventvolym och osanerade recent-eventdetaljer.
 
-Utåt återstår endast providerstatus samt capability status/dataState/freshness/last-success. Scope coverage/repositoryantal och Activity/eventvolym stannar i Skvallerbyttans skyddade dashboard/API eftersom de är organisationsomfattande och inte kan bevisas public-only.
+Den generella Drift-metoden returnerar endast providerstatus samt capability status/dataState/freshness/last-success. Scope coverage/repositoryantal och organisationsomfattande Activity/eventvolym stannar i Skvallerbyttans skyddade dashboard/API. Repository-Activity kan endast lämna observationslagret genom den separata `getPublicActivity`-metoden med explicit live-public allowlist och sanerad modell.
 
 Den här gränsen undviker dubbel providerlogik och bevarar Skvallerbyttans read-only säkerhetsmodell.
 
@@ -264,6 +302,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:slug/issues` — sanerade publika GitHub Issues för repositoryprojekt; PR-poster filtreras bort.
 - `/projekt/:slug/builds` — sampled, cachead Actions-summary från Skvallerbyttan för repositoryprojekt.
+- `/projekt/:slug/aktivitet` — observerade repositoryevents från Skvallerbyttans public-safe Activity-kontrakt.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
 - `/projekt/:slug/releases` — Portal-presentation av officiella GitHub Releases för publicerade repositoryprojekt.
@@ -273,7 +312,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/auth/jobb[/...]` — server-side redirect till Jobbs befintliga skyddade origin före Portal-shell.
 - `/drift[/...]` — Drift & insyn från den sanerade Skvallerbyttan-snapshoten.
 - `/changelog` — officiella publicerade GitHub Releases för Portalens publika repositoryprojekt.
-- `/aktivitet` — råare aktivitet.
+- `/aktivitet` — observerad GitHub repositoryaktivitet för Portalens live-publika repositoryprojekt, med explicit coverage.
 - `/sok` — reserverad access-aware global sökyta.
 - `/om` — produkt- och ägarskapskontext.
 
