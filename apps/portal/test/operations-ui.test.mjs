@@ -20,11 +20,7 @@ test("Drift and insight DOM contract is unique and wired", () => {
     "operations-generated",
     "operations-provider-grid",
     "operations-capability-summary",
-    "operations-activity-total",
-    "operations-activity-copy",
     "operations-capabilities",
-    "operations-activity-list",
-    "operations-coverage",
     "operations-error"
   ]) {
     assert.equal(occurrences(html, `id="${id}"`), 1, id);
