@@ -104,7 +104,7 @@ För operativ drift gäller dessutom:
 9. För repository-CI läser `getPublicRepositoryCi()` endast D1 source cache-keyn `overview`; repoName måste matcha en cachead rad med `visibility = public` och `archived != true`.
 10. CI-RPC:n returnerar sampled Actions-summary och `sourceRefreshedAt`/freshness, men inte actor, provider-permissions/fel, event breakdown eller rå runpayload. Saknad cache är `not_observed`, inte healthy.
 11. För Portal-Activity tar `getPublicActivity()` endast bounded repositorykortnamn, intersectar dem med cachead publik/icke-arkiverad `overview`, och queryar därefter D1-ledgern med explicit repositoryfilter. En explicit lista som blir tom fail-closed och kan inte bli en organisationsvid query.
-12. Activity-RPC:n returnerar endast GitHub aggregate counts/coverage och sanerade repositoryevents utan `resourceId`, actor eller rå payload. Cloudflare account-/org-events går inte genom detta kontrakt.
+12. Activity-RPC:n returnerar endast GitHub aggregate counts/coverage och sanerade repositoryevents utan `resourceId`, actor eller rå payload. Endast capabilities `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions` får publiceras; security, Custom Properties och effective-ruleset-events filtreras bort. Cloudflare account-/org-events går inte genom detta kontrakt.
 
 ## Data
 
