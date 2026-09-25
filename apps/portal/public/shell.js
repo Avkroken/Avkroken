@@ -20,6 +20,8 @@
 
     if (/^\/projekt\/[^/]+\/wiki(?:\/|$)/.test(path)) return "wiki";
 
+    if (/^\/projekt\/[^/]+\/issues(?:\/|$)/.test(path)) return "project-issues";
+
     if (/^\/projekt\/[^/]+\/releases(?:\/|$)/.test(path)) return "project-releases";
 
     if (/^\/projekt\/[^/]+$/.test(path)) return "project-detail";
