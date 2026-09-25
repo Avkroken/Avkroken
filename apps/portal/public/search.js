@@ -162,8 +162,13 @@
 
       const generated = formatFreshness(payload.generatedAt);
       const coverage = payload.source?.coverage;
+      const coverageLabel = coverage === "partial"
+        ? " · delvis täckning"
+        : coverage === "bounded"
+          ? " · begränsad täckning"
+          : "";
       freshness.textContent = generated
-        ? "Index " + generated + (coverage === "partial" ? " · delvis täckning" : "")
+        ? "Index " + generated + coverageLabel
         : "";
 
       renderResults(payload);
