@@ -1,6 +1,10 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
-import { normalizePublicRepositories } from "./project-source.mjs";
+import {
+  mergePublicProjectCatalog,
+  normalizePublicAppManifest,
+  normalizePublicRepositories
+} from "./project-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -10,6 +14,12 @@ const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
 const MAX_DOC_DEPTH = 2;
+
+const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
+const PUBLIC_APP_DISCOVERY_ROOT = "apps";
+const PUBLIC_APP_MANIFEST = "portal.public.json";
+const MAX_PUBLIC_APP_DIRECTORIES = 32;
+const MAX_PUBLIC_APP_MANIFEST_BYTES = 8192;
 
 const WATCHED_SERVICES = ["skvallerbyttan"];
 const HEARTBEAT_EXPECTED_INTERVAL_SECONDS = 15 * 60;
@@ -270,10 +280,101 @@ async function getDocContent(requestUrl, env) {
     }
   });
 }
+async function readPublicAppManifest(repo, directory, env) {
+  const sourcePath = directory.path;
+  const manifestPath = sourcePath + "/" + PUBLIC_APP_MANIFEST;
+  const endpoint = "https://api.github.com/repos/" +
+    encodeURIComponent(repo.owner.login) + "/" + encodeURIComponent(repo.name) +
+    "/contents/" + encodedPath(manifestPath) +
+    "?ref=" + encodeURIComponent(repo.default_branch);
+
+  const response = await fetch(endpoint, {
+    headers: githubHeaders(env, "application/vnd.github.raw+json")
+  });
+
+  if (response.status === 404) return { project: null, invalid: false };
+  if (!response.ok) return { project: null, invalid: true };
+
+  const raw = await response.text();
+  if (raw.length > MAX_PUBLIC_APP_MANIFEST_BYTES) {
+    return { project: null, invalid: true };
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(raw);
+  } catch {
+    return { project: null, invalid: true };
+  }
+
+  const project = normalizePublicAppManifest(manifest, {
+    sourcePath,
+    repositoryName: repo.full_name,
+    repository: repo.html_url,
+    ref: repo.default_branch,
+    hasDiscussions: repo.has_discussions === true,
+    updatedAt: repo.pushed_at || repo.updated_at || null,
+    stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : 0
+  });
+
+  return { project, invalid: project === null };
+}
+
+async function loadPublicAppProjects(repositories, env) {
+  const repo = repositories.find(candidate =>
+    candidate &&
+    candidate.name === PUBLIC_APP_DISCOVERY_REPOSITORY &&
+    candidate.visibility === "public" &&
+    candidate.archived === false
+  );
+
+  if (!repo) return { projects: [], status: "not_configured" };
+
+  const endpoint = "https://api.github.com/repos/" +
+    encodeURIComponent(repo.owner.login) + "/" + encodeURIComponent(repo.name) +
+    "/contents/" + encodedPath(PUBLIC_APP_DISCOVERY_ROOT) +
+    "?ref=" + encodeURIComponent(repo.default_branch);
+  const listing = await fetchGitHubJson(endpoint, env);
+
+  if (!listing.ok || !Array.isArray(listing.data)) {
+    return { projects: [], status: "unavailable" };
+  }
+
+  const directories = listing.data
+    .filter(item => item && item.type === "dir" && typeof item.path === "string")
+    .slice(0, MAX_PUBLIC_APP_DIRECTORIES);
+
+  let partial = listing.data.filter(item => item && item.type === "dir").length >
+    MAX_PUBLIC_APP_DIRECTORIES;
+
+  const manifests = await Promise.all(
+    directories.map(directory => readPublicAppManifest(repo, directory, env))
+  );
+
+  const projects = [];
+  for (const result of manifests) {
+    if (result.invalid) partial = true;
+    if (result.project) projects.push(result.project);
+  }
+
+  return {
+    projects,
+    status: partial ? "partial" : "available"
+  };
+}
+
 async function loadPublicProjects(env) {
   const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
   if (!github.ok) throw new Error("github_unavailable:" + github.status);
-  return normalizePublicRepositories(await github.json());
+
+  const repositories = await github.json();
+  const repositoryProjects = normalizePublicRepositories(repositories);
+  const appDiscovery = await loadPublicAppProjects(repositories, env);
+
+  return {
+    projects: mergePublicProjectCatalog(repositoryProjects, appDiscovery.projects),
+    appDiscovery: appDiscovery.status
+  };
 }
 
 async function getPublicProjects(env, ctx) {
@@ -288,15 +389,16 @@ async function getPublicProjects(env, ctx) {
   }
 
   try {
-    const projects = await loadPublicProjects(env);
+    const catalog = await loadPublicProjects(env);
     const body = JSON.stringify({
       source: {
         provider: "github",
         scope: "Avkroken",
-        coverage: "active_public_repositories"
+        coverage: "active_public_repositories_and_opt_in_apps",
+        appDiscovery: catalog.appDiscovery
       },
       generatedAt: new Date().toISOString(),
-      projects
+      projects: catalog.projects
     });
 
     const cachedResponse = new Response(body, {
