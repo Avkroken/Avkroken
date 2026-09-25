@@ -53,7 +53,7 @@ Credentialvärden dokumenteras inte här.
 
 Om GitHub API inte kan läsas returnerar backend `502 github_unavailable` och UI visar att projekt-/tjänstelistan är otillgänglig.
 
-Katalogsvaret innehåller `generatedAt` och deklarerad coverage `active_public_repositories`.
+Katalogsvaret innehåller `generatedAt` och deklarerad coverage `active_public_repositories_and_opt_in_apps`.
 
 ### Appdiscovery
 
@@ -73,9 +73,11 @@ Opt-in-appdiscovery läser endast `portal.public.json` under appkataloger.
 
 Om GitHub-katalogen inte kan läsas returneras `502` med `github_unavailable`. UI visar ett explicit unavailable-state.
 
+Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
+
 ### Dokumentinnehåll
 
-- okänd repository/path: `404 document_not_found`;
+- okänd katalognyckel/route-path eller path som inte finns i katalogpostens allowlist: `404 document_not_found`;
 - providerfel: `404` eller `502 document_unavailable`;
 - dokument över tillåten storlek: `413 document_too_large`.
 
@@ -109,8 +111,9 @@ Service binding används i stället för att exponera en publik administrationse
 - Lägg inte providercredentials i browser assets.
 - Skapa inte ny credential för Portal v2 om befintligt verifierat flöde räcker.
 - `.github`, retired sources, arkiverade och icke-publika repositories ska inte hamna i den publika projektkatalogen.
-- Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post.
-- Jobb/Auth-data får inte passera publik Portal-cache eller publik sök.
+- Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post eller app-docs-källa.
+- Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
+- Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök.
 - Skvallerbyttans providerintegration förblir read-only.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
 
@@ -124,8 +127,9 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
-7. dokumentationsrendering visar “Visa original” till canonical källa;
-8. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-9. cache-/heartbeat-beteende har inte regresserat.
+7. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
+8. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
+9. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
+10. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
