@@ -976,6 +976,57 @@ a.portal-product-card:hover {
   text-align: right;
 }
 
+.project-issues-list {
+  display: grid;
+  gap: var(--ak-space-3);
+}
+
+.project-issue {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ak-space-4);
+  align-items: start;
+  padding: var(--ak-space-4);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-3);
+  background:
+    linear-gradient(150deg, rgb(255 255 255 / 2%), transparent 60%),
+    var(--ak-surface-default);
+}
+
+.project-issue-main {
+  min-width: 0;
+}
+
+.project-issue-number {
+  display: block;
+  margin-bottom: var(--ak-space-1);
+  color: var(--ak-text-tertiary);
+  font: .72rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.project-issue-title {
+  color: var(--ak-text-primary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  font-weight: 680;
+  line-height: 1.45;
+}
+
+.project-issue-title:hover {
+  color: var(--ak-accent-strong);
+}
+
+.project-issue-meta {
+  display: grid;
+  justify-items: end;
+  gap: var(--ak-space-1);
+  color: var(--ak-text-tertiary);
+  white-space: nowrap;
+  font-size: .75rem;
+}
+
 .changelog-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1192,6 +1243,14 @@ a.portal-product-card:hover {
 
   .portal-search-control {
     grid-template-columns: 1fr;
+  }
+
+  .project-issue {
+    grid-template-columns: 1fr;
+  }
+
+  .project-issue-meta {
+    justify-items: start;
   }
 
   .changelog-release-head,
