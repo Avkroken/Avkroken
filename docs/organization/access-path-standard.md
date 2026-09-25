@@ -1,5 +1,8 @@
 # Access-standard för Avkrokens webbappar
 
+> **Scope:** Detta dokument gäller webbappar i `Avkroken/Avkroken`-monorepot. Fristående Avkroken-repositories äger sina egna access-/exponeringskontrakt.
+
+
 Grundprincipen är **neka som standard**. Ingenting ska bli publikt bara för att det råkar ligga på en Worker eller under en gemensam domän.
 
 ## Två exponeringsroller
