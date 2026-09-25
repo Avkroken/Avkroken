@@ -8,7 +8,7 @@ permalink: /architecture/
 
 ## Mål
 
-Skvallerbyttan är Avkrokens centrala read-only observationslager och eventnav. GitHub och Cloudflare är auktoritativa providers; provider-webhooks terminerar i Skvallerbyttan, som normaliserar deras state, lagrar begränsad historik och exponerar samma canonical underlag till dashboard och auktoriserade maskinklienter. `Avkroken/Avkroken` och `avkroken.denied.se` är den centrala organisations- och frontytan, inte ett separat provider-observationslager.
+Skvallerbyttan är repositoryts read-only observationslager och eventnav. Koden exponerar webhook-ingress för GitHub och Cloudflare, normaliserar provider-state, lagrar begränsad historik och exponerar samma normaliserade underlag till dashboard och auktoriserade maskinklienter. Faktisk webhookkonfiguration är extern providerstate. `Avkroken/Avkroken` och `avkroken.denied.se` är den centrala organisations- och frontytan, inte ett separat provider-observationslager.
 
 ```text
 GitHub APIs ───────────────┐
@@ -81,7 +81,7 @@ GitHub-providerobservationer använder endast read-behörigheter. Administration
 
 ## GitHub
 
-Skvallerbyttan använder **Gamnacken**, Avkrokens canonical GitHub App, för read-only maskinåtkomst. Installation tokens är kortlivade och cacheas endast i Worker-instansen. En separat Skvallerbyttan GitHub App ingår inte i målarkitekturen.
+GitHub-providerkoden använder credential-bindings med `GAMNACKEN_GITHUB_APP_*`-namn för GitHub App-auth. Installation tokens är kortlivade och cacheas endast i Worker-instansen. Vilken App-installation som faktiskt är aktiv är extern GitHub-state.
 
 Canonical GitHub-state omfattar bland annat:
 
