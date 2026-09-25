@@ -1,5 +1,8 @@
 # Cloudflare credential policy
 
+> **Scope:** Detta dokument sammanfattar stabila credentialroller som används av berörda appar i `Avkroken/Avkroken`-monorepot. Det är inte en organisationsövergripande credential authority och styr inte fristående repositories.
+
+
 Det här dokumentet beskriver en **publik, repository-deklarerad least-privilege-modell**. Det är inte en inventering av faktiska Cloudflare-tokens, deras värden, resource scopes eller nuvarande account-state.
 
 ## Grundregler
