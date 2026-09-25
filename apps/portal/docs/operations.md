@@ -95,7 +95,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 3. `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
 4. deep links returnerar Portal-shell;
 5. dokumentationsrendering visar “Visa original” till canonical källa;
-6. Jobb-data går inte att hämta genom publika Portal-routes;
+6. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
 7. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
