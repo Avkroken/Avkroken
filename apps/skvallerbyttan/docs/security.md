@@ -59,7 +59,7 @@ Klasserna är partitionerade och rangordnade utan arv. Ett R3-token ersätter d�
 
 Worker-runtime får `CLOUDFLARE_API_TOKEN_R1`, `CLOUDFLARE_API_TOKEN_R2` och `CLOUDFLARE_API_TOKEN_R3` som Cloudflare Secrets Store-bindings. Koden hämtar värdet asynkront via bindingens `get()` och har ingen generisk Cloudflare-tokenfallback. De bundna secreten ska vara scope:ade för `workers`.
 
-Produktionsdeploy och explicit secret-sync använder W1 som operationscredential genom `CLOUDFLARE_API_TOKEN_W1`. W1 distribueras inte till observationsruntime som providercredential. W1 innehåller Secrets Store Write eftersom Wrangler-konfigurationen deklarerar Secrets Store-bindings.
+Produktionsdeploy och explicit secret-sync använder W1 som operationscredential genom `CLOUDFLARE_API_TOKEN_W1`. W1 distribueras inte till observationsruntime som providercredential. Deploycredentialen behöver de rättigheter som Cloudflare kräver för de operationer workflowen kör; faktisk tokenpermission-state dokumenteras inte här.
 
 Observationskoden får inte använda W1/O1 som fallback vid 403. En saknad providerpermission ska i stället rapporteras som capability-/permission-state.
 
@@ -87,7 +87,7 @@ Audit Log-normalisering har regressionstest för dessa gränser.
 
 ### GitHub
 
-`/webhooks/github` kräver POST, det befintliga Worker-secretet `SKVALLERBYTTAN_WEBHOOK_SECRET` och giltig `X-Hub-Signature-256`. **GitHub organization webhook är den enda canonical GitHub-eventkällan.** Gamnacken används för read-auth och dess App-webhook ska vara avstängd. Som migrationsskydd känner runtime primärt igen GitHub App-ingress via `X-GitHub-Hook-Installation-Target-Type: integration`, med top-level `installation` som fallback, och kvitterar den som pensionerad ingress utan att skriva Activity, cache, säkerhetsledger eller en extra warning-logg per leverans. Övriga leveranser måste fortfarande passera HMAC-verifieringen; skyddet accepterar alltså inte en alternativ secret. Delivery-ID dedupliceras innan ledger/cache uppdateras. Skvallerbyttan är canonical GitHub-eventingress; front-Workern ska inte ha en parallell GitHub-webhook enbart för docs-freshness. Docs-relevanta events skickas efter providerverifiering genom den interna Cloudflare Service Bindingen `AVKROKEN_PORTAL_DOCS` till portalens namngivna RPC-entrypoint. Service Bindingen kräver ingen separat secret och är inte en publik HTTP-endpoint.
+`/webhooks/github` kräver POST, det befintliga Worker-secretet `SKVALLERBYTTAN_WEBHOOK_SECRET` och giltig `X-Hub-Signature-256`. **Runtimekontraktet för extern GitHub-eventingress är organization-webhookformatet.** Gamnacken används i koden för read-auth; faktisk webhookkonfiguration måste verifieras i GitHub. Som migrationsskydd känner runtime primärt igen GitHub App-ingress via `X-GitHub-Hook-Installation-Target-Type: integration`, med top-level `installation` som fallback, och kvitterar den som pensionerad ingress utan att skriva Activity, cache, säkerhetsledger eller en extra warning-logg per leverans. Övriga leveranser måste fortfarande passera HMAC-verifieringen; skyddet accepterar alltså inte en alternativ secret. Delivery-ID dedupliceras innan ledger/cache uppdateras. Koden centraliserar GitHub-eventhantering i Skvallerbyttan och skickar docs-relevanta signaler vidare internt. Docs-relevanta events skickas efter providerverifiering genom den interna Cloudflare Service Bindingen `AVKROKEN_PORTAL_DOCS` till portalens namngivna RPC-entrypoint. Service Bindingen kräver ingen separat secret och är inte en publik HTTP-endpoint.
 
 ### Cloudflare
 
