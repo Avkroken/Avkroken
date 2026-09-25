@@ -191,9 +191,19 @@ export function mergePublicProjectCatalog(repositoryProjects, appProjects) {
   ];
 
   const unique = new Map();
+  const slugs = new Set();
+
   for (const project of projects) {
     if (!project || typeof project.id !== "string" || unique.has(project.id)) continue;
+
+    const slug = typeof project.slug === "string"
+      ? project.slug.trim().toLocaleLowerCase("en-US")
+      : "";
+
+    if (slug && slugs.has(slug)) continue;
+
     unique.set(project.id, project);
+    if (slug) slugs.add(slug);
   }
 
   return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "sv"));
