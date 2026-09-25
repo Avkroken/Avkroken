@@ -53,3 +53,5 @@ const handler = {
 } satisfies ExportedHandler<Env>;
 
 export default handler;
+
+export { PortalObservationsService } from "./portal-observations";
