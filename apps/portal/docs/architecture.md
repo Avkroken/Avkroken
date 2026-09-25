@@ -154,8 +154,9 @@ Wiki-publicering är repository-specifik: endast projekt med `has_wiki = true` f
 Builds/CI är repositoryspecifik operativ state och går därför genom Skvallerbyttans befintliga observationsgräns i stället för en parallell Actions-klient i Portalen.
 
 ```text
-public Portal project catalog
+live GitHub public repository list
        |
+       +--> project-source repository policy
        +--> repository project only
                  |
                  v
@@ -182,7 +183,7 @@ archived=false
 public-safe CI snapshot
 ```
 
-Portalen validerar först aktuell publik project-state. Skvallerbyttan gör därefter defense in depth mot den cacheade repositoryraden och kräver `visibility = public` och `archived != true`.
+Portalen validerar först aktuell publik repository-state genom `type=public`-listningen och samma `normalizePublicRepositories()`-policy som projektkatalogen; app-manifestdiscovery körs inte för Builds-gaten. Skvallerbyttan gör därefter defense in depth mot den cacheade repositoryraden och kräver `visibility = public` och `archived != true`.
 
 RPC:n gör ingen live GitHub-request. Den läser den canonical `overview` source-cachen och returnerar endast samplebaserad Actions-summary samt cache freshness. Actor, accepted/required permissions, providerfel, event breakdown och rå runpayload ingår inte.
 
