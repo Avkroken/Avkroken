@@ -34,6 +34,11 @@ export function projectReleasesPath(projectSlug) {
   return slug ? "/projekt/" + encodeURIComponent(slug) + "/releases" : "/projekt";
 }
 
+export function projectIssuesPath(projectSlug) {
+  const slug = String(projectSlug || "").trim();
+  return slug ? "/projekt/" + encodeURIComponent(slug) + "/issues" : "/projekt";
+}
+
 export function documentationPath(repositoryName = null, sourcePath = null) {
   const repo = String(repositoryName || "").trim();
   const base = repo

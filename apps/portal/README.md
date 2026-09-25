@@ -39,6 +39,7 @@ Portal v2 etablerar:
 - Drift & insyn från en sanerad Skvallerbyttan-snapshot via intern read-only Service Binding;
 - Changelog från officiella publicerade GitHub Releases för redan publicerade repositoryprojekt;
 - projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
+- projektspecifik Issues-vy på `/projekt/:slug/issues` för repositoryprojekt, med PR-filtrering och minimal public-only Issue-modell;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -53,6 +54,7 @@ Portalen känner bland annat igen:
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:slug/wiki` — Portal-presentation av repositoryts genererade Wiki-navigation, med länk till original-Wikin.
 - `/projekt/:slug/releases` — officiella publicerade GitHub Releases för repositoryprojekt; monorepo-appar får ingen ärvd releasevy.
+- `/projekt/:slug/issues` — publika GitHub Issues för repositoryprojekt; pull requests filtreras bort och monorepo-appar får ingen ärvd Issue-vy.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -80,6 +82,7 @@ Nuvarande Worker exponerar:
 - `GET /api/operations` — public-safe provider-/capabilitystatus från Skvallerbyttans read-only observationsmodell; responsen är `no-store`.
 - `GET /api/changelog` — bounded releasehistorik från publicerade repositoryprojekt; draft releases, monorepo-app-arv och rå release-body/author/assets exkluderas.
 - `GET /api/releases?project=...` — projektspecifik, `no-store` releasehistorik för ett redan publicerat repositoryprojekt med samma minimala releasemodell.
+- `GET /api/issues?project=...` — projektspecifik, `no-store` Issue-lista för ett redan publicerat repositoryprojekt; PR-poster och rå body/actor/assignee/milestone filtreras bort.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -151,6 +154,23 @@ Changelog använder endast repositoryprojekt som fortfarande passerar den live p
 Repositoryprojekt får både canonical GitHub Releases-länk och intern `releasesPortalUrl`. Monorepo-appar är separata projektidentiteter: deras `releases` och `releasesPortalUrl` är `null`, så source-repositoryts releasehistorik kan inte presenteras som appens egen.
 
 Den publika releasemodellen innehåller endast projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft releases och rå body/author/assets/target SHA publiceras inte. Changelog-snapshoten och projektspecifika release-responser lagras inte persistent i Cache API.
+
+### Repository Issues
+
+```text
+live public project catalog
+  -> repository projects only
+  -> GitHub Issues (state=all, updated desc)
+  -> issue-source normalization
+  -> GET /api/issues?project=...
+  -> /projekt/:slug/issues
+```
+
+Repositoryprojekt får canonical GitHub Issues-länk och intern `issuesPortalUrl`. Monorepo-appar är separata projektidentiteter: deras `issues` och `issuesPortalUrl` är `null`, så source-repositoryts Issues kan inte presenteras som appens egna.
+
+GitHubs Issues-endpoint kan innehålla pull requests. Sanitizern filtrerar därför alltid poster med `pull_request` före publicering. Den publika Issue-modellen innehåller endast issue-nummer, titel, state, created/updated, comment-count, högst åtta labelnamn, repository/project-identitet och canonical Issue-URL. Body, author, assignee, milestone och labelmetadata publiceras inte.
+
+Endpointen returnerar högst 30 senast uppdaterade poster från providerrequesten och lagras inte persistent i Cache API.
 
 ### Operativ state
 

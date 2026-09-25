@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot projektspecifik Releases-integration: 2026-09-25.
+Senast verifierad mot projektspecifik Issues-integration: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -47,7 +47,8 @@ Worker-koden innehåller idag:
 - server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor;
 - Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding;
 - Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt;
-- projektspecifik Releases-vy för repositoryprojekt via samma public-only releaseadapter.
+- projektspecifik Releases-vy för repositoryprojekt via samma public-only releaseadapter;
+- projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering.
 
 ## Publik projektmodell
 
@@ -110,12 +111,12 @@ Detaljvyn visar:
 - canonical repository, ref och app-source-path när sådan finns;
 - dokumentation i Portalen;
 - publik tjänste-URL när den finns;
-- canonical länkar till repository, Wiki där tillgängligt, Issues och Discussions;
-- intern Releases-navigation för repositoryprojekt.
+- canonical länkar till repository, Wiki där tillgängligt och Discussions;
+- intern Issues- och Releases-navigation för repositoryprojekt.
 
-Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. Monorepo-appar får ingen Releases-länk och kan inte ärva source-repositoryts releasehistorik.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Monorepo-appar får varken Issues- eller Releases-länk och kan inte ärva source-repositoryts historik som appdata.
 
-Detaljvyn hämtar fortfarande inte Issues, workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
+Detaljvyn hämtar fortfarande inte workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
 
 ## Wiki-presentation
 
@@ -177,6 +178,39 @@ Den projektspecifika release-endpointen använder samma `eligibleReleaseProjects
 - normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 10 releaser.
 
 Responsen innehåller minimal project-identitet, canonical GitHub Releases-länk och samma sanerade releasemodell som Changelog.
+
+## Projektspecifika Issues
+
+### `/api/issues?project=...`
+
+Endpointen använder aktuell public project-state och accepterar endast poster som uppfyller repositorykraven i `eligibleIssueProjects`.
+
+Providerread:
+
+- exakt `Avkroken/<repo>` från den redan validerade project-posten;
+- `state=all`, sorterad efter senaste uppdatering;
+- max 30 providerposter;
+- GitHubs PR-poster filtreras genom `pull_request`-fältet.
+
+Den publika modellen innehåller:
+
+- project slug/name/Portal URL;
+- repository;
+- issue-nummer och titel;
+- `open`/`closed`;
+- created/updated;
+- comment-count;
+- högst åtta labelnamn;
+- canonical GitHub Issue-URL.
+
+Body, user/author, assignee, milestone, label color/description och andra råfält kopieras inte.
+
+Felmodell:
+
+- tom/ogiltig slug: `400 invalid_project`;
+- okänt projekt eller monorepo-app: `404 project_issues_not_found`;
+- providerfel: `502 project_issues_unavailable`;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`.
 
 ## Global sök
 
@@ -268,7 +302,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- provider-backed projektdetaljdata för Issues/CI/aktivitet inne i Portalen;
+- provider-backed projektdetaljdata för CI/aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - aktivitetsström;

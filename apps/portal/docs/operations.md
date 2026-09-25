@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog- och projektspecifika Releases-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases- och Issues-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -154,6 +154,22 @@ Endpointen återanvänder Changelogs release-sanitizer och publicerar endast pro
 
 Monorepo-appar får ingen `releasesPortalUrl` och deras project-model har `releases = null`.
 
+### Projektspecifika Issues
+
+`GET /api/issues?project=<slug>` läser endast ett projekt som först har passerat den publika projektkatalogens repository-policy.
+
+- saknad/tom eller för lång project slug: `400 invalid_project`;
+- okänd slug eller monorepo-app: `404 project_issues_not_found`;
+- GitHub Issue-read misslyckas: `502 project_issues_unavailable`;
+- inga Issues efter PR-filtrering: `200`, `status = available`, tom `issues`-lista;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 30 Issues.
+
+Providerrequesten använder `state=all&sort=updated&direction=desc`. GitHubs Issues-API kan inkludera pull requests; `issue-source.mjs` filtrerar därför poster med `pull_request`.
+
+Endpointen publicerar inte body, author/user, assignee, milestone eller label color/description. Browsern anropar endast Portalens `/api/issues`.
+
+Monorepo-appar får ingen `issuesPortalUrl` och deras project-model har `issues = null`.
+
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -210,6 +226,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
 - Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
+- Projektspecifika Issues får endast läsa Issues för live-publicerade repositoryprojekt; filtrera GitHub PR-poster explicit och låt inte monorepo-appar ärva source-repositoryts Issues.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -220,7 +237,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations` och `/api/changelog` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå releasepayload;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion` och `/api/issues?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -237,6 +254,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 17. Changelog visar `bounded`/`partial` coverage och använder ingen persistent snapshotcache;
 18. `/projekt/Bastion/releases` visar endast Bastions publicerade releases och canonical GitHub-länk; `/projekt/skvallerbyttan/releases` saknar app-releasekälla och appens projektdetalj visar ingen Releases-knapp;
 19. `/api/releases?project=Bastion` är `no-store` och innehåller ingen raw body/author/assets/target commit;
-20. cache-/heartbeat-beteende har inte regresserat.
+20. `/projekt/Bastion/issues` visar endast Bastions sanerade Issues och canonical GitHub-länk; PR-poster filtreras bort och `/projekt/skvallerbyttan/issues` saknar app-Issuekälla;
+21. `/api/issues?project=Bastion` är `no-store` och innehåller ingen body/user/assignee/milestone eller labelmetadata utöver namn;
+22. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
