@@ -144,7 +144,8 @@ Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `pa
 ### Changelog
 
 ```text
-live public project catalog
+live GitHub public repository list
+  -> project-source repository policy
   -> repository projects only
   -> GitHub Releases
   -> release-source normalization
@@ -188,7 +189,7 @@ live public project catalog
   -> /projekt/:slug/builds
 ```
 
-Portalen gör ingen GitHub Actions-request för Builds/CI. Slugen måste först resolvea till ett redan publicerat repositoryprojekt, och Skvallerbyttans RPC gör en andra publiceringskontroll mot den cacheade repositoryradens `visibility = public` och `archived != true`.
+Portalen gör ingen GitHub Actions-request för Builds/CI. Slugen måste först resolvea genom en minimal live `type=public` repositorylistning och Portalens repositorypolicy, och Skvallerbyttans RPC gör en andra publiceringskontroll mot den cacheade repositoryradens `visibility = public` och `archived != true`.
 
 CI-snapshoten innehåller endast samplebaserad Actions-summary: pass rate, completed/success/failed/cancelled/in-progress, failures senaste 24h/7d, latest failure, duration median/p95 och MTTR. Actor, provider-permissions, providerfel, event breakdown och rå runpayload publiceras inte.
 
