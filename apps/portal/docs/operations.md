@@ -91,7 +91,7 @@ Wiki-vyn använder endast `/api/projects` och `/api/docs`.
 - unavailable project/docs catalog ger explicit degraded state;
 - “Visa original-Wiki” pekar på canonical GitHub Wiki.
 
-Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet.
+Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment.
 
 ### Dokumentationskatalog
 
@@ -175,7 +175,7 @@ Monorepo-appar får ingen `issuesPortalUrl` och deras project-model har `issues 
 
 ### Projektspecifik Builds / CI
 
-`GET /api/builds?project=<slug>` kräver först ett repositoryprojekt som passerar Portalens aktuella publiceringspolicy. Endpointen gör därefter endast ett internt RPC-anrop till `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryCi(repoName)`.
+`GET /api/builds?project=<slug>` gör först en live `type=public` repositorylistning och normaliserar den med Portalens repositorypolicy. App-manifestdiscovery används inte i Builds-gaten. Endpointen gör därefter endast ett internt RPC-anrop till `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryCi(repoName)`.
 
 - saknad/tom eller för lång project slug: `400 invalid_project`;
 - okänd slug eller monorepo-app: `404 project_builds_not_found`;
