@@ -1,104 +1,72 @@
-# Repository-integration för dokumentation
+# Dokumentationsintegration i Avkroken/Avkroken
 
-Det här dokumentet beskriver hur `Avkroken/Avkroken`, den publika `.github`-ytan och fristående projektrepositories ska fungera tillsammans.
+Detta dokument beskriver **endast monorepot `Avkroken/Avkroken`**.
 
-## Ansvarsfördelning
+## Ansvar
 
-### Avkroken/Avkroken
+### Root
 
-Äger den tekniska gemensamma modellen:
+Root äger:
 
-- dokumentationsstandard,
-- central navigation,
-- engineering-kontext,
-- monorepots repository-lokala workflows.
+- repositoryövergripande workflows och konfiguration,
+- delad dokumentation som faktiskt gäller flera `apps/*`,
+- navigation till monorepots appar.
 
-### Avkroken/.github
+### App
 
-Äger endast GitHubs publika organisationsprofil och community health-filer som ska ärvas av publika repositories.
-
-### Projektrepository
-
-Äger sin egen teknik:
+Varje app under `apps/*` äger:
 
 - README,
 - `docs/index.md`,
-- arkitektur,
+- project-context,
+- architecture,
 - operations,
 - API/auth/data/integrationsdokumentation efter behov,
-- repo-specifika agentinstruktioner.
+- app-specifika agentinstruktioner.
 
-### Wiki
+### Fristående Avkroken-repository
 
-Ger en läsarvänlig, klickbar presentation för repos där dokumentationsmängden motiverar flera sidor.
+Äger helt själv sin:
 
-## Rekommenderad struktur
+- README och `docs/`,
+- Wiki,
+- Issues,
+- Discussions,
+- repo-specifika workflows/instruktioner.
 
-```text
-README.md
-AGENTS.md
-docs/
-  index.md
-  project-context.md
-  architecture.md
-  operations.md
-  ... ämnesspecifika sidor
-```
+Det finns ingen central engineeringkälla som fristående repositories måste läsa.
 
-Små repos kan ha färre filer, men navigation och verifieringsväg ska fortfarande vara tydliga.
+### Avkroken/.github
+
+Får bära organisationsprofil, community health och en **genererad lässpegel** av dokumentation. Spegeln är navigation, inte source of truth.
 
 ## Navigationsflöde
 
-En läsare ska kunna gå:
-
 ```text
-Avkrokens portal eller dokumentationsnav
+samlad genererad portal
         |
         v
-repository README
+canonical repository
         |
-        v
-docs/index.md / Wiki
-        |
-        +--> architecture
-        +--> operations
-        +--> API/auth/data/etc.
+        +--> README
+        +--> docs/index.md
+        +--> Wiki
+        +--> Issues
+        +--> Discussions
 ```
 
 ## Undvik duplication
 
-Samma detalj ska inte kopieras mellan central docs, README, project-context och Wiki utan anledning.
+Teknisk information ändras i det repository som äger den. Aggregatet ska genereras från källan och inte handredigeras som en andra dokumentationsgren.
 
-Använd:
+## Wiki
 
-- `docs/organization/` för organisationsgemensamma regler,
-- project docs för implementation,
-- README för orientering,
-- Wiki för navigation/presentation.
-
-## Länkar
-
-Repo-lokala Markdownfiler ska använda relativa länkar när målet ligger i samma repository.
-
-Central navigation använder normala GitHub-länkar till andra repositories.
-
-## Wiki-publicering
-
-Wiki är ett separat Git-repository (`<repo>.wiki.git`). När en automatiserad synk används ska den:
-
-1. utgå från versionsstyrt innehåll i huvudrepositoryt,
-2. använda minsta nödvändiga write-permission,
-3. endast köras från betrodd default-branch-state,
-4. inte låta PR-kontrollerad kod få godtycklig write-access,
-5. misslyckas tydligt om Wiki ännu inte är initialiserad.
-
-Innan en sådan synk införs ska Wiki-repot kunna verifieras som initialiserat. En sync-workflow ska inte läggas till som ett blint experiment.
+Wiki är ett separat Git-repository (`<repo>.wiki.git`). Om synkautomation införs ska den utgå från betrodd default-branch-state, använda minsta nödvändiga write-behörighet och aldrig låta opålitlig PR-kod få godtycklig Wiki-write.
 
 ## Underhåll
 
 Vid dokumentationsändring:
 
-- uppdatera källan i projektrepositoryt,
-- håll README/index-navigation korrekt,
-- uppdatera Wiki-presentationen när publiceringsvägen är tillgänglig,
-- uppdatera centrala länkar endast när repo/struktur ändras.
+1. uppdatera källan i ägande repository;
+2. håll dess README/docs/Wiki-navigation korrekt;
+3. låt aggregatet spegla ändringen automatiskt.

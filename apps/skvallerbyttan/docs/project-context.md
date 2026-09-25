@@ -19,13 +19,11 @@ Senast verifierad för observationslagerarbetet: 2026-09-23.
 - appdokumentation: versionsstyrd i monorepot; ingen separat Pages-publicering
 - full repository check: `npm run check`
 
-`docs/organization/` i `Avkroken/Avkroken` är central källa för organisationsgemensam engineering-, CI- och governance-kontext.
-
 ## Produktansvar
 
 Skvallerbyttan är Avkrokens centrala **read-only observationslager och eventnav** för GitHub och Cloudflare. Dashboard och machine API delar samma canonical normaliserade state. Provider-webhooks ska termineras här; andra Avkroken-tjänster reagerar via interna signaler i stället för att skapa parallella provider-integrationer.
 
-`Avkroken/Avkroken` är central organisations-/engineeringkälla och `avkroken.denied.se` är fronten. Skvallerbyttan är underförrådet som äger eventström, Activity och samlad historik.
+Skvallerbyttans app-local tekniska current-state ägs av `apps/skvallerbyttan`. Portal och andra appar i samma monorepo har egna ansvar; delad monorepo-kontext dokumenteras endast när den faktiskt delas.
 
 Skvallerbyttan är inte ett administrativt provider-API.
 
@@ -59,7 +57,7 @@ Runtime behåller endast sanerad GitHub App-permissionmetadata från installatio
 
 ## Cloudflare
 
-Skvallerbyttans Cloudflare-provider är read-only och följer Avkrokens centrala credentialmodell i `../../docs/organization/cloudflare-credential-standard.md`.
+Skvallerbyttans Cloudflare-provider är read-only. Den stabila credentialmodellen är en del av Skvallerbyttans eget kod- och säkerhetskontrakt; `../../../docs/organization/cloudflare-credential-standard.md` är endast en monorepo-lokal sammanfattning, inte extern source of truth.
 
 Provider-reads är partitionerade och rangordnade utan arv:
 

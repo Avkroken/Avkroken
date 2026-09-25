@@ -14,7 +14,7 @@ Vid konflikt för repo-specifik teknik gäller följande ordning:
 4. Det här dokumentet.
 5. Äldre pull requests, issues och historik.
 
-Organisationsgemensamma standarder finns i `docs/organization/` i `Avkroken/Avkroken`, men externa GitHub-/Cloudflare-inställningar är inte app-local current-state och kopieras inte hit. Historik hör hemma i Git.
+`docs/organization/` innehåller delad kontext för `Avkroken/Avkroken`-monorepot. Jobbs app-local current-state ägs av `apps/jobb`, medan extern GitHub-/Cloudflare-live-state verifieras hos respektive provider. Historik hör hemma i Git.
 
 ## Syfte och säkerhetsgräns
 

@@ -49,7 +49,7 @@ GitHub App client secret används inte i installation-auth-flödet. Worker skapa
 
 ## Cloudflare provider auth
 
-Cloudflare-providerreads använder tre separata read-klasser enligt Avkrokens centrala credentialstandard:
+Cloudflare-providerreads använder tre separata read-klasser enligt Skvallerbyttans repo-deklarerade credentialmodell:
 
 - **R1:** platform/resource reads.
 - **R2:** analytics/observability/operations reads.
