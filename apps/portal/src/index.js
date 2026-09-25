@@ -704,6 +704,57 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 }
 
+async function getPublicOperations(env) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicOperationsSummary !== "function") {
+    return new Response(JSON.stringify({
+      schemaVersion: 1,
+      available: false,
+      status: "not_configured",
+      error: "operations_not_configured"
+    }), {
+      status: 503,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const snapshot = await service.getPublicOperationsSummary();
+    return new Response(JSON.stringify({
+      available: true,
+      status: "available",
+      ...snapshot
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("operations snapshot unavailable", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return new Response(JSON.stringify({
+      schemaVersion: 1,
+      available: false,
+      status: "error",
+      error: "operations_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 function operationalWatchdogStub(env, service) {
   if (!env.OPS_WATCHDOG) throw new Error("operational watchdog binding is not configured");
   const id = env.OPS_WATCHDOG.idFromName(service);
@@ -1027,6 +1078,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return searchPortal(url, env, ctx);
+    }
+
+    if (url.pathname === "/api/operations") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicOperations(env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";

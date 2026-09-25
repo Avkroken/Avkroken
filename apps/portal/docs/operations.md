@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki- och sökklienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök- och Drift & insyn-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -41,7 +41,8 @@ Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DN
 - observability med loggar och traces;
 - schedulerad watchdog-kontroll;
 - Durable Object `OperationalWatchdog`;
-- e-postbinding för operativa notifieringar.
+- e-postbinding för operativa notifieringar;
+- `SKVALLERBYTTAN_OBSERVATIONS` — intern Service Binding till `skvallerbyttan`/`PortalObservationsService`.
 
 Credentialvärden dokumenteras inte här.
 
@@ -121,6 +122,18 @@ Kall indexbuild är budgeterad:
 - coverage `bounded` eller `partial`;
 - ingen persistent sökindexcache; samtidiga builds i samma isolate kollapsas.
 
+### Drift & insyn
+
+`GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
+
+- saknad binding/entrypoint: `503 operations_not_configured`;
+- RPC-fel: `502 operations_unavailable`;
+- normal snapshot: `200`, `available = true`, `Cache-Control: no-store`.
+
+Endpointen returnerar inte Skvallerbyttans råa `/api/v1`-payload. Provider-permissions, installationmetadata, HTTP-status/felsträngar, scope coverage/repositoryantal och Activity/eventvolym ingår inte i snapshoten.
+
+Klienten anropar endast Portalens `/api/operations` och känner inte till Skvallerbyttans origin, dashboard-session eller machine bearer-token.
+
 ### Heartbeat
 
 `OperationalWatchdog` håller state för Skvallerbyttans heartbeat och kan markera stale när förväntad leverans uteblir.
@@ -161,6 +174,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
 - Skvallerbyttans providerintegration förblir read-only.
+- Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
 
 ## Efter deployment
@@ -169,7 +183,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs` och `/api/search?q=arkitektur` fungerar utan att exponera credentials;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur` och `/api/operations` fungerar utan att exponera credentials eller rå Skvallerbyttan-state;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -180,6 +194,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 11. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
 12. sök på ett publikt dokument ger Portal-resultat + canonical original, medan `jobb` inte kan ge skyddad Jobb-dokumentation genom indexet;
 13. sökresultat visar `bounded`/`partial` coverage och index-freshness;
-14. cache-/heartbeat-beteende har inte regresserat.
+14. `/drift` visar endast public-safe providerstatus och capability status/freshness/last-success; scope counts och Activity/eventvolym exponeras inte;
+15. om observationsbindingen saknas/faller visar `/drift` degraded state och fabricerar ingen providerstatus;
+16. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

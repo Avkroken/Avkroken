@@ -36,6 +36,7 @@ Portal v2 etablerar:
 - stabila dokumentations-URL:er;
 - rendering av publik repository-README/docs och opt-in-app-README/docs i portalen;
 - server-side global sök över publicerade projekt, README/docs och Wiki-presentationer;
+- Drift & insyn från en sanerad Skvallerbyttan-snapshot via intern read-only Service Binding;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -73,6 +74,7 @@ Nuvarande Worker exponerar:
 - `GET /api/docs` — katalog över tillåtna publika repository- och opt-in-appdokument.
 - `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL; content-path måste redan finnas i den publika katalogposten.
 - `GET /api/search?q=...` — rankade sökträffar från ett server-side index byggt endast från publicerade projekt och dokumentationskällor.
+- `GET /api/operations` — sanerad provider-/capability-/aktivitetsöversikt från Skvallerbyttans read-only observationsmodell; responsen är `no-store`.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -133,11 +135,16 @@ Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `pa
 ```text
 GitHub / Cloudflare
   -> Skvallerbyttan
-  -> normaliserad read-only observation
-  -> Portal
+  -> canonical read-only observation
+  -> PortalObservationsService
+  -> intern Service Binding
+  -> GET /api/operations
+  -> Drift & insyn
 ```
 
-Portalen ska inte skapa en andra bred providerklient för driftdata när Skvallerbyttans modell täcker behovet.
+Portalen skapar ingen andra providerklient och använder ingen Skvallerbyttan bearer-token för driftvyn. Den interna RPC-entrypointen returnerar endast en public-safe snapshot med providerstatus och capability status/dataState/freshness/last-success.
+
+Rå provider-permissions, installationmetadata, felsträngar, scope coverage/repositoryantal och Activity/eventvolym lämnar inte Skvallerbyttans skyddade observationsgräns.
 
 ### Skyddad Jobb-data
 

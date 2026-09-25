@@ -371,30 +371,68 @@
         <div class="portal-kicker">DRIFT &amp; INSYN</div>
         <h1 id="operations-title">Vad Avkroken ser</h1>
         <p>
-          Operativ state ska i första hand komma från Skvallerbyttans normaliserade read-only modell,
-          med freshness och täckning tydligt skilda från antagen komplett aktivitet.
+          Public-safe read-only status från Skvallerbyttan. Vyn visar provider- och capabilityhälsa
+          utan repositoryantal, aktivitetsvolym, credentials, permissiondetaljer eller råa event.
         </p>
       </div>
-      <div class="portal-card-grid">
+
+      <div class="operations-meta">
+        <span id="operations-status" aria-live="polite">Läser observerad state…</span>
+        <span id="operations-generated"></span>
+      </div>
+
+      <div class="portal-card-grid" id="operations-provider-grid">
         <div class="portal-info-card">
-          <div class="portal-meta-label">GITHUB</div>
-          <h3>Observerad state</h3>
-          <p>CI, releases, säkerhet och annan providerstate kopplas via Skvallerbyttan där capability finns.</p>
-        </div>
-        <div class="portal-info-card">
-          <div class="portal-meta-label">CLOUDFLARE</div>
-          <h3>Observerad state</h3>
-          <p>Portalens grundlager introducerar ingen ny Cloudflare-providerklient eller permission.</p>
-        </div>
-        <div class="portal-info-card">
-          <div class="portal-meta-label">FRESHNESS</div>
-          <h3>Synlig täckning</h3>
-          <p>Senaste lyckade observation, cacheläge och källtäckning ska visas när integrationen kopplas in.</p>
+          <div class="portal-meta-label">PROVIDERS</div>
+          <h3>Läser in…</h3>
+          <p>Hämtar public-safe providerstatus från Skvallerbyttan.</p>
         </div>
       </div>
-      <div class="portal-placeholder">
-        <strong>Dataintegration ligger i separat PR.</strong>
-        Den här foundation-PR:n etablerar ytan och accessgränsen men fabricerar ingen driftstatus.
+
+      <div class="operations-summary-grid">
+        <div class="portal-info-card">
+          <div class="portal-meta-label">CAPABILITIES</div>
+          <h3 id="operations-capability-summary">—</h3>
+          <p>Status och freshness från Skvallerbyttans capability registry.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">PUBLICERINGSGRÄNS</div>
+          <h3>Inga organisationsräknare</h3>
+          <p>Scope coverage och Activity-volymer stannar i Skvallerbyttans skyddade observationsyta.</p>
+        </div>
+      </div>
+
+      <div class="operations-layout">
+        <section class="operations-panel" aria-labelledby="operations-capabilities-title">
+          <div class="portal-section-title">
+            <div>
+              <h2 id="operations-capabilities-title">Capabilities</h2>
+              <p>Read-only status och freshness utan rå provider- eller repositorydata.</p>
+            </div>
+          </div>
+          <div id="operations-capabilities">
+            <div class="empty">Läser capabilities…</div>
+          </div>
+        </section>
+
+        <aside class="operations-panel" aria-labelledby="operations-boundary-title">
+          <div class="portal-meta-label">PRIVACY &amp; SCOPE</div>
+          <h2 id="operations-boundary-title">Public-safe snapshot</h2>
+          <p>
+            Den publika Portalen får inte ärva Skvallerbyttans fulla observationsbehörighet.
+            Den visar därför inte scope counts, observerad eventvolym, repositorynamn, actors,
+            resource-ID:n, provider-permissions, budgetar eller felpayloads.
+          </p>
+          <p>
+            Full Activity och detaljerad Insyn finns kvar bakom Skvallerbyttans befintliga
+            autentiserade dashboard/API-gräns.
+          </p>
+        </aside>
+      </div>
+
+      <div class="portal-placeholder" id="operations-error" hidden>
+        <strong>Drift &amp; insyn är tillfälligt otillgänglig.</strong>
+        Ingen providerstatus fabriceras när Skvallerbyttans public-safe observationsyta inte kan läsas.
       </div>
     </section>
 
@@ -526,5 +564,6 @@
   <script src="/docs.js" defer></script>
   <script src="/wiki.js" defer></script>
   <script src="/search.js" defer></script>
+  <script src="/operations.js" defer></script>
 </body>
 </html>

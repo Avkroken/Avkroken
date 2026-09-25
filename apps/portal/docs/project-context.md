@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot global-sökarbetet: 2026-09-25.
+Senast verifierad mot Drift & insyn-integrationen: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -44,7 +44,8 @@ Worker-koden innehåller idag:
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
 - projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
 - Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
-- server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor.
+- server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor;
+- Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding.
 
 ## Publik projektmodell
 
@@ -197,12 +198,22 @@ Skvallerbyttan kan invalidera dokumentationscache internt med cache tags genom P
 
 Skvallerbyttan är den primära read-only observationskällan där dess modell passar.
 
-Nuvarande direktkoppling mellan apparna används för:
+Direktkopplingen mellan apparna består nu av tre separata least-privilege RPC-kontrakt:
 
-- dokumentationscache-invalidering;
-- operativ heartbeat.
+- Skvallerbyttan → Portal: dokumentationscache-invalidering via `DocsInvalidationService`;
+- Skvallerbyttan → Portal: operativ heartbeat via `OperationalHeartbeatService`;
+- Portal → Skvallerbyttan: sanerad observationssnapshot via `PortalObservationsService`.
 
-Portalen visar ingen fabricerad providerstatus. Den visuella Drift & insyn-ytan väntar på separat dataadapter/integration mot normaliserad state.
+Portalens binding `SKVALLERBYTTAN_OBSERVATIONS` pekar endast på den named entrypointen. Driftvyn använder inte Skvallerbyttans skyddade HTTP-`/api/v1`, dashboard-cookie eller `SKVALLERBYTTAN_READ_API_TOKEN`.
+
+Den publika `GET /api/operations` returnerar endast:
+
+- providerstatus och senaste observationstid;
+- capability key/name/provider/status/dataState/freshness/lastSuccessAt.
+
+Snapshoten utesluter provider-endpoints och required permissions, accepterade permissions, HTTP-statusar/felsträngar, installation-/budgetmetadata, scope coverage/repositoryantal samt Activity/eventvolym och recent events. De sistnämnda modellerna är organisationsomfattande i Skvallerbyttan och kan därför inte bevisas vara public-only.
+
+Om binding eller RPC är unavailable visar Portalen ett explicit degraded state och fabricerar inte providerstatus.
 
 ## Auth / Jobb
 
@@ -224,7 +235,6 @@ Följande är medvetet inte löst ännu:
 - provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
-- Drift & insyn-data från Skvallerbyttans normaliserade API/state;
 - changelogaggregation;
 - aktivitetsström;
 - releaseautomation;

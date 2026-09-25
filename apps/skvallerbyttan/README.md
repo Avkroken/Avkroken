@@ -1,6 +1,6 @@
 # Skvallerbyttan
 
-Skvallerbyttan är ett strikt read-only observationslager och dashboard för GitHub- och Cloudflare-data. Provider-events och API-läsningar normaliseras till gemensam state för dashboard och auktoriserade maskinklienter.
+Skvallerbyttan är ett strikt read-only observationslager och dashboard för GitHub- och Cloudflare-data. Provider-events och API-läsningar normaliseras till gemensam state för dashboard och auktoriserade maskinklienter. Avkroken-portalen kan dessutom läsa en separat sanerad observationssnapshot genom den interna named RPC-entrypointen `PortalObservationsService` utan att få access till det skyddade HTTP-API:t.
 
 ## Snabb verifiering
 
@@ -27,4 +27,4 @@ README hålls medvetet kort; detaljer, kontrakt och driftinformation ligger unde
 
 ## Grundprincip
 
-Skvallerbyttan observerar provider-state men administrerar den inte. Observationsfunktioner ska inte kräva provider-write-permissions, och känsliga credentialvärden eller rådata ska inte exponeras genom dashboard eller API.
+Skvallerbyttan observerar provider-state men administrerar den inte. Observationsfunktioner ska inte kräva provider-write-permissions, och känsliga credentialvärden eller rådata ska inte exponeras genom dashboard, API eller downstream-RPC.

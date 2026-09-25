@@ -125,11 +125,32 @@ Skvallerbyttan
 (read-only observation)
        |
        v
-normaliserad state
+canonical capability / provider health / Activity
        |
        v
-Avkroken Portal
+PortalObservationsService
+(sanitization boundary)
+       |
+       v
+Cloudflare Service Binding
+       |
+       v
+GET /api/operations
+       |
+       v
+Drift & insyn
 ```
+
+Portalen har ingen parallell GitHub-/Cloudflare-providerklient för Drift & insyn. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal endast till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret.
+
+RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort:
+
+- provider endpoint/required permission och accepterade permissions;
+- HTTP-statusar, providerfel och rå budgetstate;
+- GitHub App installation-/permissionmetadata;
+- Activity `recent` med actor/resource/repository/action-detaljer.
+
+Utåt återstår endast providerstatus samt capability status/dataState/freshness/last-success. Scope coverage/repositoryantal och Activity/eventvolym stannar i Skvallerbyttans skyddade dashboard/API eftersom de är organisationsomfattande och inte kan bevisas public-only.
 
 Den här gränsen undviker dubbel providerlogik och bevarar Skvallerbyttans read-only säkerhetsmodell.
 
@@ -171,7 +192,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/tjanster` — publika tjänster/produkter.
 - `/auth` — publik auth-ingång utan skyddad payload.
 - `/auth/jobb[/...]` — server-side redirect till Jobbs befintliga skyddade origin före Portal-shell.
-- `/drift[/...]` — Drift & insyn.
+- `/drift[/...]` — Drift & insyn från den sanerade Skvallerbyttan-snapshoten.
 - `/changelog` — kuraterad release-/produktförändring.
 - `/aktivitet` — råare aktivitet.
 - `/sok` — reserverad access-aware global sökyta.
@@ -226,15 +247,19 @@ Appdokument använder source-repositoryts tagg. Skvallerbyttans appdokument i `A
 
 ## Drift & insyn
 
-Portalens Worker har redan intern heartbeat/watchdog-infrastruktur för Skvallerbyttan, men Portalen exponerar inte den som en full Drift & insyn-API.
+Driftvyn konsumerar `GET /api/operations`, som i sin tur anropar `PortalObservationsService.getPublicOperationsSummary()` över intern Service Binding.
 
-När driftvyn kopplas in ska den:
+Vyn:
 
-- konsumera normaliserad read-only state där Skvallerbyttan redan äger capability;
-- skilja observerad aktivitet från komplett aktivitet;
-- visa freshness och täckning;
-- hantera capability-fel utan att resten av Portalen bryts;
-- aldrig kräva provider-write.
+- visar GitHub/Cloudflare providerstatus utan auth-/permissiondetaljer;
+- visar capability status, data state, freshness och last success;
+- visar inte repository-scope counts eller Activity/eventvolym i den publika ytan;
+- returnerar/visar degraded state om RPC saknas eller faller;
+- kräver ingen provider-write och ingen ny credential.
+
+Detailed Activity, scope coverage och repositoryspecifik Insyn finns fortsatt endast bakom Skvallerbyttans autentiserade dashboard/API-gräns.
+
+Heartbeat/watchdog är fortsatt ett separat livenesskontrakt. Heartbeat får inte tolkas som ersättning för capability/provider health.
 
 ## Global sök
 

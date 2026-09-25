@@ -62,5 +62,12 @@
   "vars": {
     "OPS_NOTIFY_TO": "anders.eriksson@denied.se",
     "OPS_NOTIFY_FROM": "noreply@denied.se"
-  }
+  },
+  "services": [
+    {
+      "binding": "SKVALLERBYTTAN_OBSERVATIONS",
+      "service": "skvallerbyttan",
+      "entrypoint": "PortalObservationsService"
+    }
+  ]
 }
