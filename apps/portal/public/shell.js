@@ -52,16 +52,35 @@
     });
   }
 
-  function closeMenu() {
-    if (!menu || !menuToggle) return;
+  function closeMenu({ restoreFocus = false } = {}) {
+    if (!menu || !menuToggle) return false;
+    const wasOpen = menu.classList.contains("open");
     menu.classList.remove("open");
     menuToggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus && wasOpen) menuToggle.focus();
+    return wasOpen;
   }
 
-  function applyRoute({ dispatch = true } = {}) {
+  function focusViewHeading(view) {
+    const panel = panels.find(item => item.dataset.routePanel === view);
+    const heading = panel?.querySelector("h1");
+    if (!heading) return false;
+
+    const hadTabindex = heading.hasAttribute("tabindex");
+    if (!hadTabindex) heading.setAttribute("tabindex", "-1");
+    heading.focus({ preventScroll: true });
+    if (!hadTabindex) {
+      heading.addEventListener("blur", () => heading.removeAttribute("tabindex"), { once: true });
+    }
+    return document.activeElement === heading;
+  }
+
+  function applyRoute({ dispatch = true, focus = false } = {}) {
     const view = viewForPath(location.pathname);
     setView(view);
     closeMenu();
+
+    if (focus) focusViewHeading(view);
 
     if (dispatch) {
       window.dispatchEvent(new CustomEvent("portal:routechange", {
@@ -82,7 +101,7 @@
     const next = url.pathname + url.search + url.hash;
     const current = location.pathname + location.search + location.hash;
     if (next !== current) history.pushState(null, "", next);
-    applyRoute();
+    applyRoute({ focus: true });
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -107,16 +126,18 @@
   });
 
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape") closeMenu();
+    if (event.key !== "Escape") return;
+    if (closeMenu({ restoreFocus: true })) event.preventDefault();
   });
 
-  window.addEventListener("popstate", () => applyRoute());
+  window.addEventListener("popstate", () => applyRoute({ focus: true }));
 
   window.AvKrokenPortal = {
     navigate,
     setView,
     viewForPath,
-    applyRoute
+    applyRoute,
+    focusViewHeading
   };
 
   applyRoute({ dispatch: false });
