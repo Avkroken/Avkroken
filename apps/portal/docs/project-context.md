@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Wiki-presentationsarbetet: 2026-09-25.
+Senast verifierad mot global-sökarbetet: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -43,7 +43,8 @@ Worker-koden innehåller idag:
 - Portal v2 design tokens och shell-CSS;
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
 - projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
-- Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin.
+- Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
+- server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor.
 
 ## Publik projektmodell
 
@@ -141,6 +142,45 @@ Appens publika dokumentpath är relativ till app-roten och låser därmed inte P
 
 Tar katalognyckel + route-path, kräver exakt träff i den publika katalogpostens `pages`, mappar därefter till canonical source repository/ref/path och returnerar Markdown samt `sourceUrl` till originalet. Jobb saknar appmanifest och får därför ingen appdokumentationspost.
 
+## Global sök
+
+### `/api/search?q=...`
+
+Sökindexet skapas i Worker-lagret och exponeras inte som rå klientpayload.
+
+Publiceringsgränsen är:
+
+```text
+/api/projects
+      ∩
+/api/docs
+      |
+      v
+public search index
+      |
+      v
+GET /api/search?q=...
+```
+
+Det innebär att en dokumentationspost måste tillhöra ett projekt som redan finns i den publika projektkatalogen. Det är ett extra filter ovanpå docs-adapterns egen allowlist.
+
+Nuvarande indexkategorier:
+
+- `project` — projektnamn, beskrivning och publik source-metadata;
+- `wiki` — repository-Wiki som presentationspost när projektet har `wikiPortalUrl`;
+- `document` — allowlistad README/docs-Markdown samt canonical source URL.
+
+Jobb saknar publik app-post och app-docs-källa och kan därför inte nå indexbyggaren. `.github` är inte ett publicerat projekt och filtreras bort även om publika docs skulle finnas i docs-katalogen.
+
+Sökindexeringen använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor och max 120 000 tecken per dokument. Det ger rättvisare providerbudget mellan projekten och undviker att ett stort repo tar hela indexbudgeten.
+
+Coverage rapporteras som:
+
+- `bounded` — indexet byggdes inom den definierade budgeten utan observerade fetch-/appdiscoveryfel;
+- `partial` — hårdgräns, dokumentfel, truncering eller ofullständig appdiscovery reducerade täckningen.
+
+Issues och Discussions ingår ännu inte i sökindexet.
+
 ## Cache
 
 Aktuella värden i koden:
@@ -148,7 +188,8 @@ Aktuella värden i koden:
 - project catalog: 300 sekunder i Workers Cache API;
 - `/api/sites`: härledd från samma project catalog;
 - dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
-- dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache.
+- dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache;
+- server-side sökindex: 3 600 sekunder i Workers Cache API, taggat med `docs-catalog` och `search-index`.
 
 Skvallerbyttan kan invalidera dokumentationscache internt med cache tags genom Portalens service binding.
 
@@ -182,7 +223,7 @@ Följande är medvetet inte löst ännu:
 
 - provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
-- global access-aware sökindexering;
+- Issues/Discussions i global sök;
 - Drift & insyn-data från Skvallerbyttans normaliserade API/state;
 - changelogaggregation;
 - aktivitetsström;
