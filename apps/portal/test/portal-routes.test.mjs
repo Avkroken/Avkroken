@@ -37,6 +37,7 @@ test("recognizes stable public portal document routes", () => {
 
 test("does not rewrite API, assets, unknown routes, or protected Jobb paths", () => {
   for (const path of [
+    "/api/projects",
     "/api/sites",
     "/api/docs",
     "/styles.css",
