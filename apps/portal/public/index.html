@@ -371,8 +371,8 @@
         <div class="portal-kicker">DRIFT &amp; INSYN</div>
         <h1 id="operations-title">Vad Avkroken ser</h1>
         <p>
-          Sanerad read-only state från Skvallerbyttan. Providerhälsa, freshness och observerad aktivitet
-          visas utan credentials, provider-permissions, resource-ID:n eller råa event.
+          Public-safe read-only status från Skvallerbyttan. Vyn visar provider- och capabilityhälsa
+          utan repositoryantal, aktivitetsvolym, credentials, permissiondetaljer eller råa event.
         </p>
       </div>
 
@@ -385,7 +385,7 @@
         <div class="portal-info-card">
           <div class="portal-meta-label">PROVIDERS</div>
           <h3>Läser in…</h3>
-          <p>Hämtar sanerad providerstatus från Skvallerbyttan.</p>
+          <p>Hämtar public-safe providerstatus från Skvallerbyttan.</p>
         </div>
       </div>
 
@@ -396,9 +396,9 @@
           <p>Status och freshness från Skvallerbyttans capability registry.</p>
         </div>
         <div class="portal-info-card">
-          <div class="portal-meta-label">OBSERVERAD AKTIVITET · 24H</div>
-          <h3 id="operations-activity-total">—</h3>
-          <p id="operations-activity-copy">Observerade events är inte samma sak som komplett provideraktivitet.</p>
+          <div class="portal-meta-label">PUBLICERINGSGRÄNS</div>
+          <h3>Inga organisationsräknare</h3>
+          <p>Scope coverage och Activity-volymer stannar i Skvallerbyttans skyddade observationsyta.</p>
         </div>
       </div>
 
@@ -407,7 +407,7 @@
           <div class="portal-section-title">
             <div>
               <h2 id="operations-capabilities-title">Capabilities</h2>
-              <p>Implementerad read-only observationsyta med aktuell status och freshness.</p>
+              <p>Read-only status och freshness utan rå provider- eller repositorydata.</p>
             </div>
           </div>
           <div id="operations-capabilities">
@@ -415,23 +415,24 @@
           </div>
         </section>
 
-        <section class="operations-panel" aria-labelledby="operations-activity-title">
-          <div class="portal-section-title">
-            <div>
-              <h2 id="operations-activity-title">Observerad aktivitet</h2>
-              <p>Summerad per provider/capability utan actor-, resource- eller repositorydetaljer.</p>
-            </div>
-          </div>
-          <div id="operations-activity-list">
-            <div class="empty">Läser aktivitet…</div>
-          </div>
-          <div class="operations-coverage" id="operations-coverage"></div>
-        </section>
+        <aside class="operations-panel" aria-labelledby="operations-boundary-title">
+          <div class="portal-meta-label">PRIVACY &amp; SCOPE</div>
+          <h2 id="operations-boundary-title">Public-safe snapshot</h2>
+          <p>
+            Den publika Portalen får inte ärva Skvallerbyttans fulla observationsbehörighet.
+            Den visar därför inte scope counts, observerad eventvolym, repositorynamn, actors,
+            resource-ID:n, provider-permissions, budgetar eller felpayloads.
+          </p>
+          <p>
+            Full Activity och detaljerad Insyn finns kvar bakom Skvallerbyttans befintliga
+            autentiserade dashboard/API-gräns.
+          </p>
+        </aside>
       </div>
 
       <div class="portal-placeholder" id="operations-error" hidden>
         <strong>Drift &amp; insyn är tillfälligt otillgänglig.</strong>
-        Ingen providerstatus fabriceras när Skvallerbyttans sanerade observationsyta inte kan läsas.
+        Ingen providerstatus fabriceras när Skvallerbyttans public-safe observationsyta inte kan läsas.
       </div>
     </section>
 
