@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-klienten.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -77,6 +77,18 @@ Detaljvyn får endast exponera fält som redan finns i den publika normaliserade
 
 `GET /api/sites` härleds från projektkatalogen och behåller den tidigare endpointpolicyn genom `portalPublished`.
 
+### Wiki-presentation
+
+Wiki-vyn använder endast `/api/projects` och `/api/docs`.
+
+- endast repositoryprojekt med publik Wiki får `wikiPortalUrl`;
+- monorepo-appar är intever `wiki = null` och `wikiPortalUrl = null` om inget separat framtida publiceringskontrakt införs;
+- browsern anropar inte GitHub API direkt;
+- unavailable project/docs catalog ger explicit degraded state;
+- “Visa original-Wiki” pekar på canonical GitHub Wiki.
+
+Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet.
+
 ### Dokumentationskatalog
 
 Om GitHub-katalogen inte kan läsas returneras `502` med `github_unavailable`. UI visar ett explicit unavailable-state.
@@ -136,9 +148,10 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
 7. `/projekt/Bastion` och `/projekt/skvallerbyttan` renderar projektdetalj från den publika katalogen utan extra providerfetch; Skvallerbyttans detalj visar appens canonical source-path men ingen privat dashboard-payload;
-8. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
-9. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
-10. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-11. cache-/heartbeat-beteende har inte regresserat.
+8. `/projekt/Bastion/wiki` renderar Wiki-presentation från publika Portal-kataloger och länkar till original-Wikin; `/projekt/skvallerbyttan/wiki` publiceras inte eftersom appen inte har eget Wiki-kontrakt;
+9. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
+10. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
+11. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
+12. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
