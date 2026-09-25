@@ -75,9 +75,22 @@ Den returnerar endast projekt där `portalPublished = true`, vilket kräver:
 
 ### Monorepo-appar
 
-`Avkroken/Avkroken/apps` scannas inte generellt av den publika project-adaptern ännu.
+Monorepo-appar publiceras genom explicit, appägt `portal.public.json`.
 
-Det är en medveten säkerhetsgräns. App-discovery ska få en uttrycklig publik manifest-/allowlistmodell innan Skvallerbyttan eller andra monorepo-appar läggs till som separata projektposter. Jobb får inte exponeras genom generell appdiscovery.
+Discovery läser endast:
+
+- den redan publika monorepo-listningen under `apps/`;
+- exakt manifestfilen i varje appkatalog.
+
+Saknat manifest publicerar ingenting. Manifestdata valideras strikt och får inte styra canonical repository/ref/source-path. Okända fält kopieras inte till API-modellen.
+
+Nuvarande opt-in:
+
+- Skvallerbyttan: publicerad som projektpost utan publik dashboard-URL.
+- Portal: inget separat appmanifest; `Avkroken`-repositoryprojektet representerar Portalens repositoryyta.
+- Jobb: inget publikt appmanifest; skyddad Jobb-state går fortsatt endast via Auth-gränsen.
+
+`source.appDiscovery` anger om appdiscovery var `available`, `partial`, `unavailable` eller `not_configured`.
 
 ## Dokumentationsdata
 
@@ -128,7 +141,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- säker monorepo-appdiscovery med uttrycklig publik policy;
+- Portal-rendering av app-lokal README/docs för opt-in-appar;
 - full projektdetaljdata;
 - Wiki-adapter inne i Portalen;
 - global access-aware sökindexering;
