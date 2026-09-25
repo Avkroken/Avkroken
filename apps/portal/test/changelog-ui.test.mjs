@@ -24,6 +24,7 @@ test("Changelog DOM contract is unique and wired", () => {
     "changelog-title",
     "changelog-status",
     "changelog-generated",
+    "changelog-filter-controls",
     "changelog-list",
     "changelog-error"
   ]) {
@@ -38,6 +39,26 @@ test("Changelog DOM contract is unique and wired", () => {
   ]) {
     assert.ok(client.includes(`#${id}`), id);
   }
+});
+
+test("Changelog exposes only verified release-section filters", () => {
+  assert.match(html, /role="group"\s+aria-label="Filtrera Changelog"/);
+
+  for (const filter of [
+    "all",
+    "features",
+    "fixes",
+    "security",
+    "documentation",
+    "releases"
+  ]) {
+    assert.match(html, new RegExp('data-changelog-filter="' + filter + '"'));
+  }
+
+  assert.equal(html.includes('data-changelog-filter="deployments"'), false);
+  assert.ok(client.includes("release.categories"));
+  assert.ok(client.includes("categories.includes(activeFilter)"));
+  assert.ok(client.includes('"aria-pressed"'));
 });
 
 test("Changelog client reads only the Portal API and renders untrusted strings as text", () => {

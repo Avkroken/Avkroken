@@ -3,8 +3,20 @@
   const generated = document.querySelector("#changelog-generated");
   const list = document.querySelector("#changelog-list");
   const errorState = document.querySelector("#changelog-error");
+  const filterButtons = [...document.querySelectorAll("[data-changelog-filter]")];
+
+  const allowedFilters = new Set([
+    "all",
+    "features",
+    "fixes",
+    "security",
+    "documentation",
+    "releases"
+  ]);
 
   let requestSerial = 0;
+  let currentReleases = [];
+  let activeFilter = "all";
 
   function isChangelogRoute() {
     return (location.pathname.replace(/\/+$/, "") || "/") === "/changelog";
@@ -103,23 +115,40 @@
     list.appendChild(article);
   }
 
-  function render(payload) {
-    const releases = Array.isArray(payload.releases) ? payload.releases : [];
-    const coverage = payload.source?.coverage;
+  function filterLabel(value) {
+    return {
+      all: "Alla",
+      features: "Features",
+      fixes: "Fixes",
+      security: "Security",
+      documentation: "Documentation",
+      releases: "Releases"
+    }[value] || "Alla";
+  }
 
-    status.textContent = releases.length === 1
-      ? "1 publicerad release"
-      : releases.length + " publicerade releases";
+  function releaseMatchesFilter(release) {
+    if (activeFilter === "all") return true;
 
-    generated.textContent = payload.generatedAt
-      ? "Snapshot " + formatDate(payload.generatedAt) +
-        (coverage === "partial" ? " · delvis täckning" : " · begränsad täckning")
-      : "";
+    const categories = Array.isArray(release?.categories)
+      ? release.categories
+      : ["releases"];
 
-    errorState.hidden = true;
+    return categories.includes(activeFilter);
+  }
+
+  function renderList() {
+    const visible = currentReleases.filter(releaseMatchesFilter);
+
+    status.textContent = activeFilter === "all"
+      ? (currentReleases.length === 1
+        ? "1 publicerad release"
+        : currentReleases.length + " publicerade releases")
+      : visible.length + " av " + currentReleases.length +
+        " · " + filterLabel(activeFilter);
+
     clear();
 
-    if (!releases.length) {
+    if (!currentReleases.length) {
       emptyState(
         "Inga publicerade releases hittades.",
         "Projekt utan GitHub Releases visas inte som produktförändringar."
@@ -127,7 +156,28 @@
       return;
     }
 
-    for (const release of releases) renderRelease(release);
+    if (!visible.length) {
+      emptyState(
+        "Inga releaser i kategorin " + filterLabel(activeFilter) + ".",
+        "Filtret använder endast kategorier som kan härledas från publicerade release-sektioner."
+      );
+      return;
+    }
+
+    for (const release of visible) renderRelease(release);
+  }
+
+  function render(payload) {
+    currentReleases = Array.isArray(payload.releases) ? payload.releases : [];
+    const coverage = payload.source?.coverage;
+
+    generated.textContent = payload.generatedAt
+      ? "Snapshot " + formatDate(payload.generatedAt) +
+        (coverage === "partial" ? " · delvis täckning" : " · begränsad täckning")
+      : "";
+
+    errorState.hidden = true;
+    renderList();
   }
 
   async function loadChangelog() {
@@ -136,6 +186,7 @@
     const serial = ++requestSerial;
     status.textContent = "Läser releaser…";
     generated.textContent = "";
+    currentReleases = [];
     errorState.hidden = true;
     emptyState("Läser publicerade releases…", "");
 
@@ -155,10 +206,28 @@
       if (serial !== requestSerial) return;
       status.textContent = "Otillgänglig";
       generated.textContent = "";
+      currentReleases = [];
       clear();
       errorState.hidden = false;
       console.error(error);
     }
+  }
+
+  for (const button of filterButtons) {
+    button.addEventListener("click", () => {
+      const filter = String(button.dataset.changelogFilter || "");
+      if (!allowedFilters.has(filter) || filter === activeFilter) return;
+
+      activeFilter = filter;
+      for (const item of filterButtons) {
+        item.setAttribute(
+          "aria-pressed",
+          String(item.dataset.changelogFilter === activeFilter)
+        );
+      }
+
+      renderList();
+    });
   }
 
   window.addEventListener("portal:routechange", event => {
