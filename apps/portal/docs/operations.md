@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn- och Changelog-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog- och projektspecifika Releases-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -140,6 +140,20 @@ Budget:
 
 Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller target commit, och monorepo-appar ärver inte source-repositoryts releases.
 
+### Projektspecifika Releases
+
+`GET /api/releases?project=<slug>` läser endast ett projekt som först har passerat den publika projektkatalogens repository-policy.
+
+- saknad/tom eller för lång project slug: `400 invalid_project`;
+- okänd slug eller monorepo-app: `404 project_releases_not_found`;
+- GitHub release-read misslyckas: `502 project_releases_unavailable`;
+- inga publicerade releases: `200`, `status = available`, tom `releases`-lista;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 10 releaser.
+
+Endpointen återanvänder Changelogs release-sanitizer och publicerar endast project-identitet, repository, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft/body/author/assets/target commit lämnar inte backend.
+
+Monorepo-appar får ingen `releasesPortalUrl` och deras project-model har `releases = null`.
+
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -195,7 +209,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post eller app-docs-källa.
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
-- Changelog får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
+- Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -221,6 +235,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 15. om observationsbindingen saknas/faller visar `/drift` degraded state och fabricerar ingen providerstatus;
 16. `/changelog` visar publicerade releases från publika repositoryprojekt med canonical original-länkar; drafts och Skvallerbyttan-appens source-repositoryreleases publiceras inte som appreleases;
 17. Changelog visar `bounded`/`partial` coverage och använder ingen persistent snapshotcache;
-18. cache-/heartbeat-beteende har inte regresserat.
+18. `/projekt/Bastion/releases` visar endast Bastions publicerade releases och canonical GitHub-länk; `/projekt/skvallerbyttan/releases` saknar app-releasekälla och appens projektdetalj visar ingen Releases-knapp;
+19. `/api/releases?project=Bastion` är `no-store` och innehåller ingen raw body/author/assets/target commit;
+20. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

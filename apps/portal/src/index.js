@@ -736,6 +736,106 @@ async function fetchProjectReleases(project, env) {
   };
 }
 
+async function loadPublicProjectReleases(projectSlug, env) {
+  const projectCatalog = await loadPublicProjects(env);
+  const project = eligibleReleaseProjects(projectCatalog.projects, 100)
+    .find(item => item.slug === projectSlug);
+
+  if (!project) return null;
+
+  const fetched = await fetchProjectReleases(project, env);
+  if (fetched.failed) {
+    throw new Error("project_releases_unavailable");
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "github",
+      scope: "public_portal_repository_project",
+      coverage: "bounded",
+      releases: {
+        limit: CHANGELOG_RELEASES_PER_REPOSITORY
+      }
+    },
+    project: {
+      slug: project.slug,
+      name: project.name,
+      portalUrl: project.portalUrl,
+      repository: project.source.repository,
+      releasesUrl: project.releases
+    },
+    releases: sortPublicReleases(
+      fetched.releases,
+      CHANGELOG_RELEASES_PER_REPOSITORY
+    )
+  };
+}
+
+async function getPublicProjectReleases(requestUrl, env) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+
+  if (!projectSlug || projectSlug.length > 120) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const payload = await loadPublicProjectReleases(projectSlug, env);
+
+    if (!payload) {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "project_releases_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    return new Response(JSON.stringify({
+      status: "available",
+      ...payload
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public project releases unavailable", {
+      project: projectSlug,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "project_releases_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 async function fetchChangelogReleases(projects, env) {
   const results = [];
 
@@ -1214,6 +1314,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicChangelog(env);
+    }
+
+    if (url.pathname === "/api/releases") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicProjectReleases(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";

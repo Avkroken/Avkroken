@@ -37,6 +37,8 @@ test("normalizes active public repositories even without a published endpoint", 
   assert.equal(project.source.repository, "Avkroken/Bastion");
   assert.equal(project.wiki, "https://github.com/Avkroken/Bastion/wiki");
   assert.equal(project.wikiPortalUrl, "/projekt/Bastion/wiki");
+  assert.equal(project.releases, "https://github.com/Avkroken/Bastion/releases");
+  assert.equal(project.releasesPortalUrl, "/projekt/Bastion/releases");
 });
 
 test("filters organization infrastructure, retired repositories, archived, and non-public repositories", () => {

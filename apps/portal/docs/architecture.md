@@ -222,6 +222,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
+- `/projekt/:slug/releases` — Portal-presentation av officiella GitHub Releases för publicerade repositoryprojekt.
 - `/dokumentation[/...]` — samlad dokumentationsyta.
 - `/tjanster` — publika tjänster/produkter.
 - `/auth` — publik auth-ingång utan skyddad payload.
@@ -294,6 +295,34 @@ Vyn:
 Detailed Activity, scope coverage och repositoryspecifik Insyn finns fortsatt endast bakom Skvallerbyttans autentiserade dashboard/API-gräns.
 
 Heartbeat/watchdog är fortsatt ett separat livenesskontrakt. Heartbeat får inte tolkas som ersättning för capability/provider health.
+
+## Repository Releases
+
+Repositoryprojekt får en intern `releasesPortalUrl` som pekar på `/projekt/:slug/releases`. Monorepo-appar får uttryckligen `releases = null` och `releasesPortalUrl = null` och kan därför inte ärva source-repositoryts releasehistorik.
+
+Dataflödet är:
+
+```text
+public project catalog
+       |
+       +--> repository project only
+                 |
+                 v
+       GET /api/releases?project=:slug
+                 |
+                 v
+       GitHub Releases for exact repository
+                 |
+                 v
+       release-source.mjs sanitization
+                 |
+                 v
+       /projekt/:slug/releases
+```
+
+Endpointen använder samma sanitizer som Changelog. Den publicerar inte release body, author, assets eller target commit och filtrerar alltid drafts. Browsern gör inga GitHub API-anrop.
+
+Responsen lagras inte persistent i Cache API. Projektet måste finnas i den aktuella publika katalogen och passera repository-eligibility vid varje request.
 
 ## Global sök
 

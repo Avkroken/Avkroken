@@ -226,7 +226,7 @@ function renderProjectDetail() {
     detailAction("Canonical source", project.sourceUrl),
     detailAction("Issues", project.issues),
     detailAction("Discussions", project.discussions),
-    detailAction("Releases", project.releases)
+    detailAction("Releases", project.releasesPortalUrl, { internal: true })
   ].filter(Boolean);
 
   detailActions.innerHTML = actions.join("");
