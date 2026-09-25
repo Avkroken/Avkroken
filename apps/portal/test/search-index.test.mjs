@@ -5,7 +5,8 @@ import {
   buildProjectSearchEntries,
   filterSearchableDocs,
   searchableMarkdown,
-  searchEntries
+  searchEntries,
+  selectSearchDocumentTasks
 } from "../src/search-index.mjs";
 
 test("normalizes Markdown into searchable public text without hidden comments or link URLs", () => {
@@ -150,4 +151,18 @@ test("requires a meaningful query and caps result count", () => {
 
   assert.deepEqual(searchEntries(entries, "x"), []);
   assert.equal(searchEntries(entries, "portal", 100).length, 50);
+});
+
+
+test("selects search documents fairly across public sources", () => {
+  const entries = [
+    { key: "A", pages: [{ path: "a1" }, { path: "a2" }, { path: "a3" }] },
+    { key: "B", pages: [{ path: "b1" }, { path: "b2" }, { path: "b3" }] },
+    { key: "C", pages: [{ path: "c1" }] }
+  ];
+
+  assert.deepEqual(
+    selectSearchDocumentTasks(entries, 5).map(task => task.entry.key + ":" + task.page.path),
+    ["A:a1", "B:b1", "C:c1", "A:a2", "B:b2"]
+  );
 });
