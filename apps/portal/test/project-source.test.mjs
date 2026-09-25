@@ -33,6 +33,8 @@ test("normalizes active public repositories even without a published endpoint", 
   assert.equal(project.url, null);
   assert.equal(project.portalPublished, false);
   assert.equal(project.portalUrl, "/projekt/Bastion");
+  assert.equal(project.issues, "https://github.com/Avkroken/Bastion/issues");
+  assert.equal(project.issuesPortalUrl, "/projekt/Bastion/issues");
   assert.equal(project.documentation, "/projekt/Bastion/dokumentation");
   assert.equal(project.source.repository, "Avkroken/Bastion");
   assert.equal(project.wiki, "https://github.com/Avkroken/Bastion/wiki");
