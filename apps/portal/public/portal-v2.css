@@ -244,6 +244,11 @@ body.portal-v2::before {
   border-bottom: 1px solid var(--line);
 }
 
+.portal-hero-copy,
+.portal-hero-aside {
+  min-width: 0;
+}
+
 .portal-hero-copy h1 {
   margin: var(--ak-space-4) 0;
   max-width: 820px;
