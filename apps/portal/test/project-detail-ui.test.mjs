@@ -22,6 +22,10 @@ const detailIds = [
   "project-detail-ref",
   "project-detail-updated",
   "project-detail-source-path",
+  "project-detail-releases",
+  "project-detail-releases-title",
+  "project-detail-releases-state",
+  "project-detail-release-list",
   "project-detail-error"
 ];
 
@@ -45,4 +49,22 @@ test("project slug routes use the dedicated detail surface", () => {
 test("project cards link to their stable Portal detail route", () => {
   assert.ok(app.includes("project.portalUrl"));
   assert.ok(app.includes(">Översikt</a>"));
+});
+
+
+test("repository project detail loads only its scoped public releases", () => {
+  assert.ok(app.includes('"/api/changelog?project="'));
+  assert.ok(app.includes('project?.type !== "repository"'));
+  assert.ok(app.includes('project.type === "repository"'));
+  assert.ok(app.includes("encodeURIComponent(project.slug)"));
+  assert.ok(app.includes("releases.slice(0, 5)"));
+  assert.equal(app.includes("api.github.com"), false);
+});
+
+test("project release rendering is DOM-safe and race checked", () => {
+  assert.ok(app.includes("detailReleaseRequestSerial"));
+  assert.ok(app.includes("projectSlugFromLocation() !== project.slug"));
+  assert.ok(app.includes("document.createElement"));
+  assert.ok(app.includes("title.textContent"));
+  assert.ok(app.includes('link.rel = "noopener noreferrer"'));
 });
