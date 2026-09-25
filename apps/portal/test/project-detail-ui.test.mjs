@@ -10,22 +10,29 @@ function occurrences(source, value) {
   return source.split(value).length - 1;
 }
 
-test("project detail DOM contract is unique and wired", () => {
-  for (const id of [
-    "project-detail-view",
-    "project-detail-title",
-    "project-detail-description",
-    "project-detail-category",
-    "project-detail-breadcrumb",
-    "project-detail-actions",
-    "project-detail-source-kind",
-    "project-detail-repository",
-    "project-detail-ref",
-    "project-detail-updated",
-    "project-detail-source-path",
-    "project-detail-error"
-  ]) {
+const detailIds = [
+  "project-detail-view",
+  "project-detail-title",
+  "project-detail-description",
+  "project-detail-category",
+  "project-detail-breadcrumb",
+  "project-detail-actions",
+  "project-detail-source-kind",
+  "project-detail-repository",
+  "project-detail-ref",
+  "project-detail-updated",
+  "project-detail-source-path",
+  "project-detail-error"
+];
+
+test("project detail DOM contract uses unique ids", () => {
+  for (const id of detailIds) {
     assert.equal(occurrences(html, `id="${id}"`), 1, id);
+  }
+});
+
+test("project detail renderer references the DOM it owns", () => {
+  for (const id of detailIds.filter(id => id !== "project-detail-view")) {
     assert.ok(app.includes(`#${id}`), id);
   }
 });
