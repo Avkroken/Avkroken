@@ -4,6 +4,7 @@ import {
   activityFromCloudflareAudit,
   activityFromCloudflareWebhook,
   activityFromGitHubWebhook,
+  normalizeActivityRepositoryFilters,
 } from "../src/activity";
 
 test("GitHub webhook activity is normalized without retaining raw payload", () => {
@@ -88,4 +89,23 @@ test("Cloudflare audit classification maps storage and Zero Trust resources to s
   for (const [payload, capability] of cases) {
     assert.equal(activityFromCloudflareAudit(payload as any)?.capability, capability);
   }
+});
+
+
+test("activity repository filters are bounded, unique and never accept path-like values", () => {
+  assert.deepEqual(
+    normalizeActivityRepositoryFilters([
+      "Bastion",
+      " Bastion ",
+      "../Jobb",
+      "Repo/Other",
+      ".",
+      "..",
+      "Klarsprak",
+    ]),
+    ["Bastion", "Klarsprak"],
+  );
+
+  const many = Array.from({ length: 80 }, (_, index) => "repo-" + index);
+  assert.equal(normalizeActivityRepositoryFilters(many).length, 50);
 });

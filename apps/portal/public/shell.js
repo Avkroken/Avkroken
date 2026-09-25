@@ -26,6 +26,8 @@
 
     if (/^\/projekt\/[^/]+\/builds(?:\/|$)/.test(path)) return "project-builds";
 
+    if (/^\/projekt\/[^/]+\/aktivitet(?:\/|$)/.test(path)) return "activity";
+
     if (/^\/projekt\/[^/]+$/.test(path)) return "project-detail";
     if (path === "/projekt") return "projects";
     if (path === "/tjanster") return "services";

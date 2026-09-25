@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues- och Builds/CI-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues-, Builds/CI- och Activity-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -29,7 +29,7 @@ Aktuellt versionsstyrt kontrakt:
 
 Feature branches ska inte deploya produktion.
 
-När den här Builds/CI-integrationen senare rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` deployas och verifieras först. Därefter kan Portal-versionen som anropar metoden deployas. Service Bindingens target/entrypoint ändras inte och ingen ny secret behövs.
+När Builds/CI- och Activity-integrationen senare rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Därefter kan Portal-versionen som anropar metoderna deployas. Service Bindingens target/entrypoint ändras inte och ingen ny secret behövs.
 
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
@@ -91,7 +91,7 @@ Wiki-vyn använder endast `/api/projects` och `/api/docs`.
 - unavailable project/docs catalog ger explicit degraded state;
 - “Visa original-Wiki” pekar på canonical GitHub Wiki.
 
-Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment.
+Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment. Activity-fältet `activityPortalUrl` bump:ar därefter nyckeln till `github-projects-v7`, så en pre-Activity v6-payload inte kan återanvändas.
 
 ### Dokumentationskatalog
 
@@ -195,6 +195,25 @@ Publikt CI-underlag begränsas till samplebaserad summary. Actor, permissionmeta
 
 Monorepo-appar har ingen `buildsPortalUrl` och `builds = null`.
 
+### Observerad Activity
+
+`GET /api/activity?days=<1..30>&project=<slug>` gör först en live `type=public` repositorylistning och använder Portalens repositorypolicy. `project` är valfri:
+
+- utan `project` väljs högst 50 live-publika repositoryprojekt;
+- med `project` krävs exakt match mot ett repositoryprojekt; monorepo-appar är inte giltiga Activity-källor;
+- saknad/tom/för lång explicit project slug: `400 invalid_project`;
+- okänd slug eller monorepo-app: `404 project_activity_not_found`;
+- saknad binding eller RPC-metod: `503 activity_not_configured`;
+- project-list/RPC-fel: `502 activity_unavailable`;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`.
+
+Portal anropar endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicActivity(repositoryNames, days)`. Skvallerbyttan gör ingen providerrequest för denna metod. RPC:n kontrollerar de begärda repositories mot cachead `overview` och kräver `visibility = public` samt `archived != true` innan D1-ledgern `observation_events` queryas.
+
+En explicit repository-lista som efter validering blir tom ger ett fail-closed SQL-filter (`1 = 0`), inte en bred query. D1-resultatet filtreras till GitHub och exakt godkända repositorykortnamn.
+
+Den publika modellen innehåller aggregate counts/coverage samt recent event-rader med repository/project, capability, source, coverage, event/action och occurred/received timestamps. `resourceId`, actor, providerfel, permissionmetadata och rå webhookpayload publiceras inte. Public capability-scope är endast `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security/governance-capabilities filtreras bort. Portal gör dessutom en andra whitelistprojektion mot de repositories som passerade den live publika gaten.
+
+Global `/aktivitet` publicerar inte Cloudflare account-/org-aktivitet. UI:t använder genomgående **observerad aktivitet**, visar coverage och påstår inte att perioden är komplett.
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -253,6 +272,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
 - Projektspecifika Issues får endast läsa Issues för live-publicerade repositoryprojekt; filtrera GitHub PR-poster explicit och låt inte monorepo-appar ärva source-repositoryts Issues.
 - Projektspecifik Builds/CI får endast läsa Skvallerbyttans public-safe cache-RPC efter live public-project-lookup; Portalen får inte göra en egen GitHub Actions-read och monorepo-appar får inte ärva source-repositoryts CI.
+- Activity får endast läsa Skvallerbyttans separata repository-allowlistade Activity-RPC efter live public-project-lookup; explicit tom repositoryscope ska fail-closed och monorepo-appar får inte ärva source-repositoryts eventström.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -263,7 +283,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion` och `/api/builds?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion`, `/api/builds?project=Bastion` och `/api/activity?project=Bastion&days=7` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -284,6 +304,9 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 21. `/api/issues?project=Bastion` är `no-store` och innehåller ingen body/user/assignee/milestone eller labelmetadata utöver namn;
 22. `/projekt/Bastion/builds` visar sampled CI-summary med freshness och canonical Actions-länk utan direkt GitHub Actions-request; `/projekt/skvallerbyttan/builds` saknar app-CI-källa;
 23. stale/missing Skvallerbyttan overview-cache visas som stale/not-observed och utlöser ingen Portal-driven providerrefresh;
-24. cache-/heartbeat-beteende har inte regresserat.
+24. `/aktivitet` visar endast observerade GitHub-events för live-publika repositoryprojekt med explicit coverage; inga Cloudflare account-/org-events, resource-ID:n eller actors publiceras;
+25. `/projekt/Bastion/aktivitet` är scope:ad till Bastion medan `/projekt/skvallerbyttan/aktivitet` saknar app-Activitykälla;
+26. `/api/activity` är `no-store`, bounded till 50 repositories/30 dagar och en tom/ogiltig intern repositorylista kan inte falla tillbaka till organisationsomfattande Activity;
+27. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

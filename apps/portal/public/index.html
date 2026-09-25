@@ -680,14 +680,77 @@
       aria-labelledby="activity-title"
       hidden
     >
+      <nav class="portal-breadcrumbs" id="activity-breadcrumbs" aria-label="Brödsmulor" hidden>
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="activity-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Aktivitet</span>
+      </nav>
+
       <div class="portal-page-head">
         <div class="portal-kicker">AKTIVITET</div>
         <h1 id="activity-title">Aktivitet</h1>
-        <p>Råare commits, PR:er, deploys, workflow runs, dokumentationsändringar och observerade events.</p>
+        <p id="activity-description">
+          Observerade GitHub-händelser från Portalens publika repositoryprojekt.
+          Coverage visas explicit och ska inte tolkas som komplett historik.
+        </p>
       </div>
-      <div class="portal-placeholder">
-        <strong>Aktivitetsström kopplas in separat.</strong>
-        Observerad aktivitet ska aldrig presenteras som komplett om täckningen inte är känd.
+
+      <div class="activity-toolbar">
+        <div class="changelog-meta">
+          <span id="activity-status" aria-live="polite">Läser observerad aktivitet…</span>
+          <span id="activity-generated"></span>
+        </div>
+
+        <div class="activity-period-controls" role="group" aria-label="Aktivitetsperiod">
+          <button class="portal-button" type="button" data-activity-days="1" aria-pressed="false">24 h</button>
+          <button class="portal-button" type="button" data-activity-days="7" aria-pressed="true">7 dagar</button>
+          <button class="portal-button" type="button" data-activity-days="30" aria-pressed="false">30 dagar</button>
+        </div>
+      </div>
+
+      <div class="project-detail-actions">
+        <a
+          class="portal-button"
+          id="activity-original"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >Visa repository</a>
+      </div>
+
+      <div class="activity-summary-grid" aria-label="Aktivitetssammanfattning">
+        <article class="portal-info-card">
+          <div class="portal-meta-label">OBSERVERADE EVENT</div>
+          <h3 id="activity-observed-count">—</h3>
+          <p>Summering av event i den valda observationsperioden.</p>
+        </article>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">REPOSITORIES</div>
+          <h3 id="activity-repository-count">—</h3>
+          <p>Publika repositories med godkänd observationsscope.</p>
+        </article>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">COVERAGE</div>
+          <h3 id="activity-coverage-summary">—</h3>
+          <p>Coverage kommer från observationskällan och påstår inte fullständighet.</p>
+        </article>
+      </div>
+
+      <div class="activity-coverage-note" id="activity-coverage-note">
+        Endast observerade GitHub-repositoryevents visas publikt. Cloudflare account-/org-aktivitet
+        och detaljerade resurs-ID:n stannar i Skvallerbyttans skyddade observationsyta.
+      </div>
+
+      <div class="activity-list" id="activity-list">
+        <div class="empty">Läser observerade events…</div>
+      </div>
+
+      <div class="portal-placeholder" id="activity-error" hidden>
+        <strong>Aktivitet är tillfälligt otillgänglig.</strong>
+        Ingen aktivitet fabriceras när den public-safe observationsvägen inte kan läsas.
       </div>
     </section>
 
@@ -788,5 +851,6 @@
   <script src="/project-releases.js" defer></script>
   <script src="/project-issues.js" defer></script>
   <script src="/project-builds.js" defer></script>
+  <script src="/activity.js" defer></script>
 </body>
 </html>

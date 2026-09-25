@@ -44,6 +44,11 @@ export function projectBuildsPath(projectSlug) {
   return slug ? "/projekt/" + encodeURIComponent(slug) + "/builds" : "/projekt";
 }
 
+export function projectActivityPath(projectSlug) {
+  const slug = String(projectSlug || "").trim();
+  return slug ? "/projekt/" + encodeURIComponent(slug) + "/aktivitet" : "/projekt";
+}
+
 export function documentationPath(repositoryName = null, sourcePath = null) {
   const repo = String(repositoryName || "").trim();
   const base = repo

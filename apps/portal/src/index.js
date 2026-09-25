@@ -46,6 +46,8 @@ const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
 const CHANGELOG_RESULT_LIMIT = 40;
 const CHANGELOG_FETCH_CONCURRENCY = 4;
 const PROJECT_ISSUES_LIMIT = 30;
+const ACTIVITY_REPOSITORY_LIMIT = 50;
+const ACTIVITY_DEFAULT_DAYS = 7;
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -486,7 +488,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v6");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v7");
   const cached = await cache.match(cacheKey);
 
   if (cached) {
@@ -830,6 +832,319 @@ async function getPublicProjectBuilds(requestUrl, env) {
     return new Response(JSON.stringify({
       status: "error",
       error: "project_builds_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
+const PUBLIC_ACTIVITY_CAPABILITIES = new Set([
+  "github.avkroken.repositories",
+  "github.avkroken.pull_requests",
+  "github.avkroken.actions"
+]);
+const PUBLIC_ACTIVITY_SOURCES = new Set([
+  "webhook",
+  "audit_log",
+  "snapshot_diff",
+  "reconciliation"
+]);
+const PUBLIC_ACTIVITY_COVERAGE = new Set([
+  "complete",
+  "partial",
+  "sampled",
+  "since_installation",
+  "since_first_observation",
+  "unknown"
+]);
+const PUBLIC_ACTIVITY_STATUS = new Set([
+  "available",
+  "not_configured",
+  "not_observed",
+  "unavailable"
+]);
+
+function activityDays(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return ACTIVITY_DEFAULT_DAYS;
+  return Math.min(30, Math.max(1, Math.trunc(parsed)));
+}
+
+function publicActivityProjects(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  return projects.filter(project =>
+    project?.type === "repository" &&
+    project?.source?.provider === "github" &&
+    project?.source?.kind === "repository" &&
+    typeof project?.source?.repository === "string" &&
+    /^Avkroken\/[A-Za-z0-9._-]+$/.test(project.source.repository) &&
+    typeof project?.activityPortalUrl === "string" &&
+    typeof project?.portalUrl === "string"
+  );
+}
+
+function activityText(value, maxLength) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text && text.length <= maxLength ? text : null;
+}
+
+function activityCapability(value) {
+  const text = activityText(value, 120);
+  return text && PUBLIC_ACTIVITY_CAPABILITIES.has(text) ? text : null;
+}
+
+function activitySource(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_SOURCES.has(text) ? text : null;
+}
+
+function activityCoverage(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_COVERAGE.has(text) ? text : null;
+}
+
+function activityStatus(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_STATUS.has(text) ? text : "unavailable";
+}
+
+function activityTimestamp(value) {
+  const text = activityText(value, 64);
+  return text && Number.isFinite(Date.parse(text)) ? text : null;
+}
+
+function activityCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.trunc(number)) : 0;
+}
+
+function projectActivityPayload(snapshot, projects, metadata) {
+  const byRepository = new Map(
+    projects.map(project => [project.source.repository, project])
+  );
+
+  const grouped = Array.isArray(snapshot?.grouped)
+    ? snapshot.grouped.flatMap(item => {
+      const capability = activityCapability(item?.capability);
+      const event = activityText(item?.event, 120);
+      if (!capability || !event) return [];
+      return [{
+        capability,
+        event,
+        observedCount: activityCount(item.observedCount)
+      }];
+    })
+    : [];
+
+  const coverage = Array.isArray(snapshot?.coverage)
+    ? snapshot.coverage.flatMap(item => {
+      const capability = activityCapability(item?.capability);
+      const source = activitySource(item?.source);
+      const coverageValue = activityCoverage(item?.coverage);
+      if (!capability || !source || !coverageValue) {
+        return [];
+      }
+
+      return [{
+        capability,
+        source,
+        coverage: coverageValue,
+        firstObservedAt: activityTimestamp(item.firstObservedAt),
+        lastObservedAt: activityTimestamp(item.lastObservedAt),
+        periodComplete: false,
+        sampling: activityText(item.sampling, 80) || "unknown",
+        observedCount: activityCount(item.observedCount)
+      }];
+    })
+    : [];
+
+  const recent = Array.isArray(snapshot?.recent)
+    ? snapshot.recent.flatMap(item => {
+      const project = byRepository.get(item?.repository);
+      const capability = activityCapability(item?.capability);
+      const source = activitySource(item?.source);
+      const coverageValue = activityCoverage(item?.coverage);
+      const event = activityText(item?.event, 120);
+      const receivedAt = activityTimestamp(item?.receivedAt);
+
+      if (
+        !project ||
+        !capability ||
+        !capability.startsWith("github.avkroken.") ||
+        !source ||
+        !coverageValue ||
+        !event ||
+        !receivedAt
+      ) {
+        return [];
+      }
+
+      return [{
+        projectSlug: project.slug,
+        projectName: project.name,
+        projectUrl: project.portalUrl,
+        repository: project.source.repository,
+        capability,
+        source,
+        coverage: coverageValue,
+        event,
+        action: activityText(item.action, 120),
+        occurredAt: activityTimestamp(item.occurredAt),
+        receivedAt
+      }];
+    })
+    : [];
+
+  const period = snapshot?.period &&
+    Number.isFinite(Number(snapshot.period.days)) &&
+    activityTimestamp(snapshot.period.from) &&
+    activityTimestamp(snapshot.period.to)
+      ? {
+        days: Math.min(30, Math.max(1, Math.trunc(Number(snapshot.period.days)))),
+        from: activityTimestamp(snapshot.period.from),
+        to: activityTimestamp(snapshot.period.to)
+      }
+      : null;
+
+  return {
+    generatedAt: activityTimestamp(snapshot?.generatedAt) || new Date().toISOString(),
+    source: {
+      provider: "skvallerbyttan",
+      scope: metadata.projectSlug
+        ? "public_repository_project"
+        : "public_repository_projects",
+      coverage: metadata.discoveredRepositories > metadata.requestedRepositories
+        ? "partial"
+        : "bounded",
+      observedActivity: true,
+      repositoryLimit: ACTIVITY_REPOSITORY_LIMIT,
+      discoveredRepositories: metadata.discoveredRepositories,
+      requestedRepositories: metadata.requestedRepositories
+    },
+    project: metadata.projectSlug
+      ? (() => {
+        const project = projects[0];
+        return project ? {
+          slug: project.slug,
+          name: project.name,
+          portalUrl: project.portalUrl,
+          repository: project.source.repository,
+          repositoryUrl: project.repository
+        } : null;
+      })()
+      : null,
+    activity: {
+      available: snapshot?.available === true,
+      status: activityStatus(snapshot?.status),
+      repositoryCount: activityCount(snapshot?.repositoryCount),
+      period,
+      grouped,
+      coverage,
+      recent
+    }
+  };
+}
+
+async function getPublicActivity(requestUrl, env) {
+  const projectParam = requestUrl.searchParams.get("project");
+  const projectSlug = projectParam === null ? null : String(projectParam).trim();
+  const days = activityDays(requestUrl.searchParams.get("days"));
+
+  if (projectParam !== null && (!projectSlug || projectSlug.length > 120)) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const repositoryProjects = await loadLivePublicRepositoryProjects(env);
+    const eligible = publicActivityProjects(repositoryProjects);
+
+    let selected;
+    if (projectSlug) {
+      const project = eligible.find(item => item.slug === projectSlug);
+      if (!project) {
+        return new Response(JSON.stringify({
+          status: "error",
+          error: "project_activity_not_found"
+        }), {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          }
+        });
+      }
+      selected = [project];
+    } else {
+      selected = eligible.slice(0, ACTIVITY_REPOSITORY_LIMIT);
+    }
+
+    const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+    if (!service || typeof service.getPublicActivity !== "function") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "activity_not_configured"
+      }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    const repositoryNames = selected.map(project =>
+      project.source.repository.slice("Avkroken/".length)
+    );
+    const snapshot = await service.getPublicActivity(repositoryNames, days);
+
+    if (!snapshot || typeof snapshot !== "object" || snapshot.schemaVersion !== 1) {
+      throw new Error("invalid public activity snapshot");
+    }
+
+    const payload = projectActivityPayload(snapshot, selected, {
+      projectSlug,
+      discoveredRepositories: projectSlug ? 1 : eligible.length,
+      requestedRepositories: selected.length
+    });
+
+    return new Response(JSON.stringify({
+      status: "available",
+      ...payload
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public Activity unavailable", {
+      project: projectSlug,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "activity_unavailable"
     }), {
       status: 502,
       headers: {
@@ -1588,6 +1903,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicProjectBuilds(url, env);
+    }
+
+    if (url.pathname === "/api/activity") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicActivity(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";

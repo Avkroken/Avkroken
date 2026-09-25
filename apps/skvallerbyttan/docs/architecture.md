@@ -34,10 +34,11 @@ CF Audit Logs ──────────────┘
             /api/v1 contract        PortalObservationsService
              ├── dashboard          (sanitized read-only RPC)
              └── machine clients        ├─ provider/capability snapshot
-                 │                    └─ cached repository CI snapshot
+                 │                    ├─ cached repository CI snapshot
+                 │                    └─ allowlistad repository Activity
                  │                           │
                  │                           ▼
-                 │                    avkroken Drift & insyn / Builds
+                 │                    avkroken Drift & insyn / Builds / Aktivitet
                  │
                  └──────── internal signals ────────────────► avkroken RPC
                                                       ├─ docs cache invalidation
@@ -64,9 +65,13 @@ Readinesspayloaden produceras av faktiska lokala/provider-probes men innehåller
 
 Portalens operativa läsväg är separat från heartbeat och det skyddade HTTP-API:t. `PortalObservationsService` exporteras som named Worker RPC-entrypoint och läser samma canonical capability/provider-health/Activity-modeller, men passerar dem genom en explicit sanitization boundary innan de lämnar Skvallerbyttan.
 
-Den generella Drift-snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom RPC:n.
+Den generella Drift-snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom den generella Drift-metoden.
 
 Samma named entrypoint har ett separat repository-CI-kontrakt. `getPublicRepositoryCi(repoName)` läser endast D1 source cache-keyn `overview`; den startar ingen GitHub Actions-request. Repositoryraden måste själv vara `visibility = public` och icke-arkiverad. Utåt projiceras endast sampled Actions-summary, source cache-tid och explicit `fresh|stale|unknown`. Actor, permissions/fel, event breakdown och rå runpayload lämnar inte Skvallerbyttan.
+
+Ett separat repository-Activity-kontrakt exponeras som `getPublicActivity(repositoryNames, days)`. Begärda repositorykortnamn begränsas till 50 och intersectas med den cacheade `overview`-state:n; endast rader med `visibility = public` och `archived != true` går vidare. Därefter queryas D1 `observation_events` med `provider = github` och ett explicit `repository IN (...)`-filter. En explicit lista som efter validering blir tom lägger till `1 = 0` och kan inte falla tillbaka till organisationsomfattande Activity.
+
+Activity-sanitizern returnerar aggregate counts/coverage och recent event-rader med repository, capability, source, coverage, event/action och timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload lämnar inte Skvallerbyttan. Capability-allowlisten innehåller endast `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective-ruleset-events publiceras inte. Cloudflare account-/org-Activity publiceras inte genom detta kontrakt.
 
 ## Runtime
 
@@ -85,6 +90,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - Workers RPC-entrypoint: `src/portal-observations.ts`
 - ren public-safe Drift-sanitizationmodell: `src/portal-observations-model.ts`
 - ren public-safe repository-CI-modell: `src/portal-ci-model.ts`
+- ren public-safe repository-Activity-modell: `src/portal-activity-model.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
@@ -92,7 +98,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 
 Externa klienter får normaliserade modeller, inte generella provider-dumpar. Relevant state bär status, freshness och provenance. Repository governance skiljer mellan `direct`, `inherited` och `effective` där providern ger tillräckligt underlag.
 
-Portalens publika Drift & insyn- och Builds-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state och får inte göra en ny providerread på Portalens begäran.
+Portalens publika Drift & insyn-, Builds- och Activity-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state, och repository-Activity från den reducerade D1-eventledgern efter dubbel publiceringskontroll; inget av kontrakten får göra en ny providerread på Portalens begäran.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration: read används där GitHub kräver den nivån; provider-write ingår inte i observationslagret.
 

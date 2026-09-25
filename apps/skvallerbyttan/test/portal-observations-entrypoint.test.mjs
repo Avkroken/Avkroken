@@ -16,6 +16,7 @@ test("Skvallerbyttan exports a dedicated Portal observations RPC entrypoint", ()
   );
   assert.match(observations, /getPublicOperationsSummary/);
   assert.match(observations, /getPublicRepositoryCi/);
+  assert.match(observations, /getPublicActivity/);
 });
 
 test("Portal observations service does not use HTTP read-token authorization", () => {
@@ -23,7 +24,6 @@ test("Portal observations service does not use HTTP read-token authorization", (
   assert.equal(observations.includes("authorization"), false);
   assert.equal(observations.includes("Bearer "), false);
   assert.equal(observations.includes("recent:"), false);
-  assert.equal(observations.includes("getObservedActivity"), false);
   assert.equal(observations.includes("scopeCoverage:"), false);
 });
 
@@ -34,6 +34,19 @@ test("Portal repository CI RPC reuses Skvallerbyttan Actions ownership without H
   assert.match(observations, /publicCiRepository/);
   assert.equal(observations.includes("githubOptionalJson"), false);
   assert.equal(observations.includes("getRepositoryActions"), false);
+  assert.equal(observations.includes("/actions/runs"), false);
+  assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
+  assert.equal(observations.includes("authorization"), false);
+  assert.equal(observations.includes("Bearer "), false);
+});
+
+
+test("Portal activity RPC reads only the internal activity ledger behind a cached public-repository gate", () => {
+  assert.match(observations, /getObservedActivity/);
+  assert.match(observations, /buildPortalActivitySnapshot/);
+  assert.match(observations, /readSourceCache/);
+  assert.equal(observations.includes("githubOptionalJson"), false);
+  assert.equal(observations.includes("/events"), false);
   assert.equal(observations.includes("/actions/runs"), false);
   assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
   assert.equal(observations.includes("authorization"), false);
