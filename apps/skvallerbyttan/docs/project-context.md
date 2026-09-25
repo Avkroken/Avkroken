@@ -46,7 +46,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 - **Gamnacken GitHub App:** Avkrokens canonical provideridentitet för read-only GitHub-observationer i Skvallerbyttan. En separat Skvallerbyttan GitHub App ska inte användas.
 - **GitHub OAuth:** interaktiv login går direkt mot GitHub med state, PKCE S256 och numerisk GitHub-ID-allowlist.
 - **GitHub organization webhook:** canonical event-ingress för Activity, security ledger och cache invalidation; Custom Property-definitioner/värden används som governance freshness-signaler när de levereras.
-- **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till live Worker-tjänsten `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
+- **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
 
 GitHub REST API-version: `2026-03-10`.
@@ -81,7 +81,7 @@ För publik repositorydokumentation:
 
 1. GitHub levererar `push`/`repository` till Skvallerbyttan.
 2. Skvallerbyttan verifierar webhooksignaturen och organisationsgränsen.
-3. Relevanta docs-events signaleras till live Worker-tjänsten `avkroken` genom den interna Service Bindingen `AVKROKEN_PORTAL_DOCS`.
+3. Relevanta docs-events signaleras till deklarerat service target `avkroken` genom Service Bindingen `AVKROKEN_PORTAL_DOCS`.
 4. Portalens `DocsInvalidationService` purgar endast `docs-catalog` och berörda `docs-repo-*` cache-tags.
 5. Activity/deduplication ligger fortsatt i Skvallerbyttan; portalen blir inte ett parallellt eventlager.
 
@@ -140,11 +140,11 @@ Repositorykod och dokumentation kan mergeas utan att automatiskt:
 - deploya Worker
 
 Dessa är separata efterföljande driftåtgärder.
-## Free-first observability
+## Observability
 
-Skvallerbyttans runtime-observability är Cloudflare-native och ska som standard fungera på Workers Free utan externa telemetry-sinks.
+Skvallerbyttans Wrangler-konfiguration använder Cloudflare-native observability utan externa telemetry-sinks.
 
-Aktuell produktionskonfiguration:
+Repository-deklarerad observability-konfiguration:
 
 - Worker-entrypointen använder ingen extern telemetry-SDK.
 - Cloudflare Workers Observability samlar invocation logs, exceptions och traces.
@@ -153,6 +153,6 @@ Aktuell produktionskonfiguration:
 - `observability.redact_query_string = true` skyddar OAuth `code`/`state` och andra query-värden före persistens.
 - `observability.logs.destinations` och `observability.traces.destinations` ska vara tomma/odeklarerade i den normala produktionstopologin.
 - Extern telemetry-export är inte en del av Skvallerbyttans normala produktionskontrakt.
-- Produktionsverifieringen failar om externa observability-destinationer återintroduceras eller sampling överskrider organisationens 10%/1%-tak.
+- Produktionsverifieringen kontrollerar externa observability-destinationer och de samplinggränser som repositoryt själv deklarerar.
 
 Skvallerbyttan har för närvarande ingen AI/LLM- eller Workers AI-anropsväg. Ingen artificiell `gen_ai.conversation.id`-telemetri ska skapas utan en faktisk AI-konversation.
