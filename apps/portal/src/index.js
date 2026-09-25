@@ -596,9 +596,17 @@ async function loadSearchIndex(env) {
   const failedDocuments = fetched.filter(result => result.failed).length;
   const truncatedDocuments = fetched.filter(result => result.truncated).length;
 
-  const coverage = limited || failedDocuments > 0
-    ? "partial"
-    : "complete";
+  const appDiscoveryIncomplete =
+    projectCatalog.appDiscovery === "partial" ||
+    projectCatalog.appDiscovery === "unavailable" ||
+    projectCatalog.appDiscovery === "not_configured";
+  const coverage =
+    limited ||
+    failedDocuments > 0 ||
+    truncatedDocuments > 0 ||
+    appDiscoveryIncomplete
+      ? "partial"
+      : "bounded";
 
   return {
     generatedAt: new Date().toISOString(),
@@ -613,7 +621,8 @@ async function loadSearchIndex(env) {
         indexed: documentEntries.length,
         failed: failedDocuments,
         truncated: truncatedDocuments,
-        limit: MAX_SEARCH_DOCUMENTS
+        limit: MAX_SEARCH_DOCUMENTS,
+        catalogDepth: MAX_DOC_DEPTH
       }
     },
     entries: [
