@@ -23,6 +23,11 @@ import {
   normalizePublicReleases,
   sortPublicReleases
 } from "./release-source.mjs";
+import {
+  eligibleIssueProjects,
+  normalizePublicIssues,
+  sortPublicIssues
+} from "./issue-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -40,6 +45,8 @@ const CHANGELOG_REPOSITORY_LIMIT = 24;
 const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
 const CHANGELOG_RESULT_LIMIT = 40;
 const CHANGELOG_FETCH_CONCURRENCY = 4;
+const PROJECT_ISSUES_FETCH_LIMIT = 100;
+const PROJECT_ISSUES_RESULT_LIMIT = 50;
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -713,6 +720,132 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 }
 
+async function fetchProjectIssues(project, env) {
+  const repository = String(project?.source?.repository || "");
+  const parts = repository.split("/");
+  if (parts.length !== 2 || parts[0] !== "Avkroken" || !parts[1]) {
+    return { issues: [], failed: true };
+  }
+
+  const endpoint =
+    "https://api.github.com/repos/" + encodeURIComponent(parts[0]) + "/" +
+    encodeURIComponent(parts[1]) +
+    "/issues?state=open&sort=updated&direction=desc&per_page=" +
+    PROJECT_ISSUES_FETCH_LIMIT;
+
+  const result = await fetchGitHubJson(endpoint, env);
+
+  if (!result.ok || !Array.isArray(result.data)) {
+    return { issues: [], failed: true };
+  }
+
+  return {
+    issues: normalizePublicIssues(project, result.data),
+    failed: false,
+    providerLimitReached: result.data.length >= PROJECT_ISSUES_FETCH_LIMIT
+  };
+}
+
+async function loadPublicProjectIssues(projectSlug, env) {
+  const projectCatalog = await loadPublicProjects(env);
+  const project = eligibleIssueProjects(projectCatalog.projects, 100)
+    .find(item => item.slug === projectSlug);
+
+  if (!project) return null;
+
+  const fetched = await fetchProjectIssues(project, env);
+  if (fetched.failed) throw new Error("project_issues_unavailable");
+
+  const issues = sortPublicIssues(fetched.issues, PROJECT_ISSUES_RESULT_LIMIT);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "github",
+      scope: "public_portal_repository_project",
+      coverage: fetched.providerLimitReached || fetched.issues.length > issues.length
+        ? "partial"
+        : "bounded",
+      issues: {
+        providerLimit: PROJECT_ISSUES_FETCH_LIMIT,
+        resultLimit: PROJECT_ISSUES_RESULT_LIMIT
+      }
+    },
+    project: {
+      slug: project.slug,
+      name: project.name,
+      portalUrl: project.portalUrl,
+      repository: project.source.repository,
+      issuesUrl: project.issues
+    },
+    issues
+  };
+}
+
+async function getPublicProjectIssues(requestUrl, env) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+
+  if (!projectSlug || projectSlug.length > 120) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const payload = await loadPublicProjectIssues(projectSlug, env);
+
+    if (!payload) {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "project_issues_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    return new Response(JSON.stringify({
+      status: "available",
+      ...payload
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public project Issues unavailable", {
+      project: projectSlug,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "project_issues_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 async function fetchProjectReleases(project, env) {
   const repository = String(project?.source?.repository || "");
   const parts = repository.split("/");
@@ -1321,6 +1454,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicProjectReleases(url, env);
+    }
+
+    if (url.pathname === "/api/issues") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicProjectIssues(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";
