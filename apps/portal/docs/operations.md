@@ -47,9 +47,9 @@ Credentialvärden dokumenteras inte här.
 
 ## Felmodell
 
-### GitHub site discovery
+### GitHub project/site discovery
 
-Om GitHub API inte kan läsas returnerar backend `502` och UI visar att projekt-/tjänstelistan är otillgänglig.
+Om GitHub API inte kan läsas returnerar `/api/projects` eller `/api/sites` `502` och UI visar att berörd katalog är otillgänglig. Project catalog och site catalog har separata cache keys.
 
 ### Dokumentationskatalog
 
@@ -92,7 +92,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
+3. `/api/projects`, `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
 4. deep links returnerar Portal-shell;
 5. dokumentationsrendering visar “Visa original” till canonical källa;
 6. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
