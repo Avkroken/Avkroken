@@ -209,10 +209,9 @@ Portalens binding `SKVALLERBYTTAN_OBSERVATIONS` pekar endast på den named entry
 Den publika `GET /api/operations` returnerar endast:
 
 - providerstatus och senaste observationstid;
-- capability key/name/provider/status/dataState/freshness/lastSuccessAt/scope coverage;
-- 24h observerad aktivitet aggregerad per provider/capability/source/coverage.
+- capability key/name/provider/status/dataState/freshness/lastSuccessAt.
 
-Snapshoten utesluter provider-endpoints och required permissions, accepterade permissions, HTTP-statusar/felsträngar, installation-/budgetmetadata samt activity recent events med repository/resource/action-detaljer. Activity-täckning behåller `periodComplete = false`.
+Snapshoten utesluter provider-endpoints och required permissions, accepterade permissions, HTTP-statusar/felsträngar, installation-/budgetmetadata, scope coverage/repositoryantal samt Activity/eventvolym och recent events. De sistnämnda modellerna är organisationsomfattande i Skvallerbyttan och kan därför inte bevisas vara public-only.
 
 Om binding eller RPC är unavailable visar Portalen ett explicit degraded state och fabricerar inte providerstatus.
 
