@@ -147,6 +147,72 @@
     </section>
 
     <section
+      class="portal-route-panel"
+      id="project-detail-view"
+      data-route-panel="project-detail"
+      aria-labelledby="project-detail-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span id="project-detail-breadcrumb">Projekt</span>
+      </nav>
+
+      <div class="portal-page-head project-detail-head">
+        <div class="portal-kicker" id="project-detail-category">PROJEKT</div>
+        <h1 id="project-detail-title">Läser in projekt…</h1>
+        <p id="project-detail-description">Projektmetadata hämtas från Portalens normaliserade publika projektkatalog.</p>
+      </div>
+
+      <div class="project-detail-layout">
+        <section class="project-detail-primary" aria-labelledby="project-detail-overview-title">
+          <div class="portal-section-title">
+            <div>
+              <h2 id="project-detail-overview-title">Översikt</h2>
+              <p>Portalmetadata och navigation till canonical källor.</p>
+            </div>
+          </div>
+
+          <div class="project-detail-actions" id="project-detail-actions" aria-label="Projektlänkar"></div>
+
+          <dl class="project-detail-facts" id="project-detail-facts">
+            <div>
+              <dt>Källtyp</dt>
+              <dd id="project-detail-source-kind">—</dd>
+            </div>
+            <div>
+              <dt>Repository</dt>
+              <dd id="project-detail-repository">—</dd>
+            </div>
+            <div>
+              <dt>Ref</dt>
+              <dd id="project-detail-ref">—</dd>
+            </div>
+            <div>
+              <dt>Senast uppdaterad</dt>
+              <dd id="project-detail-updated">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <aside class="project-detail-source" aria-labelledby="project-detail-source-title">
+          <div class="portal-meta-label">CANONICAL SOURCE</div>
+          <h2 id="project-detail-source-title">Ägs utanför Portalen</h2>
+          <p id="project-detail-source-copy">
+            Portalen presenterar projektet men teknisk current-state, dokumentation, Issues, Discussions och releases ägs i källan.
+          </p>
+          <div class="project-detail-source-path" id="project-detail-source-path" hidden></div>
+        </aside>
+      </div>
+
+      <div class="portal-placeholder" id="project-detail-error" hidden>
+        <strong>Projektet kunde inte hittas.</strong>
+        Projektet finns inte i den aktuella publika katalogen.
+      </div>
+    </section>
+
+    <section
       class="portal-route-panel docs-view"
       id="docs-view"
       data-route-panel="docs"
