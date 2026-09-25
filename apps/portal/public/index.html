@@ -371,30 +371,67 @@
         <div class="portal-kicker">DRIFT &amp; INSYN</div>
         <h1 id="operations-title">Vad Avkroken ser</h1>
         <p>
-          Operativ state ska i första hand komma från Skvallerbyttans normaliserade read-only modell,
-          med freshness och täckning tydligt skilda från antagen komplett aktivitet.
+          Sanerad read-only state från Skvallerbyttan. Providerhälsa, freshness och observerad aktivitet
+          visas utan credentials, provider-permissions, resource-ID:n eller råa event.
         </p>
       </div>
-      <div class="portal-card-grid">
+
+      <div class="operations-meta">
+        <span id="operations-status" aria-live="polite">Läser observerad state…</span>
+        <span id="operations-generated"></span>
+      </div>
+
+      <div class="portal-card-grid" id="operations-provider-grid">
         <div class="portal-info-card">
-          <div class="portal-meta-label">GITHUB</div>
-          <h3>Observerad state</h3>
-          <p>CI, releases, säkerhet och annan providerstate kopplas via Skvallerbyttan där capability finns.</p>
-        </div>
-        <div class="portal-info-card">
-          <div class="portal-meta-label">CLOUDFLARE</div>
-          <h3>Observerad state</h3>
-          <p>Portalens grundlager introducerar ingen ny Cloudflare-providerklient eller permission.</p>
-        </div>
-        <div class="portal-info-card">
-          <div class="portal-meta-label">FRESHNESS</div>
-          <h3>Synlig täckning</h3>
-          <p>Senaste lyckade observation, cacheläge och källtäckning ska visas när integrationen kopplas in.</p>
+          <div class="portal-meta-label">PROVIDERS</div>
+          <h3>Läser in…</h3>
+          <p>Hämtar sanerad providerstatus från Skvallerbyttan.</p>
         </div>
       </div>
-      <div class="portal-placeholder">
-        <strong>Dataintegration ligger i separat PR.</strong>
-        Den här foundation-PR:n etablerar ytan och accessgränsen men fabricerar ingen driftstatus.
+
+      <div class="operations-summary-grid">
+        <div class="portal-info-card">
+          <div class="portal-meta-label">CAPABILITIES</div>
+          <h3 id="operations-capability-summary">—</h3>
+          <p>Status och freshness från Skvallerbyttans capability registry.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">OBSERVERAD AKTIVITET · 24H</div>
+          <h3 id="operations-activity-total">—</h3>
+          <p id="operations-activity-copy">Observerade events är inte samma sak som komplett provideraktivitet.</p>
+        </div>
+      </div>
+
+      <div class="operations-layout">
+        <section class="operations-panel" aria-labelledby="operations-capabilities-title">
+          <div class="portal-section-title">
+            <div>
+              <h2 id="operations-capabilities-title">Capabilities</h2>
+              <p>Implementerad read-only observationsyta med aktuell status och freshness.</p>
+            </div>
+          </div>
+          <div id="operations-capabilities">
+            <div class="empty">Läser capabilities…</div>
+          </div>
+        </section>
+
+        <section class="operations-panel" aria-labelledby="operations-activity-title">
+          <div class="portal-section-title">
+            <div>
+              <h2 id="operations-activity-title">Observerad aktivitet</h2>
+              <p>Summerad per provider/capability utan actor-, resource- eller repositorydetaljer.</p>
+            </div>
+          </div>
+          <div id="operations-activity-list">
+            <div class="empty">Läser aktivitet…</div>
+          </div>
+          <div class="operations-coverage" id="operations-coverage"></div>
+        </section>
+      </div>
+
+      <div class="portal-placeholder" id="operations-error" hidden>
+        <strong>Drift &amp; insyn är tillfälligt otillgänglig.</strong>
+        Ingen providerstatus fabriceras när Skvallerbyttans sanerade observationsyta inte kan läsas.
       </div>
     </section>
 
@@ -526,5 +563,6 @@
   <script src="/docs.js" defer></script>
   <script src="/wiki.js" defer></script>
   <script src="/search.js" defer></script>
+  <script src="/operations.js" defer></script>
 </body>
 </html>
