@@ -47,7 +47,8 @@ Foundationen känner bland annat igen:
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
-- `/auth[/...]`
+- `/auth` — publik Auth-ingång.
+- `/auth/jobb[/...]` — server-side `302` till befintliga skyddade `https://jobb.denied.se/` före Portal-shell.
 - `/drift[/...]`
 - `/changelog`
 - `/aktivitet`
@@ -93,7 +94,7 @@ Portalen ska inte skapa en andra bred providerklient för driftdata när Skvalle
 
 ### Skyddad Jobb-data
 
-Skyddad Jobb-data får inte gå genom den publika Portal-datavägen. Den publika Auth-ytan kan länka till Jobb men innehåller ingen skyddad payload.
+Skyddad Jobb-data får inte gå genom den publika Portal-datavägen. Den publika Auth-ytan kan länka till Jobb men innehåller ingen skyddad payload. Direkta Portal-paths under `/auth/jobb` redirectas till Jobbs befintliga skyddade origin innan Portal-shell eller datafetch.
 
 ## Lokal utveckling
 
