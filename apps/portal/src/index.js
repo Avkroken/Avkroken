@@ -496,7 +496,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v6");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v7");
   const cached = await cache.match(cacheKey);
 
   if (cached) {
@@ -562,17 +562,20 @@ async function getPortalSites(env, ctx) {
 }
 
 async function loadPublicActivity(env) {
-  const repositoryProjects = await loadLivePublicRepositoryProjects(env);
-  const eligible = eligibleActivityProjects(repositoryProjects, ACTIVITY_PROJECT_LIMIT);
-  const eventsResult = await fetchGitHubJson(GITHUB_PUBLIC_ACTIVITY_API, env);
+  const [repositoryProjects, eventsResult] = await Promise.all([
+    loadLivePublicRepositoryProjects(env),
+    fetchGitHubJson(GITHUB_PUBLIC_ACTIVITY_API, env)
+  ]);
 
   if (!eventsResult.ok || !Array.isArray(eventsResult.data)) {
     throw new Error("public_activity_unavailable:" + eventsResult.status);
   }
 
-  const events = normalizePublicActivity(eligible, eventsResult.data);
+  const eligible = eligibleActivityProjects(repositoryProjects, 100);
+  const selected = eligible.slice(0, ACTIVITY_PROJECT_LIMIT);
+  const events = normalizePublicActivity(selected, eventsResult.data);
   const projects = new Map(
-    eligible.map(project => [
+    selected.map(project => [
       project.slug,
       {
         slug: project.slug,
@@ -588,10 +591,11 @@ async function loadPublicActivity(env) {
     source: {
       provider: "github",
       scope: "public_organization_events_filtered_to_portal_repositories",
-      coverage: "bounded",
+      coverage: eligible.length > selected.length ? "partial" : "bounded",
       realtime: false,
       repositories: {
         eligible: eligible.length,
+        observed: selected.length,
         limit: ACTIVITY_PROJECT_LIMIT,
         mixedScopeExcluded: repositoryProjects.some(
           project => project?.source?.repository === "Avkroken/Avkroken"
