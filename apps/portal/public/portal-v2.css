@@ -1440,7 +1440,7 @@ a.portal-product-card:hover {
   }
 
   .portal-hero-copy h1 {
-    font-size: clamp(3.15rem, 21vw, 5.4rem);
+    font-size: clamp(3.15rem, 18vw, 5.4rem);
   }
 
   .portal-dashboard,
