@@ -42,8 +42,8 @@
     const legacy = legacyRouteFromHash();
     if (legacy) return legacy;
 
-    const pathname = location.pathname.replace(/\\+$/, "") || "/";
-    const projectDocs = pathname.match(/^\\/projekt\\/([^/]+)\\/dokumentation(?:\\/(.*))?$/);
+    const pathname = location.pathname.replace(/\/+$/, "") || "/";
+    const projectDocs = pathname.match(/^\/projekt\/([^/]+)\/dokumentation(?:\/(.*))?$/);
     if (projectDocs) {
       return {
         repo: decodeURIComponent(projectDocs[1]),
