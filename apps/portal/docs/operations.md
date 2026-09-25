@@ -81,7 +81,7 @@ Heartbeat-state ska inte automatiskt tolkas som komplett provider health för Gi
 
 `/api/projects` lagras i Workers Cache API med fem minuters cachetid.
 
-Svaret använder browserrevalidering och en Cloudflare-cacheperiod på 300 sekunder. `/api/sites` härleds från samma normaliserade response.
+Klientresponsen kräver revalidering. Workers Cache API lagrar en separat response-kopia med `Cache-Control: public, max-age=300`, och cache-hit-responsen normaliseras tillbaka till klientrevalidering. `/api/sites` härleds från samma normaliserade response.
 
 ### Dokumentation
 
