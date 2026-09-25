@@ -14,9 +14,13 @@ const detailRef = document.querySelector("#project-detail-ref");
 const detailUpdated = document.querySelector("#project-detail-updated");
 const detailSourcePath = document.querySelector("#project-detail-source-path");
 const detailError = document.querySelector("#project-detail-error");
+const detailReleases = document.querySelector("#project-detail-releases");
+const detailReleasesState = document.querySelector("#project-detail-releases-state");
+const detailReleaseList = document.querySelector("#project-detail-release-list");
 
 let allProjects = [];
 let projectsLoaded = false;
+let detailReleaseRequestSerial = 0;
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -147,6 +151,105 @@ function detailAction(label, href, { primary = false, internal = false } = {}) {
   return `<a class="portal-button${primary ? " primary" : ""}"${routeAttribute} href="${escapeHtml(href)}"${externalAttributes}>${escapeHtml(label)}</a>`;
 }
 
+function resetProjectReleases() {
+  detailReleaseRequestSerial += 1;
+  if (detailReleases) detailReleases.hidden = true;
+  if (detailReleasesState) detailReleasesState.textContent = "";
+  detailReleaseList?.replaceChildren();
+}
+
+function projectReleaseElement(release) {
+  const article = document.createElement("article");
+  article.className = "project-release-item";
+
+  const main = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = release.name || release.tag || "Release";
+
+  const meta = document.createElement("div");
+  meta.className = "project-release-meta";
+
+  const tag = document.createElement("span");
+  tag.className = "badge";
+  tag.textContent = release.tag || "release";
+  meta.appendChild(tag);
+
+  if (release.prerelease === true) {
+    const prerelease = document.createElement("span");
+    prerelease.className = "project-release-prerelease";
+    prerelease.textContent = "Prerelease";
+    meta.appendChild(prerelease);
+  }
+
+  const date = document.createElement("time");
+  date.dateTime = release.publishedAt || "";
+  date.textContent = formatDate(release.publishedAt);
+  meta.appendChild(date);
+
+  main.append(title, meta);
+
+  const link = document.createElement("a");
+  link.className = "project-release-link";
+  link.href = release.url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.textContent = "Visa release";
+
+  article.append(main, link);
+  return article;
+}
+
+async function loadProjectReleases(project) {
+  const serial = ++detailReleaseRequestSerial;
+
+  if (!detailReleases || !detailReleasesState || !detailReleaseList) return;
+  if (project?.type !== "repository") {
+    resetProjectReleases();
+    return;
+  }
+
+  detailReleases.hidden = false;
+  detailReleasesState.textContent = "Läser publicerade GitHub Releases…";
+  detailReleaseList.replaceChildren();
+
+  try {
+    const response = await fetch(
+      "/api/changelog?project=" + encodeURIComponent(project.slug),
+      { headers: { Accept: "application/json" } }
+    );
+
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const payload = await response.json();
+
+    if (serial !== detailReleaseRequestSerial || projectSlugFromLocation() !== project.slug) {
+      return;
+    }
+
+    const releases = Array.isArray(payload.releases) ? payload.releases.slice(0, 5) : [];
+    const partial = payload.source?.coverage === "partial";
+
+    detailReleasesState.textContent = releases.length
+      ? releases.length + " senaste publicerade release" + (releases.length === 1 ? "" : "s") +
+        (partial ? " · delvis täckning" : "")
+      : partial
+        ? "Releasekällan kunde inte läsas fullständigt."
+        : "Inga publicerade GitHub Releases hittades.";
+
+    for (const release of releases) {
+      detailReleaseList.appendChild(projectReleaseElement(release));
+    }
+  } catch (error) {
+    if (serial !== detailReleaseRequestSerial || projectSlugFromLocation() !== project.slug) {
+      return;
+    }
+
+    detailReleasesState.textContent =
+      "Releasehistoriken är inte tillgänglig i den aktuella publika projektkatalogen.";
+    detailReleaseList.replaceChildren();
+    console.error(error);
+  }
+}
+
 function resetProjectDetail() {
   if (!detailTitle) return;
   detailCategory.textContent = "PROJEKT";
@@ -161,6 +264,7 @@ function resetProjectDetail() {
   detailSourcePath.hidden = true;
   detailSourcePath.textContent = "";
   detailError.hidden = true;
+  resetProjectReleases();
 }
 
 function renderProjectDetail() {
@@ -187,6 +291,7 @@ function renderProjectDetail() {
     detailUpdated.textContent = "—";
     detailSourcePath.hidden = true;
     detailError.hidden = false;
+    resetProjectReleases();
     document.title = "Projekt saknas · Avkroken";
     return;
   }
@@ -230,6 +335,13 @@ function renderProjectDetail() {
   ].filter(Boolean);
 
   detailActions.innerHTML = actions.join("");
+
+  if (project.type === "repository") {
+    loadProjectReleases(project);
+  } else {
+    resetProjectReleases();
+  }
+
   document.title = `${project.name || project.slug} · Avkroken`;
 }
 
