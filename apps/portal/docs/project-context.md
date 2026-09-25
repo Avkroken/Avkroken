@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot projektdetaljarbetet: 2026-09-25.
+Senast verifierad mot Wiki-presentationsarbetet: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -42,7 +42,8 @@ Worker-koden innehåller idag:
 - stabila dokumentations-URL:er;
 - Portal v2 design tokens och shell-CSS;
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
-- projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning.
+- projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
+- Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin.
 
 ## Publik projektmodell
 
@@ -64,7 +65,7 @@ Adapterpolicyn:
 - accepterar bara HTTPS-homepage som publik endpoint;
 - markerar Politiker, Klarspråk och Produkter som `independentProduct`;
 - bär canonical GitHub-repository/ref i `source`;
-- bär stabil `portalUrl` för projektdetalj och, för repositories där GitHub exponerar det, canonical Wiki-länk.
+- bär stabil `portalUrl` för projektdetalj och, för repositories där GitHub exponerar det, canonical Wiki-länk samt intern `wikiPortalUrl`.
 
 ### `/api/sites`
 
@@ -108,6 +109,23 @@ Detaljvyn visar:
 - canonical länkar till repository, Wiki där tillgängligt, Issues, Discussions och Releases.
 
 Detaljvyn hämtar inte Issues, releasehistorik, workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
+
+## Wiki-presentation
+
+Repository-Wikis synkas redan av repo-lokala Actions från canonical `README.md` och `docs/index.md`. Workflows genererar `Home.md`, `Documentation.md` och `_Sidebar.md` och anger uttryckligen att Wikin är navigation/presentation, inte teknisk source of truth.
+
+Portalen skapar därför inte en separat GitHub-Wiki-providerklient. För repositoryprojekt där GitHub rapporterar `has_wiki = true` exponeras `/projekt/:slug/wiki`.
+
+Wiki-vyn:
+
+- läser endast Portalens publika `/api/projects` och `/api/docs`;
+- återger projektets Wiki-navigation och publika README/docs som interna Portal-länkar;
+- visar canonical länk till GitHub-Wikin;
+- länkar Issues/Discussions/Repository till canonical GitHub-ytor;
+- gör inga direkta browseranrop till GitHub API;
+- publicerar inte Wiki för monorepo-appar enbart därför att source-repositoryt har Wiki.
+
+Skvallerbyttan är därför fortsatt utan separat app-Wiki-yta. Jobb påverkas inte och saknar fortsatt publik app-post.
 
 ## Dokumentationsdata
 
@@ -163,7 +181,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 Följande är medvetet inte löst ännu:
 
 - provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
-- Wiki-adapter inne i Portalen;
+- direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - global access-aware sökindexering;
 - Drift & insyn-data från Skvallerbyttans normaliserade API/state;
 - changelogaggregation;

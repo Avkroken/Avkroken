@@ -5,7 +5,8 @@ import {
   isPortalDocumentRoute,
   normalizePortalPath,
   projectPath,
-  protectedRedirectForPath
+  protectedRedirectForPath,
+  wikiPath
 } from "../src/portal-routes.mjs";
 
 test("normalizes trailing slashes without changing root", () => {
@@ -21,6 +22,7 @@ test("recognizes stable public portal document routes", () => {
     "/projekt/Bastion",
     "/projekt/Bastion/dokumentation",
     "/projekt/Bastion/dokumentation/docs/architecture.md",
+    "/projekt/Bastion/wiki",
     "/dokumentation",
     "/dokumentation/arkitektur",
     "/tjanster",
@@ -43,6 +45,7 @@ test("does not rewrite API, assets, unknown routes, or protected Jobb paths", ()
     "/styles.css",
     "/portal-v2.css",
     "/app.js",
+    "/wiki.js",
     "/favicon.ico",
     "/not-a-portal-route",
     "/auth/jobb",
@@ -73,4 +76,11 @@ test("builds stable project detail URLs", () => {
   assert.equal(projectPath(), "/projekt");
   assert.equal(projectPath("Bastion"), "/projekt/Bastion");
   assert.equal(projectPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag");
+});
+
+
+test("builds stable Wiki presentation URLs", () => {
+  assert.equal(wikiPath(), "/projekt");
+  assert.equal(wikiPath("Bastion"), "/projekt/Bastion/wiki");
+  assert.equal(wikiPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag/wiki");
 });

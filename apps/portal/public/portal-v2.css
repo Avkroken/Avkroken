@@ -644,6 +644,118 @@ a.portal-product-card:hover {
   line-height: 1.5;
 }
 
+.wiki-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, .34fr) minmax(0, 1fr);
+  gap: var(--ak-space-5);
+  align-items: start;
+}
+
+.wiki-navigation,
+.wiki-content {
+  min-width: 0;
+  padding: var(--ak-space-6);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-3);
+  background: var(--ak-surface-default);
+}
+
+.wiki-navigation {
+  position: sticky;
+  top: 96px;
+  background:
+    linear-gradient(145deg, rgb(208 174 103 / 4%), transparent 62%),
+    var(--ak-surface-sunken);
+}
+
+.wiki-navigation h2 {
+  margin: var(--ak-space-2) 0 var(--ak-space-4);
+  font-size: 1.1rem;
+}
+
+.wiki-navigation nav {
+  display: grid;
+  gap: var(--ak-space-1);
+}
+
+.wiki-navigation a {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--ak-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--ak-radius-2);
+  color: var(--ak-text-secondary);
+  text-decoration: none;
+}
+
+.wiki-navigation a:hover {
+  color: var(--ak-text-primary);
+  border-color: var(--ak-border-subtle);
+  background: var(--ak-surface-raised);
+}
+
+.wiki-content-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--ak-space-4);
+  padding-bottom: var(--ak-space-4);
+  border-bottom: 1px solid var(--ak-border-subtle);
+}
+
+.wiki-content-head h2 {
+  margin: var(--ak-space-2) 0 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.wiki-note {
+  margin: var(--ak-space-5) 0;
+  color: var(--ak-text-secondary);
+  line-height: 1.65;
+}
+
+.wiki-doc-list {
+  display: grid;
+  gap: var(--ak-space-2);
+}
+
+.wiki-doc-item {
+  display: grid;
+  gap: var(--ak-space-1);
+  padding: var(--ak-space-4);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-2);
+  color: inherit;
+  background: var(--ak-surface-sunken);
+  text-decoration: none;
+}
+
+.wiki-doc-item:hover {
+  border-color: color-mix(in srgb, var(--ak-accent-default) 42%, var(--ak-border-subtle));
+  background: var(--ak-surface-raised);
+}
+
+.wiki-doc-item strong {
+  color: var(--ak-text-primary);
+}
+
+.wiki-doc-item span {
+  color: var(--ak-text-tertiary);
+  overflow-wrap: anywhere;
+  font: .75rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.wiki-collaboration {
+  margin-top: var(--ak-space-8);
+  padding-top: var(--ak-space-5);
+  border-top: 1px solid var(--ak-border-subtle);
+}
+
+.wiki-collaboration h3 {
+  margin: 0 0 var(--ak-space-3);
+}
+
 .portal-v2 footer {
   border-color: var(--ak-border-subtle);
   color: var(--ak-text-tertiary);
@@ -750,8 +862,13 @@ a.portal-product-card:hover {
   }
 
   .portal-boundary,
-  .project-detail-layout {
+  .project-detail-layout,
+  .wiki-layout {
     grid-template-columns: 1fr;
+  }
+
+  .wiki-navigation {
+    position: static;
   }
 
   .project-detail-facts {

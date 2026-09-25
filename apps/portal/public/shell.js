@@ -18,6 +18,8 @@
       /^\/projekt\/[^/]+\/dokumentation(?:\/|$)/.test(path)
     ) return "docs";
 
+    if (/^\/projekt\/[^/]+\/wiki(?:\/|$)/.test(path)) return "wiki";
+
     if (/^\/projekt\/[^/]+$/.test(path)) return "project-detail";
     if (path === "/projekt") return "projects";
     if (path === "/tjanster") return "services";

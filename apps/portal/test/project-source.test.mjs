@@ -36,6 +36,7 @@ test("normalizes active public repositories even without a published endpoint", 
   assert.equal(project.documentation, "/projekt/Bastion/dokumentation");
   assert.equal(project.source.repository, "Avkroken/Bastion");
   assert.equal(project.wiki, "https://github.com/Avkroken/Bastion/wiki");
+  assert.equal(project.wikiPortalUrl, "/projekt/Bastion/wiki");
 });
 
 test("filters organization infrastructure, retired repositories, archived, and non-public repositories", () => {
@@ -81,4 +82,11 @@ test("returns a stable sorted public project catalog", () => {
     repo({ name: "Bastion", full_name: "Avkroken/Bastion" })
   ]);
   assert.deepEqual(projects.map(project => project.name), ["Bastion", "Produkter"]);
+});
+
+
+test("does not expose a Portal Wiki route when repository Wiki is disabled", () => {
+  const project = normalizePublicRepository(repo({ has_wiki: false }));
+  assert.equal(project.wiki, null);
+  assert.equal(project.wikiPortalUrl, null);
 });
