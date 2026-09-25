@@ -60,35 +60,40 @@ test("rejects non-app and nested arbitrary source paths", () => {
 
 test("content locations require an exact page already present in the public catalog entry", () => {
   const entry = {
+    sourceKind: "app",
     sourceRepository: "Avkroken",
+    sourcePath: "apps/skvallerbyttan",
     defaultBranch: "main",
     repository: "https://github.com/Avkroken/Avkroken",
     pages: [
-      { path: "apps/skvallerbyttan/README.md" },
-      { path: "apps/skvallerbyttan/docs/architecture.md" }
+      { path: "README.md" },
+      { path: "docs/architecture.md" }
     ]
   };
 
   assert.deepEqual(
-    docsContentLocation(entry, "apps/skvallerbyttan/docs/architecture.md"),
+    docsContentLocation(entry, "docs/architecture.md"),
     {
       repository: "Avkroken",
       ref: "main",
       path: "apps/skvallerbyttan/docs/architecture.md"
     }
   );
+  assert.equal(docsContentLocation(entry, "../jobb/README.md"), null);
   assert.equal(docsContentLocation(entry, "apps/jobb/README.md"), null);
 });
 
 test("canonical URLs use the canonical repository/ref/path from the catalog entry", () => {
   const entry = {
+    sourceKind: "app",
     sourceRepository: "Avkroken",
+    sourcePath: "apps/skvallerbyttan",
     defaultBranch: "main",
     repository: "https://github.com/Avkroken/Avkroken",
-    pages: [{ path: "apps/skvallerbyttan/docs/API guide.md" }]
+    pages: [{ path: "docs/API guide.md" }]
   };
   assert.equal(
-    canonicalDocUrl(entry, "apps/skvallerbyttan/docs/API guide.md"),
+    canonicalDocUrl(entry, "docs/API guide.md"),
     "https://github.com/Avkroken/Avkroken/blob/main/apps/skvallerbyttan/docs/API%20guide.md"
   );
 });
