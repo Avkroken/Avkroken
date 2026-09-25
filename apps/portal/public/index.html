@@ -444,11 +444,38 @@
       <div class="portal-page-head">
         <div class="portal-kicker">SÖK</div>
         <h1 id="search-title">Sök i Avkroken</h1>
-        <p>Global sök får endast indexera publikt tillåtet innehåll. Skyddat material filtreras före indexering.</p>
+        <p>
+          Sök över publicerade projekt, README/docs och Wiki-presentationer.
+          Skyddat material filtreras bort före indexering.
+        </p>
       </div>
-      <div class="portal-placeholder">
-        <strong>Access-aware sökindex byggs i separat PR.</strong>
-        Ingen publik sökfunktion aktiveras innan indexeringsgränsen är implementerad och testad.
+
+      <form class="portal-search-form" id="portal-search-form" role="search">
+        <label for="portal-search-input">Sökfråga</label>
+        <div class="portal-search-control">
+          <input
+            id="portal-search-input"
+            name="q"
+            type="search"
+            minlength="2"
+            maxlength="120"
+            autocomplete="off"
+            placeholder="Exempel: arkitektur, Bastion, deployment"
+          >
+          <button class="portal-button primary" type="submit">Sök</button>
+        </div>
+      </form>
+
+      <div class="portal-search-meta">
+        <span id="portal-search-status" aria-live="polite">Skriv minst två tecken.</span>
+        <span id="portal-search-freshness"></span>
+      </div>
+
+      <div class="portal-search-results" id="portal-search-results">
+        <div class="empty">
+          <strong>Ingen sökning ännu.</strong>
+          <span>Resultat visas endast från Portalens publika, förfiltrerade källor.</span>
+        </div>
       </div>
     </section>
 
@@ -498,5 +525,6 @@
   <script src="/shell.js" defer></script>
   <script src="/docs.js" defer></script>
   <script src="/wiki.js" defer></script>
+  <script src="/search.js" defer></script>
 </body>
 </html>

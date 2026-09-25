@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-klienten.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki- och sökklienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -101,6 +101,26 @@ Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `
 - providerfel: `404` eller `502 document_unavailable`;
 - dokument över tillåten storlek: `413 document_too_large`.
 
+### Global sök
+
+`GET /api/search?q=...` kräver minst två tecken och max 120 tecken.
+
+- tom/kort fråga: `200` med `status = query_required` och tom resultatlista utan indexbuild;
+- för lång fråga: `400 query_too_long`;
+- index-/providerfel: `502 search_unavailable`;
+- normal sökning: `200`, `status = available`, `generatedAt`, source coverage och rankade resultat.
+
+Sökindexet byggs endast från intersektionen av publicerade projekt och publicerade docs-källor. Klienten får inte rå `searchText`.
+
+Kall indexbuild är budgeterad:
+
+- max 32 Markdown-dokument;
+- round-robin över docs-källor;
+- max 120 000 tecken per dokument;
+- concurrency 4;
+- coverage `bounded` eller `partial`;
+- ingen persistent sökindexcache; samtidiga builds i samma isolate kollapsas.
+
 ### Heartbeat
 
 `OperationalWatchdog` håller state för Skvallerbyttans heartbeat och kan markera stale när förväntad leverans uteblir.
@@ -114,6 +134,12 @@ Heartbeat-state ska inte automatiskt tolkas som komplett provider health för Gi
 `/api/projects` lagras i Workers Cache API med fem minuters cachetid.
 
 Klientresponsen kräver revalidering. Workers Cache API lagrar en separat response-kopia med `Cache-Control: public, max-age=300`, och cache-hit-responsen normaliseras tillbaka till klientrevalidering. `/api/sites` härleds från samma normaliserade response.
+
+### Sökindex
+
+Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik project/docs-state när en sökning kräver index och query-responsen använder `Cache-Control: no-store`.
+
+Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. Det reducerar burst-dubletter utan att skapa en stale publiceringscache.
 
 ### Dokumentation
 
@@ -133,7 +159,7 @@ Service binding används i stället för att exponera en publik administrationse
 - `.github`, retired sources, arkiverade och icke-publika repositories ska inte hamna i den publika projektkatalogen.
 - Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post eller app-docs-källa.
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
-- Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök.
+- Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
 - Skvallerbyttans providerintegration förblir read-only.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
 
@@ -143,7 +169,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
+3. `/api/projects`, `/api/sites`, `/api/docs` och `/api/search?q=arkitektur` fungerar utan att exponera credentials;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -152,6 +178,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 9. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
 10. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
 11. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-12. cache-/heartbeat-beteende har inte regresserat.
+12. sök på ett publikt dokument ger Portal-resultat + canonical original, medan `jobb` inte kan ge skyddad Jobb-dokumentation genom indexet;
+13. sökresultat visar `bounded`/`partial` coverage och index-freshness;
+14. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

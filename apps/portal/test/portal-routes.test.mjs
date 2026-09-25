@@ -42,10 +42,12 @@ test("does not rewrite API, assets, unknown routes, or protected Jobb paths", ()
   for (const path of [
     "/api/sites",
     "/api/docs",
+    "/api/search",
     "/styles.css",
     "/portal-v2.css",
     "/app.js",
     "/wiki.js",
+    "/search.js",
     "/favicon.ico",
     "/not-a-portal-route",
     "/auth/jobb",

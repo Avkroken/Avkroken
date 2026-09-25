@@ -238,13 +238,63 @@ När driftvyn kopplas in ska den:
 
 ## Global sök
 
-Sök är inte implementerad.
+Global sök är implementerad som ett server-side index i Worker-lagret.
 
-Säkerhetskrav för framtida index:
+### Accessgräns
 
-- publicering/indexering ska vara access-aware före data når publikt index;
-- Jobb/Auth-payload får inte först indexeras publikt och därefter döljas i UI;
-- källdata ska bära canonical URL, repository, ref/path och genererings-/hämtningstid när modellen stöder det.
+Indexbyggaren tar inte en bred GitHub-sökning som sedan filtreras i browsern. I stället krävs att källan redan har passerat båda publika katalogerna:
+
+```text
+public project catalog
+          ∩
+public docs catalog
+          |
+          v
+search-index.mjs
+          |
+          v
+bounded request-time index
+          |
+          v
+GET /api/search?q=...
+          |
+          v
+ranked results only
+```
+
+Detta ger defense in depth:
+
+- `.github` kan finnas i publik docs-discovery men saknar projektpost och indexeras därför inte;
+- en monorepo-app måste först ha giltigt `portal.public.json`;
+- appdokument måste dessutom finnas i appens publika docs-katalog;
+- Jobb saknar båda publiceringsvägarna;
+- browsern får aldrig hela indexet och gör inga GitHub API-anrop för sök.
+
+### Indexposter
+
+`src/search-index.mjs` normaliserar tre resultattyper:
+
+- `project`;
+- `wiki`;
+- `document`.
+
+Varje resultat bär Portal-URL samt canonical original-URL där sådan finns. Dokumentresultat bär source repository/ref/path men inte rå `searchText`.
+
+### Providerbudget och täckning
+
+Kall indexbuild:
+
+- hämtar public project/docs state;
+- väljer högst 32 dokument round-robin mellan publicerade docs-källor;
+- hämtar max 120 000 tecken per valt dokument;
+- använder concurrency 4;
+- lagrar inte indexet i Cache API; samtidiga builds i samma isolate delar ett in-flight Promise.
+
+Indexet påstår inte fullständig täckning. `bounded` betyder att definierad budget användes utan observerad reducering; `partial` betyder att dokumentgräns, fetchfel, truncering eller appdiscovery minskade täckningen.
+
+Sökindexet är medvetet utan persistent Cache API-lagring. Det undviker att avpublicerade projektnamn, snippets eller canonical länkar kan ligga kvar i en datacenterlokal cache efter publiceringsändring.
+
+Issues och Discussions är inte indexerade ännu.
 
 ## Designskikt
 

@@ -11,6 +11,13 @@ import {
   normalizePublicAppManifest,
   normalizePublicRepositories
 } from "./project-source.mjs";
+import {
+  buildDocumentSearchEntry,
+  buildProjectSearchEntries,
+  filterSearchableDocs,
+  searchEntries,
+  selectSearchDocumentTasks
+} from "./search-index.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -20,6 +27,10 @@ const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
 const MAX_DOC_DEPTH = 2;
+const MAX_SEARCH_DOCUMENTS = 32;
+const MAX_SEARCH_DOC_CHARS = 120000;
+const SEARCH_FETCH_CONCURRENCY = 4;
+const SEARCH_RESULT_LIMIT = 24;
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -518,6 +529,181 @@ async function getPortalSites(env, ctx) {
   });
 }
 
+async function fetchSearchDocument(task, env) {
+  const { entry, page } = task;
+  const location = docsContentLocation(entry, page.path);
+  const sourceUrl = canonicalDocUrl(entry, page.path);
+
+  if (!location || !sourceUrl) {
+    return { searchEntry: null, failed: true, truncated: false };
+  }
+
+  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(location.repository) +
+    "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
+  const response = await fetch(endpoint, {
+    headers: githubHeaders(env, "application/vnd.github.raw+json")
+  });
+
+  if (!response.ok) {
+    return { searchEntry: null, failed: true, truncated: false };
+  }
+
+  const raw = await response.text();
+  const truncated = raw.length > MAX_SEARCH_DOC_CHARS;
+  const markdown = truncated ? raw.slice(0, MAX_SEARCH_DOC_CHARS) : raw;
+
+  return {
+    searchEntry: buildDocumentSearchEntry(entry, page, markdown, sourceUrl),
+    failed: false,
+    truncated
+  };
+}
+
+async function fetchSearchDocuments(tasks, env) {
+  const results = [];
+
+  for (let index = 0; index < tasks.length; index += SEARCH_FETCH_CONCURRENCY) {
+    const batch = tasks.slice(index, index + SEARCH_FETCH_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(task => fetchSearchDocument(task, env))
+    );
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
+let pendingSearchIndex = null;
+
+async function loadSearchIndex(env) {
+  const [projectCatalog, docsCatalog] = await Promise.all([
+    loadPublicProjects(env),
+    loadDocsCatalog(env)
+  ]);
+
+  const projects = projectCatalog.projects;
+  const searchableDocs = filterSearchableDocs(projects, docsCatalog);
+  const discoveredDocuments = searchableDocs.reduce(
+    (sum, entry) => sum + (Array.isArray(entry.pages) ? entry.pages.length : 0),
+    0
+  );
+  const tasks = selectSearchDocumentTasks(searchableDocs, MAX_SEARCH_DOCUMENTS);
+  const limited = discoveredDocuments > tasks.length;
+  const fetched = await fetchSearchDocuments(tasks, env);
+
+  const documentEntries = fetched
+    .map(result => result.searchEntry)
+    .filter(Boolean);
+  const failedDocuments = fetched.filter(result => result.failed).length;
+  const truncatedDocuments = fetched.filter(result => result.truncated).length;
+
+  const appDiscoveryIncomplete =
+    projectCatalog.appDiscovery === "partial" ||
+    projectCatalog.appDiscovery === "unavailable" ||
+    projectCatalog.appDiscovery === "not_configured";
+  const coverage =
+    limited ||
+    failedDocuments > 0 ||
+    truncatedDocuments > 0 ||
+    appDiscoveryIncomplete
+      ? "partial"
+      : "bounded";
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "github",
+      scope: "Avkroken",
+      input: "public_project_catalog_intersect_public_docs_catalog",
+      coverage,
+      appDiscovery: projectCatalog.appDiscovery,
+      documents: {
+        discovered: discoveredDocuments,
+        indexed: documentEntries.length,
+        failed: failedDocuments,
+        truncated: truncatedDocuments,
+        limit: MAX_SEARCH_DOCUMENTS,
+        catalogDepth: MAX_DOC_DEPTH
+      }
+    },
+    entries: [
+      ...buildProjectSearchEntries(projects),
+      ...documentEntries
+    ]
+  };
+}
+
+async function getSearchIndex(env) {
+  if (!pendingSearchIndex) {
+    pendingSearchIndex = loadSearchIndex(env).finally(() => {
+      pendingSearchIndex = null;
+    });
+  }
+
+  return pendingSearchIndex;
+}
+
+async function searchPortal(requestUrl, env, ctx) {
+  const query = String(requestUrl.searchParams.get("q") || "").trim();
+
+  if (query.length > 120) {
+    return new Response(JSON.stringify({ error: "query_too_long" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  if (query.length < 2) {
+    return new Response(JSON.stringify({
+      query,
+      status: "query_required",
+      generatedAt: null,
+      source: null,
+      resultCount: 0,
+      results: []
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  try {
+    const index = await getSearchIndex(env);
+    const results = searchEntries(index.entries, query, SEARCH_RESULT_LIMIT);
+
+    return new Response(JSON.stringify({
+      query,
+      status: "available",
+      generatedAt: index.generatedAt,
+      source: index.source,
+      resultCount: results.length,
+      results
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  } catch (error) {
+    console.error("public search index unavailable", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({ error: "search_unavailable" }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+}
+
 function operationalWatchdogStub(env, service) {
   if (!env.OPS_WATCHDOG) throw new Error("operational watchdog binding is not configured");
   const id = env.OPS_WATCHDOG.idFromName(service);
@@ -834,6 +1020,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getDocContent(url, env);
+    }
+
+    if (url.pathname === "/api/search") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return searchPortal(url, env, ctx);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";

@@ -35,6 +35,7 @@ Portal v2 etablerar:
 - Portal-native Wiki-presentation på `/projekt/:slug/wiki` för repositoryprojekt där GitHub Wiki är aktiverad;
 - stabila dokumentations-URL:er;
 - rendering av publik repository-README/docs och opt-in-app-README/docs i portalen;
+- server-side global sök över publicerade projekt, README/docs och Wiki-presentationer;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -71,6 +72,7 @@ Nuvarande Worker exponerar:
 - `GET /api/sites` — bakåtkompatibel vy över de projekt som har både portal-category-topic och publik HTTPS-homepage.
 - `GET /api/docs` — katalog över tillåtna publika repository- och opt-in-appdokument.
 - `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL; content-path måste redan finnas i den publika katalogposten.
+- `GET /api/search?q=...` — rankade sökträffar från ett server-side index byggt endast från publicerade projekt och dokumentationskällor.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -106,6 +108,25 @@ GitHub repository / explicit opt-in app
 ```
 
 Godtyckliga provider-paths accepteras inte av content-endpointen; vald route-path måste finnas i den redan byggda publika katalogposten.
+
+### Global sök
+
+Sökindexet byggs server-side från intersektionen mellan:
+
+1. projekt som redan publicerats i `/api/projects`;
+2. dokumentationskällor som redan publicerats i `/api/docs`.
+
+Därmed kan en bredare publik repositoryyta som `.github` eller en opublicerad monorepo-app inte nå sökindexet enbart genom docs-discovery.
+
+Indexet innehåller:
+
+- projektmetadata;
+- repository-Wiki som presentationspost när `wikiPortalUrl` finns;
+- allowlistad README/docs-Markdown för publicerade repository-/appkällor.
+
+Issues och Discussions indexeras inte i den nuvarande versionen.
+
+Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `partial` coverage. Indexet byggs vid sökrequest och lagras inte i Cache API; samtidiga kalla byggen i samma isolate kollapsas till ett gemensamt in-flight Promise. Klienten får endast rankade resultat för aktuell fråga, inte hela råindexet.
 
 ### Operativ state
 
