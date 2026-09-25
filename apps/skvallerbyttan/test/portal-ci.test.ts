@@ -109,8 +109,8 @@ test("Portal CI snapshot reports stale state without hiding the cached sample", 
   assert.equal(snapshot.available, true);
   assert.equal(snapshot.status, "available");
   assert.equal(snapshot.freshness, "stale");
-  assert.equal(snapshot.summary?.sampledRuns, undefined);
   assert.equal(snapshot.coverage?.sampledRuns, 100);
+  assert.equal(JSON.stringify(snapshot.summary).includes("sampledRuns"), false);
 });
 
 test("Portal CI snapshot distinguishes unavailable Actions from missing observation", () => {
