@@ -91,7 +91,7 @@ client project catalog
        +--> /projekt/:slug
 ```
 
-När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det, Issues, Discussions och Releases. Den hämtar inte issue-, release- eller CI-data från GitHub på detaljsidans sidvisning.
+När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues- och Releases-routes. Själva detaljsidan hämtar inte issue-, release- eller CI-data från GitHub.
 
 
 ### Changelog / Releases
@@ -220,6 +220,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/` — Avkroken.
 - `/projekt` — projektöversikt.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
+- `/projekt/:slug/issues` — sanerade publika GitHub Issues för repositoryprojekt; PR-poster filtreras bort.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
 - `/projekt/:slug/releases` — Portal-presentation av officiella GitHub Releases för publicerade repositoryprojekt.
@@ -323,6 +324,37 @@ public project catalog
 Endpointen använder samma sanitizer som Changelog. Den publicerar inte release body, author, assets eller target commit och filtrerar alltid drafts. Browsern gör inga GitHub API-anrop.
 
 Responsen lagras inte persistent i Cache API. Projektet måste finnas i den aktuella publika katalogen och passera repository-eligibility vid varje request.
+
+## Repository Issues
+
+Repository-Issues är repositoryägd publik information, inte Skvallerbyttan-operativ state.
+
+```text
+public project catalog
+       |
+       +--> repository project only
+                 |
+                 v
+       GET /api/issues?project=:slug
+                 |
+                 v
+       exact repository GitHub Issues
+                 |
+                 v
+       issue-source.mjs sanitization
+                 |
+                 v
+       /projekt/:slug/issues
+```
+
+Publiceringsgränsen är tvåstegad:
+
+1. slugen måste först resolvea till ett repositoryprojekt i den aktuella publika project-katalogen;
+2. providerresultatet passerar `normalizePublicIssues` innan något lämnar Workern.
+
+`issue-source.mjs` kräver canonical `Avkroken/<repo>` och canonical `https://github.com/Avkroken/<repo>/issues/<number>`. Poster med `pull_request` filtreras bort. Endast number/title/state/timestamps/comments/labelnamn och canonical navigation publiceras.
+
+Monorepo-appar har `issues = null` och `issuesPortalUrl = null` och kan inte ärva source-repositoryts Issuehistorik.
 
 ## Global sök
 
