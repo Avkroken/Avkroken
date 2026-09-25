@@ -20,6 +20,7 @@ import {
 } from "./search-index.mjs";
 import {
   eligibleReleaseProjects,
+  findEligibleReleaseProject,
   normalizePublicReleases,
   sortPublicReleases
 } from "./release-source.mjs";
@@ -750,36 +751,56 @@ async function fetchChangelogReleases(projects, env) {
   return results;
 }
 
-async function loadPublicChangelog(env) {
+async function loadPublicChangelog(env, projectSlug = null) {
   const projectCatalog = await loadPublicProjects(env);
+  const scopedProject = projectSlug
+    ? findEligibleReleaseProject(projectCatalog.projects, projectSlug)
+    : null;
+
+  if (projectSlug && !scopedProject) {
+    return {
+      notFound: true,
+      projectSlug
+    };
+  }
+
   const eligible = eligibleReleaseProjects(projectCatalog.projects, 100);
-  const selected = eligible.slice(0, CHANGELOG_REPOSITORY_LIMIT);
+  const selected = scopedProject
+    ? [scopedProject]
+    : eligible.slice(0, CHANGELOG_REPOSITORY_LIMIT);
   const fetched = await fetchChangelogReleases(selected, env);
 
   const failedRepositories = fetched.filter(result => result.failed).length;
+  const resultLimit = scopedProject
+    ? CHANGELOG_RELEASES_PER_REPOSITORY
+    : CHANGELOG_RESULT_LIMIT;
   const releases = sortPublicReleases(
     fetched.flatMap(result => result.releases),
-    CHANGELOG_RESULT_LIMIT
+    resultLimit
   );
 
   return {
+    notFound: false,
     generatedAt: new Date().toISOString(),
     source: {
       provider: "github",
-      scope: "public_portal_repository_projects",
+      scope: scopedProject
+        ? "public_portal_repository_project"
+        : "public_portal_repository_projects",
+      project: scopedProject?.slug || null,
       coverage:
-        eligible.length > selected.length || failedRepositories > 0
+        (!scopedProject && eligible.length > selected.length) || failedRepositories > 0
           ? "partial"
           : "bounded",
       repositories: {
-        eligible: eligible.length,
+        eligible: scopedProject ? 1 : eligible.length,
         observed: selected.length - failedRepositories,
         failed: failedRepositories,
-        limit: CHANGELOG_REPOSITORY_LIMIT
+        limit: scopedProject ? 1 : CHANGELOG_REPOSITORY_LIMIT
       },
       releases: {
         perRepositoryLimit: CHANGELOG_RELEASES_PER_REPOSITORY,
-        resultLimit: CHANGELOG_RESULT_LIMIT
+        resultLimit
       }
     },
     releases
@@ -788,18 +809,59 @@ async function loadPublicChangelog(env) {
 
 let pendingPublicChangelog = null;
 
-async function getPublicChangelog(env) {
+async function getPublicChangelog(requestUrl, env) {
+  const hasProjectFilter = requestUrl.searchParams.has("project");
+  const projectSlug = hasProjectFilter
+    ? String(requestUrl.searchParams.get("project") || "").trim()
+    : null;
+
+  if (hasProjectFilter && (!projectSlug || projectSlug.length > 120)) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
   try {
-    if (!pendingPublicChangelog) {
-      pendingPublicChangelog = loadPublicChangelog(env).finally(() => {
-        pendingPublicChangelog = null;
+    let payload;
+    if (projectSlug) {
+      payload = await loadPublicChangelog(env, projectSlug);
+    } else {
+      if (!pendingPublicChangelog) {
+        pendingPublicChangelog = loadPublicChangelog(env).finally(() => {
+          pendingPublicChangelog = null;
+        });
+      }
+      payload = await pendingPublicChangelog;
+    }
+
+    if (payload.notFound) {
+      return new Response(JSON.stringify({
+        status: "not_found",
+        error: "changelog_project_not_found",
+        project: projectSlug
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
       });
     }
 
-    const payload = await pendingPublicChangelog;
     return new Response(JSON.stringify({
       status: "available",
-      ...payload
+      generatedAt: payload.generatedAt,
+      source: payload.source,
+      releases: payload.releases
     }), {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
@@ -1213,7 +1275,7 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Method Not Allowed", { status: 405 });
       }
-      return getPublicChangelog(env);
+      return getPublicChangelog(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";
