@@ -169,6 +169,7 @@ Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter 
 - `days` begränsas till 1–30;
 - recent-queryn är fortsatt max 100 rader efter repositoryfiltret;
 - public-sanitizern tar bort `resourceId`, resource type, actor och alla råa provider-/credentialfält;
+- endast capabilities `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions` tillåts; security, Custom Properties och effective-ruleset-events filtreras bort;
 - Cloudflare account-/org-events ingår inte i Portal-kontraktet;
 - coverage och `periodComplete = false` ska visas som observationsmetadata, inte som komplett aktivitet.
 ## Push-baserad liveness och readiness
