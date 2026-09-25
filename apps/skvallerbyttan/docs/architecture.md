@@ -62,7 +62,7 @@ Readinesspayloaden produceras av faktiska lokala/provider-probes men innehåller
 
 Portalens operativa läsväg är separat från heartbeat och det skyddade HTTP-API:t. `PortalObservationsService` exporteras som named Worker RPC-entrypoint och läser samma canonical capability/provider-health/Activity-modeller, men passerar dem genom en explicit sanitization boundary innan de lämnar Skvallerbyttan.
 
-Den snapshoten innehåller endast providerstatus/senaste observation, capability key/name/provider/status/dataState/freshness/last-success/scope coverage samt aggregerad Activity och coverage. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata och Activity `recent` publiceras inte genom RPC:n.
+Den snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom RPC:n.
 
 ## Runtime
 
