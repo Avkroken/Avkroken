@@ -4,6 +4,7 @@ import {
   documentationPath,
   isPortalDocumentRoute,
   normalizePortalPath,
+  projectPath,
   protectedRedirectForPath
 } from "../src/portal-routes.mjs";
 
@@ -65,4 +66,11 @@ test("builds stable documentation URLs with encoded repository and source path",
     documentationPath("Repo med mellanslag", "docs/API guide.md"),
     "/projekt/Repo%20med%20mellanslag/dokumentation/docs/API%20guide.md"
   );
+});
+
+
+test("builds stable project detail URLs", () => {
+  assert.equal(projectPath(), "/projekt");
+  assert.equal(projectPath("Bastion"), "/projekt/Bastion");
+  assert.equal(projectPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag");
 });
