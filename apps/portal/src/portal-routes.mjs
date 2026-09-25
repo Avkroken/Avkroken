@@ -11,6 +11,8 @@ const STATIC_PORTAL_ROUTES = new Set([
   "/sok"
 ]);
 
+const PROTECTED_JOBB_ORIGIN = "https://jobb.denied.se/";
+
 export function normalizePortalPath(pathname) {
   const value = String(pathname || "/").split("?")[0].split("#")[0] || "/";
   if (value === "/") return "/";
@@ -34,8 +36,17 @@ export function documentationPath(repositoryName = null, sourcePath = null) {
   return encoded ? base + "/" + encoded : base;
 }
 
+export function protectedRedirectForPath(pathname) {
+  const path = normalizePortalPath(pathname);
+  if (path === "/auth/jobb" || path.startsWith("/auth/jobb/")) {
+    return PROTECTED_JOBB_ORIGIN;
+  }
+  return null;
+}
+
 export function isPortalDocumentRoute(pathname) {
   const path = normalizePortalPath(pathname);
+  if (protectedRedirectForPath(path)) return false;
   if (STATIC_PORTAL_ROUTES.has(path)) return true;
 
   if (/^\/projekt\/[^/]+$/.test(path)) return true;
@@ -45,16 +56,6 @@ export function isPortalDocumentRoute(pathname) {
 
   if (/^\/dokumentation(?:\/.*)?$/.test(path)) return true;
   if (/^\/drift(?:\/.*)?$/.test(path)) return true;
-  if (/^\/auth(?:\/.*)?$/.test(path)) return true;
 
   return false;
-}
-
-
-export function protectedRedirectForPath(pathname) {
-  const path = normalizePortalPath(pathname);
-  if (path === "/auth/jobb" || path.startsWith("/auth/jobb/")) {
-    return "https://jobb.denied.se/";
-  }
-  return null;
 }
