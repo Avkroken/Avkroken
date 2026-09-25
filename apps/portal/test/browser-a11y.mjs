@@ -320,10 +320,32 @@ async function main() {
     for (const path of ["/", "/dokumentation", "/aktivitet"]) {
       await runAxe(path);
       const overflow = await execute(
-        "return {" +
-        "scrollWidth: document.documentElement.scrollWidth," +
-        "clientWidth: document.documentElement.clientWidth" +
-        "};"
+        `var viewport = document.documentElement.clientWidth;
+        var offenders = Array.from(document.querySelectorAll('body *'))
+          .filter(function(element) {
+            var style = getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden') return false;
+            var rect = element.getBoundingClientRect();
+            return rect.width > 0 && (rect.right > viewport + 1 || rect.left < -1);
+          })
+          .slice(0, 12)
+          .map(function(element) {
+            var rect = element.getBoundingClientRect();
+            return {
+              tag: element.tagName.toLowerCase(),
+              id: element.id || null,
+              className: typeof element.className === 'string' ? element.className : null,
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width),
+              text: (element.textContent || '').trim().slice(0, 80)
+            };
+          });
+        return {
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: viewport,
+          offenders: offenders
+        };`
       );
       assert.ok(
         overflow.scrollWidth <= overflow.clientWidth + 1,
