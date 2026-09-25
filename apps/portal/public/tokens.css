@@ -1,0 +1,74 @@
+:root {
+  color-scheme: dark;
+
+  /* Primitive color tokens — mirrored from the Portal v2 Figma reference. */
+  --ak-ink-950: #080b09;
+  --ak-ink-900: #0c100d;
+  --ak-ink-850: #111713;
+  --ak-ink-800: #171f19;
+  --ak-ink-700: #263129;
+  --ak-ink-600: #3b493e;
+  --ak-mist-500: #718077;
+  --ak-mist-300: #a6b1aa;
+  --ak-mist-100: #dce2dd;
+  --ak-paper-50: #f3f5f1;
+  --ak-moss-500: #799881;
+  --ak-moss-300: #a6c2ac;
+  --ak-brass-500: #d0ae67;
+  --ak-brass-300: #e4ca91;
+  --ak-ember-500: #c9796f;
+  --ak-ember-300: #e1a49b;
+  --ak-sky-500: #7899ad;
+  --ak-sky-300: #a6bec9;
+
+  /* Semantic color tokens. */
+  --ak-surface-canvas: var(--ak-ink-950);
+  --ak-surface-sunken: var(--ak-ink-900);
+  --ak-surface-default: var(--ak-ink-850);
+  --ak-surface-raised: var(--ak-ink-800);
+  --ak-surface-interactive: var(--ak-ink-700);
+  --ak-border-subtle: var(--ak-ink-700);
+  --ak-border-default: var(--ak-ink-600);
+  --ak-text-primary: var(--ak-paper-50);
+  --ak-text-secondary: var(--ak-mist-300);
+  --ak-text-tertiary: var(--ak-mist-500);
+  --ak-accent-default: var(--ak-brass-500);
+  --ak-accent-strong: var(--ak-brass-300);
+  --ak-focus-ring: var(--ak-brass-300);
+  --ak-status-success: var(--ak-moss-300);
+  --ak-status-warning: var(--ak-brass-300);
+  --ak-status-danger: var(--ak-ember-300);
+  --ak-status-info: var(--ak-sky-300);
+
+  /* Spacing. */
+  --ak-space-0: 0;
+  --ak-space-1: 4px;
+  --ak-space-2: 8px;
+  --ak-space-3: 12px;
+  --ak-space-4: 16px;
+  --ak-space-5: 20px;
+  --ak-space-6: 24px;
+  --ak-space-8: 32px;
+  --ak-space-10: 40px;
+  --ak-space-12: 48px;
+  --ak-space-16: 64px;
+  --ak-space-20: 80px;
+
+  /* Radius and borders. */
+  --ak-radius-1: 4px;
+  --ak-radius-2: 8px;
+  --ak-radius-3: 12px;
+  --ak-radius-4: 16px;
+  --ak-radius-pill: 999px;
+  --ak-border-1: 1px;
+  --ak-border-2: 2px;
+
+  /* Elevation. */
+  --ak-elevation-1: 0 8px 24px rgb(0 0 0 / 24%);
+  --ak-elevation-2: 0 18px 54px rgb(0 0 0 / 34%);
+
+  /* Responsive reference values. */
+  --ak-breakpoint-mobile: 480px;
+  --ak-breakpoint-tablet: 820px;
+  --ak-breakpoint-desktop: 1180px;
+}
