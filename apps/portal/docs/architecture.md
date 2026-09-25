@@ -78,7 +78,8 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt/:repository/dokumentation[/...]` — repositorydokumentation.
 - `/dokumentation[/...]` — samlad dokumentationsyta.
 - `/tjanster` — publika tjänster/produkter.
-- `/auth[/...]` — publika auth-ingångar, aldrig skyddad payload.
+- `/auth` — publik auth-ingång utan skyddad payload.
+- `/auth/jobb[/...]` — server-side redirect till Jobbs befintliga skyddade origin före Portal-shell.
 - `/drift[/...]` — Drift & insyn.
 - `/changelog` — kuraterad release-/produktförändring.
 - `/aktivitet` — råare aktivitet.
