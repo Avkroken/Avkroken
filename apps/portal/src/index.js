@@ -1,4 +1,10 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
+import {
+  appDocsSource,
+  canonicalDocUrl,
+  docsContentLocation,
+  repositoryDocsSource
+} from "./docs-source.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import {
   mergePublicProjectCatalog,
@@ -138,16 +144,41 @@ async function readmePage(repo, env) {
   return { path: result.data.path, label: "Översikt" };
 }
 
+async function markdownFilePage(repo, env, path, label) {
+  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(repo.name) +
+    "/contents/" + encodedPath(path) + "?ref=" + encodeURIComponent(repo.default_branch);
+  const result = await fetchGitHubJson(endpoint, env);
+
+  if (
+    !result.ok ||
+    !result.data ||
+    result.data.type !== "file" ||
+    result.data.path !== path ||
+    !/\.(md|markdown)$/i.test(result.data.path)
+  ) {
+    return null;
+  }
+
+  return { path: result.data.path, label };
+}
+
 function pageSort(a, b) {
-  const rank = value => value.path === "docs/index.md" ? 0 : value.path === "README.md" ? 1 : 2;
+  const rank = value => {
+    if (/(^|\/)docs\/index\.(md|markdown)$/i.test(value.path)) return 0;
+    if (/(^|\/)README\.(md|markdown)$/i.test(value.path)) return 1;
+    return 2;
+  };
   const diff = rank(a) - rank(b);
   if (diff !== 0) return diff;
   return a.path.localeCompare(b.path, "sv");
 }
 
 async function buildDocsEntry(repo, env) {
+  const source = repositoryDocsSource(repo);
+  if (!source) return null;
+
   const [docs, readme] = await Promise.all([
-    scanMarkdownDocs(repo, env),
+    scanMarkdownDocs(repo, env, source.docsRoot),
     readmePage(repo, env)
   ]);
 
@@ -156,17 +187,31 @@ async function buildDocsEntry(repo, env) {
   pages.sort(pageSort);
 
   return {
-    name: repo.name,
+    ...source,
     description: repo.description || "",
-    repository: repo.html_url,
-    issues: repo.html_url + "/issues",
-    language: repo.language || null,
-    updatedAt: repo.pushed_at || repo.updated_at || null,
-    defaultBranch: repo.default_branch,
-    hasPages: repo.has_pages === true,
-    pagesUrl: repo.has_pages === true
-      ? "https://avkroken.github.io/" + encodeURIComponent(repo.name) + "/"
-      : null,
+    pages
+  };
+}
+
+async function buildAppDocsEntry(project, repositories, env) {
+  const source = appDocsSource(project);
+  if (!source) return null;
+
+  const repo = repositories.find(candidate => candidate?.full_name === project.source.repository);
+  if (!repo) return null;
+
+  const [docs, readme] = await Promise.all([
+    scanMarkdownDocs(repo, env, source.docsRoot),
+    markdownFilePage(repo, env, source.readmePath, "Översikt")
+  ]);
+
+  const pages = [...docs];
+  if (readme && !pages.some(page => page.path === readme.path)) pages.push(readme);
+  pages.sort(pageSort);
+
+  return {
+    ...source,
+    description: project.description || "",
     pages
   };
 }
@@ -175,13 +220,31 @@ async function loadDocsCatalog(env) {
   const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
   if (!github.ok) throw new Error("github_unavailable:" + github.status);
 
-  const repos = (await github.json()).filter(repo =>
+  const repositories = await github.json();
+  const publicRepositories = repositories.filter(repo =>
     repo &&
     repo.visibility === "public" &&
     repo.archived === false &&
     !isRetiredRepository(repo.name)
   );
-  const entries = await Promise.all(repos.map(repo => buildDocsEntry(repo, env)));
+
+  const [repositoryEntries, appDiscovery] = await Promise.all([
+    Promise.all(publicRepositories.map(repo => buildDocsEntry(repo, env))),
+    loadPublicAppProjects(repositories, env)
+  ]);
+
+  const appEntries = await Promise.all(
+    appDiscovery.projects.map(project => buildAppDocsEntry(project, repositories, env))
+  );
+
+  const entries = [];
+  const keys = new Set();
+  for (const entry of [...repositoryEntries, ...appEntries]) {
+    if (!entry || keys.has(entry.key)) continue;
+    keys.add(entry.key);
+    entries.push(entry);
+  }
+
   entries.sort((a, b) => a.name.localeCompare(b.name, "sv"));
   return entries;
 }
@@ -209,7 +272,7 @@ async function getDocsCatalog(env) {
 }
 
 async function getDocContent(requestUrl, env) {
-  const repoName = requestUrl.searchParams.get("repo") || "";
+  const sourceKey = requestUrl.searchParams.get("repo") || "";
   const requestedPath = requestUrl.searchParams.get("path") || "";
 
   let catalog;
@@ -225,9 +288,12 @@ async function getDocContent(requestUrl, env) {
     });
   }
 
-  const repo = catalog.find(entry => entry.name === repoName);
-  const page = repo?.pages.find(entry => entry.path === requestedPath);
-  if (!repo || !page) {
+  const entry = catalog.find(item => item.key === sourceKey);
+  const page = entry?.pages.find(item => item.path === requestedPath);
+  const location = docsContentLocation(entry, requestedPath);
+  const sourceUrl = canonicalDocUrl(entry, requestedPath);
+
+  if (!entry || !page || !location || !sourceUrl) {
     return new Response(JSON.stringify({ error: "document_not_found" }), {
       status: 404,
       headers: {
@@ -237,8 +303,8 @@ async function getDocContent(requestUrl, env) {
     });
   }
 
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(repo.name) +
-    "/contents/" + encodedPath(page.path) + "?ref=" + encodeURIComponent(repo.defaultBranch);
+  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(location.repository) +
+    "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
   const github = await fetch(endpoint, {
     headers: githubHeaders(env, "application/vnd.github.raw+json")
   });
@@ -265,18 +331,18 @@ async function getDocContent(requestUrl, env) {
   }
 
   return new Response(JSON.stringify({
-    repo: repo.name,
+    repo: entry.key,
+    name: entry.name,
     path: page.path,
     label: page.label,
     markdown,
-    sourceUrl: repo.repository + "/blob/" + encodeURIComponent(repo.defaultBranch) + "/" +
-      page.path.split("/").map(encodeURIComponent).join("/")
+    sourceUrl
   }), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "public, max-age=0, must-revalidate",
       "Cloudflare-CDN-Cache-Control": "public, max-age=" + DOC_CONTENT_CACHE_SECONDS,
-      "Cache-Tag": "docs-catalog," + docsRepoTag(repo.name)
+      "Cache-Tag": "docs-catalog," + docsRepoTag(entry.sourceRepository)
     }
   });
 }
@@ -379,7 +445,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v2");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v3");
   const cached = await cache.match(cacheKey);
 
   if (cached) {
