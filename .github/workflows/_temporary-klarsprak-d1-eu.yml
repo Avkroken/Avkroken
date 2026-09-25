@@ -1,4 +1,4 @@
-name: Temporary compare Klarsprak D1 content hashes
+name: Temporary migrate Klarsprak D1 to EU
 
 on:
   push:
@@ -8,19 +8,94 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: d1-eu-klarsprak
+  cancel-in-progress: false
+
 jobs:
-  compare:
+  migrate:
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
       CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
       SOURCE_DB_ID: a8117d9d-a65d-430d-a8a2-9b4ef3fd9e2f
+      SOURCE_DB_NAME: klarsprak-db
       TARGET_DB_ID: 7891c6c7-0d4b-4e23-b2d8-d3eaaabdcfce
+      TARGET_DB_NAME: klarsprak-db-eu
+      EXPECTED_KLARSPRAK_SHA: a34238b7d6f1fd3521d517baf34de2a4f63535bc
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
-      - name: Compare non-sensitive table hashes
+
+      - name: Preflight schema equality and freeze source writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          import fs from "node:fs";
+          import crypto from "node:crypto";
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
+          const source=process.env.SOURCE_DB_ID, target=process.env.TARGET_DB_ID;
+          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          async function get(id){const r=await fetch(`${base}/${id}`,{headers});const b=await r.json();if(!r.ok||!b.success)throw new Error("metadata failed");return b.result;}
+          async function q(id,body){const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify(body)});const b=await r.json();if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false))throw new Error(`query failed ${r.status}`);return b.result;}
+          const [sInfo,tInfo]=await Promise.all([get(source),get(target)]);
+          if(sInfo.name!==process.env.SOURCE_DB_NAME) throw new Error("source identity mismatch");
+          if(tInfo.name!==process.env.TARGET_DB_NAME||tInfo.jurisdiction!=="eu"||tInfo.read_replication?.mode!=="auto") throw new Error("target metadata mismatch");
+          const schemaSql="SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%' ORDER BY type,name";
+          const sSchema=(await q(source,{sql:schemaSql}))[0].results;
+          const tSchema=(await q(target,{sql:schemaSql}))[0].results;
+          const digest=x=>crypto.createHash("sha256").update(JSON.stringify(x)).digest("hex");
+          if(digest(sSchema)!==digest(tSchema)) throw new Error("source/target schema mismatch");
+          const tables=sSchema.filter(x=>x.type==="table").map(x=>x.name);
+          fs.writeFileSync("/tmp/tables.json",JSON.stringify(tables));
+          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
+          const batch=[];
+          tables.forEach((table,i)=>{
+            const suffix=String(i).padStart(3,"0");
+            for(const [op,event] of [["i","INSERT"],["u","UPDATE"],["d","DELETE"]]){
+              batch.push({sql:`CREATE TRIGGER IF NOT EXISTS ${qi(`__eu_freeze_${suffix}_${op}`)} BEFORE ${event} ON ${qi(table)} BEGIN SELECT RAISE(ABORT, 'EU D1 migration in progress'); END`});
+            }
+          });
+          await q(source,{batch});
+          const frozen=Number((await q(source,{sql:"SELECT COUNT(*) AS n FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%'"}))[0].results[0].n);
+          if(frozen!==tables.length*3) throw new Error("freeze trigger count mismatch");
+          console.log("Klarsprak source frozen; schema equality verified");
+          NODE
+
+      - name: Reset inactive EU target data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.TARGET_DB_ID;
+          const url=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${id}/query`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          const batch=["submissions","published_terms","d1_migrations"].map(name=>({sql:`DELETE FROM "${name}"`}));
+          const r=await fetch(url,{method:"POST",headers,body:JSON.stringify({batch})});
+          const b=await r.json();
+          if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false)) throw new Error(`target reset failed ${r.status}`);
+          console.log("Inactive EU target rows cleared");
+          NODE
+
+      - name: Export source data only
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.136.1 d1 export "$SOURCE_DB_NAME" --remote --output=/tmp/klarsprak-data.sql --no-schema --skip-confirmation
+          test -s /tmp/klarsprak-data.sql
+          echo "Export bytes: $(wc -c </tmp/klarsprak-data.sql)"
+
+      - name: Import source data into EU target
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.136.1 d1 execute "$TARGET_DB_NAME" --remote --file=/tmp/klarsprak-data.sql --yes
+
+      - name: Verify exact table hashes
         shell: bash
         run: |
           set -euo pipefail
@@ -30,24 +105,67 @@ jobs:
           const ids={source:process.env.SOURCE_DB_ID,target:process.env.TARGET_DB_ID};
           const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
           const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          async function q(id,sql){
-            const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql})});
-            const b=await r.json();
-            if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false)) throw new Error(`query failed ${r.status}`);
-            return b.result[0].results;
-          }
-          function canonical(value){
-            if(Array.isArray(value)) return value.map(canonical);
-            if(value&&typeof value==="object") return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));
-            return value;
-          }
+          async function q(id,sql){const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql})});const b=await r.json();if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false))throw new Error(`query failed ${r.status}`);return b.result[0].results;}
+          function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==="object")return Object.fromEntries(Object.keys(value).sort().map(k=>[k,canonical(value[k])]));return value;}
           const digest=rows=>crypto.createHash("sha256").update(JSON.stringify(rows.map(canonical).map(JSON.stringify).sort())).digest("hex");
           for(const table of ["d1_migrations","published_terms","submissions"]){
-            const out={table};
-            for(const [label,id] of Object.entries(ids)){
-              const rows=await q(id,`SELECT * FROM "${table}"`);
-              out[label]={count:rows.length,sha256:digest(rows)};
-            }
-            console.log(JSON.stringify(out));
+            const s=await q(ids.source,`SELECT * FROM "${table}"`);
+            const t=await q(ids.target,`SELECT * FROM "${table}"`);
+            if(s.length!==t.length||digest(s)!==digest(t)) throw new Error(`hash mismatch for ${table}`);
+            console.log(JSON.stringify({table,count:s.length,sha256:digest(s)}));
           }
+          NODE
+
+      - name: Checkout merged Klarsprak main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet https://github.com/Avkroken/Klarsprak.git /tmp/klarsprak
+          git -C /tmp/klarsprak checkout --quiet "$EXPECTED_KLARSPRAK_SHA"
+          [[ "$(git -C /tmp/klarsprak rev-parse HEAD)" == "$EXPECTED_KLARSPRAK_SHA" ]]
+
+      - name: Verify and deploy Klarsprak with EU D1
+        working-directory: /tmp/klarsprak
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          npx wrangler deploy --dry-run
+          npm run migrate:production
+          npm run deploy
+          touch /tmp/eu-deployed
+          npm run verify:production
+
+      - name: Verify EU target metadata and data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.TARGET_DB_ID;
+          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          const info=await (await fetch(`${base}/${id}`,{headers})).json();
+          if(!info.success||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="auto") throw new Error("EU target metadata mismatch");
+          const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql:"SELECT COUNT(*) AS terms FROM published_terms; SELECT COUNT(*) AS submissions FROM submissions;"})});
+          const b=await r.json();
+          if(!r.ok||!b.success||Number(b.result[0].results[0].terms)!==38||Number(b.result[1].results[0].submissions)!==5) throw new Error("EU target counts mismatch");
+          console.log(JSON.stringify({name:info.result.name,jurisdiction:info.result.jurisdiction,read_replication:info.result.read_replication?.mode,terms:38,submissions:5}));
+          NODE
+
+      - name: Restore source writes on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          node <<'NODE'
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.SOURCE_DB_ID;
+          const url=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${id}/query`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          const q=async body=>{const r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)});if(!r.ok)return null;return r.json();};
+          const found=await q({sql:"SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%' ORDER BY name"});
+          const names=found?.result?.[0]?.results?.map?.(x=>x.name)||[];
+          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
+          if(names.length) await q({batch:names.map(name=>({sql:`DROP TRIGGER ${qi(name)}`}))});
+          console.log("Best-effort source unfreeze:",names.length);
           NODE
