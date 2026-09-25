@@ -6,7 +6,7 @@ permalink: /project-context/
 
 # Projektkontext
 
-Senast verifierad för Portalens Drift & insyn-integration: 2026-09-25.
+Senast verifierad för Portalens repository-CI-integration: 2026-09-25.
 
 ## Repository
 
@@ -48,6 +48,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
 - **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en public-safe snapshot av provider health och capability status/dataState/freshness/last-success.
+- **Portal repository-CI:** samma named entrypoint exponerar `getPublicRepositoryCi(repoName)`, som endast läser canonical `overview` source cache, kräver en cachead publik/icke-arkiverad repositoryrad och returnerar en sanerad sampled Actions-summary med explicit freshness. Metoden gör ingen GitHub-providerrequest.
 
 GitHub REST API-version: `2026-03-10`.
 
@@ -99,6 +100,8 @@ För operativ drift gäller dessutom:
 6. När Portalens Drift & insyn-vy läses anropar Portal `PortalObservationsService.getPublicOperationsSummary()` via account-intern Service Binding.
 7. RPC-snapshoten innehåller inte provider-endpoints/required permissions, accepterade permissions, HTTP-status/felsträngar eller installation-/budgetmetadata.
 8. Scope coverage/repositoryantal och Activity/eventvolym går inte till Portalen eftersom Skvallerbyttans canonical modeller är organisationsomfattande och inte kan bevisas public-only. De stannar bakom dashboard/API-auth.
+9. För repository-CI läser `getPublicRepositoryCi()` endast D1 source cache-keyn `overview`; repoName måste matcha en cachead rad med `visibility = public` och `archived != true`.
+10. CI-RPC:n returnerar sampled Actions-summary och `sourceRefreshedAt`/freshness, men inte actor, provider-permissions/fel, event breakdown eller rå runpayload. Saknad cache är `not_observed`, inte healthy.
 
 ## Data
 
@@ -117,7 +120,7 @@ Canonical HTTP-kontrakt ligger under `/api/v1`. Det kan läsas av:
 
 Machine access är GET-only och attribueras consumer `chatgpt`.
 
-Portalens Drift & insyn använder **inte** detta HTTP-kontrakt och får ingen bearer-token. Den använder endast named `PortalObservationsService`, som är ett separat sanerat downstream-kontrakt.
+Portalens Drift & insyn och repository-CI använder **inte** detta HTTP-kontrakt och får ingen bearer-token. De använder endast named `PortalObservationsService`, som är ett separat sanerat downstream-kontrakt.
 
 ## Epistemisk modell
 
