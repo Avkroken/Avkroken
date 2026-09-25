@@ -96,8 +96,14 @@ test("Activity API is no-store, bounded and uses only an in-flight collapse", ()
   assert.equal(handler.includes("caches.default"), false);
 });
 
-test("Activity source explicitly identifies non-realtime bounded coverage", () => {
-  assert.ok(worker.includes('coverage: "bounded"'));
+test("Activity source explicitly identifies non-realtime bounded/partial coverage", () => {
+  assert.ok(worker.includes('coverage: eligible.length > selected.length ? "partial" : "bounded"'));
   assert.ok(worker.includes("realtime: false"));
   assert.ok(worker.includes("mixedScopeExcluded"));
+  assert.ok(worker.includes("observed: selected.length"));
+});
+
+test("project catalog cache schema includes Activity navigation fields", () => {
+  assert.ok(worker.includes("github-projects-v7"));
+  assert.equal(worker.includes("github-projects-v6"), false);
 });
