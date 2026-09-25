@@ -6,7 +6,7 @@ permalink: /project-context/
 
 # Projektkontext
 
-Senast verifierad för observationslagerarbetet: 2026-09-23.
+Senast verifierad för Portalens Drift & insyn-integration: 2026-09-25.
 
 ## Repository
 
@@ -47,6 +47,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 - **GitHub webhook-ingress:** runtime implementerar organization-webhookformatet för Activity, security ledger och cache invalidation; faktisk hookkonfiguration är extern GitHub-state.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
+- **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en sanerad snapshot av provider health, capability status/freshness/scope coverage och aggregerad Activity.
 
 GitHub REST API-version: `2026-03-10`.
 
@@ -95,6 +96,9 @@ För operativ drift gäller dessutom:
 3. Portalens Durable Object tidsstämplar mottagningen själv.
 4. Utebliven heartbeat i mer än 35 minuter ger e-postnotis; återkommen leverans ger recovery-notis.
 5. Publika `/health`/`/ready` används inte och behöver inga edge-undantag.
+6. När Portalens Drift & insyn-vy läses anropar Portal `PortalObservationsService.getPublicOperationsSummary()` via account-intern Service Binding.
+7. RPC-snapshoten innehåller inte provider-endpoints/required permissions, accepterade permissions, HTTP-status/felsträngar, installation-/budgetmetadata eller Activity `recent` med repository/resource/action.
+8. Activity som går till Portalen är aggregerad och behåller coverage med `periodComplete = false`.
 
 ## Data
 
@@ -106,12 +110,14 @@ Workers Analytics Engine dataset `skvallerbyttan_observability` tar read telemet
 
 ## API
 
-Canonical kontrakt ligger under `/api/v1`. Det kan läsas av:
+Canonical HTTP-kontrakt ligger under `/api/v1`. Det kan läsas av:
 
 - autentiserad dashboard-session
 - machine bearer-token `SKVALLERBYTTAN_READ_API_TOKEN`
 
 Machine access är GET-only och attribueras consumer `chatgpt`.
+
+Portalens Drift & insyn använder **inte** detta HTTP-kontrakt och får ingen bearer-token. Den använder endast named `PortalObservationsService`, som är ett separat sanerat downstream-kontrakt.
 
 ## Epistemisk modell
 
