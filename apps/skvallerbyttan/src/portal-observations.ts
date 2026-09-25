@@ -3,11 +3,17 @@ import type { Env } from "./env";
 import { getCapabilities } from "./capabilities";
 import { getProviderHealth } from "./provider-health";
 import { organization } from "./env";
-import { getRepositoryActions } from "./data";
 import {
   buildPortalRepositoryCiSnapshot,
+  publicCiRepository,
+  type PortalCiRepositoryObservation,
   type PortalRepositoryCiSnapshot,
 } from "./portal-ci-model";
+import {
+  readSourceCache,
+  sourceCacheAgeMs,
+  sourceCacheInvalidated,
+} from "./source-cache";
 import {
   buildPortalOperationsSnapshot,
   type PortalOperationsSnapshot,
@@ -26,17 +32,34 @@ export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOpera
 
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
 
+const PORTAL_CI_FRESH_MS = 6 * 60 * 60 * 1000;
+
+type OverviewCache = {
+  repositories?: PortalCiRepositoryObservation[];
+};
+
 export async function getPortalRepositoryCiSnapshot(
   env: Env,
   repoName: string,
 ): Promise<PortalRepositoryCiSnapshot> {
   const repository = `${organization(env)}/${repoName}`;
-  const actions = await getRepositoryActions(env, repository);
+  const cached = await readSourceCache<OverviewCache>(env, "overview");
+  const repositories = Array.isArray(cached?.value?.repositories)
+    ? cached.value.repositories
+    : [];
+  const observation = publicCiRepository(repositories, repository);
+
+  const stale = cached
+    ? sourceCacheInvalidated(cached) ||
+      sourceCacheAgeMs(cached.refreshedAt) > PORTAL_CI_FRESH_MS
+    : false;
 
   return buildPortalRepositoryCiSnapshot({
     generatedAt: new Date().toISOString(),
     repository,
-    actions,
+    observation,
+    sourceRefreshedAt: cached?.refreshedAt ?? null,
+    freshness: cached ? (stale ? "stale" : "fresh") : "unknown",
   });
 }
 
