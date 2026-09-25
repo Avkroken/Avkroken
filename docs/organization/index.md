@@ -1,54 +1,35 @@
-# Avkrokens dokumentationsnav
+# Delad dokumentation för Avkroken/Avkroken
 
-Den här sidan är den centrala kartan över Avkrokens versionsstyrda organisations- och projektdokumentation.
+> **Scope:** Den här katalogen gäller endast `Avkroken/Avkroken` och apparna i detta monorepo. Den är inte source of truth för fristående Avkroken-repositories.
 
-## Gemensamma standarder
+## Delade monorepodokument
 
 | Dokument | Användning |
 | --- | --- |
-| [Dokumentationsstandard](documentation-standard.md) | README, docs, Wiki och uppdateringskontrakt |
-| [Repository-integration](repository-documentation.md) | hur centralt och repo-lokalt innehåll kopplas ihop |
-| [Engineering context](engineering-context.md) | gemensam teknisk/CI-kontext |
-| [Access inventory](access-inventory.md) | dokumenterad accessyta |
-| [Access path standard](access-path-standard.md) | gemensamma accessvägar |
-| [Cloudflare credential standard](cloudflare-credential-standard.md) | credentialmodell för berörda Cloudflare-flöden |
+| [Dokumentationsmodell](documentation-standard.md) | README, app-docs och Wiki inom monorepot |
+| [Repository-integration](repository-documentation.md) | hur root och `apps/*` delar dokumentation |
+| [Engineering context](engineering-context.md) | gemensam teknisk/CI-kontext för monorepot |
+| [Access inventory](access-inventory.md) | publik klassificeringsmodell för monorepots webbappar |
+| [Access path standard](access-path-standard.md) | accessprinciper för monorepots webbappar |
+| [Cloudflare credential model](cloudflare-credential-standard.md) | stabil kod-/credentialmodell som används av monorepots berörda appar |
 
-## Projektdokumentation
+## Appdokumentation
 
-Varje projekt äger sin egen README och `docs/`. Gå via repositoryts README för aktuell projektkarta.
-
-- [Bastion](https://github.com/Avkroken/Bastion)
-- [Docker-idempotent-update](https://github.com/Avkroken/Docker-idempotent-update)
 - [Jobb](../../apps/jobb/README.md)
-- [Klarsprak](https://github.com/Avkroken/Klarsprak)
-- [Pastebinit](https://github.com/Avkroken/Pastebinit)
-- [Politiker](https://github.com/Avkroken/Politiker)
-- [Produkter](https://github.com/Avkroken/Produkter)
 - [Skvallerbyttan](../../apps/skvallerbyttan/README.md)
-- [Avkroken portal](../../apps/portal/)
+- Portal: `apps/portal/`
 
-## Så hänger ytorna ihop
+## Fristående repositories
 
-```text
-Avkroken/Avkroken
-  |
-  +--> docs/organization     gemensamma standarder
-  +--> apps/*                samlade applikationer
-  +--> .github/workflows     repository-lokal CI
-  |
-  +--> fristående repository
-         |
-         +--> README.md       snabb ingång
-         +--> docs/index.md   klickbar dokumentationskarta
-         +--> docs/*.md       versionsstyrd teknisk källa
-         +--> Wiki            lättnavigerad presentation
+Bastion, Docker-idempotent-update, Klarsprak, Pastebinit, Politiker och Produkter äger själva sin dokumentation, Wiki, Issues och Discussions. Denna katalog ska inte duplicera eller styra deras tekniska current-state.
 
-Avkroken/.github
-  +--> publik organisationsprofil och community health-filer
-```
+Den samlade organisationsvyn kan byggas automatiskt i `Avkroken/.github`, men den vyn är endast en lässpegel.
 
 ## Grundregel
 
-Central dokumentation ska hjälpa läsaren hitta rätt och förstå gemensamma regler. Den ska inte kopiera projektens tekniska manualer.
+Ändra information där den ägs:
 
-När ett projekt ändras uppdateras dess egna docs. När en organisationsgemensam modell ändras uppdateras `docs/organization/` i `Avkroken/Avkroken`.
+- app-/repoimplementation → appens eller repositoryts egna docs;
+- monorepo-gemensam implementation → denna katalog;
+- GitHub/Cloudflare live-state → verifieras hos providern;
+- samlad organisationsvy → genereras, inte handunderhålls som source of truth.
