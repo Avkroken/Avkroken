@@ -1,4 +1,4 @@
-name: Temporary migrate Produkter D1 to EU
+name: Temporary create clean Produkter EU D1 target
 
 on:
   push:
@@ -8,192 +8,24 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: d1-eu-produkter
-  cancel-in-progress: false
-
 jobs:
-  migrate:
+  create:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
       CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
-      SOURCE_DB_ID: f1301925-95c3-47c7-b513-a25d4cfaf881
-      SOURCE_DB_NAME: product_describer
-      TARGET_DB_ID: d0bf1d69-64c4-4072-b9ce-d9a15129b526
-      TARGET_DB_NAME: produkter-eu
-      EXPECTED_PRODUKTER_SHA: 17ac896a6555d8db018c33cc6223813bf7e13456
-      ROLLBACK_PRODUKTER_SHA: c233b5d435f26a438edca14089254cc11dcea15e
     steps:
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "24"
-
-      - name: Preflight and freeze source writes
+      - name: Create clean EU target
         shell: bash
         run: |
           set -euo pipefail
-          node <<'NODE'
-          import fs from "node:fs";
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
-          const source=process.env.SOURCE_DB_ID, target=process.env.TARGET_DB_ID;
-          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
-          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          async function get(id){const r=await fetch(`${base}/${id}`,{headers});const b=await r.json();if(!r.ok||!b.success)throw new Error(`metadata failed ${r.status}`);return b.result;}
-          async function q(id,body){const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify(body)});const b=await r.json();if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false))throw new Error(`query failed ${r.status}`);return b.result;}
-          const [s,t]=await Promise.all([get(source),get(target)]);
-          if(s.name!==process.env.SOURCE_DB_NAME) throw new Error("source identity mismatch");
-          if(t.name!==process.env.TARGET_DB_NAME||t.jurisdiction!=="eu"||t.read_replication?.mode!=="auto") throw new Error("target metadata mismatch");
-          const targetTables=(await q(target,{sql:"SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name"}))[0].results;
-          if(targetTables.length) throw new Error("EU target is not empty");
-          const tables=(await q(source,{sql:"SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name"}))[0].results.map(x=>x.name);
-          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
-          const counts={};
-          for(const table of tables) counts[table]=Number((await q(source,{sql:`SELECT COUNT(*) AS n FROM ${qi(table)}`}))[0].results[0].n);
-          fs.writeFileSync("/tmp/source-counts.json",JSON.stringify(counts));
-          const batch=[];
-          tables.forEach((table,i)=>{
-            const suffix=String(i).padStart(3,"0");
-            for(const [op,event] of [["i","INSERT"],["u","UPDATE"],["d","DELETE"]]){
-              batch.push({sql:`CREATE TRIGGER IF NOT EXISTS ${qi(`__eu_freeze_${suffix}_${op}`)} BEFORE ${event} ON ${qi(table)} BEGIN SELECT RAISE(ABORT, 'EU D1 migration in progress'); END`});
-            }
-          });
-          await q(source,{batch});
-          const frozen=Number((await q(source,{sql:"SELECT COUNT(*) AS n FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%'"}))[0].results[0].n);
-          if(frozen!==tables.length*3) throw new Error(`freeze trigger mismatch ${frozen}/${tables.length*3}`);
-          console.log("Produkter source frozen. Tables:",tables.length);
-          console.log("Source row counts:",JSON.stringify(counts));
-          NODE
-
-      - name: Export frozen source
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@4.139.0 d1 export "$SOURCE_DB_NAME" --remote --output=/tmp/produkter.sql --skip-confirmation
-          test -s /tmp/produkter.sql
-          echo "Export bytes: $(wc -c </tmp/produkter.sql)"
-
-      - name: Import into EU target
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@4.139.0 d1 execute "$TARGET_DB_NAME" --remote --file=/tmp/produkter.sql --yes
-
-      - name: Verify exact row counts and unfreeze EU target
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          import fs from "node:fs";
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, target=process.env.TARGET_DB_ID;
-          const expected=JSON.parse(fs.readFileSync("/tmp/source-counts.json","utf8"));
-          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
-          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          async function q(body){const r=await fetch(`${base}/${target}/query`,{method:"POST",headers,body:JSON.stringify(body)});const b=await r.json();if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false))throw new Error(`query failed ${r.status}`);return b.result;}
-          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
-          const actual={};
-          for(const table of Object.keys(expected)) actual[table]=Number((await q({sql:`SELECT COUNT(*) AS n FROM ${qi(table)}`}))[0].results[0].n);
-          if(JSON.stringify(actual)!==JSON.stringify(expected)) throw new Error(`row count mismatch expected=${JSON.stringify(expected)} actual=${JSON.stringify(actual)}`);
-          const triggers=(await q({sql:"SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%' ORDER BY name"}))[0].results.map(x=>x.name);
-          if(triggers.length) await q({batch:triggers.map(name=>({sql:`DROP TRIGGER ${qi(name)}`}))});
-          const remaining=Number((await q({sql:"SELECT COUNT(*) AS n FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%'"}))[0].results[0].n);
-          if(remaining!==0) throw new Error("EU target still frozen");
-          console.log("Imported row counts verified:",JSON.stringify(actual));
-          NODE
-
-      - name: Checkout merged Produkter main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone --quiet https://github.com/Avkroken/Produkter.git /tmp/produkter
-          git -C /tmp/produkter checkout --quiet "$EXPECTED_PRODUKTER_SHA"
-          [[ "$(git -C /tmp/produkter rev-parse HEAD)" == "$EXPECTED_PRODUKTER_SHA" ]]
-
-      - name: Install and validate Cloudflare Workers
-        shell: bash
-        run: |
-          set -euo pipefail
-          for unit in app engine processor; do
-            cd "/tmp/produkter/cloudflare/$unit"
-            npm ci --ignore-scripts --no-audit --no-fund
-            npm run typecheck
-            npx wrangler deploy --dry-run
-          done
-
-      - name: Deploy processor with EU D1
-        working-directory: /tmp/produkter/cloudflare/processor
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run deploy
-          touch /tmp/processor-deployed
-
-      - name: Deploy engine with EU D1
-        working-directory: /tmp/produkter/cloudflare/engine
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run deploy
-          touch /tmp/engine-deployed
-
-      - name: Deploy app with EU D1
-        working-directory: /tmp/produkter/cloudflare/app
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run deploy
-          touch /tmp/app-deployed
-
-      - name: Verify all three Workers and EU target directly
-        shell: bash
-        run: |
-          set -euo pipefail
-          for worker in produkter-bearbetare produkter-motor produkter; do
-            npx --yes wrangler@4.139.0 deployments list --name "$worker" >"/tmp/$worker.deployments"
-            test -s "/tmp/$worker.deployments"
-          done
-          node <<'NODE'
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.TARGET_DB_ID;
-          const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
-          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          const info=await (await fetch(`${base}/${id}`,{headers})).json();
-          if(!info.success||info.result.name!=="produkter-eu"||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="auto") throw new Error("EU target metadata mismatch");
-          const sql="SELECT COUNT(*) AS products FROM products; SELECT COUNT(*) AS prices FROM price_history; SELECT COUNT(*) AS renders FROM render_jobs;";
-          const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql})});
-          const b=await r.json();
-          if(!r.ok||!b.success) throw new Error("EU target query failed");
-          const products=Number(b.result?.[0]?.results?.[0]?.products);
-          const prices=Number(b.result?.[1]?.results?.[0]?.prices);
-          const renders=Number(b.result?.[2]?.results?.[0]?.renders);
-          if(products<32833||prices<782398||renders<943864) throw new Error("EU target core row counts regressed");
-          console.log(JSON.stringify({name:info.result.name,jurisdiction:info.result.jurisdiction,read_replication:info.result.read_replication.mode,file_size:info.result.file_size,products,prices,renders}));
-          NODE
-          touch /tmp/eu-verified
-
-      - name: Roll back Workers to old D1 if cutover fails
-        if: failure()
-        shell: bash
-        run: |
-          set +e
-          if [[ -e /tmp/processor-deployed || -e /tmp/engine-deployed || -e /tmp/app-deployed ]]; then
-            rm -rf /tmp/produkter-rollback
-            git clone --quiet https://github.com/Avkroken/Produkter.git /tmp/produkter-rollback
-            git -C /tmp/produkter-rollback checkout --quiet "$ROLLBACK_PRODUKTER_SHA"
-            for unit in processor engine app; do
-              cd "/tmp/produkter-rollback/cloudflare/$unit"
-              npm ci --ignore-scripts --no-audit --no-fund
-              if [[ "$unit" == "app" ]]; then npm run deploy; else npm run deploy; fi
-            done
+          name="produkter-eu-v2"
+          list="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database?name=$name")"
+          id="$(printf '%s' "$list" | jq -r --arg n "$name" '.result[] | select(.name==$n) | .uuid' | head -n1)"
+          if [[ -z "$id" ]]; then
+            response="$(curl -fsS -X POST               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json"               --data '{"name":"produkter-eu-v2","jurisdiction":"eu","read_replication":{"mode":"auto"}}'               "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database")"
+            id="$(printf '%s' "$response" | jq -r '.result.uuid')"
           fi
-          node <<'NODE'
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.SOURCE_DB_ID;
-          const url=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${id}/query`;
-          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          const q=async body=>{const r=await fetch(url,{method:"POST",headers,body:JSON.stringify(body)});if(!r.ok)return null;return r.json();};
-          const found=await q({sql:"SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%' ORDER BY name"});
-          const names=found?.result?.[0]?.results?.map?.(x=>x.name)||[];
-          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
-          if(names.length) await q({batch:names.map(name=>({sql:`DROP TRIGGER ${qi(name)}`}))});
-          console.log("Best-effort source unfreeze:",names.length);
-          NODE
+          detail="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database/$id")"
+          printf '%s' "$detail" | jq -e '.success and .result.name=="produkter-eu-v2" and .result.jurisdiction=="eu" and .result.read_replication.mode=="auto" and (.result.file_size // 0) <= 100000' >/dev/null
+          printf '%s' "$detail" | jq -c '{uuid:.result.uuid,name:.result.name,jurisdiction:.result.jurisdiction,read_replication:.result.read_replication.mode,file_size:.result.file_size}'
