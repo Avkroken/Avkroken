@@ -23,7 +23,8 @@
   }
 
   function isActivityRoute() {
-    return location.pathname === "/aktivitet" || Boolean(projectSlugFromLocation());
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    return path === "/aktivitet" || Boolean(projectSlugFromLocation());
   }
 
   function clear() {
