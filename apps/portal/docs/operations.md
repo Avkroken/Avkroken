@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues- och Builds/CI-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues-, Builds/CI- och Activity-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -91,7 +91,7 @@ Wiki-vyn använder endast `/api/projects` och `/api/docs`.
 - unavailable project/docs catalog ger explicit degraded state;
 - “Visa original-Wiki” pekar på canonical GitHub Wiki.
 
-Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment.
+Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar cache-nyckeln till `github-projects-v6`. Activity-navigationen bump:ar därefter till `github-projects-v7`, så en pre-Activity v6-payload inte återanvänds efter deployment.
 
 ### Dokumentationskatalog
 
@@ -195,6 +195,35 @@ Publikt CI-underlag begränsas till samplebaserad summary. Actor, permissionmeta
 
 Monorepo-appar har ingen `buildsPortalUrl` och `builds = null`.
 
+### Publik Activity
+
+`GET /api/activity` och `GET /api/activity?project=<slug>` läser GitHubs public organization events och korsar dem mot live `type=public` repository-state.
+
+- project-query över 120 tecken: `400 invalid_project`;
+- okänd, mixed-scope eller icke-eligible project slug: `404 project_activity_not_found`;
+- provider-/repositorylistningsfel: `502 activity_unavailable`;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`.
+
+Budget:
+
+- max 100 Events API-poster från providern;
+- max 50 eligible fristående repositoryprojekt;
+- max 40 returnerade events.
+
+Coverage:
+
+- `bounded` när repositorybudgeten inte kapar eligible-listan;
+- `partial` när fler än 50 eligible repositories finns;
+- `realtime = false` alltid.
+
+GitHub dokumenterar Events API som icke-realtid med möjlig latency cirka 30 sekunder–6 timmar. Snapshotens `generatedAt` är Portalens lästid, inte händelsernas fullständighetsgräns.
+
+Mixed-scope `Avkroken/Avkroken` exkluderas helt. Monorepo-appar får ingen `activityPortalUrl`.
+
+Sanitizern publicerar inte actor/login/avatar, branch/tag/ref, SHA/before, commitmeddelanden, PR/Issue-titlar eller rå payload. Endast Push/PullRequest/Issues/Release/Create/Delete accepteras.
+
+Activity lagras inte i Workers Cache API. Ett isolate-lokalt in-flight Promise får endast kollapsa samtidiga builds och rensas efter success/failure.
+
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -253,6 +282,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
 - Projektspecifika Issues får endast läsa Issues för live-publicerade repositoryprojekt; filtrera GitHub PR-poster explicit och låt inte monorepo-appar ärva source-repositoryts Issues.
 - Projektspecifik Builds/CI får endast läsa Skvallerbyttans public-safe cache-RPC efter live public-project-lookup; Portalen får inte göra en egen GitHub Actions-read och monorepo-appar får inte ärva source-repositoryts CI.
+- Publik Activity får endast använda GitHubs public organization events efter live-public repo-filter; mixed-scope-monorepot och appar exkluderas, och rå actor/ref/SHA/title/payload får inte publiceras.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -263,7 +293,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion` och `/api/builds?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion`, `/api/builds?project=Bastion` och `/api/activity?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -284,6 +314,9 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 21. `/api/issues?project=Bastion` är `no-store` och innehåller ingen body/user/assignee/milestone eller labelmetadata utöver namn;
 22. `/projekt/Bastion/builds` visar sampled CI-summary med freshness och canonical Actions-länk utan direkt GitHub Actions-request; `/projekt/skvallerbyttan/builds` saknar app-CI-källa;
 23. stale/missing Skvallerbyttan overview-cache visas som stale/not-observed och utlöser ingen Portal-driven providerrefresh;
-24. cache-/heartbeat-beteende har inte regresserat.
+24. `/aktivitet` visar endast accepterade public Events API-poster från eligible fristående repositories och deklarerar bounded/partial + ej realtid;
+25. `/projekt/Bastion/aktivitet` filtrerar samma snapshot till Bastion, medan `/projekt/Avkroken/aktivitet` och app-projekt saknar eligible Activity-källa;
+26. Activity-responsen innehåller ingen actor/avatar/ref/SHA/commit message/PR- eller Issue-titel/rå payload;
+27. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
