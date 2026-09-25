@@ -79,8 +79,8 @@ test("project Builds backend validates public project before using the Skvallerb
     "async function fetchProjectIssues(project, env)"
   );
 
-  assert.ok(handler.includes("loadPublicProjects(env)"));
-  assert.ok(handler.includes("publicBuildProject(projectCatalog.projects"));
+  assert.ok(handler.includes("loadLivePublicRepositoryProjects(env)"));
+  assert.ok(handler.includes("publicBuildProject(repositoryProjects"));
   assert.ok(handler.includes("SKVALLERBYTTAN_OBSERVATIONS"));
   assert.ok(handler.includes("getPublicRepositoryCi"));
   assert.equal(handler.includes("api.github.com"), false);
