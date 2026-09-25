@@ -164,7 +164,7 @@ export function normalizePublicAppManifest(manifest, context = {}) {
     issues: repository + "/issues",
     discussions: context.hasDiscussions === true ? repository + "/discussions" : null,
     releases: repository + "/releases",
-    documentation: null,
+    documentation: documentationPath(slug),
     pages: null,
     language: null,
     repoSizeKb: null,
