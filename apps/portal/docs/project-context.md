@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot project/source-adapterarbetet: 2026-09-25.
+Senast verifierad mot projektdetaljarbetet: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -41,7 +41,8 @@ Worker-koden innehåller idag:
 - server-side shell fallback för kända Portal-dokumentroutes;
 - stabila dokumentations-URL:er;
 - Portal v2 design tokens och shell-CSS;
-- informationsarkitektur utan GitHub-begrepp som huvudnavigation.
+- informationsarkitektur utan GitHub-begrepp som huvudnavigation;
+- projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning.
 
 ## Publik projektmodell
 
@@ -62,7 +63,8 @@ Adapterpolicyn:
 - behåller projekt även när publik homepage saknas;
 - accepterar bara HTTPS-homepage som publik endpoint;
 - markerar Politiker, Klarspråk och Produkter som `independentProduct`;
-- bär canonical GitHub-repository/ref i `source`.
+- bär canonical GitHub-repository/ref i `source`;
+- bär stabil `portalUrl` för projektdetalj och, för repositories där GitHub exponerar det, canonical Wiki-länk.
 
 ### `/api/sites`
 
@@ -91,6 +93,21 @@ Nuvarande opt-in:
 - Jobb: inget publikt appmanifest; skyddad Jobb-state går fortsatt endast via Auth-gränsen.
 
 `source.appDiscovery` anger om appdiscovery var `available`, `partial`, `unavailable` eller `not_configured`.
+
+## Projektdetalj
+
+`/projekt/:slug` renderas från samma katalogpayload som Projekt- och Tjänster-vyerna redan har hämtat. Klientnavigationen gör därför ingen ny GitHub-request när en projektdetalj öppnas.
+
+Detaljvyn visar:
+
+- projektnamn, kategori och beskrivning;
+- källtyp (`repository` eller `monorepo_app`);
+- canonical repository, ref och app-source-path när sådan finns;
+- dokumentation i Portalen;
+- publik tjänste-URL när den finns;
+- canonical länkar till repository, Wiki där tillgängligt, Issues, Discussions och Releases.
+
+Detaljvyn hämtar inte Issues, releasehistorik, workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
 
 ## Dokumentationsdata
 
@@ -145,7 +162,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- full projektdetaljdata;
+- provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
 - Wiki-adapter inne i Portalen;
 - global access-aware sökindexering;
 - Drift & insyn-data från Skvallerbyttans normaliserade API/state;
