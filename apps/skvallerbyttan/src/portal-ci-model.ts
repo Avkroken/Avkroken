@@ -1,34 +1,21 @@
-import type { ActionSummary, WorkflowRun } from "./metrics";
+import type { ActionSummary } from "./metrics";
 
-type RepositoryRun = WorkflowRun & {
-  actor?: { login?: string };
-  display_title?: string;
-  id?: number;
-  [key: string]: unknown;
-};
-
-export type RepositoryActionsInput = {
-  available: boolean;
-  summary: ActionSummary | null;
-  runs: RepositoryRun[];
-  status: number;
-  reason?: string;
-  acceptedPermissions: string | null;
-};
+export type PortalCiFreshness = "fresh" | "stale" | "unknown";
 
 export type PortalRepositoryCiSnapshot = {
   schemaVersion: 1;
   generatedAt: string;
   repository: string;
   available: boolean;
-  status: "available" | "unavailable";
+  status: "available" | "unavailable" | "not_observed";
+  freshness: PortalCiFreshness;
+  sourceRefreshedAt: string | null;
   coverage: {
-    providerSampleLimit: 100;
-    recentRunsLimit: 12;
-  };
-  summary: {
-    totalRuns: number;
     sampledRuns: number;
+    totalRuns: number;
+    sampleLimit: 100;
+  } | null;
+  summary: {
     completedSample: number;
     successfulSample: number;
     failedSample: number;
@@ -43,17 +30,14 @@ export type PortalRepositoryCiSnapshot = {
     mttrMedianMs: number | null;
     mttrSampleCount: number;
   } | null;
-  recentRuns: Array<{
-    id: number;
-    name: string | null;
-    title: string | null;
-    event: string | null;
-    status: string | null;
-    conclusion: string | null;
-    createdAt: string | null;
-    updatedAt: string | null;
-    url: string;
-  }>;
+};
+
+export type PortalCiRepositoryObservation = {
+  fullName?: unknown;
+  visibility?: unknown;
+  archived?: unknown;
+  actions?: unknown;
+  capabilities?: unknown;
 };
 
 const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9._-]+$/;
@@ -72,7 +56,7 @@ function timestamp(value: unknown): string | null {
 
 function nonNegative(value: unknown): number {
   const number = Number(value);
-  return Number.isFinite(number) ? Math.max(0, number) : 0;
+  return Number.isFinite(number) ? Math.max(0, Math.trunc(number)) : 0;
 }
 
 function nullableDuration(value: unknown): number | null {
@@ -81,93 +65,110 @@ function nullableDuration(value: unknown): number | null {
   return Number.isFinite(number) && number >= 0 ? number : null;
 }
 
-function passRate(value: unknown): number | null {
+function normalizedPassRate(value: unknown): number | null {
   if (value == null) return null;
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 && number <= 1 ? number : null;
 }
 
-function runUrl(repository: string, id: number, value: unknown): string | null {
-  const url = safeText(value, 360);
-  if (!url) return null;
-
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:" || parsed.host !== "github.com") return null;
-    if (parsed.pathname !== "/" + repository + "/actions/runs/" + id) return null;
-    if (parsed.search || parsed.hash || parsed.username || parsed.password) return null;
-    return parsed.href;
-  } catch {
-    return null;
-  }
+function actionSummary(value: unknown): ActionSummary | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as ActionSummary;
 }
 
-function sanitizeSummary(summary: ActionSummary | null): PortalRepositoryCiSnapshot["summary"] {
-  if (!summary) return null;
+function actionsAvailable(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (value as Record<string, unknown>).actions === true;
+}
 
-  return {
-    totalRuns: nonNegative(summary.totalRuns),
-    sampledRuns: nonNegative(summary.sampledRuns),
-    completedSample: nonNegative(summary.completedSample),
-    successfulSample: nonNegative(summary.successfulSample),
-    failedSample: nonNegative(summary.failedSample),
-    cancelledSample: nonNegative(summary.cancelledSample),
-    inProgressSample: nonNegative(summary.inProgressSample),
-    passRate: passRate(summary.passRate),
-    failedLast24h: nonNegative(summary.failedLast24h),
-    failedLast7d: nonNegative(summary.failedLast7d),
-    latestFailureAt: timestamp(summary.latestFailureAt),
-    medianDurationMs: nullableDuration(summary.medianDurationMs),
-    p95DurationMs: nullableDuration(summary.p95DurationMs),
-    mttrMedianMs: nullableDuration(summary.mttrMedianMs),
-    mttrSampleCount: nonNegative(summary.mttrSampleCount),
-  };
+export function publicCiRepository(
+  repositories: PortalCiRepositoryObservation[],
+  repository: string,
+): PortalCiRepositoryObservation | null {
+  if (!PUBLIC_REPOSITORY.test(repository)) return null;
+
+  return repositories.find((row) =>
+    row?.fullName === repository &&
+    row?.visibility === "public" &&
+    row?.archived !== true
+  ) ?? null;
 }
 
 export function buildPortalRepositoryCiSnapshot(input: {
   generatedAt: string;
   repository: string;
-  actions: RepositoryActionsInput;
+  observation: PortalCiRepositoryObservation | null;
+  sourceRefreshedAt: string | null;
+  freshness: PortalCiFreshness;
 }): PortalRepositoryCiSnapshot {
   if (!PUBLIC_REPOSITORY.test(input.repository)) {
     throw new Error("invalid public repository");
   }
 
-  const recentRuns = input.actions.available
-    ? input.actions.runs
-      .map((run) => {
-        const id = Number(run.id);
-        if (!Number.isSafeInteger(id) || id <= 0) return null;
-        const url = runUrl(input.repository, id, run.html_url);
-        if (!url) return null;
+  const generatedAt = timestamp(input.generatedAt) ?? new Date(0).toISOString();
+  const sourceRefreshedAt = timestamp(input.sourceRefreshedAt);
 
-        return {
-          id,
-          name: safeText(run.name, 160),
-          title: safeText(run.display_title, 240),
-          event: safeText(run.event, 80),
-          status: safeText(run.status, 80),
-          conclusion: safeText(run.conclusion, 80),
-          createdAt: timestamp(run.created_at),
-          updatedAt: timestamp(run.updated_at),
-          url,
-        };
-      })
-      .filter((run): run is NonNullable<typeof run> => Boolean(run))
-      .slice(0, 12)
-    : [];
+  if (!input.observation) {
+    return {
+      schemaVersion: 1,
+      generatedAt,
+      repository: input.repository,
+      available: false,
+      status: "not_observed",
+      freshness: "unknown",
+      sourceRefreshedAt,
+      coverage: null,
+      summary: null,
+    };
+  }
+
+  const summary = actionSummary(input.observation.actions);
+  const available = actionsAvailable(input.observation.capabilities) && summary !== null;
+
+  if (!available || !summary) {
+    return {
+      schemaVersion: 1,
+      generatedAt,
+      repository: input.repository,
+      available: false,
+      status: "unavailable",
+      freshness: input.freshness,
+      sourceRefreshedAt,
+      coverage: null,
+      summary: null,
+    };
+  }
+
+  const sampledRuns = nonNegative(summary.sampledRuns);
+  const totalRuns = nonNegative(summary.totalRuns);
 
   return {
     schemaVersion: 1,
-    generatedAt: timestamp(input.generatedAt) ?? new Date(0).toISOString(),
+    generatedAt,
     repository: input.repository,
-    available: input.actions.available,
-    status: input.actions.available ? "available" : "unavailable",
+    available: true,
+    status: "available",
+    freshness: input.freshness,
+    sourceRefreshedAt,
     coverage: {
-      providerSampleLimit: 100,
-      recentRunsLimit: 12,
+      sampledRuns,
+      totalRuns,
+      sampleLimit: 100,
     },
-    summary: input.actions.available ? sanitizeSummary(input.actions.summary) : null,
-    recentRuns,
+    summary: {
+      completedSample: nonNegative(summary.completedSample),
+      successfulSample: nonNegative(summary.successfulSample),
+      failedSample: nonNegative(summary.failedSample),
+      cancelledSample: nonNegative(summary.cancelledSample),
+      inProgressSample: nonNegative(summary.inProgressSample),
+      passRate: normalizedPassRate(summary.passRate),
+      failedLast24h: nonNegative(summary.failedLast24h),
+      failedLast7d: nonNegative(summary.failedLast7d),
+      latestFailureAt: timestamp(summary.latestFailureAt),
+      medianDurationMs: nullableDuration(summary.medianDurationMs),
+      p95DurationMs: nullableDuration(summary.p95DurationMs),
+      mttrMedianMs: nullableDuration(summary.mttrMedianMs),
+      mttrSampleCount: nonNegative(summary.mttrSampleCount),
+    },
   };
 }
