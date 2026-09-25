@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   eligibleReleaseProjects,
+  findEligibleReleaseProject,
   normalizePublicRelease,
   normalizePublicReleases,
   sortPublicReleases
@@ -150,4 +151,41 @@ test("sorts releases newest first with a hard result cap", () => {
   ]);
 
   assert.deepEqual(sortPublicReleases(items, 2).map(item => item.tag), ["v2", "v3"]);
+});
+
+
+test("finds only an eligible repository project by stable slug", () => {
+  const repositories = [
+    project(),
+    project({
+      id: "repository:produkter",
+      slug: "Produkter",
+      name: "Produkter",
+      portalUrl: "/projekt/Produkter",
+      source: {
+        provider: "github",
+        kind: "repository",
+        repository: "Avkroken/Produkter",
+        ref: "main"
+      }
+    }),
+    project({
+      id: "app:avkroken/avkroken:skvallerbyttan",
+      type: "app",
+      slug: "skvallerbyttan",
+      name: "Skvallerbyttan",
+      portalUrl: "/projekt/skvallerbyttan",
+      source: {
+        provider: "github",
+        kind: "monorepo_app",
+        repository: "Avkroken/Avkroken"
+      }
+    })
+  ];
+
+  assert.equal(findEligibleReleaseProject(repositories, "Bastion")?.slug, "Bastion");
+  assert.equal(findEligibleReleaseProject(repositories, "Produkter")?.slug, "Produkter");
+  assert.equal(findEligibleReleaseProject(repositories, "skvallerbyttan"), null);
+  assert.equal(findEligibleReleaseProject(repositories, "missing"), null);
+  assert.equal(findEligibleReleaseProject(repositories, ""), null);
 });
