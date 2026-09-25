@@ -28,7 +28,7 @@ Gamnackens faktiska permission-state verifieras i runtime från Appens egen inst
 
 Repository-scopeade PR/issues, Actions och effective rulesets registreras per repository och aggregeras med explicit scope coverage. Ett lyckat repoanrop får därför inte markera hela capabilityn som available om andra förväntade repositories är denied eller felar.
 
-Gamnackens permissions är observationsruntimens canonical GitHub App-permissions och verifieras från live installation/token-state.
+Dokumentet beskriver de GitHub App-permissions som observationskoden behöver. Faktiska installation-/tokenpermissions är extern GitHub-state och måste verifieras hos providern när driftstate spelar roll.
 
 ## Cloudflare
 
