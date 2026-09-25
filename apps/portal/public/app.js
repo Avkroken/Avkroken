@@ -222,6 +222,7 @@ function renderProjectDetail() {
       primary: Boolean(project.url)
     }),
     detailAction("Repository", project.repository),
+    detailAction("Wiki", project.wiki),
     detailAction("Canonical source", project.sourceUrl),
     detailAction("Issues", project.issues),
     detailAction("Discussions", project.discussions),
