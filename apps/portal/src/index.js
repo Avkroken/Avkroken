@@ -205,8 +205,16 @@ async function buildAppDocsEntry(project, repositories, env) {
     markdownFilePage(repo, env, source.readmePath, "Översikt")
   ]);
 
-  const pages = [...docs];
-  if (readme && !pages.some(page => page.path === readme.path)) pages.push(readme);
+  const sourcePages = [...docs];
+  if (readme && !sourcePages.some(page => page.path === readme.path)) sourcePages.push(readme);
+
+  const prefix = source.sourcePath + "/";
+  const pages = sourcePages
+    .filter(page => page.path.startsWith(prefix))
+    .map(page => ({
+      ...page,
+      path: page.path.slice(prefix.length)
+    }));
   pages.sort(pageSort);
 
   return {
