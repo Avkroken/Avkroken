@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { CapabilityObservation } from "../src/capabilities";
-import { buildPortalOperationsSnapshot } from "../src/portal-observations";
+import { buildPortalOperationsSnapshot } from "../src/portal-observations-model";
 
 function capability(overrides: Partial<CapabilityObservation> = {}): CapabilityObservation {
   return {
