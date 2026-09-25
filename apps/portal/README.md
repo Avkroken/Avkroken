@@ -32,6 +32,7 @@ Portal v2 etablerar:
 - normaliserad publik repository-project-katalog;
 - projekt- och tjänsteytor ovanpå samma projektmodell;
 - projektdetalj på `/projekt/:slug` som återanvänder den redan hämtade katalogen och visar canonical navigation utan nya provideranrop;
+- Portal-native Wiki-presentation på `/projekt/:slug/wiki` för repositoryprojekt där GitHub Wiki är aktiverad;
 - stabila dokumentations-URL:er;
 - rendering av publik repository-README/docs och opt-in-app-README/docs i portalen;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
@@ -46,6 +47,7 @@ Portalen känner bland annat igen:
 - `/`
 - `/projekt`
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
+- `/projekt/:slug/wiki` — Portal-presentation av repositoryts genererade Wiki-navigation, med länk till original-Wikin.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -89,7 +91,7 @@ GitHub public repositories
   -> project-source adapter
   -> normaliserad katalog
   -> Workers cache
-  -> Avkroken Projekt/Tjänster/Projektdetalj
+  -> Avkroken Projekt/Tjänster/Projektdetalj/Wiki-presentation
 ```
 
 ### Dokumentationskällor
