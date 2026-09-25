@@ -33,9 +33,11 @@ CF Audit Logs ──────────────┘
                  ▼                            ▼
             /api/v1 contract        PortalObservationsService
              ├── dashboard          (sanitized read-only RPC)
-             └── machine clients             │
+             └── machine clients        ├─ provider/capability snapshot
+                 │                    └─ cached repository CI snapshot
+                 │                           │
                  │                           ▼
-                 │                    avkroken Drift & insyn
+                 │                    avkroken Drift & insyn / Builds
                  │
                  └──────── internal signals ────────────────► avkroken RPC
                                                       ├─ docs cache invalidation
@@ -62,7 +64,9 @@ Readinesspayloaden produceras av faktiska lokala/provider-probes men innehåller
 
 Portalens operativa läsväg är separat från heartbeat och det skyddade HTTP-API:t. `PortalObservationsService` exporteras som named Worker RPC-entrypoint och läser samma canonical capability/provider-health/Activity-modeller, men passerar dem genom en explicit sanitization boundary innan de lämnar Skvallerbyttan.
 
-Den snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom RPC:n.
+Den generella Drift-snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom RPC:n.
+
+Samma named entrypoint har ett separat repository-CI-kontrakt. `getPublicRepositoryCi(repoName)` läser endast D1 source cache-keyn `overview`; den startar ingen GitHub Actions-request. Repositoryraden måste själv vara `visibility = public` och icke-arkiverad. Utåt projiceras endast sampled Actions-summary, source cache-tid och explicit `fresh|stale|unknown`. Actor, permissions/fel, event breakdown och rå runpayload lämnar inte Skvallerbyttan.
 
 ## Runtime
 
@@ -79,7 +83,8 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - read telemetry: `src/telemetry.ts`
 - provider health: `src/provider-health.ts`
 - Workers RPC-entrypoint: `src/portal-observations.ts`
-- ren public-safe sanitizationmodell: `src/portal-observations-model.ts`
+- ren public-safe Drift-sanitizationmodell: `src/portal-observations-model.ts`
+- ren public-safe repository-CI-modell: `src/portal-ci-model.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
@@ -87,7 +92,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 
 Externa klienter får normaliserade modeller, inte generella provider-dumpar. Relevant state bär status, freshness och provenance. Repository governance skiljer mellan `direct`, `inherited` och `effective` där providern ger tillräckligt underlag.
 
-Portalens publika Drift & insyn-konsument är ännu snävare än machine-API:t: den kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg.
+Portalens publika Drift & insyn- och Builds-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state och får inte göra en ny providerread på Portalens begäran.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration: read används där GitHub kräver den nivån; provider-write ingår inte i observationslagret.
 
@@ -106,6 +111,39 @@ Canonical GitHub-state omfattar bland annat:
 - GitHub App installation/token permissionnivåer och endpointens accepterade permissions, utan credentialvärden
 - repository-scope coverage för PR/issues, Actions och effective rulesets
 - rate-limit headers och provider health
+
+## Portal repository-CI
+
+Skvallerbyttans breda `overview` innehåller redan `actions.summary` för varje observerat repository. Portalens CI-RPC använder just detta cacheade underlag.
+
+```text
+scheduled / operator overview observation
+        |
+        v
+D1 api_cache["overview"]
+        |
+        v
+PortalObservationsService.getPublicRepositoryCi(repo)
+        |
+        +--> exact Avkroken/<repo>
+        +--> visibility = public
+        +--> archived != true
+        +--> capability.actions = true
+        |
+        v
+portal-ci-model.ts
+        |
+        +--> sampled pass/failure/duration/MTTR
+        +--> sourceRefreshedAt
+        +--> fresh / stale / unknown
+        |
+        v
+Avkroken Portal /projekt/:slug/builds
+```
+
+Freshnesshorisonten för detta downstream-kontrakt är sex timmar eftersom det är `overview` source cache som läses. En invaliderad eller äldre cachepost kan fortfarande returneras som `stale`; den får inte presenteras som fresh. Om cache eller publik repositoryrad saknas returneras `not_observed`.
+
+Detta kontrakt är medvetet summary-only. Individuella recent runs finns i Skvallerbyttans autentiserade repositorydetail men publiceras inte genom Portal-RPC:n i den här modellen.
 
 ## Cloudflare
 

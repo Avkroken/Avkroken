@@ -40,6 +40,7 @@ Portal v2 etablerar:
 - Changelog från officiella publicerade GitHub Releases för redan publicerade repositoryprojekt;
 - projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
 - projektspecifik Issues-vy på `/projekt/:slug/issues` för repositoryprojekt, med PR-filtrering och minimal public-only Issue-modell;
+- projektspecifik Builds / CI-vy på `/projekt/:slug/builds` från Skvallerbyttans cacheade read-only Actions-summary;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -55,6 +56,7 @@ Portalen känner bland annat igen:
 - `/projekt/:slug/wiki` — Portal-presentation av repositoryts genererade Wiki-navigation, med länk till original-Wikin.
 - `/projekt/:slug/releases` — officiella publicerade GitHub Releases för repositoryprojekt; monorepo-appar får ingen ärvd releasevy.
 - `/projekt/:slug/issues` — publika GitHub Issues för repositoryprojekt; pull requests filtreras bort och monorepo-appar får ingen ärvd Issue-vy.
+- `/projekt/:slug/builds` — sampled observerad GitHub Actions-state från Skvallerbyttans cache för repositoryprojekt; monorepo-appar får ingen ärvd CI-vy.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -83,6 +85,7 @@ Nuvarande Worker exponerar:
 - `GET /api/changelog` — bounded releasehistorik från publicerade repositoryprojekt; draft releases, monorepo-app-arv och rå release-body/author/assets exkluderas.
 - `GET /api/releases?project=...` — projektspecifik, `no-store` releasehistorik för ett redan publicerat repositoryprojekt med samma minimala releasemodell.
 - `GET /api/issues?project=...` — projektspecifik, `no-store` Issue-lista för ett redan publicerat repositoryprojekt; PR-poster och rå body/actor/assignee/milestone filtreras bort.
+- `GET /api/builds?project=...` — projektspecifik, `no-store` CI-snapshot från Skvallerbyttans interna `PortalObservationsService`; ingen direkt Actions-request görs av Portalen.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -141,7 +144,8 @@ Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `pa
 ### Changelog
 
 ```text
-live public project catalog
+live GitHub public repository list
+  -> project-source repository policy
   -> repository projects only
   -> GitHub Releases
   -> release-source normalization
@@ -171,6 +175,25 @@ Repositoryprojekt får canonical GitHub Issues-länk och intern `issuesPortalUrl
 GitHubs Issues-endpoint kan innehålla pull requests. Sanitizern filtrerar därför alltid poster med `pull_request` före publicering. Den publika Issue-modellen innehåller endast issue-nummer, titel, state, created/updated, comment-count, högst åtta labelnamn, repository/project-identitet och canonical Issue-URL. Body, author, assignee, milestone och labelmetadata publiceras inte.
 
 Endpointen returnerar högst 30 senast uppdaterade poster från providerrequesten och lagras inte persistent i Cache API.
+
+### Repository Builds / CI
+
+```text
+live public project catalog
+  -> repository project only
+  -> SKVALLERBYTTAN_OBSERVATIONS
+  -> PortalObservationsService.getPublicRepositoryCi(repo)
+  -> Skvallerbyttan overview source cache
+  -> public-only CI sanitizer
+  -> GET /api/builds?project=...
+  -> /projekt/:slug/builds
+```
+
+Portalen gör ingen GitHub Actions-request för Builds/CI. Slugen måste först resolvea genom en minimal live `type=public` repositorylistning och Portalens repositorypolicy, och Skvallerbyttans RPC gör en andra publiceringskontroll mot den cacheade repositoryradens `visibility = public` och `archived != true`.
+
+CI-snapshoten innehåller endast samplebaserad Actions-summary: pass rate, completed/success/failed/cancelled/in-progress, failures senaste 24h/7d, latest failure, duration median/p95 och MTTR. Actor, provider-permissions, providerfel, event breakdown och rå runpayload publiceras inte.
+
+Freshness kommer från Skvallerbyttans canonical `overview` source cache. Portalen visar `fresh`, `stale` eller `unknown` och gör inte en providerrefresh som fallback vid sidvisning. Monorepo-appar har `builds = null` och `buildsPortalUrl = null`.
 
 ### Operativ state
 
