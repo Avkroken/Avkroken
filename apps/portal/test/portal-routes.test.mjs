@@ -4,6 +4,7 @@ import {
   documentationPath,
   isPortalDocumentRoute,
   normalizePortalPath,
+  projectActivityPath,
   projectBuildsPath,
   projectIssuesPath,
   projectPath,
@@ -29,6 +30,7 @@ test("recognizes stable public portal document routes", () => {
     "/projekt/Bastion/releases",
     "/projekt/Bastion/issues",
     "/projekt/Bastion/builds",
+    "/projekt/Bastion/aktivitet",
     "/dokumentation",
     "/dokumentation/arkitektur",
     "/tjanster",
@@ -54,6 +56,7 @@ test("does not rewrite API, assets, unknown routes, or protected Jobb paths", ()
     "/api/releases",
     "/api/issues",
     "/api/builds",
+    "/api/activity",
     "/styles.css",
     "/portal-v2.css",
     "/app.js",
@@ -64,6 +67,7 @@ test("does not rewrite API, assets, unknown routes, or protected Jobb paths", ()
     "/project-releases.js",
     "/project-issues.js",
     "/project-builds.js",
+    "/activity.js",
     "/favicon.ico",
     "/not-a-portal-route",
     "/auth/jobb",
@@ -130,5 +134,15 @@ test("builds stable project Builds URLs", () => {
   assert.equal(
     projectBuildsPath("Repo med mellanslag"),
     "/projekt/Repo%20med%20mellanslag/builds"
+  );
+});
+
+
+test("builds stable project Activity URLs", () => {
+  assert.equal(projectActivityPath(), "/aktivitet");
+  assert.equal(projectActivityPath("Bastion"), "/projekt/Bastion/aktivitet");
+  assert.equal(
+    projectActivityPath("Repo med mellanslag"),
+    "/projekt/Repo%20med%20mellanslag/aktivitet"
   );
 });
