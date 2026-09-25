@@ -3,11 +3,7 @@
   const generated = document.querySelector("#operations-generated");
   const providerGrid = document.querySelector("#operations-provider-grid");
   const capabilitySummary = document.querySelector("#operations-capability-summary");
-  const activityTotal = document.querySelector("#operations-activity-total");
-  const activityCopy = document.querySelector("#operations-activity-copy");
   const capabilitiesTarget = document.querySelector("#operations-capabilities");
-  const activityTarget = document.querySelector("#operations-activity-list");
-  const coverageTarget = document.querySelector("#operations-coverage");
   const errorState = document.querySelector("#operations-error");
 
   let requestSerial = 0;
@@ -52,14 +48,18 @@
 
   function freshnessLabel(value) {
     return {
-      fresh: "Fresh",
-      stale: "Stale",
+      fresh: "Aktuell",
+      stale: "Inaktuell",
       unknown: "Okänd"
     }[value] || "Okänd";
   }
 
   function providerLabel(value) {
-    return value === "github" ? "GitHub" : value === "cloudflare" ? "Cloudflare" : String(value || "Provider");
+    return value === "github"
+      ? "GitHub"
+      : value === "cloudflare"
+        ? "Cloudflare"
+        : String(value || "Provider");
   }
 
   function statusBadge(value) {
@@ -104,7 +104,7 @@
     const available = items.filter(item => item.status === "available").length;
     const stale = items.filter(item => item.status === "stale").length;
     capabilitySummary.textContent = available + " / " + items.length + " tillgängliga" +
-      (stale ? " · " + stale + " stale" : "");
+      (stale ? " · " + stale + " inaktuella" : "");
 
     for (const provider of ["github", "cloudflare"]) {
       const rows = items.filter(item => item.provider === provider);
@@ -139,17 +139,9 @@
 
         const freshness = document.createElement("span");
         freshness.className = "operations-freshness";
-        freshness.textContent = freshnessLabel(item.freshness) + " · " + formatDate(item.lastSuccessAt);
+        freshness.textContent =
+          freshnessLabel(item.freshness) + " · " + formatDate(item.lastSuccessAt);
         state.appendChild(freshness);
-
-        if (item.scopeCoverage) {
-          const scope = document.createElement("span");
-          scope.className = "operations-scope";
-          scope.textContent =
-            "Scope " + Number(item.scopeCoverage.available || 0) +
-            "/" + Number(item.scopeCoverage.expected || 0) + " available";
-          state.appendChild(scope);
-        }
 
         row.append(main, state);
         list.appendChild(row);
@@ -167,71 +159,6 @@
     }
   }
 
-  function renderActivity(activity) {
-    clear(activityTarget);
-    clear(coverageTarget);
-
-    if (!activity?.available) {
-      activityTotal.textContent = "Ej tillgänglig";
-      activityCopy.textContent = "Skvallerbyttan har ingen tillgänglig aggregerad activity-state.";
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "Ingen observerad aktivitetsdata tillgänglig.";
-      activityTarget.appendChild(empty);
-      return;
-    }
-
-    activityTotal.textContent = Number(activity.observedTotal || 0) + " observerade events";
-    activityCopy.textContent =
-      "Summering för de senaste " + Number(activity.period?.days || 1) +
-      " dygnen. Perioden deklareras inte som komplett.";
-
-    for (const item of safeArray(activity.byCapability)) {
-      const row = document.createElement("div");
-      row.className = "operations-activity-row";
-
-      const title = document.createElement("div");
-      const strong = document.createElement("strong");
-      strong.textContent = item.capability || "Capability";
-      const provider = document.createElement("span");
-      provider.textContent = providerLabel(item.provider);
-      title.append(strong, provider);
-
-      const count = document.createElement("span");
-      count.className = "operations-activity-count";
-      count.textContent = String(Number(item.observedCount || 0));
-
-      row.append(title, count);
-      activityTarget.appendChild(row);
-    }
-
-    if (!activityTarget.children.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "Inga events observerade under perioden.";
-      activityTarget.appendChild(empty);
-    }
-
-    const coverageRows = safeArray(activity.coverage);
-    if (coverageRows.length) {
-      const heading = document.createElement("h3");
-      heading.textContent = "Täckning";
-      coverageTarget.appendChild(heading);
-
-      for (const item of coverageRows) {
-        const line = document.createElement("div");
-        line.className = "operations-coverage-row";
-        line.textContent =
-          providerLabel(item.provider) + " · " +
-          String(item.capability || "") + " · " +
-          String(item.source || "") + " · " +
-          String(item.coverage || "unknown") + " · " +
-          Number(item.observedCount || 0) + " observerade";
-        coverageTarget.appendChild(line);
-      }
-    }
-  }
-
   function render(payload) {
     status.textContent = "Observerad state";
     generated.textContent = payload.generatedAt
@@ -241,7 +168,6 @@
 
     renderProviders(payload.providers);
     renderCapabilities(payload.capabilities);
-    renderActivity(payload.activity);
   }
 
   async function loadOperations() {
@@ -270,11 +196,7 @@
       generated.textContent = "";
       clear(providerGrid);
       clear(capabilitiesTarget);
-      clear(activityTarget);
-      clear(coverageTarget);
       capabilitySummary.textContent = "—";
-      activityTotal.textContent = "—";
-      activityCopy.textContent = "Ingen operativ state visas när källan inte kan läsas.";
       errorState.hidden = false;
       console.error(error);
     }
