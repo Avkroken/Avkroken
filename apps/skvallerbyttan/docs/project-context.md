@@ -99,6 +99,8 @@ För operativ drift gäller dessutom:
 
 ## Data
 
+Produktionsbindingen `STATS_DB` ska peka på en D1-databas skapad med Cloudflare-jurisdiction `eu`. Jurisdiction är providerstate som sätts vid databasskapande och ska verifieras live vid replacement/cutover.
+
 D1 används för persistent state, cache, detailed events och reconciliation state. `0004_cloudflare_events.sql` innehåller Cloudflare-eventledgern, `0005_observations.sql` introducerar capability observations och generic Activity ledger, och `0006_capability_scope_observations.sql` lägger till repository-scopeade capability observations, scope coverage samt provider-accepterad permissionmetadata. Produktionsdeploy ska applicera samtliga väntande versionerade D1-migrationer via Wrangler före Worker-deploy.
 
 Workers Analytics Engine dataset `skvallerbyttan_observability` tar read telemetry med consumer-attribution.

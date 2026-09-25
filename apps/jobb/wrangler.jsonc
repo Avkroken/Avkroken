@@ -41,7 +41,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "jobb",
+      "database_name": "jobb-eu",
+      "database_id": "58219fde-4782-4b28-acb3-186df203f2f7",
       "migrations_dir": "migrations"
     }
   ],
