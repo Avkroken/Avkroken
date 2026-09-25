@@ -55,6 +55,7 @@ test("normalizes a published release to the minimal public Changelog contract", 
     name: "v0.24.1",
     publishedAt: "2026-09-07T04:33:03Z",
     url: "https://github.com/Avkroken/Bastion/releases/tag/v0.24.1",
+    categories: ["releases"],
     prerelease: false
   });
 
@@ -62,6 +63,39 @@ test("normalizes a published release to the minimal public Changelog contract", 
   for (const forbidden of ["body", "author", "assets", "target_commitish", "must-not-be-copied"]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
+});
+
+test("derives changelog categories only from recognized release section headings", () => {
+  const item = normalizePublicRelease(project(), release({
+    body: [
+      "## 0.25.0",
+      "### Features",
+      "* add a feature",
+      "### Bug Fixes",
+      "* fix a bug",
+      "### Security",
+      "* harden a boundary",
+      "### Documentation",
+      "* update docs",
+      "## Dependency updates",
+      "* chore(deps): update dependency"
+    ].join("\n")
+  }));
+
+  assert.deepEqual(
+    item.categories,
+    ["releases", "features", "fixes", "security", "documentation"]
+  );
+  assert.equal(JSON.stringify(item).includes("add a feature"), false);
+  assert.equal(JSON.stringify(item).includes("Dependency updates"), false);
+});
+
+test("does not infer categories from arbitrary release prose", () => {
+  const item = normalizePublicRelease(project(), release({
+    body: "This release mentions a feature and a security fix without canonical section headings."
+  }));
+
+  assert.deepEqual(item.categories, ["releases"]);
 });
 
 test("rejects drafts, malformed source projects and non-canonical release URLs", () => {
