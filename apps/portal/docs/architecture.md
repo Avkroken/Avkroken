@@ -52,7 +52,7 @@ GET /api/projects
 Projektmodellen skiljer mellan canonical källdata och härledd presentation:
 
 - `source.provider`, `source.repository` och `source.ref` pekar på källan;
-- `portalUrl`, `documentation`, `issues`, `discussions`, `releases`, canonical repository-Wiki och intern `wikiPortalUrl` där tillgängligt är navigationslänkar;
+- `portalUrl`, `documentation`, `issues`, `releases`, `builds`, `discussions`, canonical repository-Wiki samt interna `wikiPortalUrl`, `issuesPortalUrl`, `releasesPortalUrl` och `buildsPortalUrl` där tillgängligt är navigationslänkar;
 - `portalPublished` är en härledd kompatibilitetsflagga för tidigare `/api/sites`;
 - `independentProduct` markerar Politiker, Klarspråk och Produkter så Portal-skalet inte används som deras produktidentitet.
 
@@ -91,7 +91,7 @@ client project catalog
        +--> /projekt/:slug
 ```
 
-När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues- och Releases-routes. Själva detaljsidan hämtar inte issue-, release- eller CI-data från GitHub.
+När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues-, Releases- och Builds/CI-routes. Själva detaljsidan gör ingen separat providerrequest för dessa vyer.
 
 
 ### Changelog / Releases
@@ -148,6 +148,47 @@ repository README/docs
 `/projekt/:slug/wiki` läser Portalens befintliga publika projekt- och dokumentationskataloger. Browsern gör inga direkta GitHub API-anrop från Wiki-vyn. Original-Wikin finns alltid som canonical presentationslänk.
 
 Wiki-publicering är repository-specifik: endast projekt med `has_wiki = true` får `wikiPortalUrl`. Monorepo-appar är separata projektidentiteter och får inte ärva source-repositoryts Wiki automatiskt.
+
+### Repository Builds / CI
+
+Builds/CI är repositoryspecifik operativ state och går därför genom Skvallerbyttans befintliga observationsgräns i stället för en parallell Actions-klient i Portalen.
+
+```text
+public Portal project catalog
+       |
+       +--> repository project only
+                 |
+                 v
+GET /api/builds?project=:slug
+                 |
+                 v
+SKVALLERBYTTAN_OBSERVATIONS
+                 |
+                 v
+PortalObservationsService.getPublicRepositoryCi(repo)
+                 |
+                 v
+Skvallerbyttan D1 source cache: overview
+                 |
+       +---------+----------+
+       |                    |
+       v                    v
+public repo check       Actions summary
+visibility=public       sampled metrics
+archived=false
+       |                    |
+       +---------+----------+
+                 v
+public-safe CI snapshot
+```
+
+Portalen validerar först aktuell publik project-state. Skvallerbyttan gör därefter defense in depth mot den cacheade repositoryraden och kräver `visibility = public` och `archived != true`.
+
+RPC:n gör ingen live GitHub-request. Den läser den canonical `overview` source-cachen och returnerar endast samplebaserad Actions-summary samt cache freshness. Actor, accepted/required permissions, providerfel, event breakdown och rå runpayload ingår inte.
+
+Cacheåldern jämförs mot sex timmar, samma horisont som den breda overview-cachen. En äldre eller invaliderad post får returneras som `stale`; Portalens UI visar detta explicit i stället för att forcera providerrefresh.
+
+Monorepo-appar får `builds = null` och `buildsPortalUrl = null` och kan inte ärva source-repositoryts CI-status som appdata.
 
 ### Operativ providerstate
 
@@ -221,6 +262,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt` — projektöversikt.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:slug/issues` — sanerade publika GitHub Issues för repositoryprojekt; PR-poster filtreras bort.
+- `/projekt/:slug/builds` — sampled, cachead Actions-summary från Skvallerbyttan för repositoryprojekt.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
 - `/projekt/:slug/releases` — Portal-presentation av officiella GitHub Releases för publicerade repositoryprojekt.
@@ -272,6 +314,12 @@ Projektadaptern och dokumentationsadaptern använder samma providerfamilj men ol
 Klientresponsen kräver revalidering. Workers Cache API får en separat response-kopia med `Cache-Control: public, max-age=300`; en cache-hit skrivs tillbaka till klienten med revalideringsheader. `stale-while-revalidate` används inte i Cache API-lagret eftersom Workers Cache API inte stöder direktiven.
 
 `/api/sites` härleds från samma normaliserade projektmodell.
+
+### Repository CI cache
+
+Portalens Builds/CI-respons lagras inte i Portalens Cache API och använder `Cache-Control: no-store`. Underlaget kommer i stället från Skvallerbyttans D1 source cache `overview`. RPC:n bär `sourceRefreshedAt` samt `fresh|stale|unknown` till klienten.
+
+Ingen Portal-sidvisning startar en Actions-providerrefresh.
 
 ### Dokumentation
 
