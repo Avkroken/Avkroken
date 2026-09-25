@@ -5,6 +5,7 @@ import {
   isPortalDocumentRoute,
   normalizePortalPath,
   projectPath,
+  projectReleasesPath,
   protectedRedirectForPath,
   wikiPath
 } from "../src/portal-routes.mjs";
@@ -87,4 +88,14 @@ test("builds stable Wiki presentation URLs", () => {
   assert.equal(wikiPath(), "/projekt");
   assert.equal(wikiPath("Bastion"), "/projekt/Bastion/wiki");
   assert.equal(wikiPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag/wiki");
+});
+
+
+test("builds stable project release URLs", () => {
+  assert.equal(projectReleasesPath(), "/projekt");
+  assert.equal(projectReleasesPath("Bastion"), "/projekt/Bastion/releases");
+  assert.equal(
+    projectReleasesPath("Repo med mellanslag"),
+    "/projekt/Repo%20med%20mellanslag/releases"
+  );
 });
