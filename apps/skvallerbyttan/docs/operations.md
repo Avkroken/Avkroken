@@ -30,6 +30,7 @@ Wrangler definierar:
 - `OBSERVABILITY` — Analytics Engine dataset `skvallerbyttan_observability`
 - `AVKROKEN_PORTAL_DOCS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `DocsInvalidationService`
 - `AVKROKEN_OPERATIONS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `OperationalHeartbeatService`
+- exported named entrypoint `PortalObservationsService` — inbound read-only RPC för Portalens sanerade Drift & insyn-snapshot; ingen separat secret eller publik HTTP-route
 - cron `0 */6 * * *` för reconciliation
 - cron `*/15 * * * *` för operativ heartbeat och global GitHub/Cloudflare capability-reconciliation
 - custom domain `skvallerbyttan.denied.se`
@@ -138,6 +139,20 @@ För Avkroken-portalen används Service Binding-konfigurationen:
 ```
 
 service target `avkroken` måste exponera den deklarerade entrypointen innan en Skvallerbyttan-version med bindingen kan fungera. Bindingen är account-intern och använder inte GitHub- eller Cloudflare-webhooksecrets.
+
+### Portal Drift & insyn RPC
+
+Skvallerbyttan exporterar `PortalObservationsService` från huvud-entrypointen. Avkroken-portalen deklarerar en separat Service Binding med target `skvallerbyttan` och denna named entrypoint.
+
+RPC:n:
+
+- använder inte `SKVALLERBYTTAN_READ_API_TOKEN`, OAuth-session eller publik HTTP;
+- returnerar endast sanerad provider/capability/activity-state;
+- exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata eller Activity recent-eventdetaljer;
+- gör inga provider-write-operationer;
+- markerar observerad Activity med befintlig coverage och gör inte perioden komplett.
+
+Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments.
 
 Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
 
