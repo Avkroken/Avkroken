@@ -43,9 +43,9 @@ Alla API-responser använder privata/no-store cacheheaders.
 
 ## GitHub provider auth
 
-Skvallerbyttan använder **Gamnacken**, Avkrokens canonical GitHub App, för provider-reads. `GAMNACKEN_GITHUB_APP_CLIENT_ID` kommer från en GitHub Actions-variable och provisioneras som en Worker runtime-binding tillsammans med `GAMNACKEN_GITHUB_APP_PRIVATE_KEY`. Client ID är inte hemligt, men hålls utanför versionsstyrd config så App-identiteten kan bytas utan kodändring.
+Provider-readkoden använder `GAMNACKEN_GITHUB_APP_CLIENT_ID` och `GAMNACKEN_GITHUB_APP_PRIVATE_KEY` som GitHub App-bindings. Workflow/runtime-kontraktet refererar till dessa namn; faktisk App-installation och credentialprovisionering är extern state.
 
-GitHub App client secret används inte. Worker skapar App-JWT och kortlivade installation tokens från Gamnackens credential. En separat Skvallerbyttan GitHub App ingår inte i målarkitekturen och ska pensioneras efter verifierad migrering. Providerpermissions ska följa minsta möjliga read-nivå; se [Permissions]({{ '/permissions/' | relative_url }}).
+GitHub App client secret används inte i installation-auth-flödet. Worker skapar App-JWT och kortlivade installation tokens från de konfigurerade GitHub App-bindings. Providerpermissions ska följa minsta möjliga read-nivå; se [Permissions]({{ '/permissions/' | relative_url }}).
 
 ## Cloudflare provider auth
 
@@ -91,7 +91,7 @@ Audit Log-normalisering har regressionstest för dessa gränser.
 
 ### Cloudflare
 
-`/webhooks/cloudflare/notifications` och `/webhooks/cloudflare/casb` är canonical push-ingress för Cloudflare-händelser som exponeras via dessa mekanismer. Befintliga Worker secrets återanvänds: Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och verifierar `cf-webhook-auth`; CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET` och verifierar den statiska headern `x-skvallerbyttan-casb-auth`.
+`/webhooks/cloudflare/notifications` och `/webhooks/cloudflare/casb` är runtime-endpoints för Cloudflare-händelser från dessa mekanismer; faktisk providerkonfiguration är extern state. Befintliga Worker secrets återanvänds: Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och verifierar `cf-webhook-auth`; CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET` och verifierar den statiska headern `x-skvallerbyttan-casb-auth`.
 
 Godtyckliga webhookpayloads lagras inte. Endast explicit normaliserad metadata går till D1.
 
