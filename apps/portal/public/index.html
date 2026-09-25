@@ -213,6 +213,74 @@
     </section>
 
     <section
+      class="portal-route-panel wiki-view"
+      id="wiki-view"
+      data-route-panel="wiki"
+      aria-labelledby="wiki-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="wiki-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Wiki</span>
+      </nav>
+
+      <div class="portal-page-head">
+        <div class="portal-kicker">WIKI</div>
+        <h1 id="wiki-title">Läser in Wiki…</h1>
+        <p id="wiki-description">
+          Wiki är ett navigations- och presentationslager ovanpå repositoryägd dokumentation.
+        </p>
+      </div>
+
+      <div class="wiki-layout">
+        <aside class="wiki-navigation" aria-labelledby="wiki-navigation-title">
+          <div class="portal-meta-label">NAVIGATION</div>
+          <h2 id="wiki-navigation-title">Wiki</h2>
+          <nav id="wiki-navigation-links" aria-label="Wiki-navigation"></nav>
+        </aside>
+
+        <article class="wiki-content" aria-live="polite">
+          <div class="wiki-content-head">
+            <div>
+              <div class="portal-meta-label">PRESENTATION</div>
+              <h2>Dokumentation</h2>
+            </div>
+            <a
+              class="portal-button"
+              id="wiki-original-link"
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              hidden
+            >Visa original-Wiki</a>
+          </div>
+
+          <p class="wiki-note">
+            Den här ytan återger samma informationsmodell som repositoryts automatiskt genererade Wiki.
+            Teknisk current-state ligger kvar i README och versionsstyrda docs.
+          </p>
+
+          <div class="wiki-doc-list" id="wiki-doc-list">
+            <div class="empty">Läser in Wiki-navigation…</div>
+          </div>
+
+          <section class="wiki-collaboration" aria-labelledby="wiki-collaboration-title">
+            <h3 id="wiki-collaboration-title">Samarbete</h3>
+            <div class="project-detail-actions" id="wiki-collaboration-links"></div>
+          </section>
+
+          <div class="portal-placeholder" id="wiki-error" hidden>
+            <strong>Wiki kunde inte visas.</strong>
+            Projektet saknar publik Wiki eller dokumentationskatalogen är tillfälligt otillgänglig.
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section
       class="portal-route-panel docs-view"
       id="docs-view"
       data-route-panel="docs"
@@ -429,5 +497,6 @@
   <script src="/app.js" defer></script>
   <script src="/shell.js" defer></script>
   <script src="/docs.js" defer></script>
+  <script src="/wiki.js" defer></script>
 </body>
 </html>
