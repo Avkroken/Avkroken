@@ -214,6 +214,55 @@
 
     <section
       class="portal-route-panel"
+      id="project-issues-view"
+      data-route-panel="project-issues"
+      aria-labelledby="project-issues-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="project-issues-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Issues</span>
+      </nav>
+
+      <div class="portal-page-head">
+        <div class="portal-kicker">ISSUES</div>
+        <h1 id="project-issues-title">Läser in Issues…</h1>
+        <p id="project-issues-description">
+          Öppna publika GitHub Issues för det här repositoryprojektet.
+        </p>
+      </div>
+
+      <div class="changelog-meta">
+        <span id="project-issues-status" aria-live="polite">Läser Issues…</span>
+        <span id="project-issues-generated"></span>
+      </div>
+
+      <div class="project-detail-actions">
+        <a
+          class="portal-button"
+          id="project-issues-original"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >Visa alla Issues på GitHub</a>
+      </div>
+
+      <div class="project-issues-list" id="project-issues-list">
+        <div class="empty">Läser öppna Issues…</div>
+      </div>
+
+      <div class="portal-placeholder" id="project-issues-error" hidden>
+        <strong>Issues kunde inte visas.</strong>
+        Projektet saknar en publik repository-Issues-yta eller GitHub-källan är tillfälligt otillgänglig.
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
       id="project-releases-view"
       data-route-panel="project-releases"
       aria-labelledby="project-releases-title"
@@ -629,5 +678,6 @@
   <script src="/operations.js" defer></script>
   <script src="/changelog.js" defer></script>
   <script src="/project-releases.js" defer></script>
+  <script src="/project-issues.js" defer></script>
 </body>
 </html>
