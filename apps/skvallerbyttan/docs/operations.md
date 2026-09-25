@@ -147,10 +147,10 @@ Skvallerbyttan exporterar `PortalObservationsService` från huvud-entrypointen. 
 RPC:n:
 
 - använder inte `SKVALLERBYTTAN_READ_API_TOKEN`, OAuth-session eller publik HTTP;
-- returnerar endast sanerad provider/capability/activity-state;
-- exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata eller Activity recent-eventdetaljer;
+- returnerar endast public-safe provider/capability-status;
+- exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata, scope coverage/repositoryantal eller Activity/eventvolym;
 - gör inga provider-write-operationer;
-- markerar observerad Activity med befintlig coverage och gör inte perioden komplett.
+- lämnar detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API.
 
 Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments.
 
