@@ -280,11 +280,16 @@ async function getPublicProjects(env, ctx) {
   const cache = caches.default;
   const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v1");
   const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+
+  if (cached) {
+    const clientResponse = new Response(cached.body, cached);
+    clientResponse.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+    return clientResponse;
+  }
 
   try {
     const projects = await loadPublicProjects(env);
-    const response = new Response(JSON.stringify({
+    const body = JSON.stringify({
       source: {
         provider: "github",
         scope: "Avkroken",
@@ -292,16 +297,22 @@ async function getPublicProjects(env, ctx) {
       },
       generatedAt: new Date().toISOString(),
       projects
-    }), {
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "public, max-age=0, must-revalidate",
-        "Cloudflare-CDN-Cache-Control": "public, max-age=" + CACHE_SECONDS
-      }
     });
 
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
-    return response;
+    const cachedResponse = new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=" + CACHE_SECONDS
+      }
+    });
+    ctx.waitUntil(cache.put(cacheKey, cachedResponse));
+
+    return new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    });
   } catch {
     return new Response(JSON.stringify({ error: "github_unavailable" }), {
       status: 502,
