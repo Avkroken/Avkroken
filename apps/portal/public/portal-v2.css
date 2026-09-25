@@ -1340,6 +1340,189 @@ a.portal-product-card:hover {
   color: var(--ak-text-secondary);
 }
 
+.home-control {
+  scroll-margin-top: 92px;
+}
+
+.home-dashboard-freshness {
+  color: var(--ak-text-tertiary);
+  font: 650 .72rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-align: right;
+}
+
+.home-control-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ak-space-4);
+  padding-top: var(--ak-space-5);
+}
+
+.home-control-card {
+  display: block;
+  min-height: 154px;
+  transition: border-color .16s ease, transform .16s ease, background .16s ease;
+}
+
+.home-control-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--ak-accent-default) 45%, var(--ak-border-subtle));
+  background:
+    linear-gradient(155deg, rgb(208 174 103 / 5%), transparent 58%),
+    var(--ak-surface-raised);
+}
+
+.home-control-card h3 {
+  margin-bottom: var(--ak-space-2);
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+  letter-spacing: -.035em;
+}
+
+.home-control-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ak-space-4);
+  margin-top: var(--ak-space-4);
+}
+
+.home-control-panel {
+  min-width: 0;
+  padding: var(--ak-space-5);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-3);
+  background:
+    linear-gradient(155deg, rgb(255 255 255 / 2.2%), transparent 58%),
+    var(--ak-surface-default);
+}
+
+.home-control-panel-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--ak-space-4);
+  padding-bottom: var(--ak-space-4);
+  border-bottom: 1px solid var(--ak-border-subtle);
+}
+
+.home-control-panel-head h3 {
+  margin: var(--ak-space-2) 0 0;
+  font-size: 1.08rem;
+}
+
+.home-control-panel-head > a {
+  flex: 0 0 auto;
+  color: var(--ak-text-secondary);
+  font-size: .78rem;
+  text-decoration: none;
+}
+
+.home-control-panel-head > a:hover {
+  color: var(--ak-accent-strong);
+}
+
+.home-dashboard-list {
+  display: grid;
+  gap: var(--ak-space-2);
+  padding-top: var(--ak-space-3);
+}
+
+.home-dashboard-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-space-4);
+  padding: var(--ak-space-3);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-2);
+  background: var(--ak-surface-sunken);
+}
+
+.home-dashboard-row-main {
+  min-width: 0;
+  display: grid;
+  gap: var(--ak-space-1);
+}
+
+.home-dashboard-row-main strong,
+.home-dashboard-row-main > a {
+  color: var(--ak-text-primary);
+  overflow-wrap: anywhere;
+  font-size: .88rem;
+}
+
+.home-dashboard-row-main > a {
+  width: fit-content;
+  text-decoration: none;
+}
+
+.home-dashboard-row-main > a:hover {
+  color: var(--ak-accent-strong);
+}
+
+.home-dashboard-row-main > span {
+  color: var(--ak-text-tertiary);
+  overflow-wrap: anywhere;
+  font: .7rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.home-dashboard-row-state {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: end;
+  gap: var(--ak-space-1);
+  color: var(--ak-text-tertiary);
+  text-align: right;
+  font-size: .72rem;
+}
+
+.home-dashboard-empty {
+  display: grid;
+  gap: var(--ak-space-1);
+  padding: var(--ak-space-4);
+  border: 1px dashed var(--ak-border-default);
+  border-radius: var(--ak-radius-2);
+  color: var(--ak-text-secondary);
+  background: color-mix(in srgb, var(--ak-surface-sunken) 78%, transparent);
+  font-size: .84rem;
+  line-height: 1.55;
+}
+
+.home-dashboard-empty strong {
+  color: var(--ak-text-primary);
+}
+
+@media (max-width: 1060px) {
+  .home-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 820px) {
+  .home-dashboard-freshness {
+    text-align: left;
+  }
+
+  .home-control-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 590px) {
+  .home-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-dashboard-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-dashboard-row-state {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
 @media (max-width: 1060px) {
   .portal-header-inner {
     grid-template-columns: auto 1fr auto;
