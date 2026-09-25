@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot projektspecifik Builds / CI-integration: 2026-09-25.
+Senast verifierad mot publik Activity-integration: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -49,7 +49,8 @@ Worker-koden innehåller idag:
 - Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt;
 - projektspecifik Releases-vy för repositoryprojekt via samma public-only releaseadapter;
 - projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering;
-- projektspecifik Builds / CI-vy för repositoryprojekt via Skvallerbyttans cacheade public-safe Actions-summary.
+- projektspecifik Builds / CI-vy för repositoryprojekt via Skvallerbyttans cacheade public-safe Actions-summary;
+- global och projektspecifik publik Activity från GitHubs public organization events, filtrerad mot live-publicerade fristående repositoryprojekt.
 
 ## Publik projektmodell
 
@@ -113,9 +114,9 @@ Detaljvyn visar:
 - dokumentation i Portalen;
 - publik tjänste-URL när den finns;
 - canonical länkar till repository, Wiki där tillgängligt och Discussions;
-- intern Issues-, Releases- och Builds / CI-navigation för repositoryprojekt.
+- intern Issues-, Releases-, Builds / CI- och Activity-navigation för repositoryprojekt där respektive publik datagräns är säker.
 
-Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService`; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases eller CI som appdata.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService`; Portalen gör ingen separat Actions-providerread. `/projekt/:slug/aktivitet` läser samma sanerade public organization-eventsnapshot som globala `/aktivitet`, filtrerad till projektet. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata; repositoryprojektet `Avkroken` får ingen Activity-route eftersom repositoryt är mixed-scope.
 
 Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggregation ska fortsatt använda rätt adapter/Skvallerbyttan där modellen passar.
 
@@ -245,6 +246,60 @@ Felmodell i Portal:
 - RPC-/projektkatalogfel: `502 project_builds_unavailable`;
 - giltigt projekt med ej observerad/unavailable CI: `200 status=available` med `ci.available = false`.
 
+## Publik Activity
+
+### `/api/activity[?project=...]`
+
+Activity är separerad från Changelog. Changelog är kuraterad releasehistorik; Activity är en råare, men fortfarande sanerad, publik repositoryeventström.
+
+Datakälla:
+
+- `GET /orgs/Avkroken/events?per_page=100` — GitHubs **public organization events**;
+- live `type=public` repositorylistning;
+- Portalens vanliga repositorypolicy;
+- extra mixed-scope-exkludering för `Avkroken/Avkroken`.
+
+`activity-source.mjs` accepterar endast:
+
+- `PushEvent`;
+- `PullRequestEvent`;
+- `IssuesEvent`;
+- `ReleaseEvent`;
+- `CreateEvent`;
+- `DeleteEvent`.
+
+Public modell innehåller:
+
+- event-ID;
+- normaliserad kind;
+- project slug/name/Portal-URL;
+- repository;
+- generell summary;
+- timestamp;
+- canonical repository/PR/Issue/Release URL.
+
+Följande kopieras inte:
+
+- actor/login/avatar;
+- branch/tag/ref;
+- commit SHA/before;
+- commitmeddelanden;
+- PR/Issue-titlar;
+- kommentarinnehåll;
+- rå eventpayload.
+
+`event.public` måste vara `true`, och PR/Issue/Release-URL måste vara canonical för exakt repository.
+
+Providerbudgeten är max 100 public org-events och max 40 returnerade Activity-poster. Max 50 säkra repositoryprojekt tas med. Överskrids repo-budgeten blir coverage `partial`, annars `bounded`. Källan är uttryckligen `realtime = false`; GitHub dokumenterar Events API-latency på cirka 30 sekunder–6 timmar.
+
+Snapshoten lagras inte i Cache API. Samtidiga Activity-builds i samma isolate delar endast ett in-flight Promise.
+
+Global `/aktivitet` visar alla accepterade poster. `/projekt/:slug/aktivitet` använder samma snapshot men kräver att slugen tillhör ett eligible fristående repositoryprojekt.
+
+`Avkroken/Avkroken` exkluderas från Activity eftersom den publika repositoryeventpayloaden inte kan avgränsas från skyddade appytor. Därmed visas inte Portal-/Jobb-/andra monorepo-events i den publika Activity-strömmen.
+
+Events API-kontraktet innehåller inte WorkflowRunEvent eller DeploymentEvent. Workflow/CI ligger i Builds-vyn; deploy-event i global Activity är fortsatt ett gap.
+
 ## Global sök
 
 ### `/api/search?q=...`
@@ -335,10 +390,9 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- provider-backed projektdetaljdata för aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
-- aktivitetsström;
+- workflow/deploy-händelser i global Activity utöver GitHubs Events API-kontrakt;
 - releaseautomation;
 - slutlig end-to-end accessibility-/browserverifiering;
 - produktionsdeployment och provider live-verifiering.
