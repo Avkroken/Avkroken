@@ -150,7 +150,7 @@ RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort
 - GitHub App installation-/permissionmetadata;
 - Activity `recent` med actor/resource/repository/action-detaljer.
 
-Utåt återstår providerstatus, capability status/dataState/freshness/last-success/scope coverage samt aggregerad observerad Activity. Coverage behålls explicit och perioder markeras inte kompletta.
+Utåt återstår endast providerstatus samt capability status/dataState/freshness/last-success. Scope coverage/repositoryantal och Activity/eventvolym stannar i Skvallerbyttans skyddade dashboard/API eftersom de är organisationsomfattande och inte kan bevisas public-only.
 
 Den här gränsen undviker dubbel providerlogik och bevarar Skvallerbyttans read-only säkerhetsmodell.
 
@@ -252,12 +252,12 @@ Driftvyn konsumerar `GET /api/operations`, som i sin tur anropar `PortalObservat
 Vyn:
 
 - visar GitHub/Cloudflare providerstatus utan auth-/permissiondetaljer;
-- visar capability status, data state, freshness, last success och scope coverage;
-- visar 24h observerad aktivitet aggregerad per capability;
-- visar Activity coverage/source utan recent-eventdetaljer;
-- skiljer observerad aktivitet från komplett aktivitet genom att bevara coverage och `periodComplete = false`;
+- visar capability status, data state, freshness och last success;
+- visar inte repository-scope counts eller Activity/eventvolym i den publika ytan;
 - returnerar/visar degraded state om RPC saknas eller faller;
 - kräver ingen provider-write och ingen ny credential.
+
+Detailed Activity, scope coverage och repositoryspecifik Insyn finns fortsatt endast bakom Skvallerbyttans autentiserade dashboard/API-gräns.
 
 Heartbeat/watchdog är fortsatt ett separat livenesskontrakt. Heartbeat får inte tolkas som ersättning för capability/provider health.
 
