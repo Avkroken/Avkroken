@@ -1,11 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPortalRepositoryCiSnapshot } from "../src/portal-ci-model";
+import {
+  buildPortalRepositoryCiSnapshot,
+  publicCiRepository,
+  type PortalCiRepositoryObservation,
+} from "../src/portal-ci-model";
 
-function actions(overrides: Record<string, unknown> = {}) {
+function observation(overrides: Partial<PortalCiRepositoryObservation> = {}): PortalCiRepositoryObservation {
   return {
-    available: true,
-    summary: {
+    fullName: "Avkroken/Bastion",
+    visibility: "public",
+    archived: false,
+    actions: {
       totalRuns: 321,
       sampledRuns: 100,
       completedSample: 97,
@@ -22,112 +28,128 @@ function actions(overrides: Record<string, unknown> = {}) {
       p95DurationMs: 300_000,
       mttrMedianMs: 600_000,
       mttrSampleCount: 3,
+      actor: "SECRET_ACTOR",
+      headSha: "SECRET_SHA",
     },
-    runs: [
-      {
-        id: 123,
-        name: "CI",
-        display_title: "feat: example",
-        event: "push",
-        status: "completed",
-        conclusion: "success",
-        actor: { login: "SECRET_ACTOR" },
-        created_at: "2026-09-25T16:10:00Z",
-        updated_at: "2026-09-25T16:12:00Z",
-        html_url: "https://github.com/Avkroken/Bastion/actions/runs/123",
-        head_sha: "SECRET_SHA",
-        head_branch: "SECRET_BRANCH",
-      },
-      {
-        id: 124,
-        name: "CI",
-        display_title: "invalid canonical URL",
-        event: "push",
-        status: "completed",
-        conclusion: "failure",
-        created_at: "2026-09-25T15:10:00Z",
-        updated_at: "2026-09-25T15:12:00Z",
-        html_url: "https://github.com/Avkroken/Other/actions/runs/124",
-      },
-    ],
-    status: 200,
-    reason: "SECRET_PROVIDER_REASON",
-    acceptedPermissions: "SECRET_ACCEPTED_PERMISSIONS",
+    capabilities: {
+      actions: true,
+      permissionDetail: "SECRET_PERMISSION",
+    },
+    security: {
+      secret: "SECRET_SECURITY",
+    },
     ...overrides,
   };
 }
 
-test("Portal CI snapshot exposes only public-safe summary and canonical run fields", () => {
+test("Portal CI selector requires a public non-archived cached repository row", () => {
+  const rows = [
+    observation({ fullName: "Avkroken/Private", visibility: "private" }),
+    observation({ fullName: "Avkroken/Archived", archived: true }),
+    observation(),
+  ];
+
+  assert.equal(publicCiRepository(rows, "Avkroken/Private"), null);
+  assert.equal(publicCiRepository(rows, "Avkroken/Archived"), null);
+  assert.equal(publicCiRepository(rows, "Other/Bastion"), null);
+  assert.equal(publicCiRepository(rows, "Avkroken/Bastion")?.fullName, "Avkroken/Bastion");
+});
+
+test("Portal CI snapshot exposes only public-safe sampled summary fields", () => {
   const snapshot = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
     repository: "Avkroken/Bastion",
-    actions: actions() as any,
+    observation: observation(),
+    sourceRefreshedAt: "2026-09-25T16:10:00Z",
+    freshness: "fresh",
   });
 
   assert.equal(snapshot.schemaVersion, 1);
   assert.equal(snapshot.repository, "Avkroken/Bastion");
   assert.equal(snapshot.available, true);
   assert.equal(snapshot.status, "available");
-  assert.equal(snapshot.coverage.providerSampleLimit, 100);
-  assert.equal(snapshot.coverage.recentRunsLimit, 12);
-  assert.equal(snapshot.summary?.totalRuns, 321);
-  assert.equal(snapshot.summary?.failedLast7d, 4);
-  assert.equal(snapshot.recentRuns.length, 1);
-  assert.deepEqual(snapshot.recentRuns[0], {
-    id: 123,
-    name: "CI",
-    title: "feat: example",
-    event: "push",
-    status: "completed",
-    conclusion: "success",
-    createdAt: "2026-09-25T16:10:00Z",
-    updatedAt: "2026-09-25T16:12:00Z",
-    url: "https://github.com/Avkroken/Bastion/actions/runs/123",
+  assert.equal(snapshot.freshness, "fresh");
+  assert.equal(snapshot.sourceRefreshedAt, "2026-09-25T16:10:00Z");
+  assert.deepEqual(snapshot.coverage, {
+    sampledRuns: 100,
+    totalRuns: 321,
+    sampleLimit: 100,
   });
+  assert.equal(snapshot.summary?.failedLast24h, 1);
+  assert.equal(snapshot.summary?.failedLast7d, 4);
+  assert.equal(snapshot.summary?.passRate, 91 / 95);
+  assert.equal(snapshot.summary?.medianDurationMs, 90_000);
+  assert.equal(snapshot.summary?.mttrMedianMs, 600_000);
 
   const serialized = JSON.stringify(snapshot);
   for (const forbidden of [
     "SECRET_ACTOR",
     "SECRET_SHA",
-    "SECRET_BRANCH",
-    "SECRET_PROVIDER_REASON",
-    "SECRET_ACCEPTED_PERMISSIONS",
-    "acceptedPermissions",
-    "actor",
-    "head_sha",
-    "head_branch",
+    "SECRET_PERMISSION",
+    "SECRET_SECURITY",
     "eventCounts",
+    "capabilities",
+    "visibility",
+    "archived",
+    "security",
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
 });
 
-test("Portal CI snapshot does not expose provider failure details", () => {
+test("Portal CI snapshot reports stale state without hiding the cached sample", () => {
   const snapshot = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
     repository: "Avkroken/Bastion",
-    actions: actions({
-      available: false,
-      summary: null,
-      runs: [],
-      status: 403,
-      reason: "SECRET_DENIED_REASON",
-      acceptedPermissions: "SECRET_PERMISSION",
-    }) as any,
+    observation: observation(),
+    sourceRefreshedAt: "2026-09-25T08:00:00Z",
+    freshness: "stale",
   });
 
-  assert.equal(snapshot.available, false);
-  assert.equal(snapshot.status, "unavailable");
-  assert.equal(snapshot.summary, null);
-  assert.deepEqual(snapshot.recentRuns, []);
-  assert.equal(JSON.stringify(snapshot).includes("SECRET_DENIED_REASON"), false);
-  assert.equal(JSON.stringify(snapshot).includes("SECRET_PERMISSION"), false);
+  assert.equal(snapshot.available, true);
+  assert.equal(snapshot.status, "available");
+  assert.equal(snapshot.freshness, "stale");
+  assert.equal(snapshot.summary?.sampledRuns, undefined);
+  assert.equal(snapshot.coverage?.sampledRuns, 100);
 });
 
-test("Portal CI snapshot rejects repositories outside the public Avkroken namespace", () => {
+test("Portal CI snapshot distinguishes unavailable Actions from missing observation", () => {
+  const unavailable = buildPortalRepositoryCiSnapshot({
+    generatedAt: "2026-09-25T16:15:00Z",
+    repository: "Avkroken/Bastion",
+    observation: observation({
+      actions: null,
+      capabilities: { actions: false, reason: "SECRET_PROVIDER_REASON" },
+    }),
+    sourceRefreshedAt: "2026-09-25T16:10:00Z",
+    freshness: "fresh",
+  });
+
+  assert.equal(unavailable.available, false);
+  assert.equal(unavailable.status, "unavailable");
+  assert.equal(unavailable.summary, null);
+  assert.equal(JSON.stringify(unavailable).includes("SECRET_PROVIDER_REASON"), false);
+
+  const missing = buildPortalRepositoryCiSnapshot({
+    generatedAt: "2026-09-25T16:15:00Z",
+    repository: "Avkroken/Bastion",
+    observation: null,
+    sourceRefreshedAt: null,
+    freshness: "unknown",
+  });
+
+  assert.equal(missing.available, false);
+  assert.equal(missing.status, "not_observed");
+  assert.equal(missing.freshness, "unknown");
+  assert.equal(missing.coverage, null);
+});
+
+test("Portal CI snapshot rejects repositories outside the Avkroken namespace", () => {
   assert.throws(() => buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
     repository: "Other/Private",
-    actions: actions() as any,
+    observation: observation(),
+    sourceRefreshedAt: "2026-09-25T16:10:00Z",
+    freshness: "fresh",
   }));
 });
