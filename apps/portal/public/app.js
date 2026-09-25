@@ -224,7 +224,7 @@ function renderProjectDetail() {
     detailAction("Repository", project.repository),
     detailAction("Wiki", project.wikiPortalUrl, { internal: true }),
     detailAction("Canonical source", project.sourceUrl),
-    detailAction("Issues", project.issues),
+    detailAction("Issues", project.issuesPortalUrl, { internal: true }),
     detailAction("Discussions", project.discussions),
     detailAction("Releases", project.releasesPortalUrl, { internal: true })
   ].filter(Boolean);
