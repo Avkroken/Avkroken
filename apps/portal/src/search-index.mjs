@@ -40,6 +40,21 @@ function safeSource(source) {
   };
 }
 
+export function filterSearchableDocs(projects, docsCatalog) {
+  if (!Array.isArray(projects) || !Array.isArray(docsCatalog)) return [];
+
+  const allowed = new Set(
+    projects
+      .map(project => normalized(project?.slug))
+      .filter(Boolean)
+  );
+
+  return docsCatalog.filter(entry => {
+    const key = normalized(entry?.key || entry?.name);
+    return key && allowed.has(key);
+  });
+}
+
 export function buildProjectSearchEntries(projects) {
   if (!Array.isArray(projects)) return [];
 
