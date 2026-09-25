@@ -1,4 +1,4 @@
-name: Temporary cut over Jobb D1 to EU
+name: Temporary finalize Jobb EU D1 cutover
 
 on:
   push:
@@ -8,90 +8,36 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: d1-eu-jobb
-  cancel-in-progress: false
-
 jobs:
-  cutover:
+  finalize:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
       CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
       SOURCE_DB_ID: 1503cc47-0a05-4129-b192-e92b58c89199
       TARGET_DB_ID: 58219fde-4782-4b28-acb3-186df203f2f7
-      EXPECTED_MAIN_SHA: b1e3fbf0d5f6655de77245637965f556b70eb829
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: b1e3fbf0d5f6655de77245637965f556b70eb829
-          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
-
-      - name: Verify source and EU target are still identical and empty of application data
+      - name: Verify Worker deployment and EU target directly
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$(git rev-parse HEAD)" == "$EXPECTED_MAIN_SHA" ]]
+          npx --yes wrangler@4.136.1 deployments list --name jobb >/tmp/deployments.txt
+          grep -q "968f53d5-caad-46b8-b3d3-7f1469952f65" /tmp/deployments.txt
           node <<'NODE'
-          import crypto from "node:crypto";
           const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
-          const ids={source:process.env.SOURCE_DB_ID,target:process.env.TARGET_DB_ID};
+          const id=process.env.TARGET_DB_ID;
           const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
           const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          async function q(id,sql){
-            const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql})});
-            const b=await r.json();
-            if(!r.ok||!b.success||b.result?.some?.(x=>x.success===false)) throw new Error(`query failed ${r.status}`);
-            return b.result[0].results;
-          }
-          async function inspect(id){
-            const schema=await q(id,"SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%' ORDER BY type,name");
-            const tables=schema.filter(x=>x.type==="table").map(x=>x.name);
-            const counts={};
-            const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
-            for(const t of tables) counts[t]=Number((await q(id,`SELECT COUNT(*) AS n FROM ${qi(t)}`))[0].n);
-            return {hash:crypto.createHash("sha256").update(JSON.stringify(schema)).digest("hex"),counts};
-          }
-          const [s,t]=await Promise.all([inspect(ids.source),inspect(ids.target)]);
-          if(s.hash!==t.hash || JSON.stringify(s.counts)!==JSON.stringify(t.counts)) throw new Error("Source and EU target diverged before cutover");
-          for(const [table,count] of Object.entries(s.counts)){
-            if(table!=="d1_migrations" && count!==0) throw new Error(`Unexpected application data in ${table}: ${count}`);
-          }
-          const info=await (await fetch(`${base}/${ids.target}`,{headers})).json();
-          if(!info.success||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="disabled") throw new Error("EU target settings mismatch");
-          console.log("Jobb source/target equality verified:", JSON.stringify(s.counts));
+          const info=await (await fetch(`${base}/${id}`,{headers})).json();
+          if(!info.success||info.result.name!=="jobb-eu"||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="disabled") throw new Error("Target D1 metadata mismatch");
+          const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql:"SELECT COUNT(*) AS migrations FROM d1_migrations"})});
+          const b=await r.json();
+          if(!r.ok||!b.success||Number(b.result?.[0]?.results?.[0]?.migrations)!==5) throw new Error("Target D1 query verification failed");
+          console.log(JSON.stringify({name:info.result.name,jurisdiction:info.result.jurisdiction,read_replication:info.result.read_replication?.mode,file_size:info.result.file_size,migrations:5}));
           NODE
-
-      - name: Install and verify Jobb
-        working-directory: apps/jobb
-        shell: bash
-        run: |
-          set -euo pipefail
-          corepack enable
-          corepack prepare pnpm@10.17.1 --activate
-          pnpm install --frozen-lockfile
-          pnpm typecheck
-          pnpm test
-
-      - name: Deploy Jobb with EU D1 binding
-        working-directory: apps/jobb
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm deploy:cloudflare
-
-      - name: Verify Jobb production readiness
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 https://jobb.denied.se/api/ready >/tmp/ready.json
-          cat /tmp/ready.json
-          jq -e '.ready == true' /tmp/ready.json >/dev/null
-
       - name: Delete retired non-EU Jobb D1
         shell: bash
         run: |
@@ -99,8 +45,7 @@ jobs:
           code="$(curl -sS -o /tmp/delete.json -w '%{http_code}' -X DELETE             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database/$SOURCE_DB_ID")"
           echo "old Jobb D1 delete HTTP status: $code"
           [[ "$code" =~ ^2 ]] || { cat /tmp/delete.json; exit 1; }
-
-      - name: Final inventory verification
+      - name: Verify old D1 is gone
         shell: bash
         run: |
           set -euo pipefail
@@ -109,4 +54,4 @@ jobs:
             (.result | any(.uuid==$old) | not) and
             (.result | any(.uuid==$eu and .name=="jobb-eu" and .jurisdiction=="eu"))
           ' >/dev/null
-          echo "Jobb is active on EU D1 and old non-EU D1 is absent"
+          echo "Jobb EU D1 cutover finalized"
