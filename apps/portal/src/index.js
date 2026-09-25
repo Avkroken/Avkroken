@@ -843,6 +843,32 @@ async function getPublicProjectBuilds(requestUrl, env) {
   }
 }
 
+const PUBLIC_ACTIVITY_CAPABILITIES = new Set([
+  "github.avkroken.repositories",
+  "github.avkroken.pull_requests",
+  "github.avkroken.actions"
+]);
+const PUBLIC_ACTIVITY_SOURCES = new Set([
+  "webhook",
+  "audit_log",
+  "snapshot_diff",
+  "reconciliation"
+]);
+const PUBLIC_ACTIVITY_COVERAGE = new Set([
+  "complete",
+  "partial",
+  "sampled",
+  "since_installation",
+  "since_first_observation",
+  "unknown"
+]);
+const PUBLIC_ACTIVITY_STATUS = new Set([
+  "available",
+  "not_configured",
+  "not_observed",
+  "unavailable"
+]);
+
 function activityDays(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return ACTIVITY_DEFAULT_DAYS;
@@ -869,6 +895,26 @@ function activityText(value, maxLength) {
   return text && text.length <= maxLength ? text : null;
 }
 
+function activityCapability(value) {
+  const text = activityText(value, 120);
+  return text && PUBLIC_ACTIVITY_CAPABILITIES.has(text) ? text : null;
+}
+
+function activitySource(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_SOURCES.has(text) ? text : null;
+}
+
+function activityCoverage(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_COVERAGE.has(text) ? text : null;
+}
+
+function activityStatus(value) {
+  const text = activityText(value, 40);
+  return text && PUBLIC_ACTIVITY_STATUS.has(text) ? text : "unavailable";
+}
+
 function activityTimestamp(value) {
   const text = activityText(value, 64);
   return text && Number.isFinite(Date.parse(text)) ? text : null;
@@ -886,9 +932,9 @@ function projectActivityPayload(snapshot, projects, metadata) {
 
   const grouped = Array.isArray(snapshot?.grouped)
     ? snapshot.grouped.flatMap(item => {
-      const capability = activityText(item?.capability, 120);
+      const capability = activityCapability(item?.capability);
       const event = activityText(item?.event, 120);
-      if (!capability || !capability.startsWith("github.avkroken.") || !event) return [];
+      if (!capability || !event) return [];
       return [{
         capability,
         event,
@@ -899,10 +945,10 @@ function projectActivityPayload(snapshot, projects, metadata) {
 
   const coverage = Array.isArray(snapshot?.coverage)
     ? snapshot.coverage.flatMap(item => {
-      const capability = activityText(item?.capability, 120);
-      const source = activityText(item?.source, 40);
-      const coverageValue = activityText(item?.coverage, 40);
-      if (!capability || !capability.startsWith("github.avkroken.") || !source || !coverageValue) {
+      const capability = activityCapability(item?.capability);
+      const source = activitySource(item?.source);
+      const coverageValue = activityCoverage(item?.coverage);
+      if (!capability || !source || !coverageValue) {
         return [];
       }
 
@@ -922,9 +968,9 @@ function projectActivityPayload(snapshot, projects, metadata) {
   const recent = Array.isArray(snapshot?.recent)
     ? snapshot.recent.flatMap(item => {
       const project = byRepository.get(item?.repository);
-      const capability = activityText(item?.capability, 120);
-      const source = activityText(item?.source, 40);
-      const coverageValue = activityText(item?.coverage, 40);
+      const capability = activityCapability(item?.capability);
+      const source = activitySource(item?.source);
+      const coverageValue = activityCoverage(item?.coverage);
       const event = activityText(item?.event, 120);
       const receivedAt = activityTimestamp(item?.receivedAt);
 
@@ -996,7 +1042,7 @@ function projectActivityPayload(snapshot, projects, metadata) {
       : null,
     activity: {
       available: snapshot?.available === true,
-      status: activityText(snapshot?.status, 40) || "unavailable",
+      status: activityStatus(snapshot?.status),
       repositoryCount: activityCount(snapshot?.repositoryCount),
       period,
       grouped,
