@@ -719,6 +719,121 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 }
 
+function publicBuildProject(projects, projectSlug) {
+  if (!Array.isArray(projects)) return null;
+
+  return projects.find(project =>
+    project?.slug === projectSlug &&
+    project?.type === "repository" &&
+    project?.source?.provider === "github" &&
+    project?.source?.kind === "repository" &&
+    typeof project?.source?.repository === "string" &&
+    /^Avkroken\/[A-Za-z0-9._-]+$/.test(project.source.repository) &&
+    typeof project?.buildsPortalUrl === "string" &&
+    typeof project?.builds === "string"
+  ) || null;
+}
+
+async function getPublicProjectBuilds(requestUrl, env) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+
+  if (!projectSlug || projectSlug.length > 120) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const projectCatalog = await loadPublicProjects(env);
+    const project = publicBuildProject(projectCatalog.projects, projectSlug);
+
+    if (!project) {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "project_builds_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+    if (!service || typeof service.getPublicRepositoryCi !== "function") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "builds_not_configured"
+      }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    const repository = project.source.repository;
+    const repoName = repository.slice("Avkroken/".length);
+    const ci = await service.getPublicRepositoryCi(repoName);
+
+    if (
+      !ci ||
+      typeof ci !== "object" ||
+      ci.schemaVersion !== 1 ||
+      ci.repository !== repository
+    ) {
+      throw new Error("invalid repository CI snapshot");
+    }
+
+    return new Response(JSON.stringify({
+      status: "available",
+      project: {
+        slug: project.slug,
+        name: project.name,
+        portalUrl: project.portalUrl,
+        repository,
+        actionsUrl: project.builds
+      },
+      ci
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public project Builds unavailable", {
+      project: projectSlug,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "project_builds_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 async function fetchProjectIssues(project, env) {
   const repository = String(project?.source?.repository || "");
   const parts = repository.split("/");
@@ -1459,6 +1574,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicProjectIssues(url, env);
+    }
+
+    if (url.pathname === "/api/builds") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicProjectBuilds(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";
