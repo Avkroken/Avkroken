@@ -94,6 +94,40 @@ client project catalog
 När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det, Issues, Discussions och Releases. Den hämtar inte issue-, release- eller CI-data från GitHub på detaljsidans sidvisning.
 
 
+### Changelog / Releases
+
+Changelog är en separat publik GitHub-adapter ovanpå samma projektpubliceringspolicy som Projekt-vyn.
+
+```text
+GitHub public org repositories
+       |
+       v
+loadPublicProjects()
+       |
+       +--> repository projects only
+       |
+       v
+GitHub Releases (max 10/repo)
+       |
+       v
+release-source.mjs
+       +--> reject drafts
+       +--> canonical release URL only
+       +--> minimal public model
+       |
+       v
+GET /api/changelog
+       |
+       v
+/changelog
+```
+
+Eligibility läses live och går inte via den femminuters `/api/projects`-cachen. Det minskar risken att en nyligen avpublicerad repositoryidentitet används för en releasefetch med en credential som fortfarande har access.
+
+`release-source.mjs` accepterar endast repositoryprojekt under `Avkroken/*`. Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
+
+Providerarbetet är bounded: högst 24 repos, 10 releaser/repo, concurrency 4 och 40 returnerade poster. `bounded` betyder den definierade budgeten; `partial` används vid repo-cap eller release-fetchfel. Ingen persistent Changelog-cache används.
+
 ### Wiki-presentation
 
 Repository-Wiki är redan en deterministisk presentationsyta som byggs från repositoryts canonical README/docs genom `.github/workflows/wiki-sync.yml`.
@@ -193,7 +227,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/auth` — publik auth-ingång utan skyddad payload.
 - `/auth/jobb[/...]` — server-side redirect till Jobbs befintliga skyddade origin före Portal-shell.
 - `/drift[/...]` — Drift & insyn från den sanerade Skvallerbyttan-snapshoten.
-- `/changelog` — kuraterad release-/produktförändring.
+- `/changelog` — officiella publicerade GitHub Releases för Portalens publika repositoryprojekt.
 - `/aktivitet` — råare aktivitet.
 - `/sok` — reserverad access-aware global sökyta.
 - `/om` — produkt- och ägarskapskontext.
