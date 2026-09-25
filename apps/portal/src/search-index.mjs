@@ -114,7 +114,7 @@ export function buildProjectSearchEntries(projects) {
       url: project.portalUrl,
       canonicalUrl: project.repository || null,
       source,
-      searchText: projectText
+      searchText: normalized(projectText)
     });
 
     if (project.wiki && project.wikiPortalUrl) {
@@ -129,14 +129,14 @@ export function buildProjectSearchEntries(projects) {
         url: project.wikiPortalUrl,
         canonicalUrl: project.wiki,
         source,
-        searchText: [
+        searchText: normalized([
           project.name,
           project.slug,
           "wiki",
           "dokumentation",
           description,
           source?.repository
-        ].filter(Boolean).join(" ")
+        ].filter(Boolean).join(" "))
       });
     }
   }
@@ -176,14 +176,14 @@ export function buildDocumentSearchEntry(entry, page, markdown, canonicalUrl) {
       ref: entry.defaultBranch || null,
       path: sourcePath
     },
-    searchText: [
+    searchText: normalized([
       entry.name,
       entry.key,
       page.label,
       page.path,
       entry.description,
       body
-    ].filter(Boolean).join(" ")
+    ].filter(Boolean).join(" "))
   };
 }
 
@@ -220,7 +220,7 @@ export function searchEntries(entries, query, limit = 24) {
 
     const title = normalized(entry.title);
     const subtitle = normalized(entry.subtitle);
-    const body = normalized(entry.searchText);
+    const body = String(entry.searchText || "");
     let score = 0;
 
     if (title === fullQuery) score += 1000;
