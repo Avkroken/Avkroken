@@ -93,6 +93,72 @@
         </a>
       </div>
 
+      <section class="portal-section home-control" aria-labelledby="home-control-title">
+        <div class="portal-section-title">
+          <div>
+            <h2 id="home-control-title">Nuläge</h2>
+            <p>Public-safe status och observerad aktivitet. Coverage och källfel redovisas utan att fyllas i med antaganden.</p>
+          </div>
+          <span class="home-dashboard-freshness" id="home-dashboard-freshness" aria-live="polite">Läser public-safe nuläge…</span>
+        </div>
+
+        <div class="home-control-grid" aria-label="Avkroken nuläge">
+          <a class="portal-info-card home-control-card" href="/projekt" data-portal-route>
+            <div class="portal-meta-label">PROJEKT</div>
+            <h3 id="home-project-count">—</h3>
+            <p id="home-project-copy">Läser publik projektkatalog…</p>
+          </a>
+          <a class="portal-info-card home-control-card" href="/drift" data-portal-route>
+            <div class="portal-meta-label">DRIFT</div>
+            <h3 id="home-provider-status">—</h3>
+            <p id="home-provider-copy">Läser observerad providerstate…</p>
+          </a>
+          <a class="portal-info-card home-control-card" href="/drift" data-portal-route>
+            <div class="portal-meta-label">UPPMÄRKSAMHET</div>
+            <h3 id="home-attention-count">—</h3>
+            <p id="home-attention-copy">Läser observerad capability-state…</p>
+          </a>
+          <a class="portal-info-card home-control-card" href="/aktivitet" data-portal-route>
+            <div class="portal-meta-label">OBSERVERAT · 7D</div>
+            <h3 id="home-activity-count">—</h3>
+            <p id="home-activity-copy">Läser observerad aktivitet…</p>
+          </a>
+        </div>
+
+        <div class="home-control-layout">
+          <section class="home-control-panel" aria-labelledby="home-attention-title">
+            <div class="home-control-panel-head">
+              <div>
+                <div class="portal-meta-label">DRIFT &amp; INSYN</div>
+                <h3 id="home-attention-title">Behöver uppmärksamhet</h3>
+              </div>
+              <a href="/drift" data-portal-route>Visa drift</a>
+            </div>
+            <div class="home-dashboard-list" id="home-attention-list">
+              <div class="home-dashboard-empty">Läser capability-state…</div>
+            </div>
+          </section>
+
+          <section class="home-control-panel" aria-labelledby="home-recent-title">
+            <div class="home-control-panel-head">
+              <div>
+                <div class="portal-meta-label">AKTIVITET</div>
+                <h3 id="home-recent-title">Senast observerat</h3>
+              </div>
+              <a href="/aktivitet" data-portal-route>Visa aktivitet</a>
+            </div>
+            <div class="home-dashboard-list" id="home-recent-activity">
+              <div class="home-dashboard-empty">Läser observerade events…</div>
+            </div>
+          </section>
+        </div>
+
+        <div class="portal-placeholder" id="home-dashboard-error" hidden>
+          <strong>Nuläget kunde inte läsas.</strong>
+          Projektkatalog, drift och aktivitet är tillfälligt otillgängliga. Övriga Portal-ytor fortsätter fungera oberoende.
+        </div>
+      </section>
+
       <section class="portal-section" aria-labelledby="home-next-title">
         <div class="portal-section-title">
           <div>
@@ -846,7 +912,7 @@
   <script src="/docs.js" defer></script>
   <script src="/wiki.js" defer></script>
   <script src="/search.js" defer></script>
-  <script src="/operations.js" defer></script>
+  <script src="/home-dashboard.js" defer></script>\n  <script src="/operations.js" defer></script>
   <script src="/changelog.js" defer></script>
   <script src="/project-releases.js" defer></script>
   <script src="/project-issues.js" defer></script>
