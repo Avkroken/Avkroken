@@ -252,6 +252,33 @@ function boundedDays(value: number): number {
   return Math.min(90, Math.max(1, Math.trunc(Number.isFinite(value) ? value : 30)));
 }
 
+const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
+
+export function normalizeActivityRepositoryFilters(
+  values: readonly unknown[],
+  limit = 50,
+): string[] {
+  const maximum = Math.max(1, Math.min(50, Math.trunc(Number(limit) || 50)));
+  const unique = new Set<string>();
+
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const repository = value.trim();
+    if (
+      !repository ||
+      repository === "." ||
+      repository === ".." ||
+      !REPOSITORY_NAME.test(repository)
+    ) {
+      continue;
+    }
+    unique.add(repository);
+    if (unique.size >= maximum) break;
+  }
+
+  return [...unique];
+}
+
 export async function getObservedActivity(
   env: Env,
   input: {
@@ -259,6 +286,7 @@ export async function getObservedActivity(
     provider?: string | null;
     capability?: string | null;
     repository?: string | null;
+    repositories?: string[];
     resource?: string | null;
   } = {},
 ): Promise<Record<string, unknown>> {
@@ -276,6 +304,15 @@ export async function getObservedActivity(
   add("provider", input.provider);
   add("capability", input.capability);
   add("repository", input.repository);
+  if (Array.isArray(input.repositories)) {
+    const repositories = normalizeActivityRepositoryFilters(input.repositories);
+    if (!repositories.length) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push(`repository IN (${repositories.map(() => "?").join(", ")})`);
+      values.push(...repositories);
+    }
+  }
   if (input.resource) {
     clauses.push("(resource_type = ? OR resource_id = ?)");
     values.push(input.resource, input.resource);
