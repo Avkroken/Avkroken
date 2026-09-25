@@ -61,29 +61,18 @@ Vanliga Worker runtime-bindings/secrets:
 - `CLOUDFLARE_CASB_WEBHOOK_SECRET`
 - `SKVALLERBYTTAN_READ_API_TOKEN` — valfri machine read API
 
-Gamnackens GitHub App-identitet består i runtime av `GAMNACKEN_GITHUB_APP_CLIENT_ID` och `GAMNACKEN_GITHUB_APP_PRIVATE_KEY`. GitHub Actions-källorna använder samma canonical namn. App-JWT signeras med RS256; private key måste höra till Gamnacken. Koden accepterar PKCS#1 `RSA PRIVATE KEY` och PKCS#8 `PRIVATE KEY`; PKCS#1 wrap:as till PKCS#8 i minnet före Web Crypto-import. GitHub App client secret behövs inte för installation-auth-flödet. Gamnacken är observationsruntimens canonical GitHub App.
+Gamnackens GitHub App-identitet består i runtime av `GAMNACKEN_GITHUB_APP_CLIENT_ID` och `GAMNACKEN_GITHUB_APP_PRIVATE_KEY`. GitHub Actions-workflows refererar till samma bindingnamn. App-JWT signeras med RS256; private key måste höra till Gamnacken. Koden accepterar PKCS#1 `RSA PRIVATE KEY` och PKCS#8 `PRIVATE KEY`; PKCS#1 wrap:as till PKCS#8 i minnet före Web Crypto-import. GitHub App client secret behövs inte för installation-auth-flödet. Repositorykoden använder dessa bindingnamn för GitHub App-auth.
 
 GitHub Actions som muterar Cloudflare använder endast `CLOUDFLARE_API_TOKEN_W1`. Wrangler får värdet via den miljövariabel som verktyget kräver, `CLOUDFLARE_API_TOKEN`, men det finns inget generiskt org-secret med det namnet.
 
-### Migrering till Gamnacken
+### Runtime credential contract
 
-Gamnacken är canonical GitHub App för Skvallerbyttans provider-reads. Credentialnamnen är:
+Repositoryt deklarerar GitHub App-bindings med namnen:
 
-- `GAMNACKEN_GITHUB_APP_CLIENT_ID` — GitHub Actions-variable och Worker runtime-secret
-- `GAMNACKEN_GITHUB_APP_PRIVATE_KEY` — GitHub Actions-secret och Worker runtime-secret
+- `GAMNACKEN_GITHUB_APP_CLIENT_ID`
+- `GAMNACKEN_GITHUB_APP_PRIVATE_KEY`
 
-Migreringen ska göras utan auth-glapp:
-
-1. konfigurera GitHub Actions-variable/secret med Gamnackens befintliga Client ID och private key,
-2. mergea ändringen som byter runtime-kontraktet,
-3. kör `Sync Cloudflare runtime secrets` från `main`; workflowen verifierar först App-identiteten mot GitHub och Avkrokens installation och skriver därefter de nya Worker-secretnamnen,
-4. kör `Deploy production` från samma `main`,
-5. verifiera GitHub provider health och capabilities i Insyn,
-6. verifiera extern GitHub-webhookkonfiguration separat; repositoryt kan inte bevisa vilken hook som är aktiv,
-7. avinstallera/radera den separata Skvallerbyttan GitHub Appen först efter lyckad runtimeverifiering,
-8. ta därefter bort de gamla oanvända Worker-secreten `SKVALLERBYTTAN_GITHUB_APP_CLIENT_ID` och `SKVALLERBYTTAN_GITHUB_APP_PRIVATE_KEY`.
-
-Själva credentialvärdena får inte skrivas i repository, loggar eller driftanteckningar.
+Faktisk GitHub App-installation, secret-/variable-provisionering och eventuell äldre App-state är extern GitHub/Cloudflare-state och dokumenteras inte här.
 
 ### Runtime secret-sync
 
@@ -130,7 +119,7 @@ För en etablerad klass:
 
 ## Event-ingress och downstream-signaler
 
-Canonical provider-ingress:
+Provider-ingress som runtimekoden stödjer:
 
 - GitHub: `POST /webhooks/github`
 - Cloudflare Notifications: `POST /webhooks/cloudflare/notifications`
