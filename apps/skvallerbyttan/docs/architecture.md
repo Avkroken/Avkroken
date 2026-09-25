@@ -68,7 +68,8 @@ Den snapshoten innehåller endast providerstatus/senaste observation samt capabi
 
 Runtime är en TypeScript-baserad Cloudflare Worker.
 
-- entrypoint: `src/entry.ts`
+- Worker module composition: `src/entry.ts`
+- HTTP/noindex handler: `src/http-entry.ts`
 - request/scheduled orchestration: `src/worker.ts`
 - canonical observations-API: `src/observations-api.ts`
 - GitHub provider: `src/github.ts`, `src/github-governance.ts`
@@ -77,7 +78,8 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - Activity: `src/activity.ts`
 - read telemetry: `src/telemetry.ts`
 - provider health: `src/provider-health.ts`
-- sanerad Portal RPC: `src/portal-observations.ts`
+- Workers RPC-entrypoint: `src/portal-observations.ts`
+- ren public-safe sanitizationmodell: `src/portal-observations-model.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
