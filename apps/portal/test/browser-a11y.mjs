@@ -341,6 +341,29 @@ async function main() {
               text: (element.textContent || '').trim().slice(0, 80)
             };
           });
+        var internalOverflow = Array.from(document.querySelectorAll('body *'))
+          .filter(function(element) {
+            var style = getComputedStyle(element);
+            return style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              element.scrollWidth > element.clientWidth + 1;
+          })
+          .slice(0, 20)
+          .map(function(element) {
+            var style = getComputedStyle(element);
+            return {
+              tag: element.tagName.toLowerCase(),
+              id: element.id || null,
+              className: typeof element.className === 'string' ? element.className : null,
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+              overflowX: style.overflowX,
+              whiteSpace: style.whiteSpace,
+              wordBreak: style.wordBreak,
+              overflowWrap: style.overflowWrap,
+              text: (element.textContent || '').trim().slice(0, 120)
+            };
+          });
         var pseudo = Array.from(document.querySelectorAll('body *'))
           .flatMap(function(element) {
             return ['::before', '::after'].map(function(kind) {
@@ -400,6 +423,7 @@ async function main() {
             };
           })(),
           offenders: offenders,
+          internalOverflow: internalOverflow,
           pseudo: pseudo
         };`
       );
