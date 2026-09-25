@@ -1,0 +1,212 @@
+name: Temporary migrate Jobb D1 to EU
+
+on:
+  push:
+    branches:
+      - chatgpt/d1-eu-migrate/2026-09-25/07-27-jobb
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-eu-jobb
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
+      CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
+      SOURCE_DB_ID: 1503cc47-0a05-4129-b192-e92b58c89199
+      SOURCE_DB_NAME: jobb
+      TARGET_DB_ID: 58219fde-4782-4b28-acb3-186df203f2f7
+      TARGET_DB_NAME: jobb-eu
+      EXPECTED_MAIN_SHA: b1e3fbf0d5f6655de77245637965f556b70eb829
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: b1e3fbf0d5f6655de77245637965f556b70eb829
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Preflight and freeze source writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_MAIN_SHA" ]]
+          [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]]
+          node <<'NODE'
+          const fs = require("fs");
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const source = process.env.SOURCE_DB_ID;
+          const target = process.env.TARGET_DB_ID;
+          const api = `https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+          async function get(id) {
+            const r = await fetch(`${api}/${id}`, { headers });
+            const b = await r.json();
+            if (!r.ok || !b.success) throw new Error(`D1 get failed for ${id}: HTTP ${r.status}`);
+            return b.result;
+          }
+          async function query(id, body) {
+            const r = await fetch(`${api}/${id}/query`, { method:"POST", headers, body:JSON.stringify(body) });
+            const b = await r.json();
+            if (!r.ok || !b.success || b.result?.some?.(x => x.success === false)) {
+              throw new Error(`D1 query failed for ${id}: HTTP ${r.status} ${JSON.stringify(b.errors || [])}`);
+            }
+            return b.result;
+          }
+          const [s,t] = await Promise.all([get(source),get(target)]);
+          if (s.name !== process.env.SOURCE_DB_NAME) throw new Error("Source database identity mismatch");
+          if (t.name !== process.env.TARGET_DB_NAME || t.jurisdiction !== "eu" || t.read_replication?.mode !== "disabled") {
+            throw new Error("Target database is not the expected EU/replication-disabled target");
+          }
+          const tableResult = await query(source,{sql:"SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name"});
+          const tables = tableResult[0].results.map(x => x.name);
+          if (!tables.length) throw new Error("Source database has no user tables");
+          const targetTables = (await query(target,{sql:"SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name"}))[0].results.map(x=>x.name);
+          if (targetTables.length) throw new Error(`Target database is not empty: ${targetTables.join(",")}`);
+          const qi = s => '"' + String(s).replaceAll('"','""') + '"';
+          const counts = {};
+          for (const table of tables) {
+            const result = await query(source,{sql:`SELECT COUNT(*) AS n FROM ${qi(table)}`});
+            counts[table] = Number(result[0].results[0].n);
+          }
+          fs.writeFileSync("/tmp/source-counts.json", JSON.stringify(counts));
+          fs.writeFileSync("/tmp/source-tables.json", JSON.stringify(tables));
+          const batch = [];
+          tables.forEach((table,i) => {
+            const suffix = String(i).padStart(3,"0");
+            for (const [op,event] of [["i","INSERT"],["u","UPDATE"],["d","DELETE"]]) {
+              const trig = qi(`__eu_freeze_${suffix}_${op}`);
+              batch.push({sql:`CREATE TRIGGER IF NOT EXISTS ${trig} BEFORE ${event} ON ${qi(table)} BEGIN SELECT RAISE(ABORT, 'EU D1 migration in progress'); END`});
+            }
+          });
+          await query(source,{batch});
+          const frozen = await query(source,{sql:"SELECT COUNT(*) AS n FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%'"});
+          if (Number(frozen[0].results[0].n) !== tables.length * 3) throw new Error("Source write-freeze trigger count mismatch");
+          console.log("Frozen source tables:", tables.length);
+          console.log("Source row counts:", JSON.stringify(counts));
+          NODE
+
+      - name: Export frozen source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.136.1 d1 export "$SOURCE_DB_NAME" --remote --output=/tmp/job.sql --skip-confirmation
+          test -s /tmp/job.sql
+          echo "Export bytes: $(wc -c </tmp/job.sql)"
+
+      - name: Import into EU target
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4.136.1 d1 execute "$TARGET_DB_NAME" --remote --file=/tmp/job.sql --yes
+
+      - name: Verify imported state and unfreeze target
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("fs");
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const source = process.env.SOURCE_DB_ID;
+          const target = process.env.TARGET_DB_ID;
+          const expected = JSON.parse(fs.readFileSync("/tmp/source-counts.json","utf8"));
+          const api = `https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+          async function query(id, body) {
+            const r = await fetch(`${api}/${id}/query`, {method:"POST",headers,body:JSON.stringify(body)});
+            const b = await r.json();
+            if(!r.ok || !b.success || b.result?.some?.(x=>x.success===false)) throw new Error(`D1 query failed: ${r.status}`);
+            return b.result;
+          }
+          const qi = s => '"' + String(s).replaceAll('"','""') + '"';
+          const actual = {};
+          for (const table of Object.keys(expected)) {
+            const r = await query(target,{sql:`SELECT COUNT(*) AS n FROM ${qi(table)}`});
+            actual[table]=Number(r[0].results[0].n);
+          }
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Row counts differ: expected ${JSON.stringify(expected)} actual ${JSON.stringify(actual)}`);
+          const triggers=(await query(target,{sql:"SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%' ORDER BY name"}))[0].results.map(x=>x.name);
+          if(triggers.length) await query(target,{batch:triggers.map(name=>({sql:`DROP TRIGGER ${qi(name)}`}))});
+          const left=await query(target,{sql:"SELECT COUNT(*) AS n FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%'"});
+          if(Number(left[0].results[0].n)!==0) throw new Error("Target freeze triggers remain");
+          const targetInfo = await (await fetch(`${api}/${target}`,{headers})).json();
+          if(!targetInfo.success || targetInfo.result.jurisdiction!=="eu") throw new Error("Target lost EU jurisdiction");
+          console.log("Imported row counts verified:", JSON.stringify(actual));
+          NODE
+
+      - name: Install and verify Jobb
+        working-directory: apps/jobb
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@10.17.1 --activate
+          pnpm install --frozen-lockfile
+          pnpm typecheck
+          pnpm test
+
+      - name: Deploy Jobb with EU D1 binding
+        working-directory: apps/jobb
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm deploy:cloudflare
+
+      - name: Verify production and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 5 https://jobb.denied.se/api/ready >/tmp/ready.json
+          jq -e '.ready == true' /tmp/ready.json >/dev/null
+          node <<'NODE'
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.TARGET_DB_ID;
+          const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${id}`,{headers:{Authorization:`Bearer ${token}`}});
+          const b=await r.json();
+          if(!r.ok||!b.success||b.result.jurisdiction!=="eu") throw new Error("EU target verification failed");
+          console.log(JSON.stringify({name:b.result.name,jurisdiction:b.result.jurisdiction,read_replication:b.result.read_replication?.mode,file_size:b.result.file_size}));
+          NODE
+
+      - name: Delete retired non-EU source
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o /tmp/delete-old.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database/$SOURCE_DB_ID")"
+          echo "D1 source delete HTTP status: $code"
+          [[ "$code" =~ ^2 ]] || { cat /tmp/delete-old.json; exit 1; }
+
+      - name: Final D1 inventory check
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database?per_page=100")"
+          printf '%s' "$list" | jq -e --arg s "$SOURCE_DB_ID" --arg t "$TARGET_DB_ID" '
+            (.result | any(.uuid==$s) | not) and
+            (.result | any(.uuid==$t and .jurisdiction=="eu" and .name=="jobb-eu"))
+          ' >/dev/null
+          echo "Jobb D1 EU cutover complete"
+
+      - name: Restore source writes on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          node <<'NODE'
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.SOURCE_DB_ID;
+          const api=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${id}/query`;
+          const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
+          const q=async body=>{const r=await fetch(api,{method:"POST",headers,body:JSON.stringify(body)}); if(!r.ok)return null; return r.json();};
+          const found=await q({sql:"SELECT name FROM sqlite_schema WHERE type='trigger' AND name LIKE '__eu_freeze_%' ORDER BY name"});
+          const names=found?.result?.[0]?.results?.map?.(x=>x.name) || [];
+          const qi=s=>'"'+String(s).replaceAll('"','""')+'"';
+          if(names.length) await q({batch:names.map(name=>({sql:`DROP TRIGGER ${qi(name)}`}))});
+          console.log("Best-effort source write-freeze cleanup:", names.length);
+          NODE
