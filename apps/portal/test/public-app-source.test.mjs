@@ -36,6 +36,8 @@ test("normalizes an explicitly opted-in public app without inventing a public en
   assert.equal(project.portalUrl, "/projekt/skvallerbyttan");
   assert.equal(project.documentation, "/projekt/skvallerbyttan/dokumentation");
   assert.equal(project.wikiPortalUrl, null);
+  assert.equal(project.releases, null);
+  assert.equal(project.releasesPortalUrl, null);
   assert.equal(project.source.kind, "monorepo_app");
   assert.equal(project.source.path, "apps/skvallerbyttan");
   assert.equal(
