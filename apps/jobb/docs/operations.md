@@ -37,6 +37,12 @@ Enligt `apps/jobb/package.json` gör kommandot två saker i ordning:
 
 Hur ett externt CI/CD-system triggar detta kommando är inte canonical repo-state och ska inte hårdkodas i detta dokument.
 
+## D1 data locality
+
+Produktionsbindingen `DB` ska använda en D1-databas skapad med `jurisdiction=eu`. Cloudflare tillåter inte att jurisdiction läggs till eller ändras efter att databasen skapats, så ett framtida byte ska göras som en kontrollerad export/import till en ny EU-databas före binding-cutover.
+
+Read replication ska vara avstängd tills Jobbs D1-requestväg använder D1 Sessions API. Att aktivera repliker utan Sessions API flyttar inte querytrafik från primären.
+
 ## Readiness
 
 `GET /api/health` är minimal liveness.
