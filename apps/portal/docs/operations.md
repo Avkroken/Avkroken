@@ -211,7 +211,7 @@ Portal anropar endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicActivity(repositoryN
 
 En explicit repository-lista som efter validering blir tom ger ett fail-closed SQL-filter (`1 = 0`), inte en bred query. D1-resultatet filtreras till GitHub och exakt godkända repositorykortnamn.
 
-Den publika modellen innehåller aggregate counts/coverage samt recent event-rader med repository/project, capability, source, coverage, event/action och occurred/received timestamps. `resourceId`, actor, providerfel, permissionmetadata och rå webhookpayload publiceras inte. Portal gör dessutom en andra whitelistprojektion mot de repositories som passerade den live publika gaten.
+Den publika modellen innehåller aggregate counts/coverage samt recent event-rader med repository/project, capability, source, coverage, event/action och occurred/received timestamps. `resourceId`, actor, providerfel, permissionmetadata och rå webhookpayload publiceras inte. Public capability-scope är endast `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security/governance-capabilities filtreras bort. Portal gör dessutom en andra whitelistprojektion mot de repositories som passerade den live publika gaten.
 
 Global `/aktivitet` publicerar inte Cloudflare account-/org-aktivitet. UI:t använder genomgående **observerad aktivitet**, visar coverage och påstår inte att perioden är komplett.
 ### Drift & insyn
