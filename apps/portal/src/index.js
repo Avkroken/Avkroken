@@ -486,7 +486,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v5");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v6");
   const cached = await cache.match(cacheKey);
 
   if (cached) {
