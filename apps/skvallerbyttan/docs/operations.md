@@ -28,8 +28,8 @@ Wrangler definierar:
 - `ASSETS`
 - `STATS_DB`
 - `OBSERVABILITY` — Analytics Engine dataset `skvallerbyttan_observability`
-- `AVKROKEN_PORTAL_DOCS` — intern Cloudflare Service Binding till live Worker-tjänsten `avkroken`, entrypoint `DocsInvalidationService`
-- `AVKROKEN_OPERATIONS` — intern Cloudflare Service Binding till live Worker-tjänsten `avkroken`, entrypoint `OperationalHeartbeatService`
+- `AVKROKEN_PORTAL_DOCS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `DocsInvalidationService`
+- `AVKROKEN_OPERATIONS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `OperationalHeartbeatService`
 - cron `0 */6 * * *` för reconciliation
 - cron `*/15 * * * *` för operativ heartbeat och global GitHub/Cloudflare capability-reconciliation
 - custom domain `skvallerbyttan.denied.se`
@@ -79,7 +79,7 @@ Migreringen ska göras utan auth-glapp:
 3. kör `Sync Cloudflare runtime secrets` från `main`; workflowen verifierar först App-identiteten mot GitHub och Avkrokens installation och skriver därefter de nya Worker-secretnamnen,
 4. kör `Deploy production` från samma `main`,
 5. verifiera GitHub provider health och capabilities i Insyn,
-6. stäng av Gamnackens App-webhook om den är aktiv; organization-webhooken är canonical event-ingress,
+6. verifiera extern GitHub-webhookkonfiguration separat; repositoryt kan inte bevisa vilken hook som är aktiv,
 7. avinstallera/radera den separata Skvallerbyttan GitHub Appen först efter lyckad runtimeverifiering,
 8. ta därefter bort de gamla oanvända Worker-secreten `SKVALLERBYTTAN_GITHUB_APP_CLIENT_ID` och `SKVALLERBYTTAN_GITHUB_APP_PRIVATE_KEY`.
 
@@ -99,18 +99,18 @@ Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den
 
 R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets Store.
 
-GitHub organization webhook använder `SKVALLERBYTTAN_WEBHOOK_SECRET`. Gamnacken är read-auth-app och ska inte ha en aktiv App-webhook mot `/webhooks/github`. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
+Runtimekoden verifierar organization-webhookpayloads med `SKVALLERBYTTAN_WEBHOOK_SECRET`. Gamnacken används av koden för read-auth; faktisk App-/organization-webhookkonfiguration är extern GitHub-state. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
 
 ### Återställning vid GitHub-webhookstorm
 
 Om Workers Logs visar stora mängder `POST /webhooks/github` ska hook-targeten avgöra åtgärden:
 
-- `integration`: Gamnacken är den enda App som ska användas för read-auth och dess **Webhook** ska vara avstängd. En separat Skvallerbyttan GitHub App är legacy och ska tas bort först efter att Gamnackens runtime-auth har verifierats i produktion.
-- `organization` med `invalid webhook signature`: skapa ett nytt slumpmässigt webhook-secret och sätt **samma värde** på Avkrokens organization webhook och Worker-secretet `SKVALLERBYTTAN_WEBHOOK_SECRET`. Secretet är ett operatörsvalt HMAC-secret, inte ett GitHub App-genererat credential.
-- För en samordnad rotation: inaktivera organization webhooken tillfälligt, uppdatera secret på GitHub och Worker-sidan, aktivera webhooken igen och verifiera en signerad leverans som returnerar HTTP 202.
+- `integration`: runtime behandlar GitHub App-webhookingress som migrations-/legacyinput. Vilka Apps eller webhooks som faktiskt finns i GitHub måste verifieras externt.
+- `organization` med `invalid webhook signature`: verifiera att GitHub-webhooken och Worker-runtime använder samma HMAC-secret utan att skriva ut värdet.
+- Vid rotation måste provider- och runtime-sidan uppdateras samordnat och därefter verifieras med en signerad leverans.
 - Skicka eller dokumentera aldrig själva secretvärdet i repository, PR, logg eller chatt.
 
-GitHub-providerwebhooken är också canonical trigger för portalens dokumentationsfreshness. På docs-relevanta `push`-events på publik default branch samt `repository`-events anropar Skvallerbyttan `AVKROKEN_PORTAL_DOCS.invalidateDocs(...)`. RPC-anropet kräver ingen ytterligare secret och går inte via publik HTTP. Tre korta retryförsök görs; vid fortsatt fel loggas signalfelet medan GitHub-eventet fortfarande kan lagras och portalens edge-TTL fungerar som fallback.
+GitHub-webhookkoden kan trigga portalens dokumentationsfreshness. På docs-relevanta `push`-events på publik default branch samt `repository`-events anropar Skvallerbyttan `AVKROKEN_PORTAL_DOCS.invalidateDocs(...)`. RPC-anropet kräver ingen ytterligare secret och går inte via publik HTTP. Tre korta retryförsök görs; vid fortsatt fel loggas signalfelet medan GitHub-eventet fortfarande kan lagras och portalens edge-TTL fungerar som fallback.
 
 Webhooken lagrar alla signerade, organisationsmatchande leveranser som reducerad Activity. Händelser som motsvarar canonical dashboard-state invalidaterar dessutom berörda source-cacher. `custom_property` och `custom_property_values` invalidaterar governance/effective-policy så ändrade Custom Properties blir synliga utan att vänta på TTL. Issue-relation events klassificeras under den gemensamma pull-request/issues-capabilityn utan att råpayload sparas.
 
@@ -148,7 +148,7 @@ För Avkroken-portalen används Service Binding-konfigurationen:
 }
 ```
 
-den live Worker-tjänsten `avkroken` måste ha den namngivna entrypointen deployad innan en Skvallerbyttan-version med bindingen deployas. Bindingen är account-intern och använder inte GitHub- eller Cloudflare-webhooksecrets.
+service target `avkroken` måste exponera den deklarerade entrypointen innan en Skvallerbyttan-version med bindingen kan fungera. Bindingen är account-intern och använder inte GitHub- eller Cloudflare-webhooksecrets.
 
 Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
 
@@ -161,7 +161,7 @@ Var 15:e minut gör runtime en intern readiness-probe och levererar resultatet v
 - lokal auth-/runtimekonfiguration
 - D1 `SELECT 1`
 - läsbar Gamnacken/GitHub OAuth/R1/R2/R3 credentialkonfiguration
-- live GitHub App-anrop via Gamnacken
+- GitHub App-probe via den konfigurerade Gamnacken-bindingen
 - Cloudflare R1-probe via Zones
 - Cloudflare R2-probe via Account
 - Cloudflare R3-probe via Tunnels
@@ -205,13 +205,12 @@ Snapshot/security-retention är därför en känd operativ begränsning, inte en
 
 Read telemetry ligger i Workers Analytics Engine i stället för D1. Skälen är att telemetry ligger på en högfrekvent kodväg, Analytics Engine-write är avsedd för detta och D1-write för varje cache-hit skulle ge onödiga row writes.
 
-Verifierat 2026-09-19:
+Publika providergränser som påverkar valet ska verifieras mot aktuell Cloudflare-dokumentation:
 
 - Analytics Engine retention: 3 månader.
 - Workers Paid publicerad prismodell: 10 miljoner datapunkter/månad inkluderat, därefter $0.25/miljon; 1 miljon SQL reads/månad inkluderat, därefter $1.00/miljon.
 - Cloudflare anger fortfarande att Analytics Engine ännu inte faktureras trots publicerad kommande prismodell.
 - D1 Workers Paid inkluderar 25 miljarder rows read/månad och 50 miljoner rows written/månad; write-overage är $1/miljon rows.
-- D1 Free enforcement för dagliga limits är aktivt sedan 2026-09-01.
 
 Faktisk Skvallerbyttan-volym efter denna ändring är inte verifierad före deployment. En Analytics Engine datapunkt skrivs per instrumenterad read/refresh. Activity-events skrivs endast för observerade provider-events, inte cache-hits.
 
@@ -275,7 +274,7 @@ W1 behöver täcka Worker deployment/routes och D1 Write när remote migration k
 
 Migrationerna `0001`–`0005` använder defensiva `CREATE ... IF NOT EXISTS` där tabeller/index skapas. `0006_capability_scope_observations.sql` är däremot en normal versionsstyrd engångsmigration: den utökar den befintliga `capability_observations`-tabellen med `ALTER TABLE ... ADD COLUMN` och skapar därefter den nya scope-tabellen/indexen. Den ska därför appliceras genom Wranglers migrationsregister, som kör endast väntande migrationsfiler och inte applicerar en redan registrerad migration igen.
 
-Den verkliga runtime-livenessen bevisas därefter av mottagen heartbeat hos den oberoende watchdogen, inte av ett post-deploy GET-anrop mot produktionsdomänen.
+Repositoryts livenessmodell bygger på receiver-observerad heartbeat snarare än ett post-deploy GET-anrop.
 
 ## Deploymentgräns
 
