@@ -40,7 +40,8 @@ function hasPortalCategory(topics = []) {
 function publicHomepage(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" ? url : null;
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url;
   } catch {
     return null;
   }
@@ -102,4 +103,94 @@ export function normalizePublicRepositories(repositories) {
     .map(normalizePublicRepository)
     .filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name, "sv"));
+}
+
+
+const PUBLIC_APP_SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+
+function safeText(value, maxLength) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text || text.length > maxLength) return null;
+  return text;
+}
+
+function sourceTreeUrl(repository, ref, sourcePath) {
+  return repository + "/tree/" + encodeURIComponent(ref) + "/" +
+    String(sourcePath).split("/").filter(Boolean).map(encodeURIComponent).join("/");
+}
+
+export function normalizePublicAppManifest(manifest, context = {}) {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return null;
+  if (manifest.schemaVersion !== 1) return null;
+
+  const slug = safeText(manifest.slug, 64);
+  const name = safeText(manifest.name, 80);
+  const description = safeText(manifest.description, 280);
+  const categoryKey = safeText(manifest.category, 32);
+  const accent = safeText(manifest.accent, 32);
+
+  if (!slug || !PUBLIC_APP_SLUG.test(slug)) return null;
+  if (!name || !description) return null;
+  if (!categoryKey || !CATEGORY_TOPICS[categoryKey]) return null;
+  if (!accent || !ACCENT_TOPICS.includes(accent)) return null;
+
+  const sourcePath = safeText(context.sourcePath, 240);
+  const repositoryName = safeText(context.repositoryName, 120);
+  const ref = safeText(context.ref, 120);
+  const repository = safeText(context.repository, 240);
+
+  if (!sourcePath || !sourcePath.startsWith("apps/")) return null;
+  if (!repositoryName || !ref || !repository || !repository.startsWith("https://github.com/")) {
+    return null;
+  }
+
+  const homepage = publicHomepage(manifest.publicUrl);
+
+  return {
+    id: "app:" + repositoryName.toLowerCase() + ":" + slug,
+    type: "app",
+    slug,
+    name,
+    description,
+    category: CATEGORY_TOPICS[categoryKey],
+    accent,
+    independentProduct: false,
+    portalPublished: Boolean(homepage),
+    url: homepage?.href || null,
+    host: homepage?.host || null,
+    repository,
+    sourceUrl: sourceTreeUrl(repository, ref, sourcePath),
+    issues: repository + "/issues",
+    discussions: context.hasDiscussions === true ? repository + "/discussions" : null,
+    releases: repository + "/releases",
+    documentation: null,
+    pages: null,
+    language: null,
+    repoSizeKb: null,
+    updatedAt: context.updatedAt || null,
+    stars: Number.isFinite(context.stars) ? context.stars : 0,
+    source: {
+      provider: "github",
+      kind: "monorepo_app",
+      repository: repositoryName,
+      ref,
+      path: sourcePath
+    }
+  };
+}
+
+export function mergePublicProjectCatalog(repositoryProjects, appProjects) {
+  const projects = [
+    ...(Array.isArray(repositoryProjects) ? repositoryProjects : []),
+    ...(Array.isArray(appProjects) ? appProjects : [])
+  ];
+
+  const unique = new Map();
+  for (const project of projects) {
+    if (!project || typeof project.id !== "string" || unique.has(project.id)) continue;
+    unique.set(project.id, project);
+  }
+
+  return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "sv"));
 }

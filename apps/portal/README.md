@@ -71,7 +71,11 @@ Nuvarande Worker exponerar:
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
-Monorepo-appar under `Avkroken/Avkroken/apps` upptäcks inte automatiskt av projektkatalogen ännu. Den gränsen är avsiktlig tills app-discovery har en explicit publik manifest-/allowlistmodell; Jobb får inte råka exponeras genom generell appscanning.
+Monorepo-appar publiceras endast genom explicit opt-in. Portalen listar `apps/` internt och försöker läsa exakt `portal.public.json` i respektive appkatalog; saknat manifest är normalt och appen läggs inte till i den publika modellen.
+
+`apps/skvallerbyttan/portal.public.json` är den första appägda publiceringsmanifesten. Den innehåller endast portalpresentation och gör inte Skvallerbyttans privata dashboard publik. Portal och Jobb har inget publikt appmanifest.
+
+Manifestet får inte styra source-path, repository eller ref; de värdena kommer från discovery-konteksten. Okända manifestfält kopieras inte till den publika projektmodellen.
 
 ## Källdata och ansvar
 

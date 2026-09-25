@@ -55,6 +55,16 @@ Om GitHub API inte kan läsas returnerar backend `502 github_unavailable` och UI
 
 Katalogsvaret innehåller `generatedAt` och deklarerad coverage `active_public_repositories`.
 
+### Appdiscovery
+
+Opt-in-appdiscovery läser endast `portal.public.json` under appkataloger.
+
+- saknat manifest är normalt och publicerar ingenting;
+- ogiltigt manifest eller manifest-read-fel markerar `source.appDiscovery = partial`;
+- fel vid listning av appkatalogen markerar `source.appDiscovery = unavailable`;
+- repositorykatalogen kan fortfarande returneras när appdiscovery är unavailable/partial;
+- inga appkatalogers övriga filer eller skyddade payloads läses av discovery-steget.
+
 ### Publicerade sites
 
 `GET /api/sites` härleds från projektkatalogen och behåller den tidigare endpointpolicyn genom `portalPublished`.
@@ -99,7 +109,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Lägg inte providercredentials i browser assets.
 - Skapa inte ny credential för Portal v2 om befintligt verifierat flöde räcker.
 - `.github`, retired sources, arkiverade och icke-publika repositories ska inte hamna i den publika projektkatalogen.
-- Monorepo-appar ska inte läggas till genom generell scanning innan explicit publik app-policy finns.
+- Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post.
 - Jobb/Auth-data får inte passera publik Portal-cache eller publik sök.
 - Skvallerbyttans providerintegration förblir read-only.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -112,9 +122,10 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
 3. `/api/projects`, `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
-5. deep links returnerar Portal-shell;
-6. dokumentationsrendering visar “Visa original” till canonical källa;
-7. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-8. cache-/heartbeat-beteende har inte regresserat.
+5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
+6. deep links returnerar Portal-shell;
+7. dokumentationsrendering visar “Visa original” till canonical källa;
+8. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
+9. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

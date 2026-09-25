@@ -57,7 +57,21 @@ Projektmodellen skiljer mellan canonical källdata och härledd presentation:
 
 Repository utan homepage finns fortfarande i Projekt-katalogen. Endast HTTPS-homepages godtas som publika endpoints.
 
-Monorepo-appar upptäcks inte genom generell scanning i detta lager. Det förhindrar att skyddad appmetadata, särskilt Jobb, exponeras av misstag innan app-discovery har en explicit publik policy.
+Monorepo-appar publiceras med explicit opt-in via en appägd `portal.public.json`.
+
+Discovery-flödet:
+
+1. Portalen hittar det publika `Avkroken/Avkroken`-repositoryt i den redan hämtade organisationslistan.
+2. Portalen listar endast toppnivån `apps/` internt.
+3. För varje appkatalog försöker den läsa exakt `portal.public.json`.
+4. `404` betyder “inte publicerad” och genererar ingen publik projektpost.
+5. Ett manifest valideras strikt innan en projektpost skapas.
+6. Source-path, repository och ref tas från discovery-konteksten och kan inte skrivas över av manifestet.
+7. Okända manifestfält kopieras inte till den publika modellen.
+
+Manifestet är presentation/publiceringskonfiguration, inte teknisk source of truth. Appens README/docs äger fortsatt teknisk current-state.
+
+Skvallerbyttan är första opt-in-appen. Manifestet innehåller ingen publik dashboard-URL, så projektposten gör inte den privata dashboarden publik. Jobb och Portal saknar publika appmanifests.
 
 ### Operativ providerstate
 
@@ -145,7 +159,8 @@ Projektadaptern och dokumentationsadaptern använder samma providerfamilj men ol
 
 - `source.provider = github`;
 - `source.scope = Avkroken`;
-- `source.coverage = active_public_repositories`;
+- `source.coverage = active_public_repositories_and_opt_in_apps`;
+- `source.appDiscovery` med `available`, `partial`, `unavailable` eller `not_configured`;
 - `generatedAt`.
 
 Klientresponsen kräver revalidering. Workers Cache API får en separat response-kopia med `Cache-Control: public, max-age=300`; en cache-hit skrivs tillbaka till klienten med revalideringsheader. `stale-while-revalidate` används inte i Cache API-lagret eftersom Workers Cache API inte stöder direktiven.

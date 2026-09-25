@@ -68,6 +68,10 @@ function projectCard(project) {
     ? `<a class="card-action" href="${escapeHtml(project.discussions)}" target="_blank" rel="noopener noreferrer">Discussions</a>`
     : "";
 
+  const sourceLink = project.sourceUrl
+    ? `<a class="card-action" href="${escapeHtml(project.sourceUrl)}" target="_blank" rel="noopener noreferrer">Källa</a>`
+    : "";
+
   const location = project.host ||
     project.source?.repository ||
     project.repository ||
@@ -87,6 +91,7 @@ function projectCard(project) {
         ${endpointLink}
         ${documentationLink}
         <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
+        ${sourceLink}
         <a class="card-action" href="${escapeHtml(project.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>
         ${discussionsLink}
       </nav>
