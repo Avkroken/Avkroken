@@ -123,7 +123,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/` — Avkroken.
 - `/projekt` — projektöversikt.
 - `/projekt/:repository` — projektdetaljens stabila namespace.
-- `/projekt/:repository/dokumentation[/...]` — repositorydokumentation.
+- `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/dokumentation[/...]` — samlad dokumentationsyta.
 - `/tjanster` — publika tjänster/produkter.
 - `/auth` — publik auth-ingång utan skyddad payload.
@@ -136,20 +136,26 @@ API- och asset-paths är inte del av SPA-fallbacken.
 
 Klienten kan fortfarande tolka äldre `#docs/...`-länkar för migration/bakåtkompatibilitet.
 
-## Repository- och dokumentationsadapter
+## Repository-, app- och dokumentationsadapter
+
+`src/docs-source.mjs` separerar Portalens route-identitet från providerkoordinaterna.
 
 Dokumentationsadaptern:
 
 1. filtrerar till publik, aktiv och icke-retired repository-state;
-2. söker README och Markdown under `docs/` till begränsat djup;
-3. bygger en katalog;
-4. validerar vald repository/path mot katalogen före innehållshämtning;
-5. returnerar Markdown och canonical `sourceUrl`;
-6. cachear katalog/innehåll med cache tags.
+2. lägger till endast monorepo-appar som redan har ett giltigt `portal.public.json`;
+3. söker repositoryts README/`docs/` eller appens app-lokala README/`docs/` till begränsat djup;
+4. bygger katalogposter med stabil `key`, canonical source repository/ref och tillåtna route-paths;
+5. validerar att vald route-path exakt finns i katalogpostens `pages` före providerfetch;
+6. mappar appens route-path, exempelvis `docs/architecture.md`, till provider-path `apps/skvallerbyttan/docs/architecture.md` först efter allowlistkontrollen;
+7. returnerar Markdown och canonical `sourceUrl`;
+8. taggar appinnehåll med det faktiska source-repositoryt för cacheinvalidering.
 
-Godtycklig GitHub-path kan därför inte användas direkt mot content-endpointen.
+Godtycklig GitHub-path kan därför inte användas direkt mot content-endpointen. Jobb saknar publiceringsmanifest och får ingen app-docs-entry.
 
-Projektadaptern och dokumentationsadaptern använder samma providerfamilj men olika kontrakt: projektadaptern normaliserar repositorymetadata, medan dokumentationsadaptern läser tillåtna dokument.
+Relativa Markdown-länkar som pekar på en annan sida i samma publika katalog hålls inne i Portal-skalet. En olöst relativ Markdown-länk till annan canonical monorepo-dokumentation faller tillbaka till motsvarande GitHub-original i stället för en felaktig Portal-path.
+
+Projektadaptern och dokumentationsadaptern använder samma providerfamilj men olika kontrakt: projektadaptern normaliserar projektmetadata, medan dokumentationsadaptern läser uttryckligen tillåtna dokument.
 
 ## Caching och freshness
 
@@ -170,6 +176,8 @@ Klientresponsen kräver revalidering. Workers Cache API får en separat response
 ### Dokumentation
 
 Katalog och innehåll har sex timmars CDN-cache och cache tags.
+
+Appdokument använder source-repositoryts tagg. Skvallerbyttans appdokument i `Avkroken/Avkroken` taggas därför som `docs-repo-avkroken`, så befintlig push-signal från monorepot invalidaterar rätt katalog/innehåll.
 
 `DocsInvalidationService` tillåter intern, explicit invalidering för berörda repositories.
 
