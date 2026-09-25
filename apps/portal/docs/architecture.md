@@ -52,7 +52,7 @@ GET /api/projects
 Projektmodellen skiljer mellan canonical källdata och härledd presentation:
 
 - `source.provider`, `source.repository` och `source.ref` pekar på källan;
-- `portalUrl`, `documentation`, `issues`, `releases`, `builds`, `discussions`, canonical repository-Wiki samt interna `wikiPortalUrl`, `issuesPortalUrl`, `releasesPortalUrl` och `buildsPortalUrl` där tillgängligt är navigationslänkar;
+- `portalUrl`, `documentation`, `issues`, `releases`, `builds`, `discussions`, canonical repository-Wiki samt interna `wikiPortalUrl`, `issuesPortalUrl`, `releasesPortalUrl`, `buildsPortalUrl` och `activityPortalUrl` där tillgängligt är navigationslänkar;
 - `portalPublished` är en härledd kompatibilitetsflagga för tidigare `/api/sites`;
 - `independentProduct` markerar Politiker, Klarspråk och Produkter så Portal-skalet inte används som deras produktidentitet.
 
@@ -91,7 +91,7 @@ client project catalog
        +--> /projekt/:slug
 ```
 
-När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues-, Releases- och Builds/CI-routes. Själva detaljsidan gör ingen separat providerrequest för dessa vyer.
+När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues-, Releases- och Builds/CI-routes samt Activity-route när repositoryt inte är mixed-scope. Själva detaljsidan gör ingen separat providerrequest för dessa vyer.
 
 
 ### Changelog / Releases
@@ -191,6 +191,43 @@ Cacheåldern jämförs mot sex timmar, samma horisont som den breda overview-cac
 
 Monorepo-appar får `builds = null` och `buildsPortalUrl = null` och kan inte ärva source-repositoryts CI-status som appdata.
 
+### Publik Activity
+
+Activity är ett separat public-only adapterflöde och använder **inte** Skvallerbyttans organisationsomfattande Activity-ledger.
+
+```text
+GitHub public org events (max 100)
+        +
+GitHub live public repositories
+        |
+        v
+repository-policy.mjs
+        |
+        +--> remove infra/retired
+        +--> remove mixed-scope Avkroken/Avkroken
+        |
+        v
+activity-source.mjs
+        +--> event.public === true
+        +--> allowlisted event types
+        +--> canonical URL validation
+        +--> strip actor/ref/SHA/title/raw payload
+        |
+        v
+GET /api/activity[?project=...]
+        |
+        +--> /aktivitet
+        +--> /projekt/:slug/aktivitet
+```
+
+Den mixed-scope repositorytypen finns i `repository-policy.mjs`. För närvarande klassas `Avkroken` som mixed-scope eftersom repositoryt även innehåller skyddade appytor, medan Events API inte ger ett säkert filpath-filter för eventet.
+
+Activity använder GitHubs public organization events-endpoint, vars providerkontrakt är fördröjt och inte realtid. Portalen deklarerar därför `realtime = false` och coverage `bounded` eller `partial`.
+
+Accepterade Events API-typer är Push, PullRequest, Issues, Release, Create och Delete. Workflow runs och deployments finns inte som eventtyper i GitHubs Events API-kontrakt och fabriceras inte i denna ström.
+
+Ingen persistent Activity-cache används. Samtidiga buildförfrågningar kan dela ett isolate-lokalt in-flight Promise.
+
 ### Operativ providerstate
 
 ```text
@@ -264,6 +301,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:slug/issues` — sanerade publika GitHub Issues för repositoryprojekt; PR-poster filtreras bort.
 - `/projekt/:slug/builds` — sampled, cachead Actions-summary från Skvallerbyttan för repositoryprojekt.
+- `/projekt/:slug/aktivitet` — bounded publik GitHub Events-ström för eligible fristående repositoryprojekt.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
 - `/projekt/:slug/releases` — Portal-presentation av officiella GitHub Releases för publicerade repositoryprojekt.
