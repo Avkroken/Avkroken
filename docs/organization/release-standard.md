@@ -91,6 +91,8 @@ Release Please är tekniskt väl lämpat för målflödet och stödjer Conventio
 
 Det strider mot repositoryts krav att release-PR ska kunna verifieras med normala CI-checks före merge.
 
+Upstreamreferens: `https://github.com/googleapis/release-please-action#other-actions-on-release-please-prs`.
+
 Följande lösningar är därför inte tillåtna som genväg:
 
 - skapa en ny PAT utan separat godkänt credentialbeslut;
