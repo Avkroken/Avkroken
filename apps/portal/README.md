@@ -38,6 +38,7 @@ Portal v2 etablerar:
 - server-side global sök över publicerade projekt, README/docs och Wiki-presentationer;
 - Drift & insyn från en sanerad Skvallerbyttan-snapshot via intern read-only Service Binding;
 - Changelog från officiella publicerade GitHub Releases för redan publicerade repositoryprojekt;
+- projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -51,6 +52,7 @@ Portalen känner bland annat igen:
 - `/projekt`
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:slug/wiki` — Portal-presentation av repositoryts genererade Wiki-navigation, med länk till original-Wikin.
+- `/projekt/:slug/releases` — officiella publicerade GitHub Releases för repositoryprojekt; monorepo-appar får ingen ärvd releasevy.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -77,6 +79,7 @@ Nuvarande Worker exponerar:
 - `GET /api/search?q=...` — rankade sökträffar från ett server-side index byggt endast från publicerade projekt och dokumentationskällor.
 - `GET /api/operations` — public-safe provider-/capabilitystatus från Skvallerbyttans read-only observationsmodell; responsen är `no-store`.
 - `GET /api/changelog` — bounded releasehistorik från publicerade repositoryprojekt; draft releases, monorepo-app-arv och rå release-body/author/assets exkluderas.
+- `GET /api/releases?project=...` — projektspecifik, `no-store` releasehistorik för ett redan publicerat repositoryprojekt med samma minimala releasemodell.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -143,9 +146,11 @@ live public project catalog
   -> /changelog
 ```
 
-Changelog använder endast repositoryprojekt som fortfarande passerar den live publika projektpolicyn när snapshoten byggs. Monorepo-appar är separata projektidentiteter och ärver inte source-repositoryts releasehistorik.
+Changelog använder endast repositoryprojekt som fortfarande passerar den live publika projektpolicyn när snapshoten byggs. Samma releaseadapter används av `/projekt/:slug/releases` genom `GET /api/releases?project=...`.
 
-Den publika releasemodellen innehåller endast projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft releases och rå body/author/assets/target SHA publiceras inte. Snapshoten lagras inte persistent i Cache API.
+Repositoryprojekt får både canonical GitHub Releases-länk och intern `releasesPortalUrl`. Monorepo-appar är separata projektidentiteter: deras `releases` och `releasesPortalUrl` är `null`, så source-repositoryts releasehistorik kan inte presenteras som appens egen.
+
+Den publika releasemodellen innehåller endast projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft releases och rå body/author/assets/target SHA publiceras inte. Changelog-snapshoten och projektspecifika release-responser lagras inte persistent i Cache API.
 
 ### Operativ state
 
