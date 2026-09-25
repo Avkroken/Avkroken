@@ -47,11 +47,11 @@ CF Audit Logs ──────────────┘
 
 Provider-events ska ha **en canonical ingress**: Skvallerbyttan. Fronten på `avkroken.denied.se` ska inte behöva GitHub- eller Cloudflare-webhookhemligheter för att reagera på observerade händelser.
 
-När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen pekar på den namngivna RPC-entrypointen `DocsInvalidationService` i den live Cloudflare-tjänsten `avkroken` (portalens källkod ligger i `Avkroken/Avkroken/apps/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
+När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen deklarerar service target `avkroken` och RPC-entrypointen `DocsInvalidationService` (portalens källkod ligger i `Avkroken/Avkroken/apps/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
 
 Repository-events signalerar också portalens dokumentationskatalog, inklusive tidigare repositorynamn vid rename. Service-signalen sker före webhook-dedupliceringen så en manuell GitHub-redelivery kan reparera en tidigare misslyckad portalinvalidering utan att dubbellagra Activity-eventet.
 
-Cloudflare-providerhändelser kommer redan in genom Notifications- och CASB-webhooks och skrivs till samma observationsmodell. Audit Logs och den sex-timmars reconciliation-körningen är safety net för det som inte exponeras som push-event.
+Koden har ingressvägar för Cloudflare Notifications/CASB och read-paths för Audit Logs/reconciliation. Vilka externa providerintegrationer som faktiskt är aktiva är Cloudflare-state och fastställs inte av repositoryt.
 
 Operativ liveness följer motsatt riktning mot klassiska health-checks: Skvallerbyttan skickar heartbeat var 15:e minut genom `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`. Receiver-state ligger i portalens Durable Object och är därmed inte beroende av Skvallerbyttans egen D1 eller HTTP-route. Utebliven leverans efter 35 minuter genererar notifiering från mottagarsidan.
 
@@ -141,7 +141,7 @@ Source-prioritet:
 3. snapshot diff
 4. reconciliation
 
-Nuvarande generella ledger använder GitHub-organisationswebhooken, Cloudflare Notifications/CASB och Cloudflare Audit Logs. Coverage anges explicit. Webhookdata är normalt `since_first_observation`; Audit Log-ingest markeras `partial`. Downstream-signaler till andra Avkroken-tjänster är effekter av redan verifierade events och är inte en ny provider-källa.
+Den generella ledgern kan normalisera GitHub-webhookevent, Cloudflare Notifications/CASB och Cloudflare Audit Logs. Coverage anges explicit. Webhookdata är normalt `since_first_observation`; Audit Log-ingest markeras `partial`. Downstream-signaler till andra Avkroken-tjänster är effekter av redan verifierade events och är inte en ny provider-källa.
 
 ## Reads
 
