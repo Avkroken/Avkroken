@@ -81,6 +81,10 @@ function projectCard(project) {
     ? `<a class="card-action" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
     : "";
 
+  const issuesLink = project.issuesPortalUrl
+    ? `<a class="card-action" data-portal-route href="${escapeHtml(project.issuesPortalUrl)}">Issues</a>`
+    : "";
+
   const discussionsLink = project.discussions
     ? `<a class="card-action" href="${escapeHtml(project.discussions)}" target="_blank" rel="noopener noreferrer">Discussions</a>`
     : "";
@@ -110,7 +114,7 @@ function projectCard(project) {
         ${documentationLink}
         <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
         ${sourceLink}
-        <a class="card-action" href="${escapeHtml(project.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>
+        ${issuesLink}
         ${discussionsLink}
       </nav>
       <div class="metrics" aria-label="Projektdata">
