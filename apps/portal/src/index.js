@@ -7,6 +7,13 @@ import {
 } from "./docs-source.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import {
+  appDocumentSearchEntry,
+  mergeSearchEntries,
+  projectSearchEntries,
+  searchEntries,
+  validateExternalSearchIndex
+} from "./search-source.mjs";
+import {
   mergePublicProjectCatalog,
   normalizePublicAppManifest,
   normalizePublicRepositories
@@ -26,6 +33,13 @@ const PUBLIC_APP_DISCOVERY_ROOT = "apps";
 const PUBLIC_APP_MANIFEST = "portal.public.json";
 const MAX_PUBLIC_APP_DIRECTORIES = 32;
 const MAX_PUBLIC_APP_MANIFEST_BYTES = 8192;
+
+const PUBLIC_SEARCH_INDEX_URL = "https://avkroken.github.io/.github/search-index.json";
+const SEARCH_CORPUS_CACHE_SECONDS = 15 * 60;
+const SEARCH_CORPUS_CACHE_KEY = "https://avkroken-cache.invalid/search-corpus-v1";
+const MAX_SEARCH_INDEX_BYTES = 5 * 1024 * 1024;
+const MAX_SEARCH_APP_PAGES = 64;
+const MAX_SEARCH_DOCUMENT_BYTES = 250000;
 
 const WATCHED_SERVICES = ["skvallerbyttan"];
 const HEARTBEAT_EXPECTED_INTERVAL_SECONDS = 15 * 60;
@@ -518,6 +532,268 @@ async function getPortalSites(env, ctx) {
   });
 }
 
+
+async function loadExternalSearchEntries() {
+  try {
+    const response = await fetch(PUBLIC_SEARCH_INDEX_URL, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Avkroken-Portal-Search"
+      }
+    });
+
+    if (!response.ok) {
+      return { status: "unavailable", generatedAt: null, entries: [] };
+    }
+
+    const raw = await response.text();
+    if (raw.length > MAX_SEARCH_INDEX_BYTES) {
+      return { status: "invalid", generatedAt: null, entries: [] };
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return { status: "invalid", generatedAt: null, entries: [] };
+    }
+
+    const parsed = validateExternalSearchIndex(payload);
+    if (!parsed) {
+      return { status: "invalid", generatedAt: null, entries: [] };
+    }
+
+    return {
+      status: "available",
+      generatedAt: parsed.generatedAt,
+      entries: parsed.entries.filter(entry => entry.kind !== "repository")
+    };
+  } catch {
+    return { status: "unavailable", generatedAt: null, entries: [] };
+  }
+}
+
+async function fetchSearchDocument(entry, page, env) {
+  const location = docsContentLocation(entry, page?.path);
+  const sourceUrl = canonicalDocUrl(entry, page?.path);
+  if (!location || !sourceUrl) return null;
+
+  const endpoint = "https://api.github.com/repos/Avkroken/" +
+    encodeURIComponent(location.repository) +
+    "/contents/" + encodedPath(location.path) +
+    "?ref=" + encodeURIComponent(location.ref);
+  const response = await fetch(endpoint, {
+    headers: githubHeaders(env, "application/vnd.github.raw+json")
+  });
+
+  if (!response.ok) return null;
+
+  const markdown = await response.text();
+  if (markdown.length > MAX_SEARCH_DOCUMENT_BYTES) return null;
+
+  return { markdown, sourceUrl };
+}
+
+async function loadPublishedAppSearchEntries(projects, env) {
+  const apps = Array.isArray(projects)
+    ? projects.filter(project =>
+        project?.type === "app" &&
+        project?.source?.kind === "monorepo_app" &&
+        typeof project?.source?.repository === "string"
+      )
+    : [];
+
+  if (!apps.length) {
+    return { status: "available", entries: [] };
+  }
+
+  const repositoryNames = [...new Set(apps.map(project => project.source.repository))];
+  const repositories = [];
+  let partial = false;
+
+  for (const fullName of repositoryNames) {
+    const parts = fullName.split("/");
+    if (parts.length !== 2 || parts[0] !== "Avkroken") {
+      partial = true;
+      continue;
+    }
+
+    const metadata = await fetchGitHubJson(
+      "https://api.github.com/repos/" + encodeURIComponent(parts[0]) + "/" +
+        encodeURIComponent(parts[1]),
+      env
+    );
+    if (!metadata.ok || !metadata.data) {
+      partial = true;
+      continue;
+    }
+    repositories.push(metadata.data);
+  }
+
+  const entries = [];
+  let pageCount = 0;
+
+  for (const project of apps) {
+    const docsEntry = await buildAppDocsEntry(project, repositories, env);
+    if (!docsEntry) {
+      partial = true;
+      continue;
+    }
+
+    for (const page of docsEntry.pages) {
+      if (pageCount >= MAX_SEARCH_APP_PAGES) {
+        partial = true;
+        break;
+      }
+      pageCount += 1;
+
+      const document = await fetchSearchDocument(docsEntry, page, env);
+      if (!document) {
+        partial = true;
+        continue;
+      }
+
+      const entry = appDocumentSearchEntry(
+        docsEntry,
+        page,
+        document.markdown,
+        document.sourceUrl
+      );
+      if (!entry) {
+        partial = true;
+        continue;
+      }
+      entries.push(entry);
+    }
+
+    if (pageCount >= MAX_SEARCH_APP_PAGES) break;
+  }
+
+  return {
+    status: partial ? "partial" : "available",
+    entries
+  };
+}
+
+async function buildSearchCorpus(env) {
+  const externalPromise = loadExternalSearchEntries();
+
+  let projectCatalog;
+  try {
+    projectCatalog = await loadPublicProjects(env);
+  } catch {
+    projectCatalog = { projects: [], appDiscovery: "unavailable" };
+  }
+
+  const [external, appDocs] = await Promise.all([
+    externalPromise,
+    loadPublishedAppSearchEntries(projectCatalog.projects, env)
+  ]);
+
+  const projects = projectSearchEntries(projectCatalog.projects);
+  const entries = mergeSearchEntries(projects, external.entries, appDocs.entries);
+
+  const projectStatus = projectCatalog.projects.length > 0
+    ? "available"
+    : "unavailable";
+  const availableSources = [
+    external.status === "available",
+    projectStatus === "available",
+    appDocs.status === "available" || appDocs.status === "partial"
+  ].filter(Boolean).length;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    externalGeneratedAt: external.generatedAt,
+    entries,
+    coverage: {
+      externalIndex: external.status,
+      projects: projectStatus,
+      appDocs: appDocs.status,
+      appDiscovery: projectCatalog.appDiscovery || "unknown",
+      state: availableSources === 0
+        ? "unavailable"
+        : (
+            external.status === "available" &&
+            projectStatus === "available" &&
+            appDocs.status === "available"
+              ? "configured_sources"
+              : "partial"
+          )
+    }
+  };
+}
+
+async function getSearchCorpus(env, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request(SEARCH_CORPUS_CACHE_KEY);
+  const cached = await cache.match(cacheKey);
+
+  if (cached) {
+    try {
+      return await cached.json();
+    } catch {
+      // Invalid internal cache falls through to a provider refresh.
+    }
+  }
+
+  const corpus = await buildSearchCorpus(env);
+  const cachedResponse = new Response(JSON.stringify(corpus), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=" + SEARCH_CORPUS_CACHE_SECONDS
+    }
+  });
+  ctx.waitUntil(cache.put(cacheKey, cachedResponse));
+  return corpus;
+}
+
+async function getSearchResults(requestUrl, env, ctx) {
+  const query = String(requestUrl.searchParams.get("q") || "").trim();
+
+  if (!query) {
+    return Response.json({
+      query: "",
+      generatedAt: null,
+      externalGeneratedAt: null,
+      coverage: { state: "not_requested" },
+      results: []
+    }, {
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  if (query.length > 120) {
+    return Response.json({ error: "query_too_long" }, {
+      status: 400,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  const corpus = await getSearchCorpus(env, ctx);
+  if (corpus?.coverage?.state === "unavailable") {
+    return Response.json({
+      error: "search_unavailable",
+      query,
+      coverage: corpus.coverage,
+      results: []
+    }, {
+      status: 503,
+      headers: { "Cache-Control": "no-store" }
+    });
+  }
+
+  return Response.json({
+    query,
+    generatedAt: corpus.generatedAt,
+    externalGeneratedAt: corpus.externalGeneratedAt,
+    coverage: corpus.coverage,
+    results: searchEntries(corpus.entries, query, 20)
+  }, {
+    headers: { "Cache-Control": "no-store" }
+  });
+}
+
 function operationalWatchdogStub(env, service) {
   if (!env.OPS_WATCHDOG) throw new Error("operational watchdog binding is not configured");
   const id = env.OPS_WATCHDOG.idFromName(service);
@@ -807,6 +1083,13 @@ export default {
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/search") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getSearchResults(url, env, ctx);
+    }
 
     if (url.pathname === "/api/projects") {
       if (request.method !== "GET" && request.method !== "HEAD") {
