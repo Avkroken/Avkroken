@@ -1,4 +1,4 @@
-import { documentationPath, projectBuildsPath, projectIssuesPath, projectPath, projectReleasesPath, wikiPath } from "./portal-routes.mjs";
+import { documentationPath, projectActivityPath, projectBuildsPath, projectIssuesPath, projectPath, projectReleasesPath, wikiPath } from "./portal-routes.mjs";
 import { isRetiredRepository } from "./repository-policy.mjs";
 
 const RESERVED_REPOSITORIES = new Set([".github"]);
@@ -81,6 +81,7 @@ export function normalizePublicRepository(repo) {
     issuesPortalUrl: projectIssuesPath(name),
     builds: canonicalRepository + "/actions",
     buildsPortalUrl: projectBuildsPath(name),
+    activityPortalUrl: projectActivityPath(name),
     wiki: repo?.has_wiki === true ? canonicalRepository + "/wiki" : null,
     wikiPortalUrl: repo?.has_wiki === true ? wikiPath(name) : null,
     discussions: repo?.has_discussions === true ? canonicalRepository + "/discussions" : null,
@@ -172,6 +173,7 @@ export function normalizePublicAppManifest(manifest, context = {}) {
     issuesPortalUrl: null,
     builds: null,
     buildsPortalUrl: null,
+    activityPortalUrl: null,
     wiki: null,
     wikiPortalUrl: null,
     discussions: context.hasDiscussions === true ? repository + "/discussions" : null,
