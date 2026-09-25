@@ -92,6 +92,26 @@ Klienten kan fortfarande tolka äldre `#docs/...`-länkar för migration/bakåtk
 
 Worker hämtar publika repositories från GitHub API.
 
+### Project adapter
+
+`src/project-adapter.mjs` normaliserar repositorymetadata till Portalens presentationsmodell.
+
+Katalogen:
+
+1. använder samma publika org-repolista som Worker redan hämtar;
+2. filtrerar bort `.github`, forks, arkiverade/icke-publika och pensionerade repositories;
+3. markerar Politiker, Klarspråk och Produkter som uttryckligt självständiga produkter;
+4. använder repository topic för klassning när en sådan finns;
+5. använder `project` som transparent fallback när explicit presentationstopic saknas;
+6. genererar canonical länkar till repository, Issues, Discussions, Releases, Actions, commits och Wiki;
+7. genererar intern Portal-länk till projektdetalj och dokumentation.
+
+Klassningens ursprung följer med som `kindSource`; den ska inte beskrivas som providerfakta när värdet kommer från Portalens policy eller fallback.
+
+`/api/projects` och `/api/sites` är separata kontrakt. Project catalog beskriver user-facing projekt/tjänster medan sites beskriver publicerade endpoints.
+
+### Dokumentationsadapter
+
 Dokumentationsadapter:
 
 1. filtrerar till publik, aktiv och icke-retired repository-state;
@@ -105,9 +125,9 @@ Godtycklig GitHub-path kan därför inte användas direkt mot content-endpointen
 
 ## Caching och freshness
 
-### Sites
+### Projects och sites
 
-`/api/sites` använder Workers Cache API med fem minuters cachetid.
+`/api/projects` och `/api/sites` använder varsin Workers Cache API-nyckel med fem minuters cachetid. De hålls separata eftersom kontrakten har olika semantik.
 
 ### Dokumentation
 
