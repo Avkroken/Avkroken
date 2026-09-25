@@ -1,5 +1,8 @@
 # Access-klassificering för Avkrokens webbappar
 
+> **Scope:** Detta dokument gäller webbappar i `Avkroken/Avkroken`-monorepot. Fristående Avkroken-repositories äger sin egen accessdokumentation och styrs inte av denna fil.
+
+
 Det här dokumentet beskriver **klassificeringsmodellen**, inte den aktuella operativa hostinventeringen. Grundregeln är **privat tills motsatsen är uttryckligen beslutad**.
 
 Exakta hostnamn, Cloudflare account-/policy-ID:n, privata appnamn, autentiseringsdetaljer, protokollundantag och migreringsordning ska inte lagras i detta publika repository.
