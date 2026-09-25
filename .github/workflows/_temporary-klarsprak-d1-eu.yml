@@ -1,4 +1,4 @@
-name: Temporary finalize Klarsprak EU D1 cutover
+name: Temporary verify Klarsprak EU D1 final state
 
 on:
   push:
@@ -9,50 +9,41 @@ permissions:
   contents: read
 
 jobs:
-  finalize:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
       CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
-      SOURCE_DB_ID: a8117d9d-a65d-430d-a8a2-9b4ef3fd9e2f
-      TARGET_DB_ID: 7891c6c7-0d4b-4e23-b2d8-d3eaaabdcfce
+      OLD_DB_ID: a8117d9d-a65d-430d-a8a2-9b4ef3fd9e2f
+      EU_DB_ID: 7891c6c7-0d4b-4e23-b2d8-d3eaaabdcfce
       EXPECTED_WORKER_VERSION: 94835c95-9e40-4c82-857f-6b348ecf8188
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
-      - name: Reverify Worker and EU D1
+      - name: Verify final provider state
         shell: bash
         run: |
           set -euo pipefail
           npx --yes wrangler@4.139.0 deployments list --name klarsprak >/tmp/deployments.txt
           grep -q "$EXPECTED_WORKER_VERSION" /tmp/deployments.txt
           node <<'NODE'
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN, id=process.env.TARGET_DB_ID;
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID, token=process.env.CLOUDFLARE_API_TOKEN;
+          const old=process.env.OLD_DB_ID, eu=process.env.EU_DB_ID;
           const base=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
           const headers={Authorization:`Bearer ${token}`,"Content-Type":"application/json"};
-          const info=await (await fetch(`${base}/${id}`,{headers})).json();
-          if(!info.success||info.result.name!=="klarsprak-db-eu"||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="auto") throw new Error("EU target metadata mismatch");
-          const r=await fetch(`${base}/${id}/query`,{method:"POST",headers,body:JSON.stringify({sql:"SELECT COUNT(*) AS terms FROM published_terms; SELECT COUNT(*) AS submissions FROM submissions;"})});
-          const b=await r.json();
-          if(!r.ok||!b.success||Number(b.result[0].results[0].terms)!==38||Number(b.result[1].results[0].submissions)!==5) throw new Error("EU target data mismatch");
-          console.log(JSON.stringify({name:info.result.name,jurisdiction:info.result.jurisdiction,read_replication:info.result.read_replication?.mode,terms:38,submissions:5}));
+          const list=await (await fetch(`${base}?per_page=100`,{headers})).json();
+          if(!list.success) throw new Error("D1 list failed");
+          const oldEntry=list.result.find(x=>x.uuid===old);
+          const euEntry=list.result.find(x=>x.uuid===eu);
+          console.log(JSON.stringify({old_present:Boolean(oldEntry),eu_list_entry:euEntry?{uuid:euEntry.uuid,name:euEntry.name,jurisdiction:euEntry.jurisdiction??null}:null}));
+          if(oldEntry) throw new Error("Old non-EU Klarsprak D1 still present");
+          if(!euEntry) throw new Error("EU Klarsprak D1 missing from inventory");
+          const info=await (await fetch(`${base}/${eu}`,{headers})).json();
+          if(!info.success||info.result.name!=="klarsprak-db-eu"||info.result.jurisdiction!=="eu"||info.result.read_replication?.mode!=="auto") throw new Error("EU D1 detail mismatch");
+          const q=await fetch(`${base}/${eu}/query`,{method:"POST",headers,body:JSON.stringify({sql:"SELECT COUNT(*) AS terms FROM published_terms; SELECT COUNT(*) AS submissions FROM submissions;"})});
+          const b=await q.json();
+          if(!q.ok||!b.success||Number(b.result?.[0]?.results?.[0]?.terms)!==38||Number(b.result?.[1]?.results?.[0]?.submissions)!==5) throw new Error("EU D1 row-count verification failed");
+          console.log(JSON.stringify({name:info.result.name,jurisdiction:info.result.jurisdiction,read_replication:info.result.read_replication.mode,terms:38,submissions:5,file_size:info.result.file_size}));
           NODE
-      - name: Delete retired non-EU Klarsprak D1
-        shell: bash
-        run: |
-          set -euo pipefail
-          code="$(curl -sS -o /tmp/delete.json -w '%{http_code}' -X DELETE             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database/$SOURCE_DB_ID")"
-          echo "old Klarsprak D1 delete HTTP status: $code"
-          [[ "$code" =~ ^2 ]] || { cat /tmp/delete.json; exit 1; }
-      - name: Final inventory verification
-        shell: bash
-        run: |
-          set -euo pipefail
-          list="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database?per_page=100")"
-          printf '%s' "$list" | jq -e --arg old "$SOURCE_DB_ID" --arg eu "$TARGET_DB_ID" '
-            (.result | any(.uuid==$old) | not) and
-            (.result | any(.uuid==$eu and .name=="klarsprak-db-eu" and .jurisdiction=="eu" and .read_replication.mode=="auto"))
-          ' >/dev/null
-          echo "Klarsprak EU D1 cutover finalized"
