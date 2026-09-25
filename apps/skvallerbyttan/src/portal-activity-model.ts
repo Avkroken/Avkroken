@@ -16,7 +16,7 @@ export type PortalActivitySnapshot = {
   schemaVersion: 1;
   generatedAt: string;
   available: boolean;
-  status: "available" | "not_configured" | "unavailable";
+  status: "available" | "not_configured" | "not_observed" | "unavailable";
   period: {
     days: number;
     from: string;
@@ -165,7 +165,11 @@ export function buildPortalActivitySnapshot(input: {
       schemaVersion: 1,
       generatedAt,
       available: false,
-      status: observed.status === "not_configured" ? "not_configured" : "unavailable",
+      status: observed.status === "not_configured"
+        ? "not_configured"
+        : observed.status === "not_observed"
+          ? "not_observed"
+          : "unavailable",
       period: null,
       repositoryCount: repositories.size,
       grouped: [],
