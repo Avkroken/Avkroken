@@ -51,7 +51,11 @@ export type PortalActivitySnapshot = {
 };
 
 const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9_.-]+$/;
-const CAPABILITY = /^github\.avkroken\.[A-Za-z0-9_.-]+$/;
+const PUBLIC_CAPABILITIES = new Set([
+  "github.avkroken.repositories",
+  "github.avkroken.pull_requests",
+  "github.avkroken.actions",
+]);
 const SOURCES = new Set<PortalActivitySource>([
   "webhook",
   "audit_log",
@@ -92,7 +96,7 @@ function count(value: unknown): number {
 
 function capability(value: unknown): string | null {
   const text = safeText(value, 120);
-  return text && CAPABILITY.test(text) ? text : null;
+  return text && PUBLIC_CAPABILITIES.has(text) ? text : null;
 }
 
 function source(value: unknown): PortalActivitySource | null {
