@@ -45,13 +45,34 @@ Portal v2-foundationen lägger till:
 - Portal v2 design tokens och shell-CSS;
 - ny informationsarkitektur utan GitHub-begrepp som huvudnavigation.
 
+Project/source-adaptern lägger därefter till:
+
+- `/api/projects` som separat normaliserad project catalog;
+- dynamisk discovery från samma publika GitHub-repolista som Worker redan använder;
+- presentationsklassning med explicit källa: `portal_policy`, `topic` eller `default`;
+- separat behandling av de tre självständiga produkterna;
+- `/projekt/:repository` som faktisk projektdetaljvy med intern dokumentation och canonical länkar för områden som ännu saknar egen adapter.
+
 ## Data som redan finns
+
+### `/api/projects`
+
+Returnerar Portalens normaliserade project catalog från aktiva publika repositories.
+
+Katalogen filtrerar bort:
+
+- `.github` som organisationsinfrastruktur;
+- forks;
+- arkiverade/icke-publika repositories;
+- pensionerade repositories enligt Portalens repository policy.
+
+Politiker, Klarspråk och Produkter markeras som självständiga produkter enligt Portalens uttryckliga presentationspolicy. Repositories utan explicit presentationstopic förblir synliga med `kindSource: "default"` i stället för att klassningen presenteras som providerfakta.
 
 ### `/api/sites`
 
 Returnerar publicerade endpoints från publika, aktiva repositories som uppfyller befintlig portal-category/topic-policy och har en publik HTTPS-homepage.
 
-Den endpointen är **inte** en komplett lista över alla Avkroken-repositories.
+Den endpointen är fortsatt en endpoint-katalog och inte project catalog.
 
 ### `/api/docs`
 
@@ -65,6 +86,7 @@ Returnerar den valda tillåtna Markdownfilen samt `sourceUrl` till canonical rep
 
 Aktuella värden i koden:
 
+- project catalog: 300 sekunder i Workers Cache API;
 - site discovery: 300 sekunder i Workers Cache API;
 - dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache.
@@ -99,9 +121,8 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst i foundationen:
 
-- komplett project/source adapter för alla relevanta repositories;
-- projektdetaljdata;
 - Wiki-adapter inne i Portalen;
+- egna Portal-adapters för Issues, Discussions, Releases, Builds/CI och projektspecifik aktivitet;
 - global access-aware sökindexering;
 - Drift & insyn-data från Skvallerbyttans normaliserade API/state;
 - changelogaggregation;
