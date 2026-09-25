@@ -306,9 +306,11 @@ async function main() {
     );
     await new Promise(resolve => setTimeout(resolve, 50));
     active = await execute(
-      "return { id: document.activeElement && document.activeElement.id, " +
-      "current: document.querySelector('a[data-nav-view="projects"]').getAttribute('aria-current'), " +
-      "visible: document.querySelectorAll('[data-route-panel]:not([hidden])').length };"
+      `return {
+        id: document.activeElement && document.activeElement.id,
+        current: document.querySelector('a[data-nav-view="projects"]').getAttribute('aria-current'),
+        visible: document.querySelectorAll('[data-route-panel]:not([hidden])').length
+      };`
     );
     assert.equal(active.id, "public-sites");
     assert.equal(active.current, "page");
