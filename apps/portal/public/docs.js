@@ -111,7 +111,7 @@
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", selected ? "true" : "false");
       button.addEventListener("click", () => {
-        navigateDocs(repo.name);
+        navigateDocs(repo.key || repo.name);
       });
       docsRepoTabs.appendChild(button);
     });
@@ -131,7 +131,7 @@
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", selected ? "true" : "false");
       button.addEventListener("click", () => {
-        navigateDocs(activeRepo.name, page.path);
+        navigateDocs(activeRepo.key || activeRepo.name, page.path);
       });
       docsPageTabs.appendChild(button);
     });
@@ -215,6 +215,46 @@
     return null;
   }
 
+  function canonicalRelativeDocHref(target) {
+    if (!activeRepo || !activePath || !activeRepo.repository || !activeRepo.defaultBranch) {
+      return null;
+    }
+
+    const value = String(target || "").trim();
+    if (
+      !value ||
+      value.startsWith("/") ||
+      value.startsWith("#") ||
+      /^https?:\/\//i.test(value) ||
+      !/\.(md|markdown)([#?].*)?$/i.test(value)
+    ) {
+      return null;
+    }
+
+    const hashIndex = value.indexOf("#");
+    const fragment = hashIndex >= 0 ? value.slice(hashIndex) : "";
+    const withoutFragment = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+    const queryIndex = withoutFragment.indexOf("?");
+    const relativePath = queryIndex >= 0
+      ? withoutFragment.slice(0, queryIndex)
+      : withoutFragment;
+
+    const routeBase = activeRepo.sourceKind === "app" && activeRepo.sourcePath
+      ? activeRepo.sourcePath + "/" + activePath
+      : activePath;
+    const resolved = normalizeRelativePath(routeBase, relativePath);
+    if (!resolved) return null;
+
+    const encodedPath = resolved
+      .split("/")
+      .filter(Boolean)
+      .map(segment => encodeURIComponent(segment))
+      .join("/");
+
+    return activeRepo.repository + "/blob/" +
+      encodeURIComponent(activeRepo.defaultBranch) + "/" + encodedPath + fragment;
+  }
+
   function safeExternalHref(target) {
     const value = String(target || "").trim();
     if (value.startsWith("#")) return value;
@@ -257,9 +297,9 @@
 
           const internal = internalDocPath(linkMatch[2]);
           if (internal) {
-            anchor.href = docsUrl(activeRepo.name, internal);
+            anchor.href = docsUrl(activeRepo.key || activeRepo.name, internal);
           } else {
-            const href = safeExternalHref(linkMatch[2]);
+            const href = canonicalRelativeDocHref(linkMatch[2]) || safeExternalHref(linkMatch[2]);
             if (href) {
               anchor.href = href;
               if (/^https?:\/\//i.test(href) && new URL(href).origin !== location.origin) {
@@ -442,7 +482,7 @@
     renderLinks(null);
 
     try {
-      const params = new URLSearchParams({ repo: repo.name, path });
+      const params = new URLSearchParams({ repo: repo.key || repo.name, path });
       const response = await fetch("/api/docs/content?" + params.toString(), {
         headers: { Accept: "application/json" }
       });
@@ -464,20 +504,20 @@
   function selectRepo(repoName, requestedPath) {
     if (!catalog || !catalog.length) return;
 
-    activeRepo = catalog.find(repo => repo.name === repoName) ||
-      catalog.find(repo => repo.name === "Skvallerbyttan") ||
+    activeRepo = catalog.find(repo => (repo.key || repo.name) === repoName) ||
+      catalog.find(repo => (repo.key || repo.name) === "skvallerbyttan") ||
       catalog[0];
 
     activePath = preferredPage(activeRepo, requestedPath);
     renderRepoTabs();
     renderPageTabs();
-    docsCount.textContent = catalog.length + " REPOS";
+    docsCount.textContent = catalog.length + " KÄLLOR";
 
     if (!activePath) {
       renderLinks(null);
       docsContent.innerHTML =
         '<div class="empty"><strong>Ingen publik Markdown-dokumentation hittades.</strong>' +
-        '<span>Förrådet finns i katalogen, men saknar README eller Markdown under docs/.</span></div>';
+        '<span>Källan finns i katalogen, men saknar tillåten README eller Markdown under docs/.</span></div>';
       return;
     }
 
@@ -499,7 +539,7 @@
       catalog = await response.json();
 
       if (!Array.isArray(catalog) || !catalog.length) {
-        docsCount.textContent = "0 REPOS";
+        docsCount.textContent = "0 KÄLLOR";
         docsContent.innerHTML =
           '<div class="empty"><strong>Ingen publik dokumentation hittades.</strong></div>';
         return;
@@ -528,7 +568,7 @@
   viewTabs.forEach(tab => {
     tab.addEventListener("click", () => {
       if (tab.dataset.view === "docs") {
-        navigateDocs(activeRepo ? activeRepo.name : null);
+        navigateDocs(activeRepo ? (activeRepo.key || activeRepo.name) : null);
       } else {
         window.AvKrokenPortal?.navigate ? window.AvKrokenPortal.navigate("/projekt") : (location.href = "/projekt");
       }

@@ -32,7 +32,7 @@ Portal v2 etablerar:
 - normaliserad publik repository-project-katalog;
 - projekt- och tjänsteytor ovanpå samma projektmodell;
 - stabila dokumentations-URL:er;
-- fortsatt rendering av publik README/docs i portalen;
+- rendering av publik repository-README/docs och opt-in-app-README/docs i portalen;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -66,8 +66,8 @@ Nuvarande Worker exponerar:
 
 - `GET /api/projects` — normaliserad katalog över aktiva publika repositories som får visas som projekt. Svaret innehåller källmetadata, genereringstid och projektposter.
 - `GET /api/sites` — bakåtkompatibel vy över de projekt som har både portal-category-topic och publik HTTPS-homepage.
-- `GET /api/docs` — katalog över tillåten publik repositorydokumentation.
-- `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL.
+- `GET /api/docs` — katalog över tillåtna publika repository- och opt-in-appdokument.
+- `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL; content-path måste redan finnas i den publika katalogposten.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -76,6 +76,8 @@ Monorepo-appar publiceras endast genom explicit opt-in. Portalen listar `apps/` 
 `apps/skvallerbyttan/portal.public.json` är den första appägda publiceringsmanifesten. Den innehåller endast portalpresentation och gör inte Skvallerbyttans privata dashboard publik. Portal och Jobb har inget publikt appmanifest.
 
 Manifestet får inte styra source-path, repository eller ref; de värdena kommer från discovery-konteksten. Okända manifestfält kopieras inte till den publika projektmodellen.
+
+För en opt-in-app använder samma manifestgräns även dokumentationsadaptern. Appens publika URL är source-path-oberoende, exempelvis `/projekt/skvallerbyttan/dokumentation/docs/architecture.md`, medan provideradaptern internt mappar den till `apps/skvallerbyttan/docs/architecture.md`. `Visa original` pekar på canonical GitHub-path.
 
 ## Källdata och ansvar
 
@@ -89,15 +91,18 @@ GitHub public repositories
   -> Avkroken Projekt/Tjänster
 ```
 
-### Repositorydokumentation
+### Dokumentationskällor
 
 ```text
-GitHub repository
-  -> Portal docs adapter
+GitHub repository / explicit opt-in app
+  -> Portal docs-source policy
+  -> docs adapter
   -> cache
   -> Avkroken-rendering
   -> "Visa original"
 ```
+
+Godtyckliga provider-paths accepteras inte av content-endpointen; vald route-path måste finnas i den redan byggda publika katalogposten.
 
 ### Operativ state
 

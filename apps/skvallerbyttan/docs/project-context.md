@@ -17,7 +17,7 @@ Senast verifierad för observationslagerarbetet: 2026-09-23.
 - production domain: `https://skvallerbyttan.denied.se`
 - dashboard: privat
 - appdokumentation: versionsstyrd i monorepot; ingen separat Pages-publicering
-- Portal-publicering: `portal.public.json` är appens explicita opt-in till Avkrokens publika projektkatalog; manifestet publicerar ingen dashboard-URL och ändrar inte dashboardens privata accessmodell
+- Portal-publicering: `portal.public.json` är appens explicita opt-in till Avkrokens publika projekt- och dokumentationskatalog; Portalen får rendera appens README/`docs/` med canonical original-länk, men manifestet publicerar ingen dashboard-URL och ändrar inte dashboardens privata accessmodell
 - full repository check: `npm run check`
 
 ## Produktansvar
