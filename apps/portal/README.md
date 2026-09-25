@@ -126,7 +126,7 @@ Indexet innehåller:
 
 Issues och Discussions indexeras inte i den nuvarande versionen.
 
-Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `partial` coverage. Klienten får endast rankade resultat för aktuell fråga, inte hela råindexet.
+Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `partial` coverage. Indexet byggs vid sökrequest och lagras inte i Cache API; samtidiga kalla byggen i samma isolate kollapsas till ett gemensamt in-flight Promise. Klienten får endast rankade resultat för aktuell fråga, inte hela råindexet.
 
 ### Operativ state
 
