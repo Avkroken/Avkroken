@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Drift & insyn-integrationen: 2026-09-25.
+Senast verifierad mot Changelog-integrationen: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -45,7 +45,8 @@ Worker-koden innehåller idag:
 - projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
 - Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
 - server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor;
-- Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding.
+- Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding;
+- Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt.
 
 ## Publik projektmodell
 
@@ -143,6 +144,25 @@ Appens publika dokumentpath är relativ till app-roten och låser därmed inte P
 
 Tar katalognyckel + route-path, kräver exakt träff i den publika katalogpostens `pages`, mappar därefter till canonical source repository/ref/path och returnerar Markdown samt `sourceUrl` till originalet. Jobb saknar appmanifest och får därför ingen appdokumentationspost.
 
+## Changelog
+
+### `/api/changelog`
+
+Changelog byggs från aktuell public project-state, men endast poster med `type = repository`, `source.provider = github`, `source.kind = repository` och ett canonical `Avkroken/<repo>`-source-repository får användas.
+
+För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
+
+- filtrerar alltid bort `draft = true`, även om den använda GitHub-credentialen skulle kunna se drafts;
+- kräver canonical `https://github.com/Avkroken/<repo>/releases/tag/...`-URL;
+- kräver `tag_name` och giltig `published_at`;
+- publicerar endast project slug/name/Portal-URL, repository, tagg/namn, publiceringstid, release-URL och `prerelease`;
+- kopierar inte body, author, assets eller target commit;
+- låter inte opt-in monorepo-appar ärva source-repositoryts releaser.
+
+Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concurrency 4 och max 40 returnerade releaser. Normal coverage är därför `bounded`, aldrig komplett. Repo-cap eller individuella release-fetchfel ger `partial`.
+
+Eligibility byggs live från GitHubs publika organisationslista vid varje Changelog-build och snapshoten lagras inte persistent i Cache API. Samtidiga builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
+
 ## Global sök
 
 ### `/api/search?q=...`
@@ -190,7 +210,8 @@ Aktuella värden i koden:
 - `/api/sites`: härledd från samma project catalog;
 - dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache;
-- server-side sökindex: ingen persistent Cache API-lagring; samtidiga kalla builds i samma isolate delar ett in-flight Promise.
+- server-side sökindex: ingen persistent Cache API-lagring; samtidiga kalla builds i samma isolate delar ett in-flight Promise;
+- Changelog snapshot: ingen persistent Cache API-lagring; samtidiga builds i samma isolate delar ett in-flight Promise.
 
 Skvallerbyttan kan invalidera dokumentationscache internt med cache tags genom Portalens service binding.
 
@@ -235,7 +256,6 @@ Följande är medvetet inte löst ännu:
 - provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
-- changelogaggregation;
 - aktivitetsström;
 - releaseautomation;
 - slutlig end-to-end accessibility-/browserverifiering;

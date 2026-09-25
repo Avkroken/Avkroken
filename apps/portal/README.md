@@ -37,6 +37,7 @@ Portal v2 etablerar:
 - rendering av publik repository-README/docs och opt-in-app-README/docs i portalen;
 - server-side global sök över publicerade projekt, README/docs och Wiki-presentationer;
 - Drift & insyn från en sanerad Skvallerbyttan-snapshot via intern read-only Service Binding;
+- Changelog från officiella publicerade GitHub Releases för redan publicerade repositoryprojekt;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -74,7 +75,8 @@ Nuvarande Worker exponerar:
 - `GET /api/docs` — katalog över tillåtna publika repository- och opt-in-appdokument.
 - `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL; content-path måste redan finnas i den publika katalogposten.
 - `GET /api/search?q=...` — rankade sökträffar från ett server-side index byggt endast från publicerade projekt och dokumentationskällor.
-- `GET /api/operations` — sanerad provider-/capability-/aktivitetsöversikt från Skvallerbyttans read-only observationsmodell; responsen är `no-store`.
+- `GET /api/operations` — public-safe provider-/capabilitystatus från Skvallerbyttans read-only observationsmodell; responsen är `no-store`.
+- `GET /api/changelog` — bounded releasehistorik från publicerade repositoryprojekt; draft releases, monorepo-app-arv och rå release-body/author/assets exkluderas.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -129,6 +131,21 @@ Indexet innehåller:
 Issues och Discussions indexeras inte i den nuvarande versionen.
 
 Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `partial` coverage. Indexet byggs vid sökrequest och lagras inte i Cache API; samtidiga kalla byggen i samma isolate kollapsas till ett gemensamt in-flight Promise. Klienten får endast rankade resultat för aktuell fråga, inte hela råindexet.
+
+### Changelog
+
+```text
+live public project catalog
+  -> repository projects only
+  -> GitHub Releases
+  -> release-source normalization
+  -> GET /api/changelog
+  -> /changelog
+```
+
+Changelog använder endast repositoryprojekt som fortfarande passerar den live publika projektpolicyn när snapshoten byggs. Monorepo-appar är separata projektidentiteter och ärver inte source-repositoryts releasehistorik.
+
+Den publika releasemodellen innehåller endast projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft releases och rå body/author/assets/target SHA publiceras inte. Snapshoten lagras inte persistent i Cache API.
 
 ### Operativ state
 
