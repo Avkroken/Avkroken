@@ -63,11 +63,12 @@ Worker-lagret returnerar portalens HTML-shell för kända dokumentroutes. API- o
 
 Nuvarande Worker exponerar:
 
+- `GET /api/projects` — normaliserad publik project catalog för Portalens projekt-/tjänsteytor.
 - `GET /api/sites` — publicerade endpoints som matchar portalens befintliga repository-/topic-policy.
 - `GET /api/docs` — katalog över tillåten publik repositorydokumentation.
 - `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL.
 
-`/api/sites` är inte en komplett organisationsinventering. Full projektinventering är ett separat adapterarbete.
+`/api/projects` är Portalens user-facing project catalog. Den byggs dynamiskt från aktiva publika repositories men filtrerar organisationsinfrastruktur, forks och pensionerade repos. `/api/sites` behåller separat semantik som publicerad endpoint-katalog.
 
 ## Källdata och ansvar
 
