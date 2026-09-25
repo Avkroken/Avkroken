@@ -22,4 +22,6 @@ test("Portal observations service does not use HTTP read-token authorization", (
   assert.equal(observations.includes("authorization"), false);
   assert.equal(observations.includes("Bearer "), false);
   assert.equal(observations.includes("recent:"), false);
+  assert.equal(observations.includes("getObservedActivity"), false);
+  assert.equal(observations.includes("scopeCoverage:"), false);
 });
