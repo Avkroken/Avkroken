@@ -130,7 +130,7 @@ Kall indexbuild är budgeterad:
 - RPC-fel: `502 operations_unavailable`;
 - normal snapshot: `200`, `available = true`, `Cache-Control: no-store`.
 
-Endpointen returnerar inte Skvallerbyttans råa `/api/v1`-payload. Provider-permissions, installationmetadata, HTTP-status/felsträngar och recent Activity-event ingår inte i snapshoten.
+Endpointen returnerar inte Skvallerbyttans råa `/api/v1`-payload. Provider-permissions, installationmetadata, HTTP-status/felsträngar, scope coverage/repositoryantal och Activity/eventvolym ingår inte i snapshoten.
 
 Klienten anropar endast Portalens `/api/operations` och känner inte till Skvallerbyttans origin, dashboard-session eller machine bearer-token.
 
@@ -194,7 +194,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 11. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
 12. sök på ett publikt dokument ger Portal-resultat + canonical original, medan `jobb` inte kan ge skyddad Jobb-dokumentation genom indexet;
 13. sökresultat visar `bounded`/`partial` coverage och index-freshness;
-14. `/drift` visar providerstatus, capability freshness/scope coverage och aggregerad observerad aktivitet utan installation-/permission-/resource-/repositorydetaljer;
+14. `/drift` visar endast public-safe providerstatus och capability status/freshness/last-success; scope counts och Activity/eventvolym exponeras inte;
 15. om observationsbindingen saknas/faller visar `/drift` degraded state och fabricerar ingen providerstatus;
 16. cache-/heartbeat-beteende har inte regresserat.
 
