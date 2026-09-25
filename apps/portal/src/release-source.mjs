@@ -1,5 +1,42 @@
 const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9._-]+$/;
 
+const RELEASE_CATEGORY_HEADINGS = new Map([
+  ["feature", "features"],
+  ["features", "features"],
+  ["bug fix", "fixes"],
+  ["bug fixes", "fixes"],
+  ["fix", "fixes"],
+  ["fixes", "fixes"],
+  ["security", "security"],
+  ["security fix", "security"],
+  ["security fixes", "security"],
+  ["security update", "security"],
+  ["security updates", "security"],
+  ["documentation", "documentation"],
+  ["docs", "documentation"]
+]);
+
+export function releaseCategories(body) {
+  const categories = new Set(["releases"]);
+  if (typeof body !== "string" || !body.trim()) return [...categories];
+
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/^#{2,3}\s+(.+?)\s*#*\s*$/);
+    if (!match) continue;
+
+    const heading = match[1]
+      .replace(/[*_`]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+
+    const category = RELEASE_CATEGORY_HEADINGS.get(heading);
+    if (category) categories.add(category);
+  }
+
+  return [...categories];
+}
+
 function safeText(value, maxLength) {
   if (typeof value !== "string") return null;
   const text = value.trim();
@@ -81,6 +118,7 @@ export function normalizePublicRelease(project, release) {
     name: safeText(release.name, 180) || tag,
     publishedAt,
     url,
+    categories: releaseCategories(release.body),
     prerelease: release.prerelease === true
   };
 }
