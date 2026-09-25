@@ -26,7 +26,7 @@ Dry-run är inte deployment.
 Wrangler definierar:
 
 - `ASSETS`
-- `STATS_DB`
+- `STATS_DB` — D1 target `skvallerbyttan-stats-eu`
 - `OBSERVABILITY` — Analytics Engine dataset `skvallerbyttan_observability`
 - `AVKROKEN_PORTAL_DOCS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `DocsInvalidationService`
 - `AVKROKEN_OPERATIONS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `OperationalHeartbeatService`
@@ -158,6 +158,12 @@ Var 15:e minut gör runtime en intern readiness-probe och levererar resultatet v
 Heartbeat-leveransen skickas även när readiness är false. GitHub-proben skriver `github.avkroken.repositories` och Cloudflare R1/R2/R3-proberna skriver sina reducerade resultat till `capability_observations`, så provider-health överlever Worker-isolatgränser och kan skilja `available`, `permission_denied`, `error` och verkligt `not_observed`. En capability-specifik 403 från exempelvis organization governance får därmed inte felaktigt klassificera hela GitHub-providern som auth-fel. Mottagarsidan avgör liveness utifrån egen mottagningstid.
 
 Avkroken-portalen lagrar heartbeat i ett separat Durable Object, förväntar leverans var 15:e minut och larmar via Cloudflare Email Service om ingen leverans har mottagits inom 35 minuter. Portalens watchdog kör var 10:e minut. När leveransen återkommer efter stale skickas återställningsnotis. Inga providercredentials eller providerpayloads ingår i heartbeat.
+
+## D1 data locality och replication
+
+`STATS_DB` ska använda en D1-databas skapad med `jurisdiction=eu`. Jurisdiction kan inte läggas till på en befintlig databas; replacement kräver ny EU-databas, verifierad export/import och därefter binding-cutover.
+
+Read replication ska vara avstängd tills Skvallerbyttans read-path använder D1 Sessions API. Utan Sessions API fortsätter queries mot primären även om replicas är aktiverade.
 
 ## Migrationer
 
