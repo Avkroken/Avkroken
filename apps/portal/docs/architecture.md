@@ -148,7 +148,7 @@ Projektadaptern och dokumentationsadaptern använder samma providerfamilj men ol
 - `source.coverage = active_public_repositories`;
 - `generatedAt`.
 
-Browsercache tvingas revalidera, medan Cloudflare kan återanvända cached response enligt den interna femminutersperioden.
+Klientresponsen kräver revalidering. Workers Cache API får en separat response-kopia med `Cache-Control: public, max-age=300`; en cache-hit skrivs tillbaka till klienten med revalideringsheader. `stale-while-revalidate` används inte i Cache API-lagret eftersom Workers Cache API inte stöder direktiven.
 
 `/api/sites` härleds från samma normaliserade projektmodell.
 
