@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {
   documentationPath,
   isPortalDocumentRoute,
-  normalizePortalPath
+  normalizePortalPath,
+  protectedRedirectForPath
 } from "../src/portal-routes.mjs";
 
 test("normalizes trailing slashes without changing root", () => {
@@ -43,6 +44,8 @@ test("does not rewrite API or asset requests to the portal shell", () => {
     "/portal-v2.css",
     "/app.js",
     "/favicon.ico",
+    "/auth/jobb",
+    "/auth/jobb/dashboard",
     "/not-a-portal-route"
   ]) {
     assert.equal(isPortalDocumentRoute(path), false, path);
@@ -56,4 +59,11 @@ test("builds stable documentation URLs with encoded repository and source path",
     documentationPath("Repo med mellanslag", "docs/API guide.md"),
     "/projekt/Repo%20med%20mellanslag/dokumentation/docs/API%20guide.md"
   );
+});
+
+
+test("routes protected Jobb paths to the existing protected origin", () => {
+  assert.equal(protectedRedirectForPath("/auth/jobb"), "https://jobb.denied.se/");
+  assert.equal(protectedRedirectForPath("/auth/jobb/dashboard"), "https://jobb.denied.se/");
+  assert.equal(protectedRedirectForPath("/auth"), null);
 });
