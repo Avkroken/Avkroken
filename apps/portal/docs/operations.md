@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök- och Drift & insyn-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn- och Changelog-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -122,6 +122,24 @@ Kall indexbuild är budgeterad:
 - coverage `bounded` eller `partial`;
 - ingen persistent sökindexcache; samtidiga builds i samma isolate kollapsas.
 
+### Changelog
+
+`GET /api/changelog` bygger en bounded snapshot från live-publicerade repositoryprojekt.
+
+- projektkatalogfel: `502 changelog_unavailable`;
+- individuellt repo-releasefel: resten av snapshoten returneras med `source.coverage = partial`;
+- inga releases: `200`, `status = available`, tom `releases`-lista;
+- normal snapshot: `200`, `status = available`, `Cache-Control: no-store`.
+
+Budget:
+
+- max 24 repositoryprojekt;
+- max 10 GitHub Releases per repository;
+- concurrency 4;
+- max 40 returnerade releaser.
+
+Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller target commit, och monorepo-appar ärver inte source-repositoryts releases.
+
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -154,6 +172,10 @@ Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik p
 
 Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. Det reducerar burst-dubletter utan att skapa en stale publiceringscache.
 
+### Changelog
+
+Changelog lagras inte persistent i Cache API. Eligibility och releases läses från aktuell publik GitHub-state när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
+
 ### Dokumentation
 
 Dokumentationscache kan invalideras internt via `DocsInvalidationService`.
@@ -173,6 +195,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post eller app-docs-källa.
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
+- Changelog får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -183,7 +206,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur` och `/api/operations` fungerar utan att exponera credentials eller rå Skvallerbyttan-state;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations` och `/api/changelog` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå releasepayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -196,6 +219,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 13. sökresultat visar `bounded`/`partial` coverage och index-freshness;
 14. `/drift` visar endast public-safe providerstatus och capability status/freshness/last-success; scope counts och Activity/eventvolym exponeras inte;
 15. om observationsbindingen saknas/faller visar `/drift` degraded state och fabricerar ingen providerstatus;
-16. cache-/heartbeat-beteende har inte regresserat.
+16. `/changelog` visar publicerade releases från publika repositoryprojekt med canonical original-länkar; drafts och Skvallerbyttan-appens source-repositoryreleases publiceras inte som appreleases;
+17. Changelog visar `bounded`/`partial` coverage och använder ingen persistent snapshotcache;
+18. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
