@@ -4,6 +4,7 @@ import {
   documentationPath,
   isPortalDocumentRoute,
   normalizePortalPath,
+  projectIssuesPath,
   projectPath,
   projectReleasesPath,
   protectedRedirectForPath,
@@ -102,5 +103,15 @@ test("builds stable project release URLs", () => {
   assert.equal(
     projectReleasesPath("Repo med mellanslag"),
     "/projekt/Repo%20med%20mellanslag/releases"
+  );
+});
+
+
+test("builds stable project Issues URLs", () => {
+  assert.equal(projectIssuesPath(), "/projekt");
+  assert.equal(projectIssuesPath("Bastion"), "/projekt/Bastion/issues");
+  assert.equal(
+    projectIssuesPath("Repo med mellanslag"),
+    "/projekt/Repo%20med%20mellanslag/issues"
   );
 });
