@@ -29,9 +29,11 @@ test("Portal observations service does not use HTTP read-token authorization", (
 
 
 test("Portal repository CI RPC reuses Skvallerbyttan Actions ownership without HTTP auth", () => {
-  assert.match(observations, /getRepositoryActions/);
+  assert.match(observations, /readSourceCache/);
   assert.match(observations, /buildPortalRepositoryCiSnapshot/);
+  assert.match(observations, /publicCiRepository/);
   assert.equal(observations.includes("githubOptionalJson"), false);
+  assert.equal(observations.includes("getRepositoryActions"), false);
   assert.equal(observations.includes("/actions/runs"), false);
   assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
   assert.equal(observations.includes("authorization"), false);
