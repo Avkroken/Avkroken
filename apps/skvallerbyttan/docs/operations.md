@@ -30,7 +30,7 @@ Wrangler definierar:
 - `OBSERVABILITY` — Analytics Engine dataset `skvallerbyttan_observability`
 - `AVKROKEN_PORTAL_DOCS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `DocsInvalidationService`
 - `AVKROKEN_OPERATIONS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `OperationalHeartbeatService`
-- exported named entrypoint `PortalObservationsService` — inbound read-only RPC för Portalens sanerade Drift & insyn-snapshot; ingen separat secret eller publik HTTP-route
+- exported named entrypoint `PortalObservationsService` — inbound read-only RPC för Portalens sanerade Drift & insyn- och repository-CI-snapshots; ingen separat secret eller publik HTTP-route
 - cron `0 */6 * * *` för reconciliation
 - cron `*/15 * * * *` för operativ heartbeat och global GitHub/Cloudflare capability-reconciliation
 - custom domain `skvallerbyttan.denied.se`
@@ -150,9 +150,10 @@ RPC:n:
 - returnerar endast public-safe provider/capability-status;
 - exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata, scope coverage/repositoryantal eller Activity/eventvolym;
 - gör inga provider-write-operationer;
-- lämnar detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API.
+- lämnar detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API;
+- exponerar `getPublicRepositoryCi(repoName)` som en separat summary-only metod som läser `overview` source cache, kräver cachead `visibility = public`/icke-arkiverad repositoryrad och aldrig startar en Actions-providerread.
 
-Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments.
+Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments. När repository-CI-metoden införs gäller samma ordning: Skvallerbyttan-versionen med `getPublicRepositoryCi` måste vara deployad innan Portal-versionen som anropar metoden.
 
 Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
 
@@ -246,6 +247,18 @@ Cron var sjätte timme fortsätter som bredare safety net:
 - prunar gamla Activity-events och webhook deliveries
 
 Reconciliation ska inte skapa provider-write-trafik.
+
+### Portal repository-CI cache
+
+`getPublicRepositoryCi` läser endast D1 source cache-keyn `overview`. Den använder inte det privata HTTP-API:t och gör ingen providerrequest.
+
+RPC:n beräknar downstream freshness så här:
+
+- cache saknas: `unknown` + `not_observed`;
+- cache högst sex timmar och ej invaliderad: `fresh`;
+- cache äldre än sex timmar eller invaliderad: `stale`.
+
+En stale snapshot får returneras för graceful degradation men måste visas som stale i Portalen. Portal-läsning triggar ingen background/providerrefresh; canonical refresh sker genom Skvallerbyttans egna reconciliation/operatorvägar.
 
 ## Cache
 
