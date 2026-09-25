@@ -51,6 +51,10 @@ test("accepts an optional public URL only when it is HTTPS", () => {
     normalizePublicAppManifest(manifest({ publicUrl: "http://example.test" }), context).url,
     null
   );
+  assert.equal(
+    normalizePublicAppManifest(manifest({ publicUrl: "https://user:pass@example.test" }), context).url,
+    null
+  );
 });
 
 test("rejects malformed or unsupported public app manifests", () => {
