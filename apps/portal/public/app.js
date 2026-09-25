@@ -230,6 +230,7 @@ function renderProjectDetail() {
     detailAction("Canonical source", project.sourceUrl),
     detailAction("Issues", project.issuesPortalUrl, { internal: true }),
     detailAction("Builds / CI", project.buildsPortalUrl, { internal: true }),
+    detailAction("Aktivitet", project.activityPortalUrl, { internal: true }),
     detailAction("Discussions", project.discussions),
     detailAction("Releases", project.releasesPortalUrl, { internal: true })
   ].filter(Boolean);
