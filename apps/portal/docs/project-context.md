@@ -84,7 +84,7 @@ Portal v2-foundationen visar ingen fabricerad providerstatus. Den visuella Drift
 
 ## Auth / Jobb
 
-Den publika Portalens Auth-yta innehåller endast en säker ingång och information om accessgränsen.
+Den publika Portalens Auth-yta innehåller endast en säker ingång och information om accessgränsen. `GET`/`HEAD` mot `/auth/jobb` och underpaths redirectas server-side till `https://jobb.denied.se/` innan Portal-shell renderas.
 
 Skyddad Jobb-data:
 
