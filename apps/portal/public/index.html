@@ -446,11 +446,24 @@
       <div class="portal-page-head">
         <div class="portal-kicker">CHANGELOG</div>
         <h1 id="changelog-title">Produktförändringar</h1>
-        <p>Kuraterade releases och produktförändringar. Rå aktivitet hör hemma under Aktivitet.</p>
+        <p>
+          Officiella publicerade GitHub Releases från Portalens redan publika repositoryprojekt.
+          Rå commits, workflow runs och observerade events hör hemma under Aktivitet.
+        </p>
       </div>
-      <div class="portal-placeholder">
-        <strong>Releaseaggregation kopplas in separat.</strong>
-        GitHub Releases ska prioriteras som officiell releasehistorik där repositoryt har versionerade releaser.
+
+      <div class="changelog-meta">
+        <span id="changelog-status" aria-live="polite">Läser releaser…</span>
+        <span id="changelog-generated"></span>
+      </div>
+
+      <div class="changelog-list" id="changelog-list">
+        <div class="empty">Läser publicerade releases…</div>
+      </div>
+
+      <div class="portal-placeholder" id="changelog-error" hidden>
+        <strong>Changelog är tillfälligt otillgänglig.</strong>
+        Ingen releasehistorik fabriceras när den publika GitHub-källan inte kan läsas.
       </div>
     </section>
 
@@ -565,5 +578,6 @@
   <script src="/wiki.js" defer></script>
   <script src="/search.js" defer></script>
   <script src="/operations.js" defer></script>
+  <script src="/changelog.js" defer></script>
 </body>
 </html>
