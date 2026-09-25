@@ -302,7 +302,7 @@ async function main() {
     await clearActions();
 
     await execute(
-      "document.querySelector('a[href="/projekt"][data-nav-view="projects"]').click(); return true;"
+      `document.querySelector('a[href="/projekt"][data-nav-view="projects"]').click(); return true;`
     );
     await new Promise(resolve => setTimeout(resolve, 50));
     active = await execute(
