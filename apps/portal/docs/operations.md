@@ -118,7 +118,8 @@ Kall indexbuild är budgeterad:
 - round-robin över docs-källor;
 - max 120 000 tecken per dokument;
 - concurrency 4;
-- coverage `bounded` eller `partial`.
+- coverage `bounded` eller `partial`;
+- ingen persistent sökindexcache; samtidiga builds i samma isolate kollapsas.
 
 ### Heartbeat
 
@@ -136,12 +137,9 @@ Klientresponsen kräver revalidering. Workers Cache API lagrar en separat respon
 
 ### Sökindex
 
-Sökindexet lagras i Workers Cache API i 3 600 sekunder med tags:
+Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik project/docs-state när en sökning kräver index och query-responsen använder `Cache-Control: no-store`.
 
-- `docs-catalog`;
-- `search-index`.
-
-Query-responsen lagras inte i shared cache (`Cache-Control: no-store`). En docs-invalidering kan därmed även slå ut underliggande sökindex utan att ett separat administrations-API införs.
+Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. Det reducerar burst-dubletter utan att skapa en stale publiceringscache.
 
 ### Dokumentation
 
