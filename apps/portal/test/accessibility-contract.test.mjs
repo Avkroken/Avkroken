@@ -52,3 +52,11 @@ test("mobile hero title uses a viewport-safe fluid size", () => {
     /\.portal-hero-copy h1\s*\{\s*font-size:\s*clamp\(3\.15rem,\s*18vw,\s*5\.4rem\);\s*\}/
   );
 });
+
+
+test("mobile page titles cannot force horizontal overflow", () => {
+  assert.match(
+    css,
+    /\.portal-page-head h1\s*\{\s*font-size:\s*clamp\(1\.7rem,\s*7vw,\s*3\.4rem\);\s*overflow-wrap:\s*anywhere;\s*\}/
+  );
+});
