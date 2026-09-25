@@ -38,19 +38,8 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function array(value: unknown): Record<string, unknown>[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is Record<string, unknown> => Boolean(record(item)))
-    : [];
-}
-
 function text(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function number(value: unknown): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
 function providerStatus(value: unknown): PublicProviderStatus {
