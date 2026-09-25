@@ -175,13 +175,16 @@ För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
 - filtrerar alltid bort `draft = true`, även om den använda GitHub-credentialen skulle kunna se drafts;
 - kräver canonical `https://github.com/Avkroken/<repo>/releases/tag/...`-URL;
 - kräver `tag_name` och giltig `published_at`;
-- publicerar endast project slug/name/Portal-URL, repository, tagg/namn, publiceringstid, release-URL och `prerelease`;
-- kopierar inte body, author, assets eller target commit;
+- publicerar endast project slug/name/Portal-URL, repository, tagg/namn, publiceringstid, release-URL, `prerelease` och en bounded `categories`-lista;
+- härleder Changelog-kategorier endast från exakta Markdown-sektionsrubriker i release body: Features, Bug Fixes/Fixes, Security och Documentation/Docs; alla poster får dessutom kategorin Releases;
+- kopierar inte body, author, assets eller target commit till den publika modellen;
 - låter inte opt-in monorepo-appar ärva source-repositoryts releaser.
 
 Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concurrency 4 och max 40 returnerade releaser. Normal coverage är därför `bounded`, aldrig komplett. Repo-cap eller individuella release-fetchfel ger `partial`.
 
 Eligibility byggs live från GitHubs publika organisationslista vid varje Changelog-build och snapshoten lagras inte persistent i Cache API. Samtidiga builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
+
+Changelog-klienten filtrerar den redan sanerade snapshoten lokalt med `Alla`, `Features`, `Fixes`, `Security`, `Documentation` och `Releases`. Det skapar inga ytterligare providerreads. `Deployments` publiceras inte som filter eftersom releaseadaptern ännu saknar en verifierad canonical deploymentrelation; Portalen fabricerar inte den kopplingen från taggar eller tidsnärhet.
 
 ### `/api/releases?project=...`
 
@@ -393,6 +396,7 @@ Följande är medvetet inte löst ännu:
 
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
+- Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
 - releaseautomation;
 - produktionsdeployment och provider live-verifiering.
 
