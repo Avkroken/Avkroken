@@ -215,6 +215,46 @@
     return null;
   }
 
+  function canonicalRelativeDocHref(target) {
+    if (!activeRepo || !activePath || !activeRepo.repository || !activeRepo.defaultBranch) {
+      return null;
+    }
+
+    const value = String(target || "").trim();
+    if (
+      !value ||
+      value.startsWith("/") ||
+      value.startsWith("#") ||
+      /^https?:\/\//i.test(value) ||
+      !/\.(md|markdown)([#?].*)?$/i.test(value)
+    ) {
+      return null;
+    }
+
+    const hashIndex = value.indexOf("#");
+    const fragment = hashIndex >= 0 ? value.slice(hashIndex) : "";
+    const withoutFragment = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+    const queryIndex = withoutFragment.indexOf("?");
+    const relativePath = queryIndex >= 0
+      ? withoutFragment.slice(0, queryIndex)
+      : withoutFragment;
+
+    const routeBase = activeRepo.sourceKind === "app" && activeRepo.sourcePath
+      ? activeRepo.sourcePath + "/" + activePath
+      : activePath;
+    const resolved = normalizeRelativePath(routeBase, relativePath);
+    if (!resolved) return null;
+
+    const encodedPath = resolved
+      .split("/")
+      .filter(Boolean)
+      .map(segment => encodeURIComponent(segment))
+      .join("/");
+
+    return activeRepo.repository + "/blob/" +
+      encodeURIComponent(activeRepo.defaultBranch) + "/" + encodedPath + fragment;
+  }
+
   function safeExternalHref(target) {
     const value = String(target || "").trim();
     if (value.startsWith("#")) return value;
@@ -259,7 +299,7 @@
           if (internal) {
             anchor.href = docsUrl(activeRepo.key || activeRepo.name, internal);
           } else {
-            const href = safeExternalHref(linkMatch[2]);
+            const href = canonicalRelativeDocHref(linkMatch[2]) || safeExternalHref(linkMatch[2]);
             if (href) {
               anchor.href = href;
               if (/^https?:\/\//i.test(href) && new URL(href).origin !== location.origin) {
