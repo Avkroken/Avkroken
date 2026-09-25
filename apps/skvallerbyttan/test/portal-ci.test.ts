@@ -35,9 +35,6 @@ function observation(overrides: Partial<PortalCiRepositoryObservation> = {}): Po
       actions: true,
       permissionDetail: "SECRET_PERMISSION",
     },
-    security: {
-      secret: "SECRET_SECURITY",
-    },
     ...overrides,
   };
 }
@@ -86,12 +83,10 @@ test("Portal CI snapshot exposes only public-safe sampled summary fields", () =>
     "SECRET_ACTOR",
     "SECRET_SHA",
     "SECRET_PERMISSION",
-    "SECRET_SECURITY",
     "eventCounts",
     "capabilities",
     "visibility",
     "archived",
-    "security",
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
@@ -145,11 +140,17 @@ test("Portal CI snapshot distinguishes unavailable Actions from missing observat
 });
 
 test("Portal CI snapshot rejects repositories outside the Avkroken namespace", () => {
-  assert.throws(() => buildPortalRepositoryCiSnapshot({
-    generatedAt: "2026-09-25T16:15:00Z",
-    repository: "Other/Private",
-    observation: observation(),
-    sourceRefreshedAt: "2026-09-25T16:10:00Z",
-    freshness: "fresh",
-  }));
+  let rejected = false;
+  try {
+    buildPortalRepositoryCiSnapshot({
+      generatedAt: "2026-09-25T16:15:00Z",
+      repository: "Other/Private",
+      observation: observation(),
+      sourceRefreshedAt: "2026-09-25T16:10:00Z",
+      freshness: "fresh",
+    });
+  } catch {
+    rejected = true;
+  }
+  assert.equal(rejected, true);
 });
