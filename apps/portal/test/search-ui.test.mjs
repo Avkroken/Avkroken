@@ -49,3 +49,12 @@ test("search worker intersects public projects and docs before indexing", () => 
 test("search API is not a Portal shell route", () => {
   assert.ok(worker.includes('url.pathname === "/api/search"'));
 });
+
+
+test("search index is not persisted in Cache API and collapses concurrent builds per isolate", () => {
+  assert.ok(worker.includes("let pendingSearchIndex = null;"));
+  assert.ok(worker.includes("pendingSearchIndex = loadSearchIndex(env).finally"));
+  assert.ok(worker.includes("pendingSearchIndex = null;"));
+  assert.equal(worker.includes("public-search-index-v1"), false);
+  assert.equal(worker.includes("SEARCH_INDEX_CACHE_SECONDS"), false);
+});
