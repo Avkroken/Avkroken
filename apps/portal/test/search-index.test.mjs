@@ -121,7 +121,7 @@ test("ranks exact title and title matches ahead of body-only matches", () => {
       subtitle: "Projekt",
       snippet: "SSH",
       url: "/projekt/Bastion",
-      searchText: "Bastion SSH"
+      searchText: "bastion ssh"
     },
     {
       id: "2",
@@ -130,7 +130,7 @@ test("ranks exact title and title matches ahead of body-only matches", () => {
       subtitle: "docs/operations.md",
       snippet: "Bastion omnämns här.",
       url: "/projekt/annat/dokumentation/docs/operations.md",
-      searchText: "Bastion omnämns här"
+      searchText: "bastion omnämns här"
     }
   ], "Bastion");
 
