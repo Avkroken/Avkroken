@@ -1,5 +1,5 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
-import { documentationPath, isPortalDocumentRoute } from "./portal-routes.mjs";
+import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -692,8 +692,15 @@ export default {
       return getDocContent(url, env);
     }
 
+    const isRead = request.method === "GET" || request.method === "HEAD";
+    const protectedRedirect = protectedRedirectForPath(url.pathname);
+
+    if (isRead && protectedRedirect) {
+      return Response.redirect(protectedRedirect, 302);
+    }
+
     if (
-      (request.method === "GET" || request.method === "HEAD") &&
+      isRead &&
       isPortalDocumentRoute(url.pathname)
     ) {
       const shellUrl = new URL("/index.html", url.origin);
