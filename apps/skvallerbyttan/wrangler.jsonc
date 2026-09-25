@@ -50,8 +50,8 @@
   "d1_databases": [
     {
       "binding": "STATS_DB",
-      "database_name": "skvallerbyttan-stats",
-      "database_id": "12b0199f-efa2-4f96-b5c5-e3a7f2144125"
+      "database_name": "skvallerbyttan-stats-eu",
+      "database_id": "5e30b2a0-e47f-43f9-95cd-fc59fb542073"
     }
   ],
   "analytics_engine_datasets": [
