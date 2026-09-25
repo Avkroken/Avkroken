@@ -1,4 +1,4 @@
-import { documentationPath } from "./portal-routes.mjs";
+import { documentationPath, projectPath } from "./portal-routes.mjs";
 import { isRetiredRepository } from "./repository-policy.mjs";
 
 const RESERVED_REPOSITORIES = new Set([".github"]);
@@ -78,8 +78,10 @@ export function normalizePublicRepository(repo) {
     host: homepage?.host || null,
     repository: canonicalRepository,
     issues: canonicalRepository + "/issues",
+    wiki: repo?.has_wiki === true ? canonicalRepository + "/wiki" : null,
     discussions: repo?.has_discussions === true ? canonicalRepository + "/discussions" : null,
     releases: canonicalRepository + "/releases",
+    portalUrl: projectPath(name),
     documentation: documentationPath(name),
     pages: repo?.has_pages === true
       ? "https://avkroken.github.io/" + encodeURIComponent(name) + "/"
@@ -162,8 +164,10 @@ export function normalizePublicAppManifest(manifest, context = {}) {
     repository,
     sourceUrl: sourceTreeUrl(repository, ref, sourcePath),
     issues: repository + "/issues",
+    wiki: null,
     discussions: context.hasDiscussions === true ? repository + "/discussions" : null,
     releases: repository + "/releases",
+    portalUrl: projectPath(slug),
     documentation: documentationPath(slug),
     pages: null,
     language: null,
@@ -187,9 +191,19 @@ export function mergePublicProjectCatalog(repositoryProjects, appProjects) {
   ];
 
   const unique = new Map();
+  const slugs = new Set();
+
   for (const project of projects) {
     if (!project || typeof project.id !== "string" || unique.has(project.id)) continue;
+
+    const slug = typeof project.slug === "string"
+      ? project.slug.trim().toLocaleLowerCase("en-US")
+      : "";
+
+    if (slug && slugs.has(slug)) continue;
+
     unique.set(project.id, project);
+    if (slug) slugs.add(slug);
   }
 
   return [...unique.values()].sort((a, b) => a.name.localeCompare(b.name, "sv"));

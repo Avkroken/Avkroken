@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -64,6 +64,14 @@ Opt-in-appdiscovery läser endast `portal.public.json` under appkataloger.
 - fel vid listning av appkatalogen markerar `source.appDiscovery = unavailable`;
 - repositorykatalogen kan fortfarande returneras när appdiscovery är unavailable/partial;
 - inga appkatalogers övriga filer eller skyddade payloads läses av discovery-steget.
+
+### Projektdetalj
+
+`/projekt/:slug` använder den redan laddade `/api/projects`-katalogen i browsern. Ingen separat providerrequest görs när detaljvyn öppnas.
+
+Okänd slug visar ett explicit not-found-state i Portal-skalet. Om projektkatalogen är unavailable visas samma degraded state i detaljvyn.
+
+Detaljvyn får endast exponera fält som redan finns i den publika normaliserade projektmodellen och canonical länkar som härleds där. Den ska inte börja läsa skyddad appstate eller operativ providerstate direkt.
 
 ### Publicerade sites
 
@@ -127,9 +135,10 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
-7. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
-8. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
-9. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-10. cache-/heartbeat-beteende har inte regresserat.
+7. `/projekt/Bastion` och `/projekt/skvallerbyttan` renderar projektdetalj från den publika katalogen utan extra providerfetch; Skvallerbyttans detalj visar appens canonical source-path men ingen privat dashboard-payload;
+8. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
+9. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
+10. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
+11. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

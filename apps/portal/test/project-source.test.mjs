@@ -17,6 +17,7 @@ function repo(overrides = {}) {
     default_branch: "main",
     has_pages: true,
     has_discussions: true,
+    has_wiki: true,
     language: "Swift",
     size: 2048,
     pushed_at: "2026-09-25T10:00:00Z",
@@ -31,8 +32,10 @@ test("normalizes active public repositories even without a published endpoint", 
   assert.equal(project.name, "Bastion");
   assert.equal(project.url, null);
   assert.equal(project.portalPublished, false);
+  assert.equal(project.portalUrl, "/projekt/Bastion");
   assert.equal(project.documentation, "/projekt/Bastion/dokumentation");
   assert.equal(project.source.repository, "Avkroken/Bastion");
+  assert.equal(project.wiki, "https://github.com/Avkroken/Bastion/wiki");
 });
 
 test("filters organization infrastructure, retired repositories, archived, and non-public repositories", () => {

@@ -18,7 +18,8 @@
       /^\/projekt\/[^/]+\/dokumentation(?:\/|$)/.test(path)
     ) return "docs";
 
-    if (path === "/projekt" || /^\/projekt\/[^/]+(?:\/|$)/.test(path)) return "projects";
+    if (/^\/projekt\/[^/]+$/.test(path)) return "project-detail";
+    if (path === "/projekt") return "projects";
     if (path === "/tjanster") return "services";
     if (path === "/auth" || path.startsWith("/auth/")) return "auth";
     if (path === "/drift" || path.startsWith("/drift/")) return "operations";

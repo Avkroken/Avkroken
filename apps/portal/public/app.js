@@ -3,7 +3,20 @@ const serviceGrid = document.querySelector("#service-grid");
 const count = document.querySelector("#site-count");
 const portalState = document.querySelector("#portal-state");
 
+const detailTitle = document.querySelector("#project-detail-title");
+const detailDescription = document.querySelector("#project-detail-description");
+const detailCategory = document.querySelector("#project-detail-category");
+const detailBreadcrumb = document.querySelector("#project-detail-breadcrumb");
+const detailActions = document.querySelector("#project-detail-actions");
+const detailSourceKind = document.querySelector("#project-detail-source-kind");
+const detailRepository = document.querySelector("#project-detail-repository");
+const detailRef = document.querySelector("#project-detail-ref");
+const detailUpdated = document.querySelector("#project-detail-updated");
+const detailSourcePath = document.querySelector("#project-detail-source-path");
+const detailError = document.querySelector("#project-detail-error");
+
 let allProjects = [];
+let projectsLoaded = false;
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -56,12 +69,16 @@ function metric(label, value) {
 }
 
 function projectCard(project) {
+  const overviewLink = project.portalUrl
+    ? `<a class="card-action primary" data-portal-route href="${escapeHtml(project.portalUrl)}">Översikt</a>`
+    : "";
+
   const endpointLink = project.url
-    ? `<a class="card-action primary" href="${escapeHtml(project.url)}" target="_blank" rel="noopener noreferrer">Öppna tjänst</a>`
+    ? `<a class="card-action" href="${escapeHtml(project.url)}" target="_blank" rel="noopener noreferrer">Öppna tjänst</a>`
     : "";
 
   const documentationLink = project.documentation
-    ? `<a class="card-action${project.url ? "" : " primary"}" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
+    ? `<a class="card-action" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
     : "";
 
   const discussionsLink = project.discussions
@@ -88,6 +105,7 @@ function projectCard(project) {
       <p>${escapeHtml(project.description || "Avkroken-projekt.")}</p>
       <div class="host">${escapeHtml(location)}</div>
       <nav class="card-actions" aria-label="Länkar för ${escapeHtml(project.name)}">
+        ${overviewLink}
         ${endpointLink}
         ${documentationLink}
         <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -112,6 +130,109 @@ function renderCollection(target, projects, emptyMessage) {
   target.innerHTML = projects.map(projectCard).join("");
 }
 
+function projectSlugFromLocation() {
+  const match = (location.pathname.replace(/\/+$/, "") || "/").match(/^\/projekt\/([^/]+)$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function detailAction(label, href, { primary = false, internal = false } = {}) {
+  if (!href) return "";
+  const routeAttribute = internal ? " data-portal-route" : "";
+  const externalAttributes = internal ? "" : ' target="_blank" rel="noopener noreferrer"';
+  return `<a class="portal-button${primary ? " primary" : ""}"${routeAttribute} href="${escapeHtml(href)}"${externalAttributes}>${escapeHtml(label)}</a>`;
+}
+
+function resetProjectDetail() {
+  if (!detailTitle) return;
+  detailCategory.textContent = "PROJEKT";
+  detailBreadcrumb.textContent = "Projekt";
+  detailTitle.textContent = "Läser in projekt…";
+  detailDescription.textContent = "Projektmetadata hämtas från Portalens normaliserade publika projektkatalog.";
+  detailActions.replaceChildren();
+  detailSourceKind.textContent = "—";
+  detailRepository.textContent = "—";
+  detailRef.textContent = "—";
+  detailUpdated.textContent = "—";
+  detailSourcePath.hidden = true;
+  detailSourcePath.textContent = "";
+  detailError.hidden = true;
+}
+
+function renderProjectDetail() {
+  if (!detailTitle) return;
+
+  const slug = projectSlugFromLocation();
+  if (!slug) return;
+
+  if (!projectsLoaded) {
+    resetProjectDetail();
+    return;
+  }
+
+  const project = allProjects.find(item => item.slug === slug);
+  if (!project) {
+    detailCategory.textContent = "PROJEKT";
+    detailBreadcrumb.textContent = slug;
+    detailTitle.textContent = "Projekt saknas";
+    detailDescription.textContent = "Den begärda projektrouten finns inte i den aktuella publika projektkatalogen.";
+    detailActions.replaceChildren();
+    detailSourceKind.textContent = "—";
+    detailRepository.textContent = "—";
+    detailRef.textContent = "—";
+    detailUpdated.textContent = "—";
+    detailSourcePath.hidden = true;
+    detailError.hidden = false;
+    document.title = "Projekt saknas · Avkroken";
+    return;
+  }
+
+  const sourceKind = project.source?.kind === "monorepo_app" ? "Monorepo-app" : "Repository";
+  const sourceRepository = project.source?.repository || project.repository || "—";
+  const sourceRef = project.source?.ref || "—";
+
+  detailCategory.textContent = String(project.category || "Projekt").toUpperCase();
+  detailBreadcrumb.textContent = project.name || project.slug;
+  detailTitle.textContent = project.name || project.slug;
+  detailDescription.textContent = project.description || "Avkroken-projekt.";
+  detailSourceKind.textContent = sourceKind;
+  detailRepository.textContent = sourceRepository;
+  detailRef.textContent = sourceRef;
+  detailUpdated.textContent = formatDate(project.updatedAt);
+  detailError.hidden = true;
+
+  if (project.source?.path) {
+    detailSourcePath.hidden = false;
+    detailSourcePath.textContent = project.source.path;
+  } else {
+    detailSourcePath.hidden = true;
+    detailSourcePath.textContent = "";
+  }
+
+  const actions = [
+    detailAction("Dokumentation", project.documentation, {
+      primary: !project.url,
+      internal: true
+    }),
+    detailAction("Öppna tjänst", project.url, {
+      primary: Boolean(project.url)
+    }),
+    detailAction("Repository", project.repository),
+    detailAction("Wiki", project.wiki),
+    detailAction("Canonical source", project.sourceUrl),
+    detailAction("Issues", project.issues),
+    detailAction("Discussions", project.discussions),
+    detailAction("Releases", project.releases)
+  ].filter(Boolean);
+
+  detailActions.innerHTML = actions.join("");
+  document.title = `${project.name || project.slug} · Avkroken`;
+}
+
 function renderProjects() {
   if (count) {
     count.textContent = `${allProjects.length} PROJEKT`;
@@ -125,6 +246,8 @@ function renderProjects() {
     products,
     "Inga självständiga publika produkter hittades i projektkatalogen."
   );
+
+  renderProjectDetail();
 }
 
 async function loadProjects() {
@@ -134,6 +257,7 @@ async function loadProjects() {
 
     const payload = await response.json();
     allProjects = Array.isArray(payload.projects) ? payload.projects : [];
+    projectsLoaded = true;
 
     if (portalState) {
       portalState.textContent = `${allProjects.length} PROJEKT`;
@@ -144,6 +268,7 @@ async function loadProjects() {
 
     renderProjects();
   } catch (error) {
+    projectsLoaded = true;
     if (count) count.textContent = "UNAVAILABLE";
     if (portalState) portalState.textContent = "INDEX OFFLINE";
 
@@ -156,8 +281,23 @@ async function loadProjects() {
         '<div class="empty"><strong>Tjänstelistan är tillfälligt otillgänglig.</strong></div>';
     }
 
+    if (projectSlugFromLocation() && detailTitle) {
+      detailTitle.textContent = "Projektkatalogen är otillgänglig";
+      detailDescription.textContent = "Projektet kan inte visas förrän den publika katalogen kan läsas.";
+      detailError.hidden = false;
+    }
+
     console.error(error);
   }
 }
 
+window.addEventListener("portal:routechange", event => {
+  if (event.detail?.view === "project-detail") {
+    renderProjectDetail();
+  } else if (document.title.endsWith(" · Avkroken") && document.title !== "Avkroken") {
+    document.title = "Avkroken";
+  }
+});
+
+resetProjectDetail();
 loadProjects();

@@ -33,6 +33,7 @@ test("normalizes an explicitly opted-in public app without inventing a public en
   assert.equal(project.slug, "skvallerbyttan");
   assert.equal(project.url, null);
   assert.equal(project.portalPublished, false);
+  assert.equal(project.portalUrl, "/projekt/skvallerbyttan");
   assert.equal(project.documentation, "/projekt/skvallerbyttan/dokumentation");
   assert.equal(project.source.kind, "monorepo_app");
   assert.equal(project.source.path, "apps/skvallerbyttan");
@@ -112,4 +113,14 @@ test("merges repository and app projects by stable id and sorts by display name"
     mergePublicProjectCatalog(repositories, apps).map(project => project.name),
     ["Avkroken", "Produkter", "Skvallerbyttan"]
   );
+});
+
+
+test("repository project wins a colliding app slug", () => {
+  const projects = mergePublicProjectCatalog(
+    [{ id: "repository:bastion", slug: "Bastion", name: "Bastion" }],
+    [{ id: "app:avkroken/avkroken:bastion", slug: "bastion", name: "App Bastion" }]
+  );
+
+  assert.deepEqual(projects.map(project => project.id), ["repository:bastion"]);
 });

@@ -46,12 +46,13 @@ GET /api/projects
        |
        +--> Projekt
        +--> Tjänster
+       +--> Projektdetalj
 ```
 
 Projektmodellen skiljer mellan canonical källdata och härledd presentation:
 
 - `source.provider`, `source.repository` och `source.ref` pekar på källan;
-- `documentation`, `issues`, `discussions` och `releases` är navigationslänkar;
+- `portalUrl`, `documentation`, `issues`, `discussions`, `releases` och repository-Wiki där tillgängligt är navigationslänkar;
 - `portalPublished` är en härledd kompatibilitetsflagga för tidigare `/api/sites`;
 - `independentProduct` markerar Politiker, Klarspråk och Produkter så Portal-skalet inte används som deras produktidentitet.
 
@@ -72,6 +73,26 @@ Discovery-flödet:
 Manifestet är presentation/publiceringskonfiguration, inte teknisk source of truth. Appens README/docs äger fortsatt teknisk current-state.
 
 Skvallerbyttan är första opt-in-appen. Manifestet innehåller ingen publik dashboard-URL, så projektposten gör inte den privata dashboarden publik. Jobb och Portal saknar publika appmanifests.
+
+### Projektdetalj
+
+`/projekt/:slug` är ett presentationsskikt ovanpå `/api/projects`, inte en separat provideradapter.
+
+Klientflödet är:
+
+```text
+GET /api/projects
+       |
+       v
+client project catalog
+       |
+       +--> /projekt
+       +--> /tjanster
+       +--> /projekt/:slug
+```
+
+När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det, Issues, Discussions och Releases. Den hämtar inte issue-, release- eller CI-data från GitHub på detaljsidans sidvisning.
+
 
 ### Operativ providerstate
 
@@ -122,7 +143,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 
 - `/` — Avkroken.
 - `/projekt` — projektöversikt.
-- `/projekt/:repository` — projektdetaljens stabila namespace.
+- `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
 - `/dokumentation[/...]` — samlad dokumentationsyta.
 - `/tjanster` — publika tjänster/produkter.
