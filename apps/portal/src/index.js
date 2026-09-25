@@ -1,4 +1,5 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
+import { documentationPath, isPortalDocumentRoute } from "./portal-routes.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -314,7 +315,7 @@ async function getDocContent(requestUrl, env) {
 }
 async function getPortalSites(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-sites-v6");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-sites-v7");
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
@@ -357,7 +358,7 @@ async function getPortalSites(env, ctx) {
         accent: accentFromTopics(repo.topics),
         repository: repo.html_url,
         issues: `${repo.html_url}/issues`,
-        documentation: "/#docs/" + encodeURIComponent(repo.name),
+        documentation: documentationPath(repo.name),
         pages: repo.has_pages === true
           ? "https://avkroken.github.io/" + encodeURIComponent(repo.name) + "/"
           : null,
@@ -689,6 +690,14 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getDocContent(url, env);
+    }
+
+    if (
+      (request.method === "GET" || request.method === "HEAD") &&
+      isPortalDocumentRoute(url.pathname)
+    ) {
+      const shellUrl = new URL("/index.html", url.origin);
+      return env.ASSETS.fetch(new Request(shellUrl, request));
     }
 
     return env.ASSETS.fetch(request);
