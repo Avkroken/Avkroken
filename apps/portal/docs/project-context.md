@@ -51,7 +51,20 @@ Worker-koden innehåller idag:
 - projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering;
 - projektspecifik Builds / CI-vy för repositoryprojekt via Skvallerbyttans cacheade public-safe Actions-summary;
 - global och projektspecifik Activity-vy från Skvallerbyttans repositoryfiltrerade observerade eventledger.
+- startsidans kontrollpanel som återanvänder endast Portalens public-safe `/api/projects`, `/api/operations` och `/api/activity?days=7`, degraderar källor oberoende och märker aktivitet som observerad/coverage-begränsad.
 
+
+## Startsida / kontrollpanel
+
+`/` är inte längre enbart en statisk navigationsyta. Browserklienten `public/home-dashboard.js` sammanställer ett begränsat nuläge från tre redan existerande Portal-API:er:
+
+- `/api/projects` för antal publicerade projekt;
+- `/api/operations` för public-safe provider-/capability-state från Skvallerbyttans read-only modell;
+- `/api/activity?days=7` för repositoryfiltrerad observerad aktivitet.
+
+Kontrollpanelen gör inga browseranrop till GitHub, Cloudflare eller Skvallerbyttans externa origin och läser ingen Auth/Jobb-väg. Varje källa degraderar separat. Om observationsunderlag saknas visas det som otillgängligt eller ej observerat; Portalen fyller inte i saknad state med antaganden.
+
+Startsidan läser medvetet inte `/api/changelog` automatiskt. Changelog-adaptern gör bounded GitHub Release-läsningar och ska inte förvandlas till en extra providerread på varje startsidesvisning. Officiell releasehistorik finns fortsatt på den explicita Changelog-ytan.
 ## Publik projektmodell
 
 ### `/api/projects`
