@@ -22,6 +22,8 @@
 
     if (/^\/projekt\/[^/]+\/releases(?:\/|$)/.test(path)) return "project-releases";
 
+    if (/^\/projekt\/[^/]+\/issues(?:\/|$)/.test(path)) return "project-issues";
+
     if (/^\/projekt\/[^/]+$/.test(path)) return "project-detail";
     if (path === "/projekt") return "projects";
     if (path === "/tjanster") return "services";
