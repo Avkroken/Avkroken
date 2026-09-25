@@ -26,6 +26,39 @@ Avkroken-rendering
        +--> Visa original
 ```
 
+### Publik projektkatalog
+
+`src/project-source.mjs` normaliserar GitHubs publika repositoryobjekt till Portalens projektmodell.
+
+```text
+GitHub org repositories
+       |
+       v
+project-source adapter
+       |
+       +--> filtrera public + active
+       +--> exkludera .github + retired sources
+       +--> normalisera source/canonical länkar
+       +--> härled presentation metadata
+       |
+       v
+GET /api/projects
+       |
+       +--> Projekt
+       +--> Tjänster
+```
+
+Projektmodellen skiljer mellan canonical källdata och härledd presentation:
+
+- `source.provider`, `source.repository` och `source.ref` pekar på källan;
+- `documentation`, `issues`, `discussions` och `releases` är navigationslänkar;
+- `portalPublished` är en härledd kompatibilitetsflagga för tidigare `/api/sites`;
+- `independentProduct` markerar Politiker, Klarspråk och Produkter så Portal-skalet inte används som deras produktidentitet.
+
+Repository utan homepage finns fortfarande i Projekt-katalogen. Endast HTTPS-homepages godtas som publika endpoints.
+
+Monorepo-appar upptäcks inte genom generell scanning i detta lager. Det förhindrar att skyddad appmetadata, särskilt Jobb, exponeras av misstag innan app-discovery har en explicit publik policy.
+
 ### Operativ providerstate
 
 ```text
@@ -49,16 +82,17 @@ Den här gränsen undviker dubbel providerlogik och bevarar Skvallerbyttans read
 ```text
 Publik Portal
    |
-   +--> Auth/Jobb-ingång
+   +--> Auth-ingång
               |
               v
-      Jobbs autentiserade backend
+      jobb.denied.se
+      autentiserad backend
               |
               v
        skyddad payload
 ```
 
-Skyddad payload går aldrig genom Portalens publika dataväg.
+Skyddad payload går aldrig genom Portalens publika dataväg. `/auth/jobb[/...]` redirectas server-side till Jobbs skyddade origin innan Portal-shell renderas.
 
 ## Routing
 
@@ -90,9 +124,7 @@ Klienten kan fortfarande tolka äldre `#docs/...`-länkar för migration/bakåtk
 
 ## Repository- och dokumentationsadapter
 
-Worker hämtar publika repositories från GitHub API.
-
-Dokumentationsadapter:
+Dokumentationsadaptern:
 
 1. filtrerar till publik, aktiv och icke-retired repository-state;
 2. söker README och Markdown under `docs/` till begränsat djup;
@@ -103,11 +135,22 @@ Dokumentationsadapter:
 
 Godtycklig GitHub-path kan därför inte användas direkt mot content-endpointen.
 
+Projektadaptern och dokumentationsadaptern använder samma providerfamilj men olika kontrakt: projektadaptern normaliserar repositorymetadata, medan dokumentationsadaptern läser tillåtna dokument.
+
 ## Caching och freshness
 
-### Sites
+### Projekt
 
-`/api/sites` använder Workers Cache API med fem minuters cachetid.
+`/api/projects` använder Workers Cache API med fem minuters cachetid. Svaret innehåller:
+
+- `source.provider = github`;
+- `source.scope = Avkroken`;
+- `source.coverage = active_public_repositories`;
+- `generatedAt`.
+
+Klientresponsen kräver revalidering. Workers Cache API får en separat response-kopia med `Cache-Control: public, max-age=300`; en cache-hit skrivs tillbaka till klienten med revalideringsheader. `stale-while-revalidate` används inte i Cache API-lagret eftersom Workers Cache API inte stöder direktiven.
+
+`/api/sites` härleds från samma normaliserade projektmodell.
 
 ### Dokumentation
 
@@ -115,11 +158,9 @@ Katalog och innehåll har sex timmars CDN-cache och cache tags.
 
 `DocsInvalidationService` tillåter intern, explicit invalidering för berörda repositories.
 
-Freshness-metadata ska utökas i senare adapterarbete; foundationen fabricerar inte freshness som inte finns i kontraktet.
-
 ## Drift & insyn
 
-Portalens Worker har redan intern heartbeat/watchdog-infrastruktur för Skvallerbyttan, men foundationen exponerar inte den som en full Drift & insyn-API.
+Portalens Worker har redan intern heartbeat/watchdog-infrastruktur för Skvallerbyttan, men Portalen exponerar inte den som en full Drift & insyn-API.
 
 När driftvyn kopplas in ska den:
 
@@ -131,7 +172,7 @@ När driftvyn kopplas in ska den:
 
 ## Global sök
 
-Sök är inte implementerad i foundationen.
+Sök är inte implementerad.
 
 Säkerhetskrav för framtida index:
 

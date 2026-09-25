@@ -21,25 +21,26 @@ Respektive repository eller app äger fortsatt sin:
 
 Portalen får läsa, cachea, rendera och länka innehållet. Speglat innehåll ska behålla en länk till originalkällan.
 
-## Portal v2 foundation
+## Portal v2
 
-Portal v2-foundationen etablerar:
+Portal v2 etablerar:
 
 - stabil path-baserad navigation;
 - ett gemensamt Avkroken-shell;
 - design tokens i kod;
 - responsiv och keyboard-navigerbar huvudnavigation;
-- projekt- och tjänsteytor ovanpå befintlig publik repository discovery;
+- normaliserad publik repository-project-katalog;
+- projekt- och tjänsteytor ovanpå samma projektmodell;
 - stabila dokumentations-URL:er;
 - fortsatt rendering av publik README/docs i portalen;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
-- strukturell markering av Jobb som skyddad tjänst.
+- strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
 Vyer med ännu ej inkopplad datakälla visar uttryckligen att integrationen ligger i ett senare arbete.
 
 ## URL-kontrakt
 
-Foundationen känner bland annat igen:
+Portalen känner bland annat igen:
 
 - `/`
 - `/projekt`
@@ -63,19 +64,32 @@ Worker-lagret returnerar portalens HTML-shell för kända dokumentroutes. API- o
 
 Nuvarande Worker exponerar:
 
-- `GET /api/sites` — publicerade endpoints som matchar portalens befintliga repository-/topic-policy.
+- `GET /api/projects` — normaliserad katalog över aktiva publika repositories som får visas som projekt. Svaret innehåller källmetadata, genereringstid och projektposter.
+- `GET /api/sites` — bakåtkompatibel vy över de projekt som har både portal-category-topic och publik HTTPS-homepage.
 - `GET /api/docs` — katalog över tillåten publik repositorydokumentation.
 - `GET /api/docs/content?repo=...&path=...` — tillåtet publikt Markdown-innehåll och canonical source URL.
 
-`/api/sites` är inte en komplett organisationsinventering. Full projektinventering är ett separat adapterarbete.
+`.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
+
+Monorepo-appar under `Avkroken/Avkroken/apps` upptäcks inte automatiskt av projektkatalogen ännu. Den gränsen är avsiktlig tills app-discovery har en explicit publik manifest-/allowlistmodell; Jobb får inte råka exponeras genom generell appscanning.
 
 ## Källdata och ansvar
 
-### Repository-/dokumentationsdata
+### Repository-/projektdata
+
+```text
+GitHub public repositories
+  -> project-source adapter
+  -> normaliserad katalog
+  -> Workers cache
+  -> Avkroken Projekt/Tjänster
+```
+
+### Repositorydokumentation
 
 ```text
 GitHub repository
-  -> Portal repository/docs adapter
+  -> Portal docs adapter
   -> cache
   -> Avkroken-rendering
   -> "Visa original"

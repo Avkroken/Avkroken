@@ -1,5 +1,6 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
+import { normalizePublicRepositories } from "./project-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -13,50 +14,6 @@ const MAX_DOC_DEPTH = 2;
 const WATCHED_SERVICES = ["skvallerbyttan"];
 const HEARTBEAT_EXPECTED_INTERVAL_SECONDS = 15 * 60;
 const HEARTBEAT_STALE_AFTER_SECONDS = 35 * 60;
-
-const CATEGORY_TOPICS = {
-  tool: "Verktyg",
-  project: "Projekt",
-  docs: "Dokumentation",
-  service: "Tjänst",
-  experiment: "Experiment"
-};
-
-const ACCENT_TOPICS = ["cyan", "blue", "violet", "magenta", "pink"];
-
-function normalizedTopicName(topic) {
-  if (typeof topic !== "string") return "";
-  return topic.startsWith("portal-") ? topic.slice("portal-".length) : topic;
-}
-
-function hasPortalCategory(topics = []) {
-  return topics.some(topic => Boolean(CATEGORY_TOPICS[normalizedTopicName(topic)]));
-}
-
-function categoryFromTopics(topics = []) {
-  for (const topic of topics) {
-    const name = normalizedTopicName(topic);
-    if (CATEGORY_TOPICS[name]) return CATEGORY_TOPICS[name];
-  }
-  return "Projekt";
-}
-
-function accentFromTopics(topics = []) {
-  for (const topic of topics) {
-    const name = normalizedTopicName(topic);
-    if (ACCENT_TOPICS.includes(name)) return name;
-  }
-  return "blue";
-}
-
-function isPublicHttpsUrl(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function githubHeaders(env, accept = "application/vnd.github+json") {
   const headers = {
@@ -313,73 +270,77 @@ async function getDocContent(requestUrl, env) {
     }
   });
 }
-async function getPortalSites(env, ctx) {
-  const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-sites-v7");
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
-
-  const headers = {
-    "Accept": "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2026-03-10",
-    "User-Agent": "Avkroken-Portal-Worker"
-  };
-
-  if (env.GITHUB_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
-
-  const github = await fetch(GITHUB_API, { headers });
-  if (!github.ok) {
-    return new Response(
-      JSON.stringify({ error: "github_unavailable", status: github.status }),
-      { status: 502, headers: { "Content-Type": "application/json; charset=utf-8" } }
-    );
-  }
-
-  const repos = await github.json();
-  const sites = repos
-    .filter(repo =>
-      repo &&
-      repo.visibility === "public" &&
-      repo.archived === false &&
-      !isRetiredRepository(repo.name) &&
-      Array.isArray(repo.topics) &&
-      hasPortalCategory(repo.topics) &&
-      typeof repo.homepage === "string" &&
-      isPublicHttpsUrl(repo.homepage)
-    )
-    .map(repo => {
-      const url = new URL(repo.homepage);
-      return {
-        name: repo.name,
-        url: url.href,
-        host: url.host,
-        description: repo.description || "",
-        category: categoryFromTopics(repo.topics),
-        accent: accentFromTopics(repo.topics),
-        repository: repo.html_url,
-        issues: `${repo.html_url}/issues`,
-        documentation: documentationPath(repo.name),
-        pages: repo.has_pages === true
-          ? "https://avkroken.github.io/" + encodeURIComponent(repo.name) + "/"
-          : null,
-        language: repo.language || null,
-        repoSizeKb: Number.isFinite(repo.size) ? repo.size : null,
-        updatedAt: repo.pushed_at || repo.updated_at || null,
-        stars: Number.isFinite(repo.stargazers_count) ? repo.stargazers_count : 0
-      };
-    });
-
-  const response = new Response(JSON.stringify(sites), {
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": `public, max-age=${CACHE_SECONDS}`
-    }
-  });
-
-  ctx.waitUntil(cache.put(cacheKey, response.clone()));
-  return response;
+async function loadPublicProjects(env) {
+  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
+  if (!github.ok) throw new Error("github_unavailable:" + github.status);
+  return normalizePublicRepositories(await github.json());
 }
 
+async function getPublicProjects(env, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v1");
+  const cached = await cache.match(cacheKey);
+
+  if (cached) {
+    const clientResponse = new Response(cached.body, cached);
+    clientResponse.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+    return clientResponse;
+  }
+
+  try {
+    const projects = await loadPublicProjects(env);
+    const body = JSON.stringify({
+      source: {
+        provider: "github",
+        scope: "Avkroken",
+        coverage: "active_public_repositories"
+      },
+      generatedAt: new Date().toISOString(),
+      projects
+    });
+
+    const cachedResponse = new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=" + CACHE_SECONDS
+      }
+    });
+    ctx.waitUntil(cache.put(cacheKey, cachedResponse));
+
+    return new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    });
+  } catch {
+    return new Response(JSON.stringify({ error: "github_unavailable" }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+}
+
+async function getPortalSites(env, ctx) {
+  const projectsResponse = await getPublicProjects(env, ctx);
+  if (!projectsResponse.ok) return projectsResponse;
+
+  const payload = await projectsResponse.clone().json();
+  const sites = Array.isArray(payload.projects)
+    ? payload.projects.filter(project => project.portalPublished === true)
+    : [];
+
+  return new Response(JSON.stringify(sites), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Cloudflare-CDN-Cache-Control": "public, max-age=" + CACHE_SECONDS
+    }
+  });
+}
 
 function operationalWatchdogStub(env, service) {
   if (!env.OPS_WATCHDOG) throw new Error("operational watchdog binding is not configured");
@@ -670,6 +631,13 @@ export default {
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/projects") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicProjects(env, ctx);
+    }
 
     if (url.pathname === "/api/sites") {
       if (request.method !== "GET" && request.method !== "HEAD") {

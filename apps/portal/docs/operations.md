@@ -47,9 +47,17 @@ Credentialvärden dokumenteras inte här.
 
 ## Felmodell
 
-### GitHub site discovery
+### Projektkatalog
 
-Om GitHub API inte kan läsas returnerar backend `502` och UI visar att projekt-/tjänstelistan är otillgänglig.
+`GET /api/projects` läser GitHubs publika repositorylista och normaliserar den.
+
+Om GitHub API inte kan läsas returnerar backend `502 github_unavailable` och UI visar att projekt-/tjänstelistan är otillgänglig.
+
+Katalogsvaret innehåller `generatedAt` och deklarerad coverage `active_public_repositories`.
+
+### Publicerade sites
+
+`GET /api/sites` härleds från projektkatalogen och behåller den tidigare endpointpolicyn genom `portalPublished`.
 
 ### Dokumentationskatalog
 
@@ -67,7 +75,15 @@ Om GitHub-katalogen inte kan läsas returneras `502` med `github_unavailable`. U
 
 Heartbeat-state ska inte automatiskt tolkas som komplett provider health för GitHub eller Cloudflare.
 
-## Cacheinvalidering
+## Cache
+
+### Projektkatalog
+
+`/api/projects` lagras i Workers Cache API med fem minuters cachetid.
+
+Klientresponsen kräver revalidering. Workers Cache API lagrar en separat response-kopia med `Cache-Control: public, max-age=300`, och cache-hit-responsen normaliseras tillbaka till klientrevalidering. `/api/sites` härleds från samma normaliserade response.
+
+### Dokumentation
 
 Dokumentationscache kan invalideras internt via `DocsInvalidationService`.
 
@@ -82,6 +98,8 @@ Service binding används i stället för att exponera en publik administrationse
 
 - Lägg inte providercredentials i browser assets.
 - Skapa inte ny credential för Portal v2 om befintligt verifierat flöde räcker.
+- `.github`, retired sources, arkiverade och icke-publika repositories ska inte hamna i den publika projektkatalogen.
+- Monorepo-appar ska inte läggas till genom generell scanning innan explicit publik app-policy finns.
 - Jobb/Auth-data får inte passera publik Portal-cache eller publik sök.
 - Skvallerbyttans providerintegration förblir read-only.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -92,10 +110,11 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
-4. deep links returnerar Portal-shell;
-5. dokumentationsrendering visar “Visa original” till canonical källa;
-6. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
-7. cache-/heartbeat-beteende har inte regresserat.
+3. `/api/projects`, `/api/sites` och `/api/docs` fungerar utan att exponera credentials;
+4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
+5. deep links returnerar Portal-shell;
+6. dokumentationsrendering visar “Visa original” till canonical källa;
+7. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
+8. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.

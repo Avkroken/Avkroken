@@ -3,9 +3,7 @@ const serviceGrid = document.querySelector("#service-grid");
 const count = document.querySelector("#site-count");
 const portalState = document.querySelector("#portal-state");
 
-let allSites = [];
-
-const independentProducts = new Set(["Politiker", "Klarsprak", "Produkter"]);
+let allProjects = [];
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -57,79 +55,96 @@ function metric(label, value) {
     </div>`;
 }
 
-function siteCard(site) {
-  const documentationLink = site.documentation
-    ? `<a class="card-action" data-portal-route href="${escapeHtml(site.documentation)}">Dokumentation</a>`
+function projectCard(project) {
+  const endpointLink = project.url
+    ? `<a class="card-action primary" href="${escapeHtml(project.url)}" target="_blank" rel="noopener noreferrer">Öppna tjänst</a>`
     : "";
+
+  const documentationLink = project.documentation
+    ? `<a class="card-action${project.url ? "" : " primary"}" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
+    : "";
+
+  const discussionsLink = project.discussions
+    ? `<a class="card-action" href="${escapeHtml(project.discussions)}" target="_blank" rel="noopener noreferrer">Discussions</a>`
+    : "";
+
+  const location = project.host ||
+    project.source?.repository ||
+    project.repository ||
+    "Repository";
 
   return `
     <article class="card"
-       style="--glow:${accentColor(site.accent)};--accent:${accentSolid(site.accent)}">
+       style="--glow:${accentColor(project.accent)};--accent:${accentSolid(project.accent)}">
       <div class="card-top">
-        <span class="badge">${escapeHtml(site.category)}</span>
+        <span class="badge">${escapeHtml(project.category || "Projekt")}</span>
         <span class="arrow" aria-hidden="true">↗</span>
       </div>
-      <h3>${escapeHtml(site.name)}</h3>
-      <p>${escapeHtml(site.description || "Avkroken-projekt.")}</p>
-      <div class="host">${escapeHtml(site.host)}</div>
-      <nav class="card-actions" aria-label="Länkar för ${escapeHtml(site.name)}">
-        <a class="card-action primary" href="${escapeHtml(site.url)}" target="_blank" rel="noopener noreferrer">Öppna</a>
+      <h3>${escapeHtml(project.name)}</h3>
+      <p>${escapeHtml(project.description || "Avkroken-projekt.")}</p>
+      <div class="host">${escapeHtml(location)}</div>
+      <nav class="card-actions" aria-label="Länkar för ${escapeHtml(project.name)}">
+        ${endpointLink}
         ${documentationLink}
-        <a class="card-action" href="${escapeHtml(site.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a class="card-action" href="${escapeHtml(site.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>
+        <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="card-action" href="${escapeHtml(project.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>
+        ${discussionsLink}
       </nav>
       <div class="metrics" aria-label="Projektdata">
-        ${metric("STACK", site.language || "—")}
-        ${metric("REPO", formatSize(site.repoSizeKb))}
-        ${metric("UPDATED", formatDate(site.updatedAt))}
+        ${metric("STACK", project.language || "—")}
+        ${metric("REPO", formatSize(project.repoSizeKb))}
+        ${metric("UPDATED", formatDate(project.updatedAt))}
       </div>
     </article>`;
 }
 
-function renderCollection(target, sites, emptyMessage) {
+function renderCollection(target, projects, emptyMessage) {
   if (!target) return;
-  if (!sites.length) {
+  if (!projects.length) {
     target.innerHTML = `<div class="empty"><strong>${escapeHtml(emptyMessage)}</strong></div>`;
     return;
   }
-  target.innerHTML = sites.map(siteCard).join("");
+  target.innerHTML = projects.map(projectCard).join("");
 }
 
-function renderSites() {
+function renderProjects() {
   if (count) {
-    count.textContent = `${allSites.length} PUBLICERADE`;
+    count.textContent = `${allProjects.length} PROJEKT`;
   }
 
-  renderCollection(grid, allSites, "Inga publicerade projekt eller tjänster hittades.");
+  renderCollection(grid, allProjects, "Inga aktiva publika projekt hittades.");
 
-  const products = allSites.filter(site => independentProducts.has(site.name));
+  const products = allProjects.filter(project => project.independentProduct === true);
   renderCollection(
     serviceGrid,
     products,
-    "Inga självständiga publika produkter hittades i portalens discovery."
+    "Inga självständiga publika produkter hittades i projektkatalogen."
   );
 }
 
-async function loadSites() {
+async function loadProjects() {
   try {
-    const response = await fetch("/api/sites", { headers: { Accept: "application/json" } });
+    const response = await fetch("/api/projects", { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    const data = await response.json();
-    allSites = Array.isArray(data) ? data : [];
+    const payload = await response.json();
+    allProjects = Array.isArray(payload.projects) ? payload.projects : [];
 
     if (portalState) {
-      portalState.textContent = `${allSites.length} PUBLIKA`;
+      portalState.textContent = `${allProjects.length} PROJEKT`;
+      if (payload.generatedAt) {
+        portalState.title = "Projektkatalog genererad " + formatDate(payload.generatedAt);
+      }
     }
 
-    renderSites();
+    renderProjects();
   } catch (error) {
     if (count) count.textContent = "UNAVAILABLE";
     if (portalState) portalState.textContent = "INDEX OFFLINE";
 
     if (grid) {
       grid.innerHTML =
-        '<div class="empty"><strong>Projektlistan är tillfälligt otillgänglig.</strong></div>';
+        '<div class="empty"><strong>Projektkatalogen är tillfälligt otillgänglig.</strong></div>';
     }
     if (serviceGrid) {
       serviceGrid.innerHTML =
@@ -140,4 +155,4 @@ async function loadSites() {
   }
 }
 
-loadSites();
+loadProjects();

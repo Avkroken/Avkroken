@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Portal v2-foundationens feature branch: 2026-09-25.
+Senast verifierad mot project/source-adapterarbetet: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -27,31 +27,59 @@ Portal kör som Cloudflare Worker med statiska assets.
 
 Worker-koden innehåller idag:
 
-- publik site discovery från GitHub;
+- normaliserad publik project/source-adapter för aktiva publika repositories;
+- bakåtkompatibel publicerad site discovery;
 - publik README/docs-katalog;
 - hämtning av tillåtet publikt Markdown;
 - cache headers och cache tags för dokumentation;
 - intern dokumentationsinvalidering via `DocsInvalidationService`;
 - intern operativ heartbeat-mottagning via `OperationalHeartbeatService`;
 - `OperationalWatchdog` som Durable Object;
-- schedulerad watchdog-kontroll.
-
-Portal v2-foundationen lägger till:
-
+- schedulerad watchdog-kontroll;
 - central route-modul i `src/portal-routes.mjs`;
 - path-baserad klientnavigation i `public/shell.js`;
 - server-side shell fallback för kända Portal-dokumentroutes;
 - stabila dokumentations-URL:er;
 - Portal v2 design tokens och shell-CSS;
-- ny informationsarkitektur utan GitHub-begrepp som huvudnavigation.
+- informationsarkitektur utan GitHub-begrepp som huvudnavigation.
 
-## Data som redan finns
+## Publik projektmodell
+
+### `/api/projects`
+
+Returnerar ett objekt med:
+
+- källmetadata för GitHub/Avkroken;
+- `generatedAt`;
+- `projects` — normaliserade aktiva publika repositoryprojekt.
+
+Adapterpolicyn:
+
+- kräver `visibility = public`;
+- exkluderar arkiverade repositories;
+- exkluderar `.github`;
+- exkluderar pensionerade source repositories enligt `repository-policy.mjs`;
+- behåller projekt även när publik homepage saknas;
+- accepterar bara HTTPS-homepage som publik endpoint;
+- markerar Politiker, Klarspråk och Produkter som `independentProduct`;
+- bär canonical GitHub-repository/ref i `source`.
 
 ### `/api/sites`
 
-Returnerar publicerade endpoints från publika, aktiva repositories som uppfyller befintlig portal-category/topic-policy och har en publik HTTPS-homepage.
+Finns kvar för kompatibilitet och härleds från samma projektmodell.
 
-Den endpointen är **inte** en komplett lista över alla Avkroken-repositories.
+Den returnerar endast projekt där `portalPublished = true`, vilket kräver:
+
+- portal-category-topic;
+- publik HTTPS-homepage.
+
+### Monorepo-appar
+
+`Avkroken/Avkroken/apps` scannas inte generellt av den publika project-adaptern ännu.
+
+Det är en medveten säkerhetsgräns. App-discovery ska få en uttrycklig publik manifest-/allowlistmodell innan Skvallerbyttan eller andra monorepo-appar läggs till som separata projektposter. Jobb får inte exponeras genom generell appdiscovery.
+
+## Dokumentationsdata
 
 ### `/api/docs`
 
@@ -65,7 +93,8 @@ Returnerar den valda tillåtna Markdownfilen samt `sourceUrl` till canonical rep
 
 Aktuella värden i koden:
 
-- site discovery: 300 sekunder i Workers Cache API;
+- project catalog: 300 sekunder i Workers Cache API;
+- `/api/sites`: härledd från samma project catalog;
 - dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache.
 
@@ -80,7 +109,7 @@ Nuvarande direktkoppling mellan apparna används för:
 - dokumentationscache-invalidering;
 - operativ heartbeat.
 
-Portal v2-foundationen visar ingen fabricerad providerstatus. Den visuella Drift & insyn-ytan väntar på separat dataadapter/integration mot normaliserad state.
+Portalen visar ingen fabricerad providerstatus. Den visuella Drift & insyn-ytan väntar på separat dataadapter/integration mot normaliserad state.
 
 ## Auth / Jobb
 
@@ -95,12 +124,12 @@ Skyddad Jobb-data:
 
 Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
-## Kända gap efter foundation
+## Kända gap
 
-Följande är medvetet inte löst i foundationen:
+Följande är medvetet inte löst ännu:
 
-- komplett project/source adapter för alla relevanta repositories;
-- projektdetaljdata;
+- säker monorepo-appdiscovery med uttrycklig publik policy;
+- full projektdetaljdata;
 - Wiki-adapter inne i Portalen;
 - global access-aware sökindexering;
 - Drift & insyn-data från Skvallerbyttans normaliserade API/state;
