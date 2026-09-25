@@ -144,17 +144,26 @@ Dessa är designreferenser, inte runtimeimplementation.
 
 ## Accessibility
 
-Shell-krav:
+Shell-kontrakt:
 
 - tydlig `:focus-visible`;
 - keyboard navigation;
-- skip link;
+- skip link till programmässigt fokuserbar `#portal-content`;
 - semantisk huvudnavigation;
 - `aria-current` för aktiv route;
+- SPA-routebyte flyttar fokus till aktiv sidrubrik utan att göra rubriker permanenta tabb-stopp;
 - mobilmeny med `aria-expanded`;
-- Escape stänger mobil navigation;
+- Escape stänger mobil navigation och återför fokus till menyknappen;
 - `prefers-reduced-motion` respekteras;
 - kontrast prioriteras framför textur/stämning;
-- layout ska fungera på liten skärm utan att information göms bakom hover.
+- layout ska fungera på liten skärm utan horisontell dokumentoverflow eller hover-only information.
 
-Kommande komponenter ska använda samma principer.
+Verifiering:
+
+- Node-kontrakttest låser fokus-/keyboardbeteendet i markup och shell;
+- headless Chrome + ChromeDriver kör faktiska klientskript;
+- `axe-core` kör WCAG A/AA-regler på alla top-level-vyer i desktopläge;
+- representativa mobilvyer kör både axe och overflowkontroll;
+- browsergaten använder endast syntetiska publika API-fixtures och kräver inga credentials.
+
+Kommande komponenter ska använda samma principer och omfattas av samma browsergate.
