@@ -52,7 +52,7 @@ GET /api/projects
 Projektmodellen skiljer mellan canonical källdata och härledd presentation:
 
 - `source.provider`, `source.repository` och `source.ref` pekar på källan;
-- `portalUrl`, `documentation`, `issues`, `discussions`, `releases` och repository-Wiki där tillgängligt är navigationslänkar;
+- `portalUrl`, `documentation`, `issues`, `discussions`, `releases`, canonical repository-Wiki och intern `wikiPortalUrl` där tillgängligt är navigationslänkar;
 - `portalPublished` är en härledd kompatibilitetsflagga för tidigare `/api/sites`;
 - `independentProduct` markerar Politiker, Klarspråk och Produkter så Portal-skalet inte används som deras produktidentitet.
 
@@ -93,6 +93,27 @@ client project catalog
 
 När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det, Issues, Discussions och Releases. Den hämtar inte issue-, release- eller CI-data från GitHub på detaljsidans sidvisning.
 
+
+### Wiki-presentation
+
+Repository-Wiki är redan en deterministisk presentationsyta som byggs från repositoryts canonical README/docs genom `.github/workflows/wiki-sync.yml`.
+
+Portalens Wiki-flöde är därför:
+
+```text
+repository README/docs
+       |
+       +--> repo-local Wiki sync --> GitHub Wiki (original presentation)
+       |
+       +--> Portal docs catalog
+                 |
+                 +--> /projekt/:slug/wiki
+                 +--> /projekt/:slug/dokumentation/...
+```
+
+`/projekt/:slug/wiki` läser Portalens befintliga publika projekt- och dokumentationskataloger. Browsern gör inga direkta GitHub API-anrop från Wiki-vyn. Original-Wikin finns alltid som canonical presentationslänk.
+
+Wiki-publicering är repository-specifik: endast projekt med `has_wiki = true` får `wikiPortalUrl`. Monorepo-appar är separata projektidentiteter och får inte ärva source-repositoryts Wiki automatiskt.
 
 ### Operativ providerstate
 
@@ -145,6 +166,7 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/projekt` — projektöversikt.
 - `/projekt/:slug` — projektdetalj från den normaliserade publika projektkatalogen.
 - `/projekt/:source/dokumentation[/...]` — dokumentation för repository eller explicit opt-in-app; app-URL:er är oberoende av monorepots provider-path.
+- `/projekt/:slug/wiki` — Wiki-presentation för repositoryprojekt med publik GitHub Wiki.
 - `/dokumentation[/...]` — samlad dokumentationsyta.
 - `/tjanster` — publika tjänster/produkter.
 - `/auth` — publik auth-ingång utan skyddad payload.
