@@ -217,7 +217,7 @@ Felmodell:
 
 ### `/api/builds?project=...`
 
-Endpointen kräver först ett live-publicerat repositoryprojekt i Portalens projektkatalog. Därefter anropas den redan konfigurerade interna bindingen `SKVALLERBYTTAN_OBSERVATIONS` och metoden `getPublicRepositoryCi(repoName)`.
+Endpointen kräver först ett live-publicerat repositoryprojekt från GitHubs publika organisationslistning, normaliserad med samma repositorypolicy som Portalens projektkatalog. App-manifest läses inte för denna repository-only gate. Därefter anropas den redan konfigurerade interna bindingen `SKVALLERBYTTAN_OBSERVATIONS` och metoden `getPublicRepositoryCi(repoName)`.
 
 Skvallerbyttans metod gör **ingen ny GitHub-request**. Den läser `overview` ur D1 source cache och kräver att den cacheade repositoryraden själv är publik och inte arkiverad innan någon CI-summary kan lämna observationslagret.
 
