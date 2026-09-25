@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot projektspecifik Issues-integration: 2026-09-25.
+Senast verifierad mot projektspecifik Builds / CI-integration: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -48,7 +48,8 @@ Worker-koden innehåller idag:
 - Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding;
 - Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt;
 - projektspecifik Releases-vy för repositoryprojekt via samma public-only releaseadapter;
-- projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering.
+- projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering;
+- projektspecifik Builds / CI-vy för repositoryprojekt via Skvallerbyttans cacheade public-safe Actions-summary.
 
 ## Publik projektmodell
 
@@ -112,11 +113,11 @@ Detaljvyn visar:
 - dokumentation i Portalen;
 - publik tjänste-URL när den finns;
 - canonical länkar till repository, Wiki där tillgängligt och Discussions;
-- intern Issues- och Releases-navigation för repositoryprojekt.
+- intern Issues-, Releases- och Builds / CI-navigation för repositoryprojekt.
 
-Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Monorepo-appar får varken Issues- eller Releases-länk och kan inte ärva source-repositoryts historik som appdata.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService`; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases eller CI som appdata.
 
-Detaljvyn hämtar fortfarande inte workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
+Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggregation ska fortsatt använda rätt adapter/Skvallerbyttan där modellen passar.
 
 ## Wiki-presentation
 
@@ -212,6 +213,38 @@ Felmodell:
 - providerfel: `502 project_issues_unavailable`;
 - normal respons: `200`, `status = available`, `Cache-Control: no-store`.
 
+## Projektspecifik Builds / CI
+
+### `/api/builds?project=...`
+
+Endpointen kräver först ett live-publicerat repositoryprojekt i Portalens projektkatalog. Därefter anropas den redan konfigurerade interna bindingen `SKVALLERBYTTAN_OBSERVATIONS` och metoden `getPublicRepositoryCi(repoName)`.
+
+Skvallerbyttans metod gör **ingen ny GitHub-request**. Den läser `overview` ur D1 source cache och kräver att den cacheade repositoryraden själv är publik och inte arkiverad innan någon CI-summary kan lämna observationslagret.
+
+Snapshoten innehåller:
+
+- repository;
+- `available` + status;
+- `fresh|stale|unknown`;
+- source cache `refreshedAt`;
+- sample coverage: sampled runs, total reported runs och samplegräns 100;
+- completed/success/failed/cancelled/in-progress;
+- sampled pass rate;
+- failures senaste 24h/7d;
+- latest failure timestamp;
+- median/p95 duration;
+- median MTTR + sample count.
+
+Den innehåller inte actor, providerpermissions, providerfel, event breakdown, head SHA/branch eller råa run-rader.
+
+Felmodell i Portal:
+
+- tom/ogiltig slug: `400 invalid_project`;
+- okänt projekt eller monorepo-app: `404 project_builds_not_found`;
+- saknad RPC-binding/metod: `503 builds_not_configured`;
+- RPC-/projektkatalogfel: `502 project_builds_unavailable`;
+- giltigt projekt med ej observerad/unavailable CI: `200 status=available` med `ci.available = false`.
+
 ## Global sök
 
 ### `/api/search?q=...`
@@ -302,7 +335,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- provider-backed projektdetaljdata för CI/aktivitet inne i Portalen;
+- provider-backed projektdetaljdata för aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - aktivitetsström;
