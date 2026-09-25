@@ -341,10 +341,66 @@ async function main() {
               text: (element.textContent || '').trim().slice(0, 80)
             };
           });
+        var pseudo = Array.from(document.querySelectorAll('body *'))
+          .flatMap(function(element) {
+            return ['::before', '::after'].map(function(kind) {
+              var style = getComputedStyle(element, kind);
+              return {
+                tag: element.tagName.toLowerCase(),
+                id: element.id || null,
+                className: typeof element.className === 'string' ? element.className : null,
+                kind: kind,
+                content: style.content,
+                position: style.position,
+                width: style.width,
+                left: style.left,
+                right: style.right,
+                transform: style.transform,
+                display: style.display
+              };
+            });
+          })
+          .filter(function(item) {
+            return item.content && item.content !== 'none' && item.content !== 'normal';
+          })
+          .slice(0, 20);
         return {
           scrollWidth: document.documentElement.scrollWidth,
           clientWidth: viewport,
-          offenders: offenders
+          bodyScrollWidth: document.body.scrollWidth,
+          bodyClientWidth: document.body.clientWidth,
+          bodyRect: (function() {
+            var rect = document.body.getBoundingClientRect();
+            return { left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) };
+          })(),
+          htmlRect: (function() {
+            var rect = document.documentElement.getBoundingClientRect();
+            return { left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) };
+          })(),
+          bodyBefore: (function() {
+            var style = getComputedStyle(document.body, '::before');
+            return {
+              content: style.content,
+              position: style.position,
+              width: style.width,
+              left: style.left,
+              right: style.right,
+              transform: style.transform
+            };
+          })(),
+          bodyAfter: (function() {
+            var style = getComputedStyle(document.body, '::after');
+            return {
+              content: style.content,
+              position: style.position,
+              width: style.width,
+              left: style.left,
+              right: style.right,
+              transform: style.transform
+            };
+          })(),
+          offenders: offenders,
+          pseudo: pseudo
         };`
       );
       assert.ok(
