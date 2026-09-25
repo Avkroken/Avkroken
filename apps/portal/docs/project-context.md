@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Changelog-integrationen: 2026-09-25.
+Senast verifierad mot projektspecifik Releases-integration: 2026-09-25.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -46,7 +46,8 @@ Worker-koden innehåller idag:
 - Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
 - server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor;
 - Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding;
-- Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt.
+- Changelog som läser bounded GitHub Releases endast för live-publicerade repositoryprojekt;
+- projektspecifik Releases-vy för repositoryprojekt via samma public-only releaseadapter.
 
 ## Publik projektmodell
 
@@ -109,9 +110,12 @@ Detaljvyn visar:
 - canonical repository, ref och app-source-path när sådan finns;
 - dokumentation i Portalen;
 - publik tjänste-URL när den finns;
-- canonical länkar till repository, Wiki där tillgängligt, Issues, Discussions och Releases.
+- canonical länkar till repository, Wiki där tillgängligt, Issues och Discussions;
+- intern Releases-navigation för repositoryprojekt.
 
-Detaljvyn hämtar inte Issues, releasehistorik, workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. Monorepo-appar får ingen Releases-länk och kan inte ärva source-repositoryts releasehistorik.
+
+Detaljvyn hämtar fortfarande inte Issues, workflow runs eller annan operativ providerstate. Sådan aggregation ligger kvar som separat arbete och ska använda rätt adapter/Skvallerbyttan där modellen passar.
 
 ## Wiki-presentation
 
@@ -162,6 +166,17 @@ För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
 Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concurrency 4 och max 40 returnerade releaser. Normal coverage är därför `bounded`, aldrig komplett. Repo-cap eller individuella release-fetchfel ger `partial`.
 
 Eligibility byggs live från GitHubs publika organisationslista vid varje Changelog-build och snapshoten lagras inte persistent i Cache API. Samtidiga builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
+
+### `/api/releases?project=...`
+
+Den projektspecifika release-endpointen använder samma `eligibleReleaseProjects` och `normalizePublicReleases` som Changelog, men gör lookup på exakt publicerad project-slug och läser endast det repositoryt.
+
+- tom/ogiltig slug: `400 invalid_project`;
+- okänt projekt eller monorepo-app: `404 project_releases_not_found`;
+- providerfel: `502 project_releases_unavailable`;
+- normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 10 releaser.
+
+Responsen innehåller minimal project-identitet, canonical GitHub Releases-länk och samma sanerade releasemodell som Changelog.
 
 ## Global sök
 
@@ -253,7 +268,7 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- provider-backed projektdetaljdata för Issues/Releases/CI/aktivitet inne i Portalen;
+- provider-backed projektdetaljdata för Issues/CI/aktivitet inne i Portalen;
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - aktivitetsström;
