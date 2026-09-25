@@ -12,14 +12,24 @@
   let activePath = null;
   let requestSerial = 0;
 
-  function docsHash(repoName, path) {
-    let hash = "#docs";
-    if (repoName) hash += "/" + encodeURIComponent(repoName);
-    if (path) hash += "/" + encodeURIComponent(path);
-    return hash;
+  function docsUrl(repoName, path) {
+    let url = repoName
+      ? "/projekt/" + encodeURIComponent(repoName) + "/dokumentation"
+      : "/dokumentation";
+
+    if (path) {
+      const encodedPath = String(path)
+        .split("/")
+        .filter(Boolean)
+        .map(segment => encodeURIComponent(segment))
+        .join("/");
+      if (encodedPath) url += "/" + encodedPath;
+    }
+
+    return url;
   }
 
-  function routeFromHash() {
+  function legacyRouteFromHash() {
     const parts = location.hash.slice(1).split("/");
     if (decodeURIComponent(parts[0] || "") !== "docs") return null;
     return {
@@ -28,7 +38,43 @@
     };
   }
 
+  function routeFromLocation() {
+    const legacy = legacyRouteFromHash();
+    if (legacy) return legacy;
+
+    const pathname = location.pathname.replace(/\\+$/, "") || "/";
+    const projectDocs = pathname.match(/^\\/projekt\\/([^/]+)\\/dokumentation(?:\\/(.*))?$/);
+    if (projectDocs) {
+      return {
+        repo: decodeURIComponent(projectDocs[1]),
+        path: projectDocs[2]
+          ? projectDocs[2].split("/").map(segment => decodeURIComponent(segment)).join("/")
+          : null
+      };
+    }
+
+    if (pathname === "/dokumentation" || pathname.startsWith("/dokumentation/")) {
+      return { repo: null, path: null };
+    }
+
+    return null;
+  }
+
+  function navigateDocs(repoName, path = null) {
+    const target = docsUrl(repoName, path);
+    if (window.AvKrokenPortal?.navigate) {
+      window.AvKrokenPortal.navigate(target);
+    } else {
+      location.href = target;
+    }
+  }
+
   function setView(view) {
+    if (window.AvKrokenPortal?.setView) {
+      window.AvKrokenPortal.setView(view);
+      return;
+    }
+
     viewTabs.forEach(tab => {
       const selected = tab.dataset.view === view;
       tab.classList.toggle("active", selected);
@@ -65,7 +111,7 @@
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", selected ? "true" : "false");
       button.addEventListener("click", () => {
-        location.hash = docsHash(repo.name);
+        navigateDocs(repo.name);
       });
       docsRepoTabs.appendChild(button);
     });
@@ -85,7 +131,7 @@
       button.classList.toggle("active", selected);
       button.setAttribute("aria-selected", selected ? "true" : "false");
       button.addEventListener("click", () => {
-        location.hash = docsHash(activeRepo.name, page.path);
+        navigateDocs(activeRepo.name, page.path);
       });
       docsPageTabs.appendChild(button);
     });
@@ -104,7 +150,7 @@
       links.push({ label: "GitHub Pages", href: activeRepo.pagesUrl });
     }
     if (sourceUrl) {
-      links.push({ label: "Källa", href: sourceUrl });
+      links.push({ label: "Visa original", href: sourceUrl });
     }
 
     links.forEach(item => {
@@ -211,7 +257,7 @@
 
           const internal = internalDocPath(linkMatch[2]);
           if (internal) {
-            anchor.href = docsHash(activeRepo.name, internal);
+            anchor.href = docsUrl(activeRepo.name, internal);
           } else {
             const href = safeExternalHref(linkMatch[2]);
             if (href) {
@@ -469,26 +515,27 @@
   }
 
   function applyRoute() {
-    const route = routeFromHash();
+    const route = routeFromLocation();
 
     if (route) {
       setView("docs");
       ensureCatalog(route);
     } else {
-      setView("projects");
+      if (!window.AvKrokenPortal) setView("projects");
     }
   }
 
   viewTabs.forEach(tab => {
     tab.addEventListener("click", () => {
       if (tab.dataset.view === "docs") {
-        location.hash = docsHash(activeRepo ? activeRepo.name : "Skvallerbyttan");
+        navigateDocs(activeRepo ? activeRepo.name : null);
       } else {
-        location.hash = "#projects";
+        window.AvKrokenPortal?.navigate ? window.AvKrokenPortal.navigate("/projekt") : (location.href = "/projekt");
       }
     });
   });
 
   window.addEventListener("hashchange", applyRoute);
+  window.addEventListener("portal:routechange", applyRoute);
   applyRoute();
 })();
