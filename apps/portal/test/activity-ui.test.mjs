@@ -125,3 +125,9 @@ test("Portal performs a second whitelist projection over the public Activity RPC
 test("project detail exposes Activity only through repository project metadata", () => {
   assert.ok(app.includes('detailAction("Aktivitet", project.activityPortalUrl, { internal: true })'));
 });
+
+
+test("Activity project metadata bumps the public project cache schema", () => {
+  assert.ok(worker.includes("github-projects-v7"));
+  assert.equal(worker.includes("github-projects-v6"), false);
+});
