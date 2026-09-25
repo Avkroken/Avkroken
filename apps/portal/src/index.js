@@ -15,7 +15,8 @@ import {
   buildDocumentSearchEntry,
   buildProjectSearchEntries,
   filterSearchableDocs,
-  searchEntries
+  searchEntries,
+  selectSearchDocumentTasks
 } from "./search-index.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
@@ -27,7 +28,7 @@ const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
 const SEARCH_INDEX_CACHE_SECONDS = 3600;
 const MAX_DOC_DEPTH = 2;
-const MAX_SEARCH_DOCUMENTS = 180;
+const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
 const SEARCH_FETCH_CONCURRENCY = 4;
 const SEARCH_RESULT_LIMIT = 24;
@@ -581,16 +582,12 @@ async function loadSearchIndex(env) {
 
   const projects = projectCatalog.projects;
   const searchableDocs = filterSearchableDocs(projects, docsCatalog);
-  const allTasks = [];
-
-  for (const entry of searchableDocs) {
-    for (const page of Array.isArray(entry.pages) ? entry.pages : []) {
-      allTasks.push({ entry, page });
-    }
-  }
-
-  const limited = allTasks.length > MAX_SEARCH_DOCUMENTS;
-  const tasks = allTasks.slice(0, MAX_SEARCH_DOCUMENTS);
+  const discoveredDocuments = searchableDocs.reduce(
+    (sum, entry) => sum + (Array.isArray(entry.pages) ? entry.pages.length : 0),
+    0
+  );
+  const tasks = selectSearchDocumentTasks(searchableDocs, MAX_SEARCH_DOCUMENTS);
+  const limited = discoveredDocuments > tasks.length;
   const fetched = await fetchSearchDocuments(tasks, env);
 
   const documentEntries = fetched
@@ -612,7 +609,7 @@ async function loadSearchIndex(env) {
       coverage,
       appDiscovery: projectCatalog.appDiscovery,
       documents: {
-        discovered: allTasks.length,
+        discovered: discoveredDocuments,
         indexed: documentEntries.length,
         failed: failedDocuments,
         truncated: truncatedDocuments,
