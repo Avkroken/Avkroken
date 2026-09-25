@@ -131,3 +131,16 @@ test("Activity project metadata bumps the public project cache schema", () => {
   assert.ok(worker.includes("github-projects-v7"));
   assert.equal(worker.includes("github-projects-v6"), false);
 });
+
+
+test("Portal Activity second projection enforces capability, source and coverage allowlists", () => {
+  assert.ok(worker.includes("PUBLIC_ACTIVITY_CAPABILITIES"));
+  assert.ok(worker.includes('"github.avkroken.repositories"'));
+  assert.ok(worker.includes('"github.avkroken.pull_requests"'));
+  assert.ok(worker.includes('"github.avkroken.actions"'));
+  assert.ok(worker.includes("PUBLIC_ACTIVITY_SOURCES"));
+  assert.ok(worker.includes("PUBLIC_ACTIVITY_COVERAGE"));
+  assert.ok(worker.includes("activityCapability(item?.capability)"));
+  assert.ok(worker.includes("activitySource(item?.source)"));
+  assert.ok(worker.includes("activityCoverage(item?.coverage)"));
+});
