@@ -3,6 +3,15 @@ const serviceGrid = document.querySelector("#service-grid");
 const count = document.querySelector("#site-count");
 const portalState = document.querySelector("#portal-state");
 
+const projectDetailTitle = document.querySelector("#project-detail-title");
+const projectDetailDescription = document.querySelector("#project-detail-description");
+const projectDetailKind = document.querySelector("#project-detail-kind");
+const projectDetailBreadcrumbs = document.querySelector("#project-detail-breadcrumbs");
+const projectDetailSource = document.querySelector("#project-detail-source");
+const projectDetailMetrics = document.querySelector("#project-detail-metrics");
+const projectDetailLinks = document.querySelector("#project-detail-links");
+const projectDetailSourceNote = document.querySelector("#project-detail-source-note");
+
 let allProjects = [];
 
 const escapeHtml = (value = "") =>
@@ -55,13 +64,22 @@ function metric(label, value) {
     </div>`;
 }
 
+function projectOverviewPath(project) {
+  const slug = String(project?.slug || project?.name || "").trim();
+  return slug ? "/projekt/" + encodeURIComponent(slug) : "/projekt";
+}
+
 function projectCard(project) {
+  const overview = projectOverviewPath(project);
   const endpointLink = project.url
     ? `<a class="card-action primary" href="${escapeHtml(project.url)}" target="_blank" rel="noopener noreferrer">Öppna tjänst</a>`
     : "";
 
+  const overviewLink =
+    `<a class="card-action${project.url ? "" : " primary"}" data-portal-route href="${escapeHtml(overview)}">Översikt</a>`;
+
   const documentationLink = project.documentation
-    ? `<a class="card-action${project.url ? "" : " primary"}" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
+    ? `<a class="card-action" data-portal-route href="${escapeHtml(project.documentation)}">Dokumentation</a>`
     : "";
 
   const discussionsLink = project.discussions
@@ -73,11 +91,15 @@ function projectCard(project) {
     project.repository ||
     "Repository";
 
+  const category = project.independentProduct === true
+    ? "Produkt"
+    : project.category || "Projekt";
+
   return `
     <article class="card"
        style="--glow:${accentColor(project.accent)};--accent:${accentSolid(project.accent)}">
       <div class="card-top">
-        <span class="badge">${escapeHtml(project.category || "Projekt")}</span>
+        <span class="badge">${escapeHtml(category)}</span>
         <span class="arrow" aria-hidden="true">↗</span>
       </div>
       <h3>${escapeHtml(project.name)}</h3>
@@ -85,8 +107,9 @@ function projectCard(project) {
       <div class="host">${escapeHtml(location)}</div>
       <nav class="card-actions" aria-label="Länkar för ${escapeHtml(project.name)}">
         ${endpointLink}
+        ${overviewLink}
         ${documentationLink}
-        <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="card-action" href="${escapeHtml(project.repository)}" target="_blank" rel="noopener noreferrer">Visa original</a>
         <a class="card-action" href="${escapeHtml(project.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>
         ${discussionsLink}
       </nav>
@@ -122,6 +145,132 @@ function renderProjects() {
   );
 }
 
+function currentProjectSlug() {
+  const match = location.pathname.match(/^\/projekt\/([^/]+)(?:\/|$)/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function projectDetailLink(label, href, { internal = false, primary = false } = {}) {
+  if (!href) return "";
+  const attrs = internal
+    ? "data-portal-route"
+    : 'target="_blank" rel="noopener noreferrer"';
+
+  return `
+    <a class="portal-project-link${primary ? " primary" : ""}" ${attrs} href="${escapeHtml(href)}">
+      <span>${escapeHtml(label)}</span>
+      <span aria-hidden="true">${internal ? "→" : "↗"}</span>
+    </a>`;
+}
+
+function setMissingProjectDetail(message) {
+  if (projectDetailKind) projectDetailKind.textContent = "PROJEKT";
+  if (projectDetailTitle) projectDetailTitle.textContent = "Projekt saknas";
+  if (projectDetailDescription) projectDetailDescription.textContent = message;
+
+  if (projectDetailBreadcrumbs) {
+    projectDetailBreadcrumbs.innerHTML = '<a href="/projekt" data-portal-route>Projekt</a>';
+  }
+
+  if (projectDetailSource) {
+    projectDetailSource.href = "https://github.com/Avkroken";
+    projectDetailSource.textContent = "Visa organisation";
+  }
+
+  if (projectDetailMetrics) projectDetailMetrics.innerHTML = "";
+  if (projectDetailLinks) projectDetailLinks.innerHTML = "";
+
+  if (projectDetailSourceNote) {
+    projectDetailSourceNote.innerHTML =
+      "<strong>Ingen publik projektpost</strong>Projektet finns inte i den normaliserade publika project catalog.";
+  }
+}
+
+function renderProjectDetail() {
+  if (!projectDetailTitle) return;
+
+  const slug = currentProjectSlug();
+  if (!slug) {
+    setMissingProjectDetail("Ingen projektreferens finns i URL:en.");
+    return;
+  }
+
+  const project = allProjects.find(entry => entry.slug === slug);
+  if (!project) {
+    setMissingProjectDetail("Projektet finns inte i den publika project catalog.");
+    return;
+  }
+
+  const category = project.independentProduct === true
+    ? "Produkt"
+    : project.category || "Projekt";
+  const sourceRef = project.source?.ref || "main";
+  const canonicalRepository = project.repository;
+  const actionsUrl = canonicalRepository ? canonicalRepository + "/actions" : null;
+  const commitsUrl = canonicalRepository
+    ? canonicalRepository + "/commits/" + encodeURIComponent(sourceRef)
+    : null;
+
+  if (projectDetailKind) projectDetailKind.textContent = category.toUpperCase();
+  if (projectDetailTitle) projectDetailTitle.textContent = project.name;
+  if (projectDetailDescription) {
+    projectDetailDescription.textContent =
+      project.description || "Publikt Avkroken-projekt utan repositorybeskrivning.";
+  }
+
+  if (projectDetailBreadcrumbs) {
+    projectDetailBreadcrumbs.innerHTML =
+      '<a href="/projekt" data-portal-route>Projekt</a>' +
+      '<span aria-hidden="true">›</span>' +
+      `<span aria-current="page">${escapeHtml(project.name)}</span>`;
+  }
+
+  if (projectDetailSource) {
+    projectDetailSource.href = canonicalRepository;
+    projectDetailSource.textContent = "Visa original";
+  }
+
+  if (projectDetailMetrics) {
+    projectDetailMetrics.innerHTML = [
+      metric("TYP", category),
+      metric("STACK", project.language || "—"),
+      metric("UPPDATERAD", formatDate(project.updatedAt)),
+      metric("REF", sourceRef)
+    ].join("");
+  }
+
+  if (projectDetailLinks) {
+    projectDetailLinks.innerHTML = [
+      projectDetailLink("Dokumentation", project.documentation, { internal: true, primary: true }),
+      project.url ? projectDetailLink("Publik tjänst", project.url) : "",
+      projectDetailLink("Issues", project.issues),
+      project.discussions ? projectDetailLink("Discussions", project.discussions) : "",
+      projectDetailLink("Releases", project.releases),
+      projectDetailLink("Builds / CI", actionsUrl),
+      projectDetailLink("Aktivitet", commitsUrl),
+      project.pages ? projectDetailLink("GitHub Pages", project.pages) : "",
+      projectDetailLink("Visa original", canonicalRepository)
+    ].filter(Boolean).join("");
+  }
+
+  if (projectDetailSourceNote) {
+    projectDetailSourceNote.innerHTML =
+      "<strong>Källmodell</strong>" +
+      "Metadata är normaliserad från " +
+      escapeHtml(project.source?.provider || "GitHub") +
+      " · " +
+      escapeHtml(project.source?.repository || project.name) +
+      " · ref " +
+      escapeHtml(sourceRef) +
+      ". Operativ state hämtas inte i denna vy.";
+  }
+}
+
 async function loadProjects() {
   try {
     const response = await fetch("/api/projects", { headers: { Accept: "application/json" } });
@@ -138,6 +287,7 @@ async function loadProjects() {
     }
 
     renderProjects();
+    renderProjectDetail();
   } catch (error) {
     if (count) count.textContent = "UNAVAILABLE";
     if (portalState) portalState.textContent = "INDEX OFFLINE";
@@ -151,8 +301,13 @@ async function loadProjects() {
         '<div class="empty"><strong>Tjänstelistan är tillfälligt otillgänglig.</strong></div>';
     }
 
+    setMissingProjectDetail("Projektkatalogen kunde inte läsas.");
     console.error(error);
   }
 }
+
+window.addEventListener("portal:routechange", event => {
+  if (event.detail?.view === "project-detail") renderProjectDetail();
+});
 
 loadProjects();
