@@ -71,7 +71,7 @@ Samma named entrypoint har ett separat repository-CI-kontrakt. `getPublicReposit
 
 Ett separat repository-Activity-kontrakt exponeras som `getPublicActivity(repositoryNames, days)`. Begärda repositorykortnamn begränsas till 50 och intersectas med den cacheade `overview`-state:n; endast rader med `visibility = public` och `archived != true` går vidare. Därefter queryas D1 `observation_events` med `provider = github` och ett explicit `repository IN (...)`-filter. En explicit lista som efter validering blir tom lägger till `1 = 0` och kan inte falla tillbaka till organisationsomfattande Activity.
 
-Activity-sanitizern returnerar aggregate counts/coverage och recent event-rader med repository, capability, source, coverage, event/action och timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload lämnar inte Skvallerbyttan. Cloudflare account-/org-Activity publiceras inte genom detta kontrakt.
+Activity-sanitizern returnerar aggregate counts/coverage och recent event-rader med repository, capability, source, coverage, event/action och timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload lämnar inte Skvallerbyttan. Capability-allowlisten innehåller endast `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective-ruleset-events publiceras inte. Cloudflare account-/org-Activity publiceras inte genom detta kontrakt.
 
 ## Runtime
 
