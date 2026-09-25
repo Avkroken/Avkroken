@@ -28,10 +28,17 @@ import {
   normalizePublicIssues,
   sortPublicIssues
 } from "./issue-source.mjs";
+import {
+  eligibleActivityProjects,
+  normalizePublicActivity,
+  sortPublicActivity
+} from "./activity-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
   "https://api.github.com/orgs/Avkroken/repos?type=public&per_page=100&sort=full_name&direction=asc";
+const GITHUB_PUBLIC_ACTIVITY_API =
+  "https://api.github.com/orgs/Avkroken/events?per_page=100";
 
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
@@ -46,6 +53,9 @@ const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
 const CHANGELOG_RESULT_LIMIT = 40;
 const CHANGELOG_FETCH_CONCURRENCY = 4;
 const PROJECT_ISSUES_LIMIT = 30;
+const ACTIVITY_PROJECT_LIMIT = 50;
+const ACTIVITY_PROVIDER_EVENT_LIMIT = 100;
+const ACTIVITY_RESULT_LIMIT = 40;
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -549,6 +559,136 @@ async function getPortalSites(env, ctx) {
       "Cloudflare-CDN-Cache-Control": "public, max-age=" + CACHE_SECONDS
     }
   });
+}
+
+async function loadPublicActivity(env) {
+  const repositoryProjects = await loadLivePublicRepositoryProjects(env);
+  const eligible = eligibleActivityProjects(repositoryProjects, ACTIVITY_PROJECT_LIMIT);
+  const eventsResult = await fetchGitHubJson(GITHUB_PUBLIC_ACTIVITY_API, env);
+
+  if (!eventsResult.ok || !Array.isArray(eventsResult.data)) {
+    throw new Error("public_activity_unavailable:" + eventsResult.status);
+  }
+
+  const events = normalizePublicActivity(eligible, eventsResult.data);
+  const projects = new Map(
+    eligible.map(project => [
+      project.slug,
+      {
+        slug: project.slug,
+        name: project.name,
+        portalUrl: project.portalUrl,
+        repository: project.source.repository
+      }
+    ])
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "github",
+      scope: "public_organization_events_filtered_to_portal_repositories",
+      coverage: "bounded",
+      realtime: false,
+      repositories: {
+        eligible: eligible.length,
+        limit: ACTIVITY_PROJECT_LIMIT,
+        mixedScopeExcluded: repositoryProjects.some(
+          project => project?.source?.repository === "Avkroken/Avkroken"
+        )
+      },
+      events: {
+        providerLimit: ACTIVITY_PROVIDER_EVENT_LIMIT,
+        resultLimit: ACTIVITY_RESULT_LIMIT,
+        observed: events.length
+      }
+    },
+    projects,
+    events
+  };
+}
+
+let pendingPublicActivity = null;
+
+async function getPublicActivity(requestUrl, env) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+
+  if (projectSlug.length > 120) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    if (!pendingPublicActivity) {
+      pendingPublicActivity = loadPublicActivity(env).finally(() => {
+        pendingPublicActivity = null;
+      });
+    }
+
+    const snapshot = await pendingPublicActivity;
+    const project = projectSlug ? snapshot.projects.get(projectSlug) : null;
+
+    if (projectSlug && !project) {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "project_activity_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    const events = sortPublicActivity(
+      projectSlug
+        ? snapshot.events.filter(item => item.projectSlug === projectSlug)
+        : snapshot.events,
+      ACTIVITY_RESULT_LIMIT
+    );
+
+    return new Response(JSON.stringify({
+      status: "available",
+      generatedAt: snapshot.generatedAt,
+      source: snapshot.source,
+      project,
+      events
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public Activity unavailable", {
+      project: projectSlug || null,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "activity_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
 }
 
 async function fetchSearchDocument(task, env) {
@@ -1588,6 +1728,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicProjectBuilds(url, env);
+    }
+
+    if (url.pathname === "/api/activity") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicActivity(url, env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";
