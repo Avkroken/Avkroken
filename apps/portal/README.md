@@ -41,7 +41,7 @@ Portal v2 etablerar:
 - projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
 - projektspecifik Issues-vy på `/projekt/:slug/issues` för repositoryprojekt, med PR-filtrering och minimal public-only Issue-modell;
 - projektspecifik Builds / CI-vy på `/projekt/:slug/builds` från Skvallerbyttans cacheade read-only Actions-summary;
-- global och projektspecifik observerad Activity från Skvallerbyttans repositoryfiltrerade eventledger, med explicit coverage och utan resource-ID:n;
+- global och projektspecifik observerad Activity från Skvallerbyttans repositoryfiltrerade eventledger, med explicit coverage och utan resource-ID:n; Public Activity tillåter endast capability-grupperna `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective-ruleset-events stannar i den skyddade observationsytan.
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
