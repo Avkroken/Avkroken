@@ -644,6 +644,66 @@ a.portal-product-card:hover {
   line-height: 1.5;
 }
 
+.project-detail-releases {
+  margin-top: var(--ak-space-5);
+  padding: var(--ak-space-5);
+  border: 1px solid var(--ak-border-subtle);
+  border-radius: var(--ak-radius-3);
+  background: var(--ak-surface-default);
+}
+
+.project-release-list {
+  display: grid;
+}
+
+.project-release-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--ak-space-4);
+  padding: var(--ak-space-3) 0;
+  border-top: 1px solid var(--ak-border-subtle);
+}
+
+.project-release-item:first-child {
+  border-top: 0;
+}
+
+.project-release-item > div {
+  min-width: 0;
+  display: grid;
+  gap: var(--ak-space-2);
+}
+
+.project-release-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ak-space-2);
+  color: var(--ak-text-tertiary);
+  font-size: .78rem;
+}
+
+.project-release-prerelease {
+  padding: .2rem .5rem;
+  border: 1px solid var(--ak-border-default);
+  border-radius: 999px;
+  color: var(--ak-accent-strong);
+  font-size: .72rem;
+  font-weight: 650;
+}
+
+.project-release-link {
+  flex: 0 0 auto;
+  color: var(--ak-sky-300);
+  text-decoration: none;
+  font-size: .82rem;
+}
+
+.project-release-link:hover {
+  text-decoration: underline;
+}
+
 .wiki-layout {
   display: grid;
   grid-template-columns: minmax(220px, .34fr) minmax(0, 1fr);
@@ -1206,6 +1266,11 @@ a.portal-product-card:hover {
   .operations-summary-grid,
   .operations-layout {
     grid-template-columns: 1fr;
+  }
+
+  .project-release-item {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .operations-capability-row {
