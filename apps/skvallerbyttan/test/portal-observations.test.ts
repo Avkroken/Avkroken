@@ -36,7 +36,7 @@ function capability(overrides: Partial<CapabilityObservation> = {}): CapabilityO
   };
 }
 
-test("Portal operations snapshot exposes only curated capability/provider/activity fields", () => {
+test("Portal operations snapshot exposes only public-safe status fields", () => {
   const snapshot = buildPortalOperationsSnapshot({
     generatedAt: "2026-09-25T15:05:00Z",
     capabilities: [
@@ -74,59 +74,14 @@ test("Portal operations snapshot exposes only curated capability/provider/activi
         },
       },
     },
-    activity: {
-      schemaVersion: 2,
-      available: true,
-      status: "available",
-      period: {
-        days: 1,
-        from: "2026-09-24T15:05:00Z",
-        to: "2026-09-25T15:05:00Z",
-      },
-      grouped: [
-        {
-          provider: "github",
-          capability: "github.avkroken.actions",
-          event: "workflow_run",
-          observedCount: 7,
-        },
-        {
-          provider: "cloudflare",
-          capability: "cloudflare.avkroken.workers",
-          event: "audit",
-          observedCount: 2,
-        },
-      ],
-      coverage: [
-        {
-          provider: "github",
-          capability: "github.avkroken.actions",
-          source: "webhook",
-          coverage: "since_first_observation",
-          firstObservedAt: "2026-09-24T15:06:00Z",
-          lastObservedAt: "2026-09-25T15:04:00Z",
-          periodComplete: false,
-          sampling: "none",
-          observedCount: 7,
-        },
-      ],
-      recent: [
-        {
-          repository: "SECRET_PRIVATE_REPOSITORY",
-          resourceId: "SECRET_RESOURCE_ID",
-          action: "SECRET_ACTION",
-        },
-      ],
-    },
   });
 
   assert.equal(snapshot.schemaVersion, 1);
   assert.equal(snapshot.providers[0].provider, "github");
   assert.equal(snapshot.providers[0].status, "available");
   assert.equal(snapshot.providers[1].status, "permission_denied");
-  assert.equal(snapshot.activity.observedTotal, 9);
-  assert.equal(snapshot.activity.byCapability[0].observedCount, 7);
-  assert.equal(snapshot.activity.coverage[0].periodComplete, false);
+  assert.equal(snapshot.capabilities[0].key, "cloudflare.avkroken.workers");
+  assert.equal(snapshot.capabilities[1].key, "github.avkroken.actions");
 
   const serialized = JSON.stringify(snapshot);
   for (const forbidden of [
@@ -136,34 +91,14 @@ test("Portal operations snapshot exposes only curated capability/provider/activi
     "SECRET_INSTALLATION_ID",
     "SECRET_TOKEN_PERMISSIONS",
     "SECRET_CF_ERROR",
-    "SECRET_PRIVATE_REPOSITORY",
-    "SECRET_RESOURCE_ID",
-    "SECRET_ACTION",
     "lastHttpStatus",
     "acceptedPermissions",
+    "scopeCoverage",
+    "activity",
     "recent",
     "endpoint",
+    "permissionState",
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
-});
-
-test("Portal activity summary does not claim complete coverage when activity is unavailable", () => {
-  const snapshot = buildPortalOperationsSnapshot({
-    generatedAt: "2026-09-25T15:05:00Z",
-    capabilities: [],
-    providerHealth: { providers: {} },
-    activity: {
-      available: false,
-      status: "not_configured",
-      reason: "SECRET_DATABASE_REASON",
-    },
-  });
-
-  assert.equal(snapshot.activity.available, false);
-  assert.equal(snapshot.activity.status, "not_configured");
-  assert.equal(snapshot.activity.period, null);
-  assert.equal(snapshot.activity.observedTotal, 0);
-  assert.deepEqual(snapshot.activity.coverage, []);
-  assert.equal(JSON.stringify(snapshot).includes("SECRET_DATABASE_REASON"), false);
 });
