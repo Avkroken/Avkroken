@@ -311,6 +311,114 @@
     </section>
 
     <section
+      class="portal-route-panel"
+      id="project-builds-view"
+      data-route-panel="project-builds"
+      aria-labelledby="project-builds-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="project-builds-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Builds / CI</span>
+      </nav>
+
+      <div class="portal-page-head">
+        <div class="portal-kicker">BUILDS / CI</div>
+        <h1 id="project-builds-title">Läser observerad CI…</h1>
+        <p id="project-builds-description">
+          Sampled GitHub Actions-state observerad och cachead av Skvallerbyttan.
+        </p>
+      </div>
+
+      <div class="changelog-meta">
+        <span id="project-builds-status" aria-live="polite">Läser CI-state…</span>
+        <span id="project-builds-generated"></span>
+      </div>
+
+      <div class="project-detail-actions">
+        <a
+          class="portal-button"
+          id="project-builds-original"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >Visa Actions på GitHub</a>
+      </div>
+
+      <div class="builds-summary-grid" id="project-builds-summary" hidden>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">SAMPLE PASS RATE</div>
+          <h3 id="project-builds-pass-rate">—</h3>
+          <p>Success/failure i den observerade run-samplen.</p>
+        </article>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">FAILED</div>
+          <h3 id="project-builds-failures">—</h3>
+          <p>Observerade failures senaste 24h / 7d.</p>
+        </article>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">DURATION</div>
+          <h3 id="project-builds-duration">—</h3>
+          <p>Median / p95 i den observerade run-samplen.</p>
+        </article>
+        <article class="portal-info-card">
+          <div class="portal-meta-label">MTTR</div>
+          <h3 id="project-builds-mttr">—</h3>
+          <p>Median recovery time där failure → success kan observeras.</p>
+        </article>
+      </div>
+
+      <section class="builds-detail" id="project-builds-detail" hidden aria-labelledby="project-builds-detail-title">
+        <div class="portal-section-title">
+          <div>
+            <h2 id="project-builds-detail-title">Observerad Actions-sample</h2>
+            <p id="project-builds-coverage">—</p>
+          </div>
+        </div>
+        <dl class="builds-facts">
+          <div>
+            <dt>Completed</dt>
+            <dd id="project-builds-completed">—</dd>
+          </div>
+          <div>
+            <dt>Success</dt>
+            <dd id="project-builds-success">—</dd>
+          </div>
+          <div>
+            <dt>Failed</dt>
+            <dd id="project-builds-failed">—</dd>
+          </div>
+          <div>
+            <dt>Cancelled</dt>
+            <dd id="project-builds-cancelled">—</dd>
+          </div>
+          <div>
+            <dt>In progress</dt>
+            <dd id="project-builds-running">—</dd>
+          </div>
+          <div>
+            <dt>Senaste failure</dt>
+            <dd id="project-builds-latest-failure">—</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="portal-placeholder" id="project-builds-unavailable" hidden>
+        <strong>CI-state är inte observerad eller tillgänglig.</strong>
+        Portalen gör ingen direkt GitHub Actions-request som fallback. Canonical Actions-sidan kan fortfarande öppnas ovan.
+      </div>
+
+      <div class="portal-placeholder" id="project-builds-error" hidden>
+        <strong>Builds / CI kunde inte visas.</strong>
+        Den sanerade Skvallerbyttan-observationsytan är tillfälligt otillgänglig.
+      </div>
+    </section>
+
+    <section
       class="portal-route-panel wiki-view"
       id="wiki-view"
       data-route-panel="wiki"
@@ -679,5 +787,6 @@
   <script src="/changelog.js" defer></script>
   <script src="/project-releases.js" defer></script>
   <script src="/project-issues.js" defer></script>
+  <script src="/project-builds.js" defer></script>
 </body>
 </html>
