@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "slug": "skvallerbyttan",
+  "name": "Skvallerbyttan",
+  "description": "Read-only observationslager för GitHub- och Cloudflare-state.",
+  "category": "project",
+  "accent": "blue"
+}
