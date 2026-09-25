@@ -47,7 +47,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 - **GitHub webhook-ingress:** runtime implementerar organization-webhookformatet för Activity, security ledger och cache invalidation; faktisk hookkonfiguration är extern GitHub-state.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
-- **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en sanerad snapshot av provider health, capability status/freshness/scope coverage och aggregerad Activity.
+- **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en public-safe snapshot av provider health och capability status/dataState/freshness/last-success.
 
 GitHub REST API-version: `2026-03-10`.
 
@@ -97,8 +97,8 @@ För operativ drift gäller dessutom:
 4. Utebliven heartbeat i mer än 35 minuter ger e-postnotis; återkommen leverans ger recovery-notis.
 5. Publika `/health`/`/ready` används inte och behöver inga edge-undantag.
 6. När Portalens Drift & insyn-vy läses anropar Portal `PortalObservationsService.getPublicOperationsSummary()` via account-intern Service Binding.
-7. RPC-snapshoten innehåller inte provider-endpoints/required permissions, accepterade permissions, HTTP-status/felsträngar, installation-/budgetmetadata eller Activity `recent` med repository/resource/action.
-8. Activity som går till Portalen är aggregerad och behåller coverage med `periodComplete = false`.
+7. RPC-snapshoten innehåller inte provider-endpoints/required permissions, accepterade permissions, HTTP-status/felsträngar eller installation-/budgetmetadata.
+8. Scope coverage/repositoryantal och Activity/eventvolym går inte till Portalen eftersom Skvallerbyttans canonical modeller är organisationsomfattande och inte kan bevisas public-only. De stannar bakom dashboard/API-auth.
 
 ## Data
 
