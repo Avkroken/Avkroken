@@ -10,7 +10,7 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases- och Issues-klienterna.
+`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues- och Builds/CI-klienterna.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
 
@@ -28,6 +28,9 @@ Aktuellt versionsstyrt kontrakt:
 - deployment kör `npm run deploy`.
 
 Feature branches ska inte deploya produktion.
+
+När den här Builds/CI-integrationen senare rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` deployas och verifieras först. Därefter kan Portal-versionen som anropar metoden deployas. Service Bindingens target/entrypoint ändras inte och ingen ny secret behövs.
+
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
 
@@ -170,6 +173,28 @@ Endpointen publicerar inte body, author/user, assignee, milestone eller label co
 
 Monorepo-appar får ingen `issuesPortalUrl` och deras project-model har `issues = null`.
 
+### Projektspecifik Builds / CI
+
+`GET /api/builds?project=<slug>` kräver först ett repositoryprojekt som passerar Portalens aktuella publiceringspolicy. Endpointen gör därefter endast ett internt RPC-anrop till `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryCi(repoName)`.
+
+- saknad/tom eller för lång project slug: `400 invalid_project`;
+- okänd slug eller monorepo-app: `404 project_builds_not_found`;
+- saknad binding eller RPC-metod: `503 builds_not_configured`;
+- projektkatalog-/RPC-fel: `502 project_builds_unavailable`;
+- giltig RPC-snapshot: `200`, `status = available`, `Cache-Control: no-store`.
+
+`ci.available = false` är inte ett transportfel. UI:t visar i stället `not_observed` eller `unavailable` utan att fabricera CI-health.
+
+Skvallerbyttans CI-RPC läser endast D1 source cache-keyn `overview`. Den gör ingen GitHub-request på Portalens sidvisning. Snapshoten bär `sourceRefreshedAt` och freshness:
+
+- `fresh` — cachead observation är högst sex timmar gammal och inte invaliderad;
+- `stale` — cacheposten är äldre än sex timmar eller invaliderad;
+- `unknown` — ingen canonical overview-cache finns.
+
+Publikt CI-underlag begränsas till samplebaserad summary. Actor, permissionmetadata, providerfel, event breakdown och råa run-rader lämnar inte Skvallerbyttan.
+
+Monorepo-appar har ingen `buildsPortalUrl` och `builds = null`.
+
 ### Drift & insyn
 
 `GET /api/operations` läser endast `SKVALLERBYTTAN_OBSERVATIONS.getPublicOperationsSummary()`.
@@ -227,6 +252,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
 - Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
 - Projektspecifika Issues får endast läsa Issues för live-publicerade repositoryprojekt; filtrera GitHub PR-poster explicit och låt inte monorepo-appar ärva source-repositoryts Issues.
+- Projektspecifik Builds/CI får endast läsa Skvallerbyttans public-safe cache-RPC efter live public-project-lookup; Portalen får inte göra en egen GitHub Actions-read och monorepo-appar får inte ärva source-repositoryts CI.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
@@ -237,7 +263,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
-3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion` och `/api/issues?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
+3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion` och `/api/builds?project=Bastion` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
 6. deep links returnerar Portal-shell;
@@ -256,6 +282,8 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 19. `/api/releases?project=Bastion` är `no-store` och innehåller ingen raw body/author/assets/target commit;
 20. `/projekt/Bastion/issues` visar endast Bastions sanerade Issues och canonical GitHub-länk; PR-poster filtreras bort och `/projekt/skvallerbyttan/issues` saknar app-Issuekälla;
 21. `/api/issues?project=Bastion` är `no-store` och innehåller ingen body/user/assignee/milestone eller labelmetadata utöver namn;
-22. cache-/heartbeat-beteende har inte regresserat.
+22. `/projekt/Bastion/builds` visar sampled CI-summary med freshness och canonical Actions-länk utan direkt GitHub Actions-request; `/projekt/skvallerbyttan/builds` saknar app-CI-källa;
+23. stale/missing Skvallerbyttan overview-cache visas som stale/not-observed och utlöser ingen Portal-driven providerrefresh;
+24. cache-/heartbeat-beteende har inte regresserat.
 
 Kalla inte deployment klar innan den verifieringen är gjord.
