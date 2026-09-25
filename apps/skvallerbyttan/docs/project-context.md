@@ -57,7 +57,7 @@ Runtime behåller endast sanerad GitHub App-permissionmetadata från installatio
 
 ## Cloudflare
 
-Skvallerbyttans Cloudflare-provider är read-only. Den stabila credentialmodellen är en del av Skvallerbyttans eget kod- och säkerhetskontrakt; `../../docs/organization/cloudflare-credential-standard.md` är endast en monorepo-lokal sammanfattning, inte extern source of truth.
+Skvallerbyttans Cloudflare-provider är read-only. Den stabila credentialmodellen är en del av Skvallerbyttans eget kod- och säkerhetskontrakt; `../../../docs/organization/cloudflare-credential-standard.md` är endast en monorepo-lokal sammanfattning, inte extern source of truth.
 
 Provider-reads är partitionerade och rangordnade utan arv:
 
