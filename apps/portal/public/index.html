@@ -680,14 +680,34 @@
       aria-labelledby="activity-title"
       hidden
     >
+      <nav class="portal-breadcrumbs" id="activity-breadcrumbs" aria-label="Brödsmulor" hidden>
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="activity-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Aktivitet</span>
+      </nav>
+
       <div class="portal-page-head">
         <div class="portal-kicker">AKTIVITET</div>
         <h1 id="activity-title">Aktivitet</h1>
-        <p>Råare commits, PR:er, deploys, workflow runs, dokumentationsändringar och observerade events.</p>
+        <p id="activity-description">
+          Publika repositoryevents från fristående Avkroken-projekt. Strömmen är fördröjd och begränsad, inte komplett eller realtid.
+        </p>
       </div>
-      <div class="portal-placeholder">
-        <strong>Aktivitetsström kopplas in separat.</strong>
-        Observerad aktivitet ska aldrig presenteras som komplett om täckningen inte är känd.
+
+      <div class="activity-meta">
+        <span id="activity-status" aria-live="polite">Läser publik aktivitet…</span>
+        <span id="activity-generated"></span>
+      </div>
+
+      <div class="activity-list" id="activity-list">
+        <div class="empty">Läser publika repositoryevents…</div>
+      </div>
+
+      <div class="portal-placeholder" id="activity-error" hidden>
+        <strong>Aktivitet är tillfälligt otillgänglig.</strong>
+        Ingen eventström fabriceras när GitHubs publika Activity-källa inte kan läsas.
       </div>
     </section>
 
@@ -788,5 +808,6 @@
   <script src="/project-releases.js" defer></script>
   <script src="/project-issues.js" defer></script>
   <script src="/project-builds.js" defer></script>
+  <script src="/activity.js" defer></script>
 </body>
 </html>
