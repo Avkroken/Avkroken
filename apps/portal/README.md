@@ -41,6 +41,7 @@ Portal v2 etablerar:
 - projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
 - projektspecifik Issues-vy på `/projekt/:slug/issues` för repositoryprojekt, med PR-filtrering och minimal public-only Issue-modell;
 - projektspecifik Builds / CI-vy på `/projekt/:slug/builds` från Skvallerbyttans cacheade read-only Actions-summary;
+- global och projektspecifik publik Activity på `/aktivitet` respektive `/projekt/:slug/aktivitet`, byggd från GitHubs public organization events efter live-public repo-filter;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -57,6 +58,7 @@ Portalen känner bland annat igen:
 - `/projekt/:slug/releases` — officiella publicerade GitHub Releases för repositoryprojekt; monorepo-appar får ingen ärvd releasevy.
 - `/projekt/:slug/issues` — publika GitHub Issues för repositoryprojekt; pull requests filtreras bort och monorepo-appar får ingen ärvd Issue-vy.
 - `/projekt/:slug/builds` — sampled observerad GitHub Actions-state från Skvallerbyttans cache för repositoryprojekt; monorepo-appar får ingen ärvd CI-vy.
+- `/projekt/:slug/aktivitet` — bounded publik GitHub Events-ström för fristående repositoryprojekt; mixed-scope-monorepot och monorepo-appar får ingen projektspecifik Activity-route.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -86,6 +88,7 @@ Nuvarande Worker exponerar:
 - `GET /api/releases?project=...` — projektspecifik, `no-store` releasehistorik för ett redan publicerat repositoryprojekt med samma minimala releasemodell.
 - `GET /api/issues?project=...` — projektspecifik, `no-store` Issue-lista för ett redan publicerat repositoryprojekt; PR-poster och rå body/actor/assignee/milestone filtreras bort.
 - `GET /api/builds?project=...` — projektspecifik, `no-store` CI-snapshot från Skvallerbyttans interna `PortalObservationsService`; ingen direkt Actions-request görs av Portalen.
+- `GET /api/activity[?project=...]` — `no-store` bounded publik Activity från GitHubs public organization events, filtrerad till live-publicerade fristående repositoryprojekt.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -194,6 +197,37 @@ Portalen gör ingen GitHub Actions-request för Builds/CI. Slugen måste först 
 CI-snapshoten innehåller endast samplebaserad Actions-summary: pass rate, completed/success/failed/cancelled/in-progress, failures senaste 24h/7d, latest failure, duration median/p95 och MTTR. Actor, provider-permissions, providerfel, event breakdown och rå runpayload publiceras inte.
 
 Freshness kommer från Skvallerbyttans canonical `overview` source cache. Portalen visar `fresh`, `stale` eller `unknown` och gör inte en providerrefresh som fallback vid sidvisning. Monorepo-appar har `builds = null` och `buildsPortalUrl = null`.
+
+### Publik Activity
+
+```text
+GitHub public organization events
+  + live GitHub public repository list
+  -> Portal repository policy
+  -> mixed-scope exclusion
+  -> activity-source sanitization
+  -> GET /api/activity[?project=...]
+  -> /aktivitet
+  -> /projekt/:slug/aktivitet
+```
+
+Activity-källan är GitHubs publika Events API, inte Skvallerbyttans skyddade organisations-Activity. GitHub dokumenterar Events API som fördröjt och inte avsett för realtid; latency kan vara cirka 30 sekunder till 6 timmar.
+
+Publiceringsgränsen:
+
+- utgår från live `type=public` repositorylistning;
+- exkluderar retired/infrastructure via vanlig repositorypolicy;
+- exkluderar mixed-scope `Avkroken/Avkroken` helt, eftersom eventpayloaden inte kan filscopas bort från skyddade appytor;
+- exkluderar monorepo-appar;
+- kräver `event.public = true`;
+- accepterar endast Push, PullRequest, Issues, Release, Create och Delete från Events API;
+- publicerar inte actor, avatar, branch/taggnamn, commit-SHA, commitmeddelande, PR/Issue-titel eller rå payload.
+
+För PR/Issue publiceras endast nummer + generell action och canonical GitHub-URL. Push/Create/Delete länkar endast till repositoryt.
+
+Snapshoten hämtar högst 100 provider-events, returnerar högst 40 poster och använder `bounded` eller `partial` coverage. Den lagras inte persistent i Cache API; samtidiga builds i samma isolate kan dela ett in-flight Promise.
+
+GitHub Events API exponerar inte WorkflowRunEvent/DeploymentEvent i detta kontrakt. Workflow-status finns i projektspecifika Builds/CI; deploy-aktivitet är fortsatt separat arbete.
 
 ### Operativ state
 
