@@ -44,3 +44,11 @@ test("mobile hero grid items may shrink inside the viewport", () => {
     /\.portal-hero-copy,\s*\.portal-hero-aside\s*\{\s*min-width:\s*0;\s*\}/
   );
 });
+
+
+test("mobile hero title uses a viewport-safe fluid size", () => {
+  assert.match(
+    css,
+    /\.portal-hero-copy h1\s*\{\s*font-size:\s*clamp\(3\.15rem,\s*18vw,\s*5\.4rem\);\s*\}/
+  );
+});
