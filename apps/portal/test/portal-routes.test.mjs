@@ -5,7 +5,8 @@ import {
   isPortalDocumentRoute,
   normalizePortalPath,
   projectPath,
-  protectedRedirectForPath
+  protectedRedirectForPath,
+  wikiPath
 } from "../src/portal-routes.mjs";
 
 test("normalizes trailing slashes without changing root", () => {
@@ -73,4 +74,11 @@ test("builds stable project detail URLs", () => {
   assert.equal(projectPath(), "/projekt");
   assert.equal(projectPath("Bastion"), "/projekt/Bastion");
   assert.equal(projectPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag");
+});
+
+
+test("builds stable Wiki presentation URLs", () => {
+  assert.equal(wikiPath(), "/projekt");
+  assert.equal(wikiPath("Bastion"), "/projekt/Bastion/wiki");
+  assert.equal(wikiPath("Repo med mellanslag"), "/projekt/Repo%20med%20mellanslag/wiki");
 });
