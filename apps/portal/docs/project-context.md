@@ -29,8 +29,8 @@ Worker-koden innehåller idag:
 
 - normaliserad publik project/source-adapter för aktiva publika repositories;
 - bakåtkompatibel publicerad site discovery;
-- publik README/docs-katalog;
-- hämtning av tillåtet publikt Markdown;
+- publik repository- och opt-in-app-README/docs-katalog;
+- hämtning av exakt allowlistat publikt Markdown via app-/repository-aware docs-source-modell;
 - cache headers och cache tags för dokumentation;
 - intern dokumentationsinvalidering via `DocsInvalidationService`;
 - intern operativ heartbeat-mottagning via `OperationalHeartbeatService`;
@@ -86,7 +86,7 @@ Saknat manifest publicerar ingenting. Manifestdata valideras strikt och får int
 
 Nuvarande opt-in:
 
-- Skvallerbyttan: publicerad som projektpost utan publik dashboard-URL.
+- Skvallerbyttan: publicerad som projektpost utan publik dashboard-URL och med app-lokal README/docs-rendering i Portal-skalet.
 - Portal: inget separat appmanifest; `Avkroken`-repositoryprojektet representerar Portalens repositoryyta.
 - Jobb: inget publikt appmanifest; skyddad Jobb-state går fortsatt endast via Auth-gränsen.
 
@@ -96,11 +96,15 @@ Nuvarande opt-in:
 
 ### `/api/docs`
 
-Bygger en katalog från publika, aktiva repositories och tillåtna README-/`docs/`-Markdownfiler.
+Bygger en katalog från publika, aktiva repositories samt app-lokal README/`docs/` för appar som redan har ett giltigt publikt manifest.
+
+Repositoryposter använder repositorynamnet som katalognyckel. Appposter använder manifestets stabila slug, exempelvis `skvallerbyttan`.
+
+Appens publika dokumentpath är relativ till app-roten och låser därmed inte Portalens URL till `apps/<name>`-strukturen.
 
 ### `/api/docs/content`
 
-Returnerar den valda tillåtna Markdownfilen samt `sourceUrl` till canonical repositorykälla.
+Tar katalognyckel + route-path, kräver exakt träff i den publika katalogpostens `pages`, mappar därefter till canonical source repository/ref/path och returnerar Markdown samt `sourceUrl` till originalet. Jobb saknar appmanifest och får därför ingen appdokumentationspost.
 
 ## Cache
 
@@ -141,7 +145,6 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 Följande är medvetet inte löst ännu:
 
-- Portal-rendering av app-lokal README/docs för opt-in-appar;
 - full projektdetaljdata;
 - Wiki-adapter inne i Portalen;
 - global access-aware sökindexering;
