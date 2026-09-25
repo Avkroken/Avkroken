@@ -253,7 +253,7 @@ public docs catalog
 search-index.mjs
           |
           v
-cached internal index
+bounded request-time index
           |
           v
 GET /api/search?q=...
@@ -288,11 +288,11 @@ Kall indexbuild:
 - väljer högst 32 dokument round-robin mellan publicerade docs-källor;
 - hämtar max 120 000 tecken per valt dokument;
 - använder concurrency 4;
-- cachear indexet i en timme.
+- lagrar inte indexet i Cache API; samtidiga builds i samma isolate delar ett in-flight Promise.
 
 Indexet påstår inte fullständig täckning. `bounded` betyder att definierad budget användes utan observerad reducering; `partial` betyder att dokumentgräns, fetchfel, truncering eller appdiscovery minskade täckningen.
 
-`docs-catalog` används som cache tag även för sökindexet så befintlig dokumentinvalidering kan slå ut indexet.
+Sökindexet är medvetet utan persistent Cache API-lagring. Det undviker att avpublicerade projektnamn, snippets eller canonical länkar kan ligga kvar i en datacenterlokal cache efter publiceringsändring.
 
 Issues och Discussions är inte indexerade ännu.
 
