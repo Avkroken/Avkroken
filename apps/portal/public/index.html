@@ -3,46 +3,140 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="AVKROKEN — projekt, verktyg och tjänster.">
-  <meta name="theme-color" content="#050912">
+  <meta name="description" content="Avkroken — samlad ingång till projekt, dokumentation, tjänster och drift.">
+  <meta name="theme-color" content="#080b09">
   <meta name="robots" content="noindex,nofollow">
-  <title>AVKROKEN</title>
+  <title>Avkroken</title>
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/mobile.css">
+  <link rel="stylesheet" href="/portal-v2.css">
 </head>
-<body>
-  <header class="shell topbar">
-    <div class="brand-mini"><span class="brand-dot"></span> AVKROKEN</div>
-    <div class="privacy-pill" id="portal-state">PUBLIC INDEX</div>
+<body class="portal-v2">
+  <a class="skip-link" href="#portal-content">Hoppa till innehåll</a>
+
+  <header class="portal-header">
+    <div class="shell portal-header-inner">
+      <a class="portal-brand" href="/" data-portal-route data-nav-view="home" aria-label="Avkroken startsida">
+        <span class="portal-brand-mark" aria-hidden="true">AK</span>
+        <span>AVKROKEN</span>
+      </a>
+
+      <nav class="portal-nav" id="portal-navigation" aria-label="Huvudnavigation">
+        <div class="portal-nav-primary">
+          <a href="/" data-portal-route data-nav-view="home">Avkroken</a>
+          <a href="/projekt" data-portal-route data-nav-view="projects">Projekt</a>
+          <a href="/dokumentation" data-portal-route data-nav-view="docs">Dokumentation</a>
+          <a href="/tjanster" data-portal-route data-nav-view="services">Tjänster</a>
+          <a href="/drift" data-portal-route data-nav-view="operations">Drift &amp; insyn</a>
+          <a href="/changelog" data-portal-route data-nav-view="changelog">Changelog</a>
+          <a href="/aktivitet" data-portal-route data-nav-view="activity">Aktivitet</a>
+        </div>
+        <div class="portal-nav-utility">
+          <a href="/auth" data-portal-route data-nav-view="auth">Auth</a>
+          <a href="/om" data-portal-route data-nav-view="about">Om</a>
+        </div>
+      </nav>
+
+      <div class="portal-status" id="portal-state" aria-live="polite">PUBLIC INDEX</div>
+
+      <button
+        class="portal-menu-toggle"
+        id="portal-menu-toggle"
+        type="button"
+        aria-controls="portal-navigation"
+        aria-expanded="false"
+      >
+        Meny
+      </button>
+    </div>
   </header>
 
-  <main class="shell">
-    <section class="hero">
-      <a class="logo-wrap" href="/" aria-label="Till startsidan">
-        <img src="/avkroken-login-logo.svg" alt="AVKROKEN">
-      </a>
-      <div class="hero-copy">
-        <div class="eyebrow">CODE · DATA · VISIONS · IDEAS</div>
-        <h1>AVKROKEN</h1>
-        <p>Projekt, tjänster och verktyg byggda och drivna inom Avkroken.</p>
-        <nav class="manifesto" aria-label="Filtrera projekt">
-          <a href="#code" data-focus="code" aria-pressed="false">CODE</a>
-          <a href="#data" data-focus="data" aria-pressed="false">DATA</a>
-          <a href="#visions" data-focus="visions" aria-pressed="false">VISIONS</a>
-          <a href="#ideas" data-focus="ideas" aria-pressed="false">IDEAS</a>
-        </nav>
+  <main class="shell portal-main" id="portal-content">
+    <section class="portal-route-panel" id="home-view" data-route-panel="home">
+      <div class="portal-hero">
+        <div class="portal-hero-copy">
+          <div class="portal-kicker">PORTAL · PRESENTATION · CONTEXT</div>
+          <h1>Avkroken</h1>
+          <p>
+            Samlad ingång till Avkrokens projekt, dokumentation, publika tjänster och observerad drift.
+            Varje repository och app fortsätter äga sin tekniska verklighet.
+          </p>
+        </div>
+        <aside class="portal-hero-aside" aria-label="Portalprincip">
+          <div class="portal-meta-label">PRINCIP</div>
+          <strong>Presentera centralt. Äg lokalt.</strong>
+          <span>Portalen speglar och sammanställer. Canonical källa ska alltid gå att nå.</span>
+        </aside>
       </div>
+
+      <div class="portal-dashboard" aria-label="Huvudområden">
+        <a class="portal-summary-card" href="/projekt" data-portal-route>
+          <div class="portal-meta-label">PROJEKT</div>
+          <h3>Projektöversikt</h3>
+          <p>Publika projekt och verktyg, upptäckta från repositorymetadata där det är säkert.</p>
+        </a>
+        <a class="portal-summary-card" href="/dokumentation" data-portal-route>
+          <div class="portal-meta-label">DOKUMENTATION</div>
+          <h3>Läs i portalen</h3>
+          <p>README och docs renderas i Avkroken med diskret länk till canonical källa.</p>
+        </a>
+        <a class="portal-summary-card" href="/tjanster" data-portal-route>
+          <div class="portal-meta-label">TJÄNSTER</div>
+          <h3>Publika produkter</h3>
+          <p>Politiker, Klarspråk och Produkter behåller sina egna visuella identiteter.</p>
+        </a>
+        <a class="portal-summary-card" href="/drift" data-portal-route>
+          <div class="portal-meta-label">DRIFT &amp; INSYN</div>
+          <h3>Observerad state</h3>
+          <p>Skvallerbyttan är primär read-only observationskälla när dess modell passar.</p>
+        </a>
+      </div>
+
+      <section class="portal-section" aria-labelledby="home-next-title">
+        <div class="portal-section-title">
+          <div>
+            <h2 id="home-next-title">Portal v2</h2>
+            <p>Det här grundlagret etablerar informationsarkitektur och routing utan att duplicera providerlogik.</p>
+          </div>
+        </div>
+        <div class="portal-card-grid">
+          <div class="portal-info-card">
+            <div class="portal-meta-label">KÄLLOR</div>
+            <h3>Repositoryägt</h3>
+            <p>README, docs, Wiki, Issues, Discussions och releases fortsätter leva där de hör hemma.</p>
+          </div>
+          <div class="portal-info-card">
+            <div class="portal-meta-label">ACCESS</div>
+            <h3>Strukturell gräns</h3>
+            <p>Skyddat Jobb-innehåll går inte genom publik rendering, cache eller sökindex.</p>
+          </div>
+          <div class="portal-info-card">
+            <div class="portal-meta-label">OBSERVATION</div>
+            <h3>Read-only</h3>
+            <p>Skvallerbyttans providerintegration förblir observerande och får ingen write-access för portalens skull.</p>
+          </div>
+        </div>
+      </section>
     </section>
 
-    <nav class="portal-tabs" aria-label="Portalvy">
-      <button class="portal-tab active" type="button" data-view="projects" aria-selected="true">Projekt</button>
-      <button class="portal-tab" type="button" data-view="docs" aria-selected="false">Dokumentation</button>
-    </nav>
+    <section
+      class="portal-route-panel"
+      id="projects-view"
+      data-route-panel="projects"
+      data-view-panel="projects"
+      aria-labelledby="public-sites"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">PROJEKT</div>
+        <h1 id="public-sites">Projekt</h1>
+        <p>Samlad projektvy. Repositoryformen används som källa, inte som portalens informationsarkitektur.</p>
+      </div>
 
-    <section class="view-panel" id="projects-view" data-view-panel="projects" aria-labelledby="public-sites">
       <div class="section-head">
         <div>
-          <h2 id="public-sites"><span class="gradient-text">Projekt &amp; tjänster</span></h2>
+          <h2>Publika projekt &amp; verktyg</h2>
         </div>
         <div class="count" id="site-count">LOADING…</div>
       </div>
@@ -52,17 +146,30 @@
       </div>
     </section>
 
-    <section class="view-panel docs-view" id="docs-view" data-view-panel="docs" aria-labelledby="docs-title" hidden>
+    <section
+      class="portal-route-panel docs-view"
+      id="docs-view"
+      data-route-panel="docs"
+      data-view-panel="docs"
+      aria-labelledby="docs-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">DOKUMENTATION</div>
+        <h1 id="docs-title">Dokumentation</h1>
+        <p>Publik dokumentation hämtas från repositoryägda canonical källor och renderas inne i Avkroken.</p>
+      </div>
+
       <div class="section-head">
         <div>
-          <h2 id="docs-title"><span class="gradient-text">Dokumentation</span></h2>
-          <p>Publik dokumentation hämtas automatiskt från Avkrokens publika GitHub-förråd.</p>
+          <h2>Repositorydokumentation</h2>
+          <p>Varje renderat dokument behåller länk till originalet.</p>
         </div>
         <div class="count" id="docs-count">LOADING…</div>
       </div>
 
       <div class="docs-shell">
-        <nav class="docs-repo-tabs" id="docs-repo-tabs" aria-label="Förråd"></nav>
+        <nav class="docs-repo-tabs" id="docs-repo-tabs" aria-label="Repositories"></nav>
         <div class="docs-toolbar">
           <nav class="docs-page-tabs" id="docs-page-tabs" aria-label="Dokumentsidor"></nav>
           <div class="docs-links" id="docs-links"></div>
@@ -72,16 +179,189 @@
         </article>
       </div>
     </section>
+
+    <section
+      class="portal-route-panel"
+      id="services-view"
+      data-route-panel="services"
+      aria-labelledby="services-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">TJÄNSTER</div>
+        <h1 id="services-title">Publika tjänster</h1>
+        <p>
+          Självständiga produkter öppnas i sina egna visuella identiteter. Avkroken homogeniserar inte
+          Politiker, Klarspråk eller Produkter.
+        </p>
+      </div>
+      <div class="grid" id="service-grid">
+        <div class="empty">Läser in publika tjänster…</div>
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="auth-view"
+      data-route-panel="auth"
+      aria-labelledby="auth-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">AUTH</div>
+        <h1 id="auth-title">Auth</h1>
+        <p>Ingångar till skyddade ytor. Publik portal visar aldrig skyddad payload före server-side auktorisering.</p>
+      </div>
+
+      <div class="portal-boundary">
+        <div>
+          <div class="portal-meta-label">SKYDDAD TJÄNST</div>
+          <h3>Jobb</h3>
+          <p>
+            Jobb-data, intern status och BankID-relaterad state hålls utanför publik rendering,
+            publik cache och publikt sökindex.
+          </p>
+        </div>
+        <a class="portal-button primary" href="https://jobb.denied.se/" rel="noopener">Öppna Jobb</a>
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="operations-view"
+      data-route-panel="operations"
+      aria-labelledby="operations-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">DRIFT &amp; INSYN</div>
+        <h1 id="operations-title">Vad Avkroken ser</h1>
+        <p>
+          Operativ state ska i första hand komma från Skvallerbyttans normaliserade read-only modell,
+          med freshness och täckning tydligt skilda från antagen komplett aktivitet.
+        </p>
+      </div>
+      <div class="portal-card-grid">
+        <div class="portal-info-card">
+          <div class="portal-meta-label">GITHUB</div>
+          <h3>Observerad state</h3>
+          <p>CI, releases, säkerhet och annan providerstate kopplas via Skvallerbyttan där capability finns.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">CLOUDFLARE</div>
+          <h3>Observerad state</h3>
+          <p>Portalens grundlager introducerar ingen ny Cloudflare-providerklient eller permission.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">FRESHNESS</div>
+          <h3>Synlig täckning</h3>
+          <p>Senaste lyckade observation, cacheläge och källtäckning ska visas när integrationen kopplas in.</p>
+        </div>
+      </div>
+      <div class="portal-placeholder">
+        <strong>Dataintegration ligger i separat PR.</strong>
+        Den här foundation-PR:n etablerar ytan och accessgränsen men fabricerar ingen driftstatus.
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="changelog-view"
+      data-route-panel="changelog"
+      aria-labelledby="changelog-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">CHANGELOG</div>
+        <h1 id="changelog-title">Produktförändringar</h1>
+        <p>Kuraterade releases och produktförändringar. Rå aktivitet hör hemma under Aktivitet.</p>
+      </div>
+      <div class="portal-placeholder">
+        <strong>Releaseaggregation kopplas in separat.</strong>
+        GitHub Releases ska prioriteras som officiell releasehistorik där repositoryt har versionerade releaser.
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="activity-view"
+      data-route-panel="activity"
+      aria-labelledby="activity-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">AKTIVITET</div>
+        <h1 id="activity-title">Aktivitet</h1>
+        <p>Råare commits, PR:er, deploys, workflow runs, dokumentationsändringar och observerade events.</p>
+      </div>
+      <div class="portal-placeholder">
+        <strong>Aktivitetsström kopplas in separat.</strong>
+        Observerad aktivitet ska aldrig presenteras som komplett om täckningen inte är känd.
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="search-view"
+      data-route-panel="search"
+      aria-labelledby="search-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">SÖK</div>
+        <h1 id="search-title">Sök i Avkroken</h1>
+        <p>Global sök får endast indexera publikt tillåtet innehåll. Skyddat material filtreras före indexering.</p>
+      </div>
+      <div class="portal-placeholder">
+        <strong>Access-aware sökindex byggs i separat PR.</strong>
+        Ingen publik sökfunktion aktiveras innan indexeringsgränsen är implementerad och testad.
+      </div>
+    </section>
+
+    <section
+      class="portal-route-panel"
+      id="about-view"
+      data-route-panel="about"
+      aria-labelledby="about-title"
+      hidden
+    >
+      <div class="portal-page-head">
+        <div class="portal-kicker">OM AVKROKEN</div>
+        <h1 id="about-title">Presentation och sammanhang</h1>
+        <p>
+          Avkroken.denied.se är presentations-, navigations-, sök- och aggregationslagret.
+          Repositoryn och apparna fortsätter vara canonical tekniska källor.
+        </p>
+      </div>
+      <div class="portal-card-grid">
+        <div class="portal-info-card">
+          <div class="portal-meta-label">ÄGARSKAP</div>
+          <h3>Repo först</h3>
+          <p>Teknisk current-state, issues, discussions, releases och dokumentation ägs lokalt.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">PORTAL</div>
+          <h3>Sammanhang</h3>
+          <p>Avkroken speglar, länkar och sammanställer utan en andra manuellt underhållen source of truth.</p>
+        </div>
+        <div class="portal-info-card">
+          <div class="portal-meta-label">ORIGINAL</div>
+          <h3>Canonical länk</h3>
+          <p>Speglat innehåll ska alltid kunna öppnas i sin ursprungliga repositorykälla.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer>
     <div class="shell">
-      <span>AVKROKEN · CODE · DATA · VISIONS · IDEAS</span>
-      <span>DENIED.SE</span>
+      <span>AVKROKEN · PRESENTATION &amp; CONTEXT</span>
+      <a href="https://github.com/Avkroken/Avkroken" target="_blank" rel="noopener noreferrer">Visa repository</a>
     </div>
   </footer>
 
   <script src="/app.js" defer></script>
+  <script src="/shell.js" defer></script>
   <script src="/docs.js" defer></script>
 </body>
 </html>
