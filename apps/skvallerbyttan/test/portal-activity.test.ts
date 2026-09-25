@@ -22,8 +22,16 @@ function observed(overrides: Record<string, unknown> = {}) {
       {
         provider: "cloudflare",
         capability: "cloudflare.avkroken.workers",
+    "github.avkroken.security",
+    "secret_scanning_alert",
         event: "update",
         observedCount: 99,
+      },
+      {
+        provider: "github",
+        capability: "github.avkroken.security",
+        event: "secret_scanning_alert",
+        observedCount: 2,
       },
     ],
     coverage: [
@@ -63,6 +71,16 @@ function observed(overrides: Record<string, unknown> = {}) {
         action: "completed",
         repository: "PrivateRepo",
         receivedAt: "2026-09-25T11:20:00Z",
+      },
+      {
+        provider: "github",
+        capability: "github.avkroken.security",
+        source: "webhook",
+        coverage: "since_first_observation",
+        event: "secret_scanning_alert",
+        action: "created",
+        repository: "Bastion",
+        receivedAt: "2026-09-25T11:15:00Z",
       },
       {
         provider: "cloudflare",
