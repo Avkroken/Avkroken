@@ -2,10 +2,9 @@
 
 ## Läs först
 
-- `../../docs/organization/engineering-context.md` — central engineering-, CI- och governance-kontext.
-- `../../docs/organization/documentation-standard.md` — organisationsgemensam dokumentationsmodell.
 - [docs/project-context.md](docs/project-context.md) — appens canonical current-state.
 - [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/security.md) och [docs/operations.md](docs/operations.md) — arkitektur, säkerhetsgränser och drift.
+- `../../docs/organization/` — endast delad monorepo-kontext när en ändring faktiskt berör flera appar.
 
 ## Invariants
 
