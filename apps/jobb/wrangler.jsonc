@@ -35,7 +35,7 @@
     {
       "binding": "GITHUB_OAUTH_CLIENT_SECRET",
       "store_id": "293e79006fa649b8b182ef105a6b46d1",
-      "secret_name": "KROSA_MAJA_CLIENT_SECRET"
+      "secret_name": "GITHUB_OAUTH_CLIENT_SECRET"
     }
   ],
   "d1_databases": [
