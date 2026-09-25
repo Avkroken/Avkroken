@@ -463,6 +463,13 @@ async function loadPublicAppProjects(repositories, env) {
   };
 }
 
+async function loadLivePublicRepositoryProjects(env) {
+  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
+  if (!github.ok) throw new Error("github_unavailable:" + github.status);
+
+  return normalizePublicRepositories(await github.json());
+}
+
 async function loadPublicProjects(env) {
   const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
   if (!github.ok) throw new Error("github_unavailable:" + github.status);
@@ -752,8 +759,8 @@ async function getPublicProjectBuilds(requestUrl, env) {
   }
 
   try {
-    const projectCatalog = await loadPublicProjects(env);
-    const project = publicBuildProject(projectCatalog.projects, projectSlug);
+    const repositoryProjects = await loadLivePublicRepositoryProjects(env);
+    const project = publicBuildProject(repositoryProjects, projectSlug);
 
     if (!project) {
       return new Response(JSON.stringify({
