@@ -261,7 +261,7 @@ Portal → Skvallerbyttan sker genom `PortalObservationsService.getPublicActivit
 - fail-closed om en explicit repository-lista blir tom/ogiltig;
 - returnerar endast aggregate counts, coverage och de högst 100 senaste ledger-raderna från den redan filtrerade queryn.
 
-Public snapshot och Portalens andra projektion tar bort `resourceId`, actors, providerfel, permissions och andra råfält. Recent events innehåller endast repository/project, capability, source, coverage, event/action och occurred/received timestamps.
+Public snapshot och Portalens andra projektion tar bort `resourceId`, actors, providerfel, permissions och andra råfält. Recent events innehåller endast repository/project, capability, source, coverage, event/action och occurred/received timestamps. Public Activity tillåter endast capability-grupperna `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective-ruleset-events stannar i den skyddade observationsytan.
 
 Global Activity visar inte Cloudflare account-/org-events. Sådan aktivitet kan inte publiceras förrän en separat uttrycklig service-/publiceringsmapping finns.
 
