@@ -65,7 +65,7 @@ test("Changelog backend derives release eligibility from live public projects", 
 test("Changelog response is not persisted in Cache API", () => {
   const handler = section(
     worker,
-    "async function getPublicChangelog(env)",
+    "async function getPublicChangelog(requestUrl, env)",
     "async function getPublicOperations(env)"
   );
 
@@ -77,4 +77,26 @@ test("Changelog response is not persisted in Cache API", () => {
 
 test("Changelog has a dedicated API route", () => {
   assert.ok(worker.includes('url.pathname === "/api/changelog"'));
+});
+
+
+test("scoped Changelog validates and resolves a live repository project", () => {
+  const load = section(
+    worker,
+    "async function loadPublicChangelog(env, projectSlug = null)",
+    "let pendingPublicChangelog = null;"
+  );
+  const handler = section(
+    worker,
+    "async function getPublicChangelog(requestUrl, env)",
+    "async function getPublicOperations(env)"
+  );
+
+  assert.ok(load.includes("findEligibleReleaseProject(projectCatalog.projects, projectSlug)"));
+  assert.ok(load.includes("? [scopedProject]"));
+  assert.ok(load.includes('"public_portal_repository_project"'));
+  assert.ok(handler.includes('requestUrl.searchParams.has("project")'));
+  assert.ok(handler.includes('"invalid_project"'));
+  assert.ok(handler.includes('"changelog_project_not_found"'));
+  assert.ok(handler.includes("loadPublicChangelog(env, projectSlug)"));
 });
