@@ -26,7 +26,6 @@ const GITHUB_API =
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
-const SEARCH_INDEX_CACHE_SECONDS = 3600;
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
@@ -574,6 +573,8 @@ async function fetchSearchDocuments(tasks, env) {
   return results;
 }
 
+let pendingSearchIndex = null;
+
 async function loadSearchIndex(env) {
   const [projectCatalog, docsCatalog] = await Promise.all([
     loadPublicProjects(env),
@@ -632,27 +633,14 @@ async function loadSearchIndex(env) {
   };
 }
 
-async function getSearchIndex(env, ctx) {
-  const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/public-search-index-v1");
-  const cached = await cache.match(cacheKey);
-
-  if (cached) {
-    return cached.json();
+async function getSearchIndex(env) {
+  if (!pendingSearchIndex) {
+    pendingSearchIndex = loadSearchIndex(env).finally(() => {
+      pendingSearchIndex = null;
+    });
   }
 
-  const index = await loadSearchIndex(env);
-  const body = JSON.stringify(index);
-  const cachedResponse = new Response(body, {
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "public, max-age=" + SEARCH_INDEX_CACHE_SECONDS,
-      "Cache-Tag": "docs-catalog,search-index"
-    }
-  });
-
-  ctx.waitUntil(cache.put(cacheKey, cachedResponse));
-  return index;
+  return pendingSearchIndex;
 }
 
 async function searchPortal(requestUrl, env, ctx) {
@@ -685,7 +673,7 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 
   try {
-    const index = await getSearchIndex(env, ctx);
+    const index = await getSearchIndex(env);
     const results = searchEntries(index.entries, query, SEARCH_RESULT_LIMIT);
 
     return new Response(JSON.stringify({
