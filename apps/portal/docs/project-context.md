@@ -172,7 +172,7 @@ Nuvarande indexkategorier:
 
 Jobb saknar publik app-post och app-docs-källa och kan därför inte nå indexbyggaren. `.github` är inte ett publicerat projekt och filtreras bort även om publika docs skulle finnas i docs-katalogen.
 
-Sökindexeringen använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor och max 120 000 tecken per dokument. Det ger rättvisare providerbudget mellan projekten och undviker att ett stort repo tar hela indexbudgeten.
+Sökindexeringen använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor och max 120 000 tecken per dokument. Det ger rättvisare providerbudget mellan projekten och undviker att ett stort repo tar hela indexbudgeten. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
 
 Coverage rapporteras som:
 
@@ -189,7 +189,7 @@ Aktuella värden i koden:
 - `/api/sites`: härledd från samma project catalog;
 - dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache;
-- server-side sökindex: 3 600 sekunder i Workers Cache API, taggat med `docs-catalog` och `search-index`.
+- server-side sökindex: ingen persistent Cache API-lagring; samtidiga kalla builds i samma isolate delar ett in-flight Promise.
 
 Skvallerbyttan kan invalidera dokumentationscache internt med cache tags genom Portalens service binding.
 
