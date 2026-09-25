@@ -213,6 +213,55 @@
     </section>
 
     <section
+      class="portal-route-panel"
+      id="project-releases-view"
+      data-route-panel="project-releases"
+      aria-labelledby="project-releases-title"
+      hidden
+    >
+      <nav class="portal-breadcrumbs" aria-label="Brödsmulor">
+        <a href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <a id="project-releases-project-link" href="/projekt" data-portal-route>Projekt</a>
+        <span aria-hidden="true">›</span>
+        <span>Releases</span>
+      </nav>
+
+      <div class="portal-page-head">
+        <div class="portal-kicker">RELEASES</div>
+        <h1 id="project-releases-title">Läser in releases…</h1>
+        <p id="project-releases-description">
+          Officiella publicerade GitHub Releases för det här repositoryprojektet.
+        </p>
+      </div>
+
+      <div class="changelog-meta">
+        <span id="project-releases-status" aria-live="polite">Läser releaser…</span>
+        <span id="project-releases-generated"></span>
+      </div>
+
+      <div class="project-detail-actions">
+        <a
+          class="portal-button"
+          id="project-releases-original"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          hidden
+        >Visa alla releases på GitHub</a>
+      </div>
+
+      <div class="changelog-list" id="project-releases-list">
+        <div class="empty">Läser publicerade releases…</div>
+      </div>
+
+      <div class="portal-placeholder" id="project-releases-error" hidden>
+        <strong>Releasehistoriken kunde inte visas.</strong>
+        Projektet saknar en publik repository-releaseyta eller GitHub-källan är tillfälligt otillgänglig.
+      </div>
+    </section>
+
+    <section
       class="portal-route-panel wiki-view"
       id="wiki-view"
       data-route-panel="wiki"
@@ -579,5 +628,6 @@
   <script src="/search.js" defer></script>
   <script src="/operations.js" defer></script>
   <script src="/changelog.js" defer></script>
+  <script src="/project-releases.js" defer></script>
 </body>
 </html>
