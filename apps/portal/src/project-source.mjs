@@ -40,7 +40,8 @@ function hasPortalCategory(topics = []) {
 function publicHomepage(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" ? url : null;
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url;
   } catch {
     return null;
   }
