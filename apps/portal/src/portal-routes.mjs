@@ -29,6 +29,11 @@ export function wikiPath(projectSlug) {
   return slug ? "/projekt/" + encodeURIComponent(slug) + "/wiki" : "/projekt";
 }
 
+export function projectReleasesPath(projectSlug) {
+  const slug = String(projectSlug || "").trim();
+  return slug ? "/projekt/" + encodeURIComponent(slug) + "/releases" : "/projekt";
+}
+
 export function documentationPath(repositoryName = null, sourcePath = null) {
   const repo = String(repositoryName || "").trim();
   const base = repo
