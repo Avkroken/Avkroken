@@ -39,7 +39,7 @@ Primär runtime är Cloudflare Worker `jobb` med entrypoint `apps/web/src/index.
 Appens `apps/jobb/wrangler.jsonc` är deployment-konfigurationen och binder:
 
 - Browser Run som `BROWSER`.
-- D1-databasen `jobb` som `DB`.
+- D1-databasen `jobb-eu` som `DB`.
 - R2-bucketen `jobb-evidence` som `EVIDENCE`.
 - Cloudflare Email som `EMAIL`.
 - Workflow `jobb-automation`, klass `JobAutomationWorkflow`, som `JOB_AUTOMATION`.
@@ -71,6 +71,8 @@ Cron kör en gång per dag den **10:e–13:e** vid `09:00 UTC`.
 - Ingen autonom jobbsökning körs den 14:e eller den 15:e–månadens slut.
 
 ## Data och state
+
+Produktionsbindingen `DB` ska peka på en D1-databas som skapats med Cloudflare-jurisdiction `eu`. Jurisdiction är creation-time providerkonfiguration och ska verifieras i Cloudflare när databasen ersätts; repositoryts UUID/name-binding är inte i sig bevis på data locality.
 
 D1-migrationerna är canonical schemahistorik:
 
