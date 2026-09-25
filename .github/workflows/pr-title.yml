@@ -33,6 +33,8 @@ jobs:
               "fix(portal): preserve mirrored Wiki links",
               "perf!: replace cache contract",
               "docs: clarify authentication model",
+              "build(deps): bump runtime dependencies",
+              "build(deps-dev): bump development dependencies",
               "chore(deps): update development dependencies",
               "ci: harden release workflow",
               "refactor(api): isolate source adapters",
@@ -44,6 +46,7 @@ jobs:
               "feat add repository documentation portal",
               "feat:",
               "Feat: add repository documentation portal",
+              "Build(deps-dev): bump development dependencies",
           )
 
           for fixture in valid:
