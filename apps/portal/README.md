@@ -41,6 +41,7 @@ Portal v2 etablerar:
 - projektspecifik Releases-vy på `/projekt/:slug/releases` för repositoryprojekt, byggd från samma public-only releaseadapter;
 - projektspecifik Issues-vy på `/projekt/:slug/issues` för repositoryprojekt, med PR-filtrering och minimal public-only Issue-modell;
 - projektspecifik Builds / CI-vy på `/projekt/:slug/builds` från Skvallerbyttans cacheade read-only Actions-summary;
+- global och projektspecifik observerad Activity från Skvallerbyttans repositoryfiltrerade eventledger, med explicit coverage och utan resource-ID:n;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
 
@@ -57,6 +58,7 @@ Portalen känner bland annat igen:
 - `/projekt/:slug/releases` — officiella publicerade GitHub Releases för repositoryprojekt; monorepo-appar får ingen ärvd releasevy.
 - `/projekt/:slug/issues` — publika GitHub Issues för repositoryprojekt; pull requests filtreras bort och monorepo-appar får ingen ärvd Issue-vy.
 - `/projekt/:slug/builds` — sampled observerad GitHub Actions-state från Skvallerbyttans cache för repositoryprojekt; monorepo-appar får ingen ärvd CI-vy.
+- `/projekt/:slug/aktivitet` — observerade GitHub repositoryevents för exakt live-publicerat repositoryprojekt; monorepo-appar får ingen ärvd aktivitetsvy.
 - `/projekt/:repository/dokumentation[/...]`
 - `/dokumentation[/...]`
 - `/tjanster`
@@ -86,6 +88,7 @@ Nuvarande Worker exponerar:
 - `GET /api/releases?project=...` — projektspecifik, `no-store` releasehistorik för ett redan publicerat repositoryprojekt med samma minimala releasemodell.
 - `GET /api/issues?project=...` — projektspecifik, `no-store` Issue-lista för ett redan publicerat repositoryprojekt; PR-poster och rå body/actor/assignee/milestone filtreras bort.
 - `GET /api/builds?project=...` — projektspecifik, `no-store` CI-snapshot från Skvallerbyttans interna `PortalObservationsService`; ingen direkt Actions-request görs av Portalen.
+- `GET /api/activity?days=...&project=...` — `no-store` observerad GitHub repositoryaktivitet från en separat public-safe Activity-RPC. `project` är valfri; utan den aggregeras endast live-publika repositoryprojekt inom en hård scopegräns.
 
 `.github`, arkiverade/icke-publika repositories och pensionerade source repositories ingår inte i `/api/projects`.
 
@@ -195,6 +198,24 @@ CI-snapshoten innehåller endast samplebaserad Actions-summary: pass rate, compl
 
 Freshness kommer från Skvallerbyttans canonical `overview` source cache. Portalen visar `fresh`, `stale` eller `unknown` och gör inte en providerrefresh som fallback vid sidvisning. Monorepo-appar har `builds = null` och `buildsPortalUrl = null`.
 
+### Observerad Activity
+
+```text
+live public repository projects
+  -> repository-only allowlist
+  -> SKVALLERBYTTAN_OBSERVATIONS.getPublicActivity(...)
+  -> Skvallerbyttan observation_events
+  -> repository filter + public/non-archived overview gate
+  -> public-only Activity sanitizer
+  -> GET /api/activity
+  -> /aktivitet eller /projekt/:slug/aktivitet
+```
+
+Portalen gör ingen GitHub event-/audit-request för Activity. Global scope begränsas till högst 50 live-publika repositoryprojekt och projektscope till exakt ett repositoryprojekt. Monorepo-appar är separata identiteter och ärver inte source-repositoryts eventström.
+
+Den publika eventmodellen innehåller endast project/repository-identitet, capability, source, coverage, event/action och observationstider. `resourceId`, actors, providerfel, permissions och rå webhookpayload publiceras inte. Cloudflare account-/org-aktivitet ingår inte i den publika Activity-ytan eftersom den saknar en säker repository-/servicekoppling.
+
+Coverage följer observationskällan, exempelvis `since_first_observation`, och `periodComplete` är fortsatt false. Portalen använder därför genomgående formuleringen **observerad aktivitet**.
 ### Operativ state
 
 ```text
@@ -209,7 +230,7 @@ GitHub / Cloudflare
 
 Portalen skapar ingen andra providerklient och använder ingen Skvallerbyttan bearer-token för driftvyn. Den interna RPC-entrypointen returnerar endast en public-safe snapshot med providerstatus och capability status/dataState/freshness/last-success.
 
-Rå provider-permissions, installationmetadata, felsträngar, scope coverage/repositoryantal och Activity/eventvolym lämnar inte Skvallerbyttans skyddade observationsgräns.
+Den generella Drift-snapshoten publicerar inte råa provider-permissions, installationmetadata, felsträngar, scope coverage/repositoryantal eller Activity/eventvolym. Repository-Activity lämnar endast Skvallerbyttan genom det separata allowlistade och sanerade Activity-kontraktet ovan.
 
 ### Skyddad Jobb-data
 
