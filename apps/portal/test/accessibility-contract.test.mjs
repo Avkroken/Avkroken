@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const shell = await readFile(new URL("../public/shell.js", import.meta.url), "utf8");
+const css = await readFile(new URL("../public/portal-v2.css", import.meta.url), "utf8");
 const browser = await readFile(new URL("./browser-a11y.mjs", import.meta.url), "utf8");
 
 test("skip-link targets a programmatically focusable main landmark", () => {
@@ -34,4 +35,12 @@ test("browser gate uses installed ChromeDriver, axe and mobile overflow assertio
   assert.ok(browser.includes("wcag22aa"));
   assert.ok(browser.includes("scrollWidth <= overflow.clientWidth + 1"));
   assert.ok(browser.includes('"portal-menu-toggle"'));
+});
+
+
+test("mobile hero grid items may shrink inside the viewport", () => {
+  assert.match(
+    css,
+    /\.portal-hero-copy,\s*\.portal-hero-aside\s*\{\s*min-width:\s*0;\s*\}/
+  );
 });
