@@ -354,7 +354,7 @@ async function getIssues(env: Env, fullName: string): Promise<{
   };
 }
 
-export async function getRepositoryActions(env: Env, fullName: string): Promise<{
+async function getActions(env: Env, fullName: string): Promise<{
   available: boolean;
   summary: ActionSummary | null;
   runs: Run[];
@@ -412,7 +412,7 @@ export async function getOverview(env: Env): Promise<Record<string, unknown>> {
     const [pulls, issues, actions] = await Promise.all([
       getPulls(env, repo.full_name),
       getIssues(env, repo.full_name),
-      getRepositoryActions(env, repo.full_name),
+      getActions(env, repo.full_name),
     ]);
     const repoSecurity = security.byRepo[repo.name.toLowerCase()] ?? emptySecurity();
     const openIssues = issues.available ? issues.count : null;
@@ -550,7 +550,7 @@ export async function getRepositoryDetail(env: Env, repoName: string): Promise<R
   const [pulls, issues, actions, languages, views, clones, referrers, paths, participation, contributors, releases, workflows, rulesets, branches, deployments, code, dependabot, secret] = await Promise.all([
     getPulls(env, raw),
     getIssues(env, raw),
-    getRepositoryActions(env, raw),
+    getActions(env, raw),
     githubOptionalJson<Record<string, number>>(env, `/repos/${encoded}/languages`),
     githubOptionalJson<{ count?: number; uniques?: number; views?: Array<{ timestamp?: string; count?: number; uniques?: number }> }>(env, `/repos/${encoded}/traffic/views?per=day`),
     githubOptionalJson<{ count?: number; uniques?: number; clones?: Array<{ timestamp?: string; count?: number; uniques?: number }> }>(env, `/repos/${encoded}/traffic/clones?per=day`),
