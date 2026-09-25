@@ -1,4 +1,4 @@
-import { documentationPath } from "./portal-routes.mjs";
+import { documentationPath, projectPath } from "./portal-routes.mjs";
 import { isRetiredRepository } from "./repository-policy.mjs";
 
 const RESERVED_REPOSITORIES = new Set([".github"]);
@@ -80,6 +80,7 @@ export function normalizePublicRepository(repo) {
     issues: canonicalRepository + "/issues",
     discussions: repo?.has_discussions === true ? canonicalRepository + "/discussions" : null,
     releases: canonicalRepository + "/releases",
+    portalUrl: projectPath(name),
     documentation: documentationPath(name),
     pages: repo?.has_pages === true
       ? "https://avkroken.github.io/" + encodeURIComponent(name) + "/"
@@ -164,6 +165,7 @@ export function normalizePublicAppManifest(manifest, context = {}) {
     issues: repository + "/issues",
     discussions: context.hasDiscussions === true ? repository + "/discussions" : null,
     releases: repository + "/releases",
+    portalUrl: projectPath(slug),
     documentation: documentationPath(slug),
     pages: null,
     language: null,
