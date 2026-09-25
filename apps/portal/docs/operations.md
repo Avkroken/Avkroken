@@ -82,7 +82,7 @@ Detaljvyn får endast exponera fält som redan finns i den publika normaliserade
 Wiki-vyn använder endast `/api/projects` och `/api/docs`.
 
 - endast repositoryprojekt med publik Wiki får `wikiPortalUrl`;
-- monorepo-appar är intever `wiki = null` och `wikiPortalUrl = null` om inget separat framtida publiceringskontrakt införs;
+- monorepo-appar ärver inte repositoryts Wiki och har `wiki = null` och `wikiPortalUrl = null` om inget separat framtida publiceringskontrakt införs;
 - browsern anropar inte GitHub API direkt;
 - unavailable project/docs catalog ger explicit degraded state;
 - “Visa original-Wiki” pekar på canonical GitHub Wiki.
