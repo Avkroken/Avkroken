@@ -91,7 +91,7 @@ Wiki-vyn använder endast `/api/projects` och `/api/docs`.
 - unavailable project/docs catalog ger explicit degraded state;
 - “Visa original-Wiki” pekar på canonical GitHub Wiki.
 
-Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment.
+Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte återanvänds med det nya klientkontraktet. Projektmodellens Builds-fält bump:ar därefter cache-nyckeln till `github-projects-v6`, så en pre-Builds v5-payload inte återanvänds efter deployment. Activity-fältet `activityPortalUrl` bump:ar därefter nyckeln till `github-projects-v7`, så en pre-Activity v6-payload inte kan återanvändas.
 
 ### Dokumentationskatalog
 
