@@ -224,7 +224,7 @@ Portalen gör först en minimal live `type=public`-listning och väljer endast r
 
 D1-queryn är fail-closed: en explicit repositorylista som efter validering blir tom ger `1 = 0`, aldrig en organisationsvid query. Queryn läser endast GitHub-event för de valda repositorykortnamnen.
 
-RPC-sanitizern och Portalens egen andra projektion publicerar endast project/repository-identitet, capability, source, coverage, event/action samt occurred/received timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload publiceras inte.
+RPC-sanitizern och Portalens egen andra projektion publicerar endast project/repository-identitet, capability, source, coverage, event/action samt occurred/received timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload publiceras inte. Capability-allowlisten är medvetet begränsad till `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective rulesets publiceras inte i Activity.
 
 Global Activity inkluderar inte Cloudflare account-/org-events. De har ingen uttrycklig publik servicekoppling och stannar därför i Skvallerbyttans skyddade observationsyta.
 
