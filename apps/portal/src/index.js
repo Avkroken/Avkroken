@@ -18,6 +18,11 @@ import {
   searchEntries,
   selectSearchDocumentTasks
 } from "./search-index.mjs";
+import {
+  eligibleReleaseProjects,
+  normalizePublicReleases,
+  sortPublicReleases
+} from "./release-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API =
@@ -31,6 +36,10 @@ const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
 const SEARCH_FETCH_CONCURRENCY = 4;
 const SEARCH_RESULT_LIMIT = 24;
+const CHANGELOG_REPOSITORY_LIMIT = 24;
+const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
+const CHANGELOG_RESULT_LIMIT = 40;
+const CHANGELOG_FETCH_CONCURRENCY = 4;
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -704,6 +713,119 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 }
 
+async function fetchProjectReleases(project, env) {
+  const repository = String(project?.source?.repository || "");
+  const parts = repository.split("/");
+  if (parts.length !== 2 || parts[0] !== "Avkroken" || !parts[1]) {
+    return { releases: [], failed: true };
+  }
+
+  const endpoint =
+    "https://api.github.com/repos/" + encodeURIComponent(parts[0]) + "/" +
+    encodeURIComponent(parts[1]) + "/releases?per_page=" +
+    CHANGELOG_RELEASES_PER_REPOSITORY;
+  const result = await fetchGitHubJson(endpoint, env);
+
+  if (!result.ok || !Array.isArray(result.data)) {
+    return { releases: [], failed: true };
+  }
+
+  return {
+    releases: normalizePublicReleases(project, result.data),
+    failed: false
+  };
+}
+
+async function fetchChangelogReleases(projects, env) {
+  const results = [];
+
+  for (let index = 0; index < projects.length; index += CHANGELOG_FETCH_CONCURRENCY) {
+    const batch = projects.slice(index, index + CHANGELOG_FETCH_CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(project => fetchProjectReleases(project, env))
+    );
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
+async function loadPublicChangelog(env) {
+  const projectCatalog = await loadPublicProjects(env);
+  const eligible = eligibleReleaseProjects(projectCatalog.projects, 100);
+  const selected = eligible.slice(0, CHANGELOG_REPOSITORY_LIMIT);
+  const fetched = await fetchChangelogReleases(selected, env);
+
+  const failedRepositories = fetched.filter(result => result.failed).length;
+  const releases = sortPublicReleases(
+    fetched.flatMap(result => result.releases),
+    CHANGELOG_RESULT_LIMIT
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "github",
+      scope: "public_portal_repository_projects",
+      coverage:
+        eligible.length > selected.length || failedRepositories > 0
+          ? "partial"
+          : "bounded",
+      repositories: {
+        eligible: eligible.length,
+        observed: selected.length - failedRepositories,
+        failed: failedRepositories,
+        limit: CHANGELOG_REPOSITORY_LIMIT
+      },
+      releases: {
+        perRepositoryLimit: CHANGELOG_RELEASES_PER_REPOSITORY,
+        resultLimit: CHANGELOG_RESULT_LIMIT
+      }
+    },
+    releases
+  };
+}
+
+let pendingPublicChangelog = null;
+
+async function getPublicChangelog(env) {
+  try {
+    if (!pendingPublicChangelog) {
+      pendingPublicChangelog = loadPublicChangelog(env).finally(() => {
+        pendingPublicChangelog = null;
+      });
+    }
+
+    const payload = await pendingPublicChangelog;
+    return new Response(JSON.stringify({
+      status: "available",
+      ...payload
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public changelog unavailable", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "changelog_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 async function getPublicOperations(env) {
   const service = env.SKVALLERBYTTAN_OBSERVATIONS;
   if (!service || typeof service.getPublicOperationsSummary !== "function") {
@@ -1085,6 +1207,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicOperations(env);
+    }
+
+    if (url.pathname === "/api/changelog") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicChangelog(env);
     }
 
     const isRead = request.method === "GET" || request.method === "HEAD";
