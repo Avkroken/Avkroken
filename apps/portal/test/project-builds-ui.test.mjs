@@ -64,7 +64,10 @@ test("project Builds client reads only the Portal API and renders through textCo
   assert.equal(client.includes("Bearer "), false);
   assert.equal(client.includes("innerHTML"), false);
   assert.ok(client.includes("textContent"));
-  assert.ok(client.includes('rel = "noopener noreferrer"'));
+  assert.match(
+    html,
+    /id="project-builds-original"[\s\S]*?target="_blank"[\s\S]*?rel="noopener noreferrer"/
+  );
 });
 
 test("shell maps repository Builds deep links to the dedicated view", () => {
