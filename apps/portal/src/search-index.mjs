@@ -55,6 +55,36 @@ export function filterSearchableDocs(projects, docsCatalog) {
   });
 }
 
+export function selectSearchDocumentTasks(entries, limit = 32) {
+  if (!Array.isArray(entries)) return [];
+
+  const queues = entries.map(entry => ({
+    entry,
+    pages: Array.isArray(entry?.pages) ? [...entry.pages] : []
+  }));
+  const selected = [];
+  const maximum = Math.max(1, Math.min(Number(limit) || 32, 100));
+
+  let pageIndex = 0;
+  while (selected.length < maximum) {
+    let added = false;
+
+    for (const queue of queues) {
+      const page = queue.pages[pageIndex];
+      if (!page) continue;
+
+      selected.push({ entry: queue.entry, page });
+      added = true;
+      if (selected.length >= maximum) break;
+    }
+
+    if (!added) break;
+    pageIndex += 1;
+  }
+
+  return selected;
+}
+
 export function buildProjectSearchEntries(projects) {
   if (!Array.isArray(projects)) return [];
 
