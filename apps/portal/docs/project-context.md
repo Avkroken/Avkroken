@@ -352,6 +352,28 @@ Skyddad Jobb-data:
 
 Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
+## Accessibility och browserverifiering
+
+Portalens statiska och klientdrivna shell verifieras i två lager:
+
+- `npm test` låser HTML-/shellkontrakt för skip-link, SPA-fokus och mobilmenyn;
+- `npm run test:browser` startar en lokal fixture-server, kör Portalens faktiska HTML/CSS/JS i headless Google Chrome via ChromeDriver och injicerar `axe-core`.
+
+Browsergaten kör WCAG A/AA-regler från axe på samtliga top-level-routes i desktopläge samt representativa mobilroutes. Den verifierar dessutom:
+
+- skip-link är första tabb-stopp och flyttar fokus till `#portal-content`;
+- SPA-navigation flyttar fokus till den nya aktiva sidans `h1`;
+- `aria-current="page"` följer aktiv route;
+- exakt en route-panel är synlig efter navigation;
+- Escape stänger öppen mobilnavigation och återför fokus till menyknappen;
+- representativa mobilroutes saknar horisontell dokumentoverflow.
+
+`#portal-content` är `tabindex="-1"` för deterministisk skip-link-fokus. Route-`h1` får temporärt `tabindex="-1"` när shellen flyttar fokus och återställs vid blur.
+
+CI använder Chrome/ChromeDriver som redan finns i GitHubs `ubuntu-latest` runner image. Inga browsercredentials eller provideranrop används; API-responser i browsertestet är syntetiska publika tom-fixtures.
+
+Detta verifierar repositoryimplementationen i browser. Produktionens faktiska Cloudflare-deployment, provider live-state och externa nätverksvägar ligger fortsatt utanför denna gate.
+
 ## Kända gap
 
 Följande är medvetet inte löst ännu:
@@ -359,7 +381,6 @@ Följande är medvetet inte löst ännu:
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - releaseautomation;
-- slutlig end-to-end accessibility-/browserverifiering;
 - produktionsdeployment och provider live-verifiering.
 
 Varje nytt arbete ska göras i separat branch/PR enligt repositoryts arbetsregler.

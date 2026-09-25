@@ -7,12 +7,29 @@ Kör från `apps/portal`.
 ```bash
 npm install
 npm test
+npm run test:browser
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-`npm test` kör Portalens Node-testsvit och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues-, Builds/CI- och Activity-klienterna.
+`npm test` kör Portalens Node-testsvit, statiska accessibilitykontrakt och syntaxkontroll av klientskripten, inklusive Wiki-, sök-, Drift & insyn-, Changelog-, projektspecifika Releases-, Issues-, Builds/CI- och Activity-klienterna.
+
+`npm run test:browser` kräver Google Chrome och ChromeDriver i PATH. GitHubs `ubuntu-latest` runner image tillhandahåller båda. Testet kör en lokal fixture-server, headless Chrome, WCAG A/AA-regler via `axe-core`, keyboard/fokusflöden och mobil overflow-kontroll. Fixture-servern använder syntetiska publika API-responser och inga secrets/providercredentials.
 
 Dry-run verifierar Worker-bundle och Wrangler-konfiguration utan produktionsdeployment.
+
+## Browser-/accessibility-gate
+
+Portal-jobbet i root-`CI` kör i ordning:
+
+1. `npm install --ignore-scripts --no-audit --no-fund`;
+2. `npm test`;
+3. versionsutskrift för `google-chrome` och `chromedriver`;
+4. `npm run test:browser`;
+5. Wrangler dry-run.
+
+Browsergaten stoppar PR på axe-WCAG A/AA-violations, trasig skip-link, felaktig SPA-fokus, felaktig mobilmeny/Escape-retur eller representativ mobil horisontell overflow.
+
+Den här gaten verifierar repositoryimplementationen. Den ersätter inte produktionssmoke-test eller Cloudflare/provider live-verifiering efter en faktisk deployment.
 
 ## Deployment
 
