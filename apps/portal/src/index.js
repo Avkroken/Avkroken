@@ -1,4 +1,5 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
+import { buildProjectEntry, isProjectCatalogRepository, sortProjectEntries } from "./project-adapter.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
@@ -313,6 +314,44 @@ async function getDocContent(requestUrl, env) {
     }
   });
 }
+async function getProjects(env, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v1");
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
+  if (!github.ok) {
+    return new Response(
+      JSON.stringify({ error: "github_unavailable", status: github.status }),
+      {
+        status: 502,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+  }
+
+  const repositories = await github.json();
+  const projects = sortProjectEntries(
+    repositories
+      .filter(isProjectCatalogRepository)
+      .map(buildProjectEntry)
+  );
+
+  const response = new Response(JSON.stringify(projects), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=${CACHE_SECONDS}`
+    }
+  });
+
+  ctx.waitUntil(cache.put(cacheKey, response.clone()));
+  return response;
+}
+
 async function getPortalSites(env, ctx) {
   const cache = caches.default;
   const cacheKey = new Request("https://avkroken-cache.invalid/github-sites-v7");
@@ -670,6 +709,13 @@ export default {
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/projects") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getProjects(env, ctx);
+    }
 
     if (url.pathname === "/api/sites") {
       if (request.method !== "GET" && request.method !== "HEAD") {
