@@ -13,7 +13,7 @@ test("normalizes trailing slashes without changing root", () => {
   assert.equal(normalizePortalPath("/drift/github///"), "/drift/github");
 });
 
-test("recognizes stable portal document routes", () => {
+test("recognizes stable public portal document routes", () => {
   for (const path of [
     "/",
     "/projekt",
@@ -24,7 +24,6 @@ test("recognizes stable portal document routes", () => {
     "/dokumentation/arkitektur",
     "/tjanster",
     "/auth",
-    "/auth/jobb",
     "/drift",
     "/drift/github",
     "/changelog",
@@ -36,7 +35,7 @@ test("recognizes stable portal document routes", () => {
   }
 });
 
-test("does not rewrite API or asset requests to the portal shell", () => {
+test("does not rewrite API, assets, unknown routes, or protected Jobb paths", () => {
   for (const path of [
     "/api/sites",
     "/api/docs",
@@ -44,12 +43,19 @@ test("does not rewrite API or asset requests to the portal shell", () => {
     "/portal-v2.css",
     "/app.js",
     "/favicon.ico",
+    "/not-a-portal-route",
     "/auth/jobb",
-    "/auth/jobb/dashboard",
-    "/not-a-portal-route"
+    "/auth/jobb/dashboard"
   ]) {
     assert.equal(isPortalDocumentRoute(path), false, path);
   }
+});
+
+test("protected Jobb paths resolve only to the existing protected origin", () => {
+  assert.equal(protectedRedirectForPath("/auth/jobb"), "https://jobb.denied.se/");
+  assert.equal(protectedRedirectForPath("/auth/jobb/dashboard"), "https://jobb.denied.se/");
+  assert.equal(protectedRedirectForPath("/auth"), null);
+  assert.equal(protectedRedirectForPath("/projekt/jobb"), null);
 });
 
 test("builds stable documentation URLs with encoded repository and source path", () => {
@@ -59,11 +65,4 @@ test("builds stable documentation URLs with encoded repository and source path",
     documentationPath("Repo med mellanslag", "docs/API guide.md"),
     "/projekt/Repo%20med%20mellanslag/dokumentation/docs/API%20guide.md"
   );
-});
-
-
-test("routes protected Jobb paths to the existing protected origin", () => {
-  assert.equal(protectedRedirectForPath("/auth/jobb"), "https://jobb.denied.se/");
-  assert.equal(protectedRedirectForPath("/auth/jobb/dashboard"), "https://jobb.denied.se/");
-  assert.equal(protectedRedirectForPath("/auth"), null);
 });
