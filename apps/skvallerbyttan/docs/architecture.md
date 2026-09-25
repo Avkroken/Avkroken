@@ -29,18 +29,21 @@ CF Audit Logs ──────────────┘
          / current       / events     read telemetry
               └────────────┼─────────────┘
                            │
-                 ┌─────────┴──────────┐
-                 ▼                    ▼
-            /api/v1 contract    internal signals
-             ├── dashboard            │
-             └── machine clients      ▼
-                              avkroken RPC
-                              ├─ docs cache invalidation
-                              └─ operational heartbeat
-                                   │
-                                   ▼
-                              independent watchdog
-                              + missing-delivery notice
+                 ┌─────────┴──────────────────┐
+                 ▼                            ▼
+            /api/v1 contract        PortalObservationsService
+             ├── dashboard          (sanitized read-only RPC)
+             └── machine clients             │
+                 │                           ▼
+                 │                    avkroken Drift & insyn
+                 │
+                 └──────── internal signals ────────────────► avkroken RPC
+                                                      ├─ docs cache invalidation
+                                                      └─ operational heartbeat
+                                                           │
+                                                           ▼
+                                                      independent watchdog
+                                                      + missing-delivery notice
 ```
 
 ## Systemgräns
@@ -57,6 +60,10 @@ Operativ liveness följer motsatt riktning mot klassiska health-checks: Skvaller
 
 Readinesspayloaden produceras av faktiska lokala/provider-probes men innehåller endast booleska resultat. Heartbeat skickas även när readiness är false, så liveness och readiness förblir separata signaler.
 
+Portalens operativa läsväg är separat från heartbeat och det skyddade HTTP-API:t. `PortalObservationsService` exporteras som named Worker RPC-entrypoint och läser samma canonical capability/provider-health/Activity-modeller, men passerar dem genom en explicit sanitization boundary innan de lämnar Skvallerbyttan.
+
+Den snapshoten innehåller endast providerstatus/senaste observation, capability key/name/provider/status/dataState/freshness/last-success/scope coverage samt aggregerad Activity och coverage. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata och Activity `recent` publiceras inte genom RPC:n.
+
 ## Runtime
 
 Runtime är en TypeScript-baserad Cloudflare Worker.
@@ -70,12 +77,15 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - Activity: `src/activity.ts`
 - read telemetry: `src/telemetry.ts`
 - provider health: `src/provider-health.ts`
+- sanerad Portal RPC: `src/portal-observations.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
 ## Canonical state
 
 Externa klienter får normaliserade modeller, inte generella provider-dumpar. Relevant state bär status, freshness och provenance. Repository governance skiljer mellan `direct`, `inherited` och `effective` där providern ger tillräckligt underlag.
+
+Portalens publika Drift & insyn-konsument är ännu snävare än machine-API:t: den kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration: read används där GitHub kräver den nivån; provider-write ingår inte i observationslagret.
 
