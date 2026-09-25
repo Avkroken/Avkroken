@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const client = await readFile(new URL("../public/project-issues.js", import.meta.url), "utf8");
 const shell = await readFile(new URL("../public/shell.js", import.meta.url), "utf8");
+const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
 
 function occurrences(source, value) {
@@ -100,4 +101,14 @@ test("project Issues API is no-store and has explicit invalid/not-found/upstream
   assert.ok(handler.includes('"project_issues_unavailable"'));
   assert.ok(handler.includes('"Cache-Control": "no-store"'));
   assert.ok(worker.includes('url.pathname === "/api/issues"'));
+});
+
+
+test("project cards only expose Portal-native Issues navigation when available", () => {
+  assert.ok(app.includes("const issuesLink = project.issuesPortalUrl"));
+  assert.ok(app.includes('data-portal-route href="${escapeHtml(project.issuesPortalUrl)}"'));
+  assert.equal(
+    app.includes('href="${escapeHtml(project.issues)}" target="_blank" rel="noopener noreferrer">Issues</a>'),
+    false
+  );
 });
