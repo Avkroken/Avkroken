@@ -114,3 +114,13 @@ test("merges repository and app projects by stable id and sorts by display name"
     ["Avkroken", "Produkter", "Skvallerbyttan"]
   );
 });
+
+
+test("repository project wins a colliding app slug", () => {
+  const projects = mergePublicProjectCatalog(
+    [{ id: "repository:bastion", slug: "Bastion", name: "Bastion" }],
+    [{ id: "app:avkroken/avkroken:bastion", slug: "bastion", name: "App Bastion" }]
+  );
+
+  assert.deepEqual(projects.map(project => project.id), ["repository:bastion"]);
+});
