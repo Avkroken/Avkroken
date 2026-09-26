@@ -1,6 +1,6 @@
 # Portal v2 — Del 1: verifierad arkitekturbas
 
-**Status:** pågående men arkitekturkontraktet är nu verifierat så långt tillgängliga providerverktyg medger. Repository-/GitHub-state och current GitHub owner-modell är verifierade och implementerade på arbetsgrenen. Cloudflare Workers Preview-buildfelet är löst med explicit fail-closed Preview-konfiguration och `avkroken`, `skvallerbyttan` samt `jobb` bygger verifierat grönt utan production-state. Figma-referensen är identifierad men live-read är verifierat blockerad av Starter-planens MCP call limit. Releaseklassificeringen på current `main` är kompletterad; konkreta taggankare `Bastion v0.24.1` och `Pastebinit v2.4.6` är direkt verifierade via GitHub refs, medan komplett providerlistning av tags/GitHub Releases fortfarande inte exponeras av den tillgängliga GitHub-connectorn.
+**Status:** Del 1-arkitekturkontraktet är verifierat mot current repository-/GitHub-state och dokumenterar kvarvarande externa begränsningar explicit. GitHub owner-modellen är verifierad och implementerad på arbetsgrenen. Cloudflare Workers Preview-buildfelet är löst med explicit fail-closed Preview-konfiguration och `avkroken`, `skvallerbyttan` samt `jobb` bygger verifierat grönt utan production-state. Figma-referensen är identifierad men live-read är verifierat blockerad av Starter-planens MCP call limit; Git/runtime förblir därför designens source of truth. Release/tag-inventeringen är nu providerverifierad via GitHubs publika REST-API för samtliga publika releasekandidater och stödrepo i scope.
 
 **Verifieringsdatum:** 2026-09-26
 
@@ -209,7 +209,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
 | Releaseautomation | Conventional Commit-/SemVer-kontrakt finns, men full release-PR-automation är avsiktligt ej aktiverad | CI-kompatibel least-privilege releaseidentitet eller annan verifierad modell | monorepo + valda repos | write-permission/CI-bypass-risk | Del 3 |
 | Releasekontrakt skiljer mellan repos | Bastion/Politiker/Pastebinit/Docker-idempotent-update har verifierade release-/PR-title-kontrakt; Produkter/Klarspråk har release notes config/Wiki men saknar motsvarande verifierat release-standard/pr-title-kontrakt | Endast faktiskt versionsbara repos får ett konsekvent, repoägt releasekontrakt | fristående repos | inkonsekventa releases | Del 3 |
-| Faktisk tag/releasehistorik | Current-main releasekontrakt är verifierade repo-för-repo. `Bastion v0.24.1` och `Pastebinit v2.4.6` är direkt verifierade som existerande GitHub refs. Bastions current-main-dokumentation anger `v0.24.1` som senast verifierad publicerad release 2026-09-07. Tillgänglig GitHub-connector saknar däremot list-endpoints för tags/Releases, så komplett providerhistorik kan inte hämtas här | Innan releaseautomation införs: kör providerlistning av tags/Releases med en read-capability som faktiskt exponerar dessa endpoints och jämför mot repoägda kontrakt | valda versionsbara repos | fel verktygs-/versionsbeslut om äldre docs behandlas som full historik | Del 3, extern capability-gap |
+| Faktisk tag/releasehistorik | Providerverifierad 2026-09-26 via tillfällig read-only GitHub Actions-inventering mot exakta `blixten85/*`-repos. Ingen publik repo träffade 100-resultatsgränsen. Avkroken 0 releases/0 tags; Bastion 54/54, latest `v0.24.1`; Politiker 72/73, latest `v0.10.5`, extra tag `deployed`; Pastebinit 41/47, latest `v2.4.6`, sex äldre taggar utan Release; Docker-idempotent-update 24/24, latest `v3.3.5`; Produkter 45/46, latest `v1.4.5`, extra tag `deployed`; Klarsprak 7/7, latest `v1.0.6`; `.github` 0/0. Inga draft/prerelease Releases observerades i inventeringen | Använd denna live-bas när Del 3 klassificerar faktisk releaseautomation. Taggar utan Release får inte automatiskt presenteras som officiella Releases | versionsbara repos + publik stöd/governance | låg för historikbasen; kvarvarande risk är att framtida state ändras före Del 3 | Del 3 |
 | Gamnacken som fristående komponent | Namnet används i Skvallerbyttans GitHub App-bindings, men något fristående current repo/app syns inte i den installerade repositorylistan | Dokumentera endast den faktiska kvarvarande rollen efter live-verifiering av GitHub App/providerstate | Skvallerbyttan | stale arkitekturbild | Del 1/3 |
 
 ## 4. C — Beslutad informationsarkitektur
@@ -410,17 +410,22 @@ Verifierad filinventering:
 
 Detta är en **fil-/konfigurationsinventering**, inte bevis på aktuell GitHub Release-/taghistorik.
 
-Kompletterad current-state 2026-09-26:
+Providerverifierad release/tag-state 2026-09-26:
 
-- **Bastion:** repoägt releasekontrakt finns. Current `main` anger senast verifierad publicerad release `v0.24.1` från 2026-09-07; GitHub-ref `v0.24.1` är direkt verifierad genom läsning på taggen.
-- **Pastebinit:** canonical package-version på current `main` är `2.4.6` i `pyproject.toml`; GitHub-ref `v2.4.6` är direkt verifierad och innehåller samma package-version.
-- **Politiker:** repoägt SemVer/GitHub Release-kontrakt finns, men appen har medvetet ingen canonical lokal produktversionsfil och ingen aktiv releaseautomation.
-- **Docker-idempotent-update:** repoägt SemVer-kontrakt finns; `vMAJOR.MINOR.PATCH` är versionsankare och samma tagg korrelerar med GHCR-publicering. Ingen canonical lokal appversionsfil finns.
-- **Produkter:** `.github/release.yml` finns, men inget verifierat repoägt `docs/release-standard.md` eller PR-title-kontrakt hittades på current `main`; behandlas därför inte som releaseautomationsklar.
-- **Klarsprak:** `.github/release.yml` finns och root `package.json` är `private: true` utan produktversion, men inget verifierat repoägt release-standard/PR-title-kontrakt hittades; behandlas därför inte som releaseautomationsklar.
-- **bastion-certificates** och **.github:** stöd/governance, inte versionsbara produktrepos i den verifierade modellen.
+| Repository | Releases | Tags | Senaste Release | Observerad avvikelse |
+| --- | ---: | ---: | --- | --- |
+| Avkroken | 0 | 0 | — | ingen versionerad releasehistorik |
+| Bastion | 54 | 54 | `v0.24.1` — 2026-09-07 | releases och tags matchar |
+| Politiker | 72 | 73 | `v0.10.5` — 2026-09-07 | extra tag `deployed` utan GitHub Release |
+| Pastebinit | 41 | 47 | `v2.4.6` — 2026-09-07 | tag-only: `v2.3.2`, `v2.3.1`, `v2.3.0`, `v2.2.7`, `v2.2.6`, `v2.2.0` |
+| Docker-idempotent-update | 24 | 24 | `v3.3.5` — 2026-09-07 | releases och tags matchar |
+| Produkter | 45 | 46 | `v1.4.5` — 2026-09-07 | extra tag `deployed` utan GitHub Release |
+| Klarsprak | 7 | 7 | `v1.0.6` — 2026-09-07 | releases och tags matchar |
+| .github | 0 | 0 | — | governance/support, ingen releasehistorik |
 
-Den tillgängliga GitHub-connectorn kan läsa refs när taggnamnet redan är känt men saknar list-actions för hela tagg-/GitHub Release-historiken. Därför markeras komplett historik som provider-capability-gap, inte som tom historik.
+Inventeringen läste första 100 Releases och tags per exakt publik repository via GitHub REST. Samtliga resultat hade färre än 100 poster, så inga listor var trunkerade. Inga draft- eller prerelease-Releases observerades. `bastion-certificates` är privat stöd/infrastruktur och ingår inte i den publika releaseinventeringen; den klassificeras inte som versionsbar produkt i denna fas.
+
+Repoägda releasekontrakt är verifierade för Bastion, Politiker, Pastebinit och Docker-idempotent-update. Produkter och Klarsprak har faktisk publicerad releasehistorik men saknar fortfarande verifierat repoägt release-standard/PR-title-kontrakt på current `main`; historiken i sig gör dem därför inte redo för ny releaseautomation.
 
 Innan releaseautomation införs ska varje repository klassificeras som:
 
@@ -439,7 +444,7 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 1. GitHub owner/topologi: **löst** — `blixten85` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
 2. Cloudflare Workers Preview-buildarna är lösta: `avkroken`, `skvallerbyttan` och `jobb` bygger grönt med fail-closed Preview-konfiguration. Portal har isolerad Durable Object-binding; Jobb exponerar endast Browser API-binding; Skvallerbyttan har current owner-var och separat Analytics Engine-dataset. Production-D1/R2/Secrets Store/Service Bindings/Workflows/Email är inte bundna i Preview. Full stateful Preview flyttas till Del 3 och kräver separat provider-resource-provisionering/migrering.
 3. Figma-referensens filidentitet/auth är verifierad; page/component/token-audit återupptas när Starter-planens MCP call limit tillåter reads igen. Detta blockerar inte runtime-arkitekturen eftersom Git är uttrycklig source of truth.
-4. Releaseklassificeringen är verifierad på current `main`. Före faktisk releaseautomation i Del 3 ska komplett providerlistning av tags/GitHub Releases göras via en GitHub read-capability som exponerar dessa endpoints; nuvarande connector gör inte det.
+4. Releaseklassificering och full publik tag/GitHub Release-inventering är providerverifierad 2026-09-26. Del 3 ska utgå från denna bas men göra en ny live-read före automation, eftersom providerstate kan ändras.
 5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `blixten85` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
 
 ### 1. Del 2 — Shell/design/docs som audit
@@ -478,9 +483,9 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | adapter/cachemodell | beslutad | adapters för repo/docs, Skvallerbyttan för operations, separat Jobb backend |
 | public/protected-kontrakt | beslutad | fail-closed före index/cache/datafetch |
 | designsystemplan | verifierad i repo; exakt Figma-fil/auth verifierad, live metadata blockerad av Starter MCP call limit | runtime Git är source of truth |
-| releaseinventering | verifierad för repo-kontrakt/klassificering och kända taggankare; komplett providerhistorik blockerad av connector-capability | Bastion `v0.24.1` + Pastebinit `v2.4.6` direkt verifierade refs; full listning krävs först inför Del 3-automation |
+| releaseinventering | verifierad | komplett publik providerinventering genomförd för Avkroken, Bastion, Politiker, Pastebinit, Docker-idempotent-update, Produkter, Klarsprak och `.github`; repoägda kontrakt separat verifierade |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
-| blockers dokumenterade | verifierad | Cloudflare Preview-build är löst; full stateful Preview är Del 3. Figma live metadata blockeras av Starter MCP call limit. Komplett tag/Release-providerhistorik blockeras av nuvarande GitHub-connectors action-yta. GitHub owner/scope är löst |
+| blockers dokumenterade | verifierad | Cloudflare Preview-build är löst; full stateful Preview är Del 3. Figma live metadata blockeras av Starter MCP call limit men runtime Git är source of truth. Release/tag-providerhistorik är nu verifierad via read-only Actions-inventering. GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
 
 Del 1 får **inte** markeras klar förrän de blockerande live-state-punkterna ovan är verifierade eller uttryckligen lösta genom ett förankrat arkitekturbeslut.
