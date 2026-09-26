@@ -6,11 +6,11 @@ permalink: /project-context/
 
 # Projektkontext
 
-Senast verifierad för Portalens repository-CI-integration: 2026-09-25.
+Senast verifierad för GitHub owner-/Portalintegrationen: 2026-09-26.
 
 ## Repository
 
-- repository: `Avkroken/Avkroken`
+- repository: `blixten85/Avkroken`
 - app path: `apps/skvallerbyttan`
 - default branch: `main`
 - runtime: TypeScript Cloudflare Worker
@@ -44,7 +44,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 
 - **GitHub App-auth:** koden använder `GAMNACKEN_GITHUB_APP_*`-bindings för read-only GitHub-observationer. Faktisk App-installation och eventuell äldre App-state är extern GitHub-state.
 - **GitHub OAuth:** interaktiv login går direkt mot GitHub med state, PKCE S256 och numerisk GitHub-ID-allowlist.
-- **GitHub webhook-ingress:** runtime implementerar organization-webhookformatet för Activity, security ledger och cache invalidation; faktisk hookkonfiguration är extern GitHub-state.
+- **GitHub webhook-ingress:** runtime verifierar signerade provider-webhooks och begränsar accepterade repositoryevents till konfigurerad owner `blixten85` via `organization.login` eller `repository.owner.login`; faktisk hookkonfiguration är extern GitHub-state.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
 - **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en public-safe snapshot av provider health och capability status/dataState/freshness/last-success.
@@ -55,7 +55,7 @@ GitHub REST API-version: `2026-03-10`.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration read får användas där GitHub kräver den nivån. Repository effective rulesets används med Metadata read.
 
-Var 15:e minut körs en begränsad GitHub capability-reconciliation för repository inventory, verkliga PR/issues-reads, Actions, organization security alerts och repository effective rulesets. PR/issues, Actions och effective rulesets persisteras per repository och aggregeras med explicit scope coverage. Capability freshness för dessa ytor är 20 minuter så normal 15-minuterskadens inte växlar till stale mellan körningarna.
+Var 15:e minut körs en begränsad GitHub capability-reconciliation för GitHub App-installationens repository inventory, verkliga PR/issues-reads, Actions och repository effective rulesets. Organization-only security/governance-capabilities returnerar `not_supported` när installationens account type är User. PR/issues, Actions och effective rulesets persisteras per repository och aggregeras med explicit scope coverage. Capability freshness för dessa ytor är 20 minuter så normal 15-minuterskadens inte växlar till stale mellan körningarna.
 
 Runtime behåller endast sanerad GitHub App-permissionmetadata från installationen/tokenen och endpointens `X-Accepted-GitHub-Permissions`; inga token- eller private-key-värden exponeras.
 
@@ -82,7 +82,7 @@ Downstream-tjänster får inte behöva duplicera providerautentisering enbart f�
 För publik repositorydokumentation:
 
 1. GitHub levererar `push`/`repository` till Skvallerbyttan.
-2. Skvallerbyttan verifierar webhooksignaturen och organisationsgränsen.
+2. Skvallerbyttan verifierar webhooksignaturen och owner-gränsen.
 3. Relevanta docs-events signaleras till deklarerat service target `avkroken` genom Service Bindingen `AVKROKEN_PORTAL_DOCS`.
 4. Portalens `DocsInvalidationService` purgar endast `docs-catalog` och berörda `docs-repo-*` cache-tags.
 5. Activity/deduplication ligger fortsatt i Skvallerbyttan; portalen blir inte ett parallellt eventlager.
@@ -103,7 +103,7 @@ För operativ drift gäller dessutom:
 8. Den generella Drift-snapshoten skickar inte scope coverage/repositoryantal eller organisationsomfattande Activity/eventvolym till Portalen.
 9. För repository-CI läser `getPublicRepositoryCi()` endast D1 source cache-keyn `overview`; repoName måste matcha en cachead rad med `visibility = public` och `archived != true`.
 10. CI-RPC:n returnerar sampled Actions-summary och `sourceRefreshedAt`/freshness, men inte actor, provider-permissions/fel, event breakdown eller rå runpayload. Saknad cache är `not_observed`, inte healthy.
-11. För Portal-Activity tar `getPublicActivity()` endast bounded repositorykortnamn, intersectar dem med cachead publik/icke-arkiverad `overview`, och queryar därefter D1-ledgern med explicit repositoryfilter. En explicit lista som blir tom fail-closed och kan inte bli en organisationsvid query.
+11. För Portal-Activity tar `getPublicActivity()` endast bounded repositorykortnamn, intersectar dem med cachead publik/icke-arkiverad `overview`, och queryar därefter D1-ledgern med explicit repositoryfilter. En explicit lista som blir tom fail-closed och kan inte bli en owner-wide query.
 12. Activity-RPC:n returnerar endast GitHub aggregate counts/coverage och sanerade repositoryevents utan `resourceId`, actor eller rå payload. Endast capabilities `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions` får publiceras; security, Custom Properties och effective-ruleset-events filtreras bort. Cloudflare account-/org-events går inte genom detta kontrakt.
 
 ## Data
