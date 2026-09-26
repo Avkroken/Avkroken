@@ -48,7 +48,7 @@ User-owner-modellen är därför implementerad på Del 1-arbetet:
 - GitHub App-installationen valideras genom current canonical repository `blixten85/Avkroken`;
 - `SKVALLERBYTTAN_GITHUB_OWNER=blixten85` är current config, med legacy `SKVALLERBYTTAN_ORG` endast som kompatibilitetsfallback;
 - organization-only Actions policies, Custom Properties och organization security configuration markeras explicit `not_supported` när GitHub App-installationens account type är User, i stället för att 404 behandlas som okänd providerstate;
-- motsvarande Pages/Wiki-spegeländring ligger separat i `blixten85/.github` PR #89.
+- motsvarande Pages/Wiki-spegeländring är mergad i `blixten85/.github` via PR #89.
 
 Det planerade username-bytet omkring 6–7 oktober ändrar inte account type. Om kontot fortsatt är ett GitHub User-konto ska organization-only capabilities därför fortsatt vara `not_supported` efter namnbytet. Oktoberjobbet ska huvudsakligen uppdatera current owner-värden/canonical länkar och därefter verifiera GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden.
 
@@ -203,7 +203,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
-| GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och spegeln på `.github` PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
+| GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
 | Cloudflare live deployment | Repository-konfiguration är läst, men account/Worker/routes/Access/service bindings/D1 jurisdiction kunde inte läsas live från tillgängliga verktyg | Live-state verifierad mot Cloudflare före driftändringar | Portal + Skvallerbyttan + Jobb | hög vid driftändring | Del 3 blocker |
 | Figma live reference | Runtime-designsystem och repo-dokumentation är läst; Figma MCP stoppades av verktygets plan/rate limit | Figma-referensens aktuella pages/components/tokens verifierade när connectorn åter är tillgänglig | Portal design | låg för runtime, eftersom Git är runtime source of truth; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
