@@ -50,7 +50,8 @@ export type PortalActivitySnapshot = {
   }>;
 };
 
-const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9_.-]+$/;
+const OWNER = /^[A-Za-z0-9_.-]+$/;
+const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
 const PUBLIC_CAPABILITIES = new Set([
   "github.avkroken.repositories",
   "github.avkroken.pull_requests",
@@ -128,12 +129,13 @@ function allowedRepositories(
   repositoryNames: readonly string[],
 ): Map<string, string> {
   const result = new Map<string, string>();
+  const owner = organization.trim();
+  if (!OWNER.test(owner) || owner === "." || owner === "..") return result;
 
   for (const value of repositoryNames.slice(0, 50)) {
     const name = safeText(value, 120);
-    if (!name || !/^[A-Za-z0-9_.-]+$/.test(name) || name === "." || name === "..") continue;
-    const fullName = organization + "/" + name;
-    if (!PUBLIC_REPOSITORY.test(fullName)) continue;
+    if (!name || !REPOSITORY_NAME.test(name) || name === "." || name === "..") continue;
+    const fullName = owner + "/" + name;
     result.set(name, fullName);
   }
 
