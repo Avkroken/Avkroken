@@ -115,9 +115,40 @@ function capability<T>(key: string, result: OptionalResult<T>): Record<string, u
   };
 }
 
+function githubProviderFailure(error: unknown): OptionalResult<never> {
+  return {
+    available: false,
+    value: null,
+    status: 0,
+    reason: error instanceof Error ? error.message : String(error),
+    acceptedPermissions: null,
+  };
+}
+
 async function getSecurityOverview(env: Env): Promise<SecurityOverview> {
   const org = organization(env);
-  const installation = await getGitHubInstallationMetadataLive(env);
+  let installation: Awaited<ReturnType<typeof getGitHubInstallationMetadataLive>>;
+  try {
+    installation = await getGitHubInstallationMetadataLive(env);
+  } catch (error) {
+    const unavailable = githubProviderFailure(error);
+    return {
+      codeScanning: { available: false, count: 0, severities: {}, truncated: false },
+      dependabot: { available: false, count: 0, severities: {}, truncated: false },
+      secretScanning: { available: false, count: 0, truncated: false },
+      byRepo: {},
+      capabilities: [
+        capability("code-scanning", unavailable),
+        capability("dependabot", unavailable),
+        capability("secret-scanning", unavailable),
+      ],
+      observations: [
+        readObservation(org, unavailable),
+        readObservation(org, unavailable),
+        readObservation(org, unavailable),
+      ],
+    };
+  }
   if (installation.accountType?.toLowerCase() === "user") {
     const unsupported = (): CapabilityScopeObservationInput => ({
       scopeId: org,
