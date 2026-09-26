@@ -7,11 +7,11 @@ async function readWranglerConfig() {
 }
 
 describe("Worker Preview contract", () => {
-  it("auto-provisions isolated state without production credentials or automation bindings", async () => {
+  it("stays fail-closed until isolated state resources are provisioned", async () => {
     const config = await readWranglerConfig();
 
-    expect(config.previews?.d1_databases).toEqual([{ binding: "DB" }]);
-    expect(config.previews?.r2_buckets).toEqual([{ binding: "EVIDENCE" }]);
+    expect(config.previews?.d1_databases).toBeUndefined();
+    expect(config.previews?.r2_buckets).toBeUndefined();
     expect(config.previews?.browser).toEqual({ binding: "BROWSER" });
 
     expect(config.previews?.secrets_store_secrets).toBeUndefined();
