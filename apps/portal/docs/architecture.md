@@ -124,7 +124,7 @@ GET /api/changelog
 
 Eligibility läses live och går inte via den femminuters `/api/projects`-cachen. Det minskar risken att en nyligen avpublicerad repositoryidentitet används för en releasefetch med en credential som fortfarande har access.
 
-`release-source.mjs` accepterar endast repositoryprojekt under `Avkroken/*`. Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
+`release-source.mjs` accepterar endast repositoryprojekt som matchar Portalens current owner-kontrakt i `github-scope.mjs` (`GITHUB_OWNER/<repo>`). Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
 
 Providerarbetet är bounded: högst 24 repos, 10 releaser/repo, concurrency 4 och 40 returnerade poster. `bounded` betyder den definierade budgeten; `partial` används vid repo-cap eller release-fetchfel. Ingen persistent Changelog-cache används.
 
@@ -440,7 +440,7 @@ Publiceringsgränsen är tvåstegad:
 1. slugen måste först resolvea till ett repositoryprojekt i den aktuella publika project-katalogen;
 2. providerresultatet passerar `normalizePublicIssues` innan något lämnar Workern.
 
-`issue-source.mjs` kräver canonical `Avkroken/<repo>` och canonical `https://github.com/Avkroken/<repo>/issues/<number>`. Poster med `pull_request` filtreras bort. Endast number/title/state/timestamps/comments/labelnamn och canonical navigation publiceras.
+`issue-source.mjs` kräver ett repository som matchar Portalens current owner-kontrakt och en canonical Issue-URL under exakt samma `owner/repo` som projektposten. Poster med `pull_request` filtreras bort. Endast number/title/state/timestamps/comments/labelnamn och canonical navigation publiceras.
 
 Monorepo-appar har `issues = null` och `issuesPortalUrl = null` och kan inte ärva source-repositoryts Issuehistorik.
 

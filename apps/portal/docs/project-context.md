@@ -168,12 +168,12 @@ Tar katalognyckel + route-path, kräver exakt träff i den publika katalogposten
 
 ### `/api/changelog`
 
-Changelog byggs från aktuell public project-state, men endast poster med `type = repository`, `source.provider = github`, `source.kind = repository` och ett canonical `Avkroken/<repo>`-source-repository får användas.
+Changelog byggs från aktuell public project-state, men endast poster med `type = repository`, `source.provider = github`, `source.kind = repository` och ett source-repository som matchar Portalens current owner-kontrakt i `github-scope.mjs` får användas.
 
 För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
 
 - filtrerar alltid bort `draft = true`, även om den använda GitHub-credentialen skulle kunna se drafts;
-- kräver canonical `https://github.com/Avkroken/<repo>/releases/tag/...`-URL;
+- kräver en canonical `https://github.com/<current-owner>/<repo>/releases/tag/...`-URL som exakt matchar projektpostens repository;
 - kräver `tag_name` och giltig `published_at`;
 - publicerar endast project slug/name/Portal-URL, repository, tagg/namn, publiceringstid, release-URL, `prerelease` och en bounded `categories`-lista;
 - härleder Changelog-kategorier endast från exakta Markdown-sektionsrubriker i release body: Features, Bug Fixes/Fixes, Security och Documentation/Docs; alla poster får dessutom kategorin Releases;
@@ -205,7 +205,7 @@ Endpointen använder aktuell public project-state och accepterar endast poster s
 
 Providerread:
 
-- exakt `Avkroken/<repo>` från den redan validerade project-posten;
+- exakt `owner/repo` från den redan validerade project-posten, där owner måste matcha Portalens current owner-kontrakt;
 - `state=all`, sorterad efter senaste uppdatering;
 - max 30 providerposter;
 - GitHubs PR-poster filtreras genom `pull_request`-fältet.
