@@ -1,6 +1,6 @@
-# Engineering context för Avkroken/Avkroken
+# Engineering context för blixten85/Avkroken
 
-Det här dokumentet beskriver **repository-deklarerad** engineering-, CI- och dokumentationsstruktur för `Avkroken/Avkroken`.
+Det här dokumentet beskriver **repository-deklarerad** engineering-, CI- och dokumentationsstruktur för `blixten85/Avkroken`.
 
 Det är inte en organisationsövergripande engineeringkälla för andra Avkroken-repositories.
 
@@ -8,7 +8,7 @@ Extern GitHub-/Cloudflare-state — exempelvis plan, aktiva rulesets, webhookkon
 
 ## Repositorystruktur
 
-`Avkroken/Avkroken` är ett publikt monorepository med applikationer under `apps/`.
+`blixten85/Avkroken` är ett publikt monorepository med applikationer under `apps/`.
 
 Publikt versionsstyrda applikationsytor omfattar:
 
@@ -18,7 +18,7 @@ Publikt versionsstyrda applikationsytor omfattar:
 
 Fristående publika Avkroken-repositories har sin egen kod, dokumentation, Wiki, Issues, Discussions och CI.
 
-`Avkroken/.github` är separat för organisationsprofil/community health och kan bära en genererad dokumentationsspegel.
+`blixten85/.github` är separat för organisationsprofil/community health och kan bära en genererad dokumentationsspegel.
 
 ## Repository-lokal CI
 
