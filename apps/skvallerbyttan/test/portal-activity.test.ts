@@ -99,7 +99,7 @@ function observed(overrides: Record<string, unknown> = {}) {
 test("Portal activity snapshot publishes only allowed GitHub repository events", () => {
   const snapshot = buildPortalActivitySnapshot({
     generatedAt: "2026-09-25T12:01:00Z",
-    organization: "Avkroken",
+    organization: "blixten85",
     repositoryNames: ["Bastion"],
     observed: observed(),
   });
@@ -120,7 +120,7 @@ test("Portal activity snapshot publishes only allowed GitHub repository events",
   }]);
   assert.equal(snapshot.recent.length, 1);
   assert.deepEqual(snapshot.recent[0], {
-    repository: "Avkroken/Bastion",
+    repository: "blixten85/Bastion",
     capability: "github.avkroken.actions",
     source: "webhook",
     coverage: "since_first_observation",
@@ -151,7 +151,7 @@ test("Portal activity snapshot publishes only allowed GitHub repository events",
 test("Portal activity snapshot preserves coverage semantics without claiming completeness", () => {
   const snapshot = buildPortalActivitySnapshot({
     generatedAt: "2026-09-25T12:01:00Z",
-    organization: "Avkroken",
+    organization: "blixten85",
     repositoryNames: ["Bastion"],
     observed: observed(),
   });
@@ -165,7 +165,7 @@ test("Portal activity snapshot preserves coverage semantics without claiming com
 test("Portal activity snapshot hides provider error details", () => {
   const unavailable = buildPortalActivitySnapshot({
     generatedAt: "2026-09-25T12:01:00Z",
-    organization: "Avkroken",
+    organization: "blixten85",
     repositoryNames: ["Bastion"],
     observed: {
       available: false,
@@ -180,7 +180,7 @@ test("Portal activity snapshot hides provider error details", () => {
 
   const notConfigured = buildPortalActivitySnapshot({
     generatedAt: "2026-09-25T12:01:00Z",
-    organization: "Avkroken",
+    organization: "blixten85",
     repositoryNames: ["Bastion"],
     observed: {
       available: false,
@@ -194,7 +194,7 @@ test("Portal activity snapshot hides provider error details", () => {
 
   const notObserved = buildPortalActivitySnapshot({
     generatedAt: "2026-09-25T12:01:00Z",
-    organization: "Avkroken",
+    organization: "blixten85",
     repositoryNames: [],
     observed: {
       available: false,
