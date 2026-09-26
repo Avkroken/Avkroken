@@ -106,7 +106,10 @@ function bump(target: Record<string, number>, severity: string | null | undefine
   target[key] = (target[key] ?? 0) + 1;
 }
 
-function capability<T>(key: string, result: OptionalResult<T>): Record<string, unknown> {
+function capability<T>(
+  key: string,
+  result: OptionalResult<T>,
+): SecurityOverview["capabilities"][number] {
   return {
     key,
     available: result.available,
