@@ -4,6 +4,7 @@ Det här är dokumentationsindex för `apps/portal`.
 
 - [Projektkontext](project-context.md)
 - [Arkitektur](architecture.md)
+- [Portal v2 — Del 1: verifierad arkitekturbas](portal-v2-architecture-contract.md)
 - [Drift](operations.md)
 - [Designsystem](design-system.md)
 
