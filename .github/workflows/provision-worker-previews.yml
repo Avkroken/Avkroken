@@ -1,0 +1,134 @@
+name: Provision Worker Preview resources
+
+on:
+  push:
+    branches:
+      - chatgpt/portal-v2-architecture/2026-09-26/14-18-del1
+    paths:
+      - .github/workflows/provision-worker-previews.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provision-worker-preview-resources
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    name: Provision isolated Preview resources
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_W1 }}
+      CLOUDFLARE_ACCOUNT_ID: b74f8c0c6a92f3006483840cf27372fd
+      WRANGLER_VERSION: 4.136.3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Validate existing deploy credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${CLOUDFLARE_API_TOKEN:-}" ]] || {
+            echo "::error::CLOUDFLARE_API_TOKEN_W1 is not configured."
+            exit 1
+          }
+
+      - name: Provision D1 databases
+        id: d1
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 list --json > /tmp/d1-list.json
+
+          ensure_d1() {
+            local name="$1"
+            local existing
+            existing="$(jq -r --arg name "$name" '.[] | select(.name == $name) | (.uuid // .id)' /tmp/d1-list.json | head -n1)"
+
+            if [[ -z "$existing" || "$existing" == "null" ]]; then
+              echo "Creating D1 database: $name"
+              npx --yes "wrangler@${WRANGLER_VERSION}" d1 create "$name" --jurisdiction eu
+            else
+              echo "Reusing D1 database: $name"
+            fi
+
+            npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$name" --json
+          }
+
+          ensure_d1 "jobb-preview-eu" > /tmp/jobb-d1.json
+          ensure_d1 "skvallerbyttan-preview-eu" > /tmp/skvallerbyttan-d1.json
+
+          JOBB_D1_ID="$(jq -r '(.uuid // .id) // empty' /tmp/jobb-d1.json)"
+          SKVALLERBYTTAN_D1_ID="$(jq -r '(.uuid // .id) // empty' /tmp/skvallerbyttan-d1.json)"
+
+          [[ -n "$JOBB_D1_ID" ]] || { echo "::error::Could not resolve jobb-preview-eu ID"; exit 1; }
+          [[ -n "$SKVALLERBYTTAN_D1_ID" ]] || { echo "::error::Could not resolve skvallerbyttan-preview-eu ID"; exit 1; }
+
+          echo "jobb_d1_id=$JOBB_D1_ID" >> "$GITHUB_OUTPUT"
+          echo "skvallerbyttan_d1_id=$SKVALLERBYTTAN_D1_ID" >> "$GITHUB_OUTPUT"
+
+          echo "jobb-preview-eu id: $JOBB_D1_ID"
+          echo "skvallerbyttan-preview-eu id: $SKVALLERBYTTAN_D1_ID"
+
+      - name: Apply Preview D1 migrations
+        shell: bash
+        env:
+          JOBB_D1_ID: ${{ steps.d1.outputs.jobb_d1_id }}
+          SKVALLERBYTTAN_D1_ID: ${{ steps.d1.outputs.skvallerbyttan_d1_id }}
+        run: |
+          set -euo pipefail
+
+          cat > apps/jobb/wrangler.preview-migrations.jsonc <<EOF
+          {
+            "d1_databases": [
+              {
+                "binding": "PREVIEW_DB",
+                "database_name": "jobb-preview-eu",
+                "database_id": "$JOBB_D1_ID",
+                "migrations_dir": "migrations"
+              }
+            ]
+          }
+          EOF
+
+          cat > apps/skvallerbyttan/wrangler.preview-migrations.jsonc <<EOF
+          {
+            "d1_databases": [
+              {
+                "binding": "PREVIEW_DB",
+                "database_name": "skvallerbyttan-preview-eu",
+                "database_id": "$SKVALLERBYTTAN_D1_ID",
+                "migrations_dir": "migrations"
+              }
+            ]
+          }
+          EOF
+
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations apply PREVIEW_DB --remote --config apps/jobb/wrangler.preview-migrations.jsonc
+          npx --yes "wrangler@${WRANGLER_VERSION}" d1 migrations apply PREVIEW_DB --remote --config apps/skvallerbyttan/wrangler.preview-migrations.jsonc
+
+      - name: Provision R2 bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if npx --yes "wrangler@${WRANGLER_VERSION}" r2 bucket info jobb-preview-evidence --jurisdiction eu --json > /tmp/jobb-r2.json 2>/tmp/jobb-r2.err; then
+            echo "Reusing R2 bucket: jobb-preview-evidence"
+          else
+            echo "Creating R2 bucket: jobb-preview-evidence"
+            cat /tmp/jobb-r2.err || true
+            npx --yes "wrangler@${WRANGLER_VERSION}" r2 bucket create jobb-preview-evidence --jurisdiction eu
+            npx --yes "wrangler@${WRANGLER_VERSION}" r2 bucket info jobb-preview-evidence --jurisdiction eu --json > /tmp/jobb-r2.json
+          fi
+
+          echo "jobb Preview R2 bucket: jobb-preview-evidence"
+          jq '{name, jurisdiction, location}' /tmp/jobb-r2.json || cat /tmp/jobb-r2.json
