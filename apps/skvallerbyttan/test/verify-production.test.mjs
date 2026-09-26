@@ -145,13 +145,13 @@ test("repository wrangler config satisfies the deployment contract", async () =>
 });
 
 
-test("repository Preview config uses isolated state and no production provider bindings", async () => {
+test("repository Preview config stays fail-closed without production provider state", async () => {
   const raw = await import("node:fs/promises").then(({ readFile }) =>
     readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
   );
   const value = JSON.parse(raw);
 
-  assert.deepEqual(value.previews?.d1_databases, [{ binding: "STATS_DB" }]);
+  assert.equal(value.previews?.d1_databases, undefined);
   assert.deepEqual(value.previews?.analytics_engine_datasets, [
     { binding: "OBSERVABILITY", dataset: "skvallerbyttan_preview" }
   ]);
