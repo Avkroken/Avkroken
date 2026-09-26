@@ -36,7 +36,7 @@ function json(res, value, status = 200) {
 function apiFixture(pathname) {
   if (pathname === "/api/projects") {
     return {
-      source: { provider: "github", scope: "Avkroken", coverage: "active_public_repositories" },
+      source: { provider: "github", scope: "blixten85", coverage: "active_public_repositories" },
       generatedAt: now,
       projects: [],
     };
