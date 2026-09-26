@@ -82,7 +82,7 @@ async function observeGitHubProbe(env: Env): Promise<boolean> {
   await recordCapabilityObservation(env, "github.avkroken.repositories", {
     status: result.available ? "available" : denied ? "permission_denied" : "error",
     permissionState: result.available ? "granted" : denied ? "permission_denied" : "unknown",
-    dataState: result.available ? "available" : "error",
+    dataState: result.available ? "available" : denied ? "unavailable" : "error",
     httpStatus: result.status,
     error: result.available ? null : result.status === 0 ? "github-provider-request-failed" : `github-http-${result.status}`,
     acceptedPermissions: result.acceptedPermissions,
