@@ -69,5 +69,15 @@
       "service": "skvallerbyttan",
       "entrypoint": "PortalObservationsService"
     }
-  ]
+  ],
+  "previews": {
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "OPS_WATCHDOG",
+          "class_name": "OperationalWatchdog"
+        }
+      ]
+    }
+  }
 }
