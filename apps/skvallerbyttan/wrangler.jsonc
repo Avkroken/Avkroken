@@ -128,11 +128,6 @@
     "vars": {
       "SKVALLERBYTTAN_GITHUB_OWNER": "blixten85"
     },
-    "d1_databases": [
-      {
-        "binding": "STATS_DB"
-      }
-    ],
     "analytics_engine_datasets": [
       {
         "binding": "OBSERVABILITY",
