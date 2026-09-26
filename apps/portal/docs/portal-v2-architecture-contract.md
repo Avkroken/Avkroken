@@ -204,7 +204,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
 | GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
-| Cloudflare live deployment | Repository-konfiguration är läst, men account/Worker/routes/Access/service bindings/D1 jurisdiction kunde inte läsas live från tillgängliga verktyg | Live-state verifierad mot Cloudflare före driftändringar | Portal + Skvallerbyttan + Jobb | hög vid driftändring | Del 3 blocker |
+| Cloudflare live deployment | Repository-konfiguration är läst och GitHub CI/dry-run är grön, men Cloudflare Workers Builds preview fallerar på samma PR-head för `avkroken`, `skvallerbyttan` och `jobb`; buildlogg/account/Worker/routes/Access/service bindings/D1 jurisdiction kan inte läsas live från tillgängliga verktyg | Verifiera Cloudflare buildlogg och live-state före merge/driftändring | Portal + Skvallerbyttan + Jobb | hög; gemensamt provider-/previewlager är misstänkt men rotorsak är inte verifierad | Del 1/3 blocker |
 | Figma live reference | Runtime-designsystem och repo-dokumentation är läst; Figma MCP stoppades av verktygets plan/rate limit | Figma-referensens aktuella pages/components/tokens verifierade när connectorn åter är tillgänglig | Portal design | låg för runtime, eftersom Git är runtime source of truth; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
 | Releaseautomation | Conventional Commit-/SemVer-kontrakt finns, men full release-PR-automation är avsiktligt ej aktiverad | CI-kompatibel least-privilege releaseidentitet eller annan verifierad modell | monorepo + valda repos | write-permission/CI-bypass-risk | Del 3 |
@@ -425,7 +425,7 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 ### 0. Slutför Del 1-blockers
 
 1. GitHub owner/topologi: **löst** — `blixten85` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
-2. Verifiera Cloudflare live-state: Worker deployments, custom domains/routes, Service Bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
+2. Verifiera Cloudflare live-state och de aktuella failed Workers Builds-previewkörningarna för `avkroken`, `skvallerbyttan` och `jobb`: buildkommando, previewkommando, root directory/watch paths, Worker deployments, custom domains/routes, Service Bindings, preview-bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
 3. Verifiera Figma-referensen när connectorn åter tillåter reads.
 4. Komplettera live release/tag-inventering för de repos som faktiskt ska vara versionsbara.
 5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `blixten85` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
@@ -468,7 +468,7 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | designsystemplan | verifierad i repo, Figma live blockerad | runtime Git är source of truth |
 | releaseinventering | delvis verifierad | kontrakt/config inventerade; full provider tag/releasehistorik kvar |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
-| blockers dokumenterade | verifierad | Cloudflare live, Figma live och full release/tag-liveinventering återstår; GitHub owner/scope är löst |
+| blockers dokumenterade | verifierad | Cloudflare live/Workers Builds preview, Figma live och full release/tag-liveinventering återstår; GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
 
 Del 1 får **inte** markeras klar förrän de blockerande live-state-punkterna ovan är verifierade eller uttryckligen lösta genom ett förankrat arkitekturbeslut.
