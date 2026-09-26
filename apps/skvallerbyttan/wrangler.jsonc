@@ -123,5 +123,21 @@
       "persist": true
     }
   },
-  "account_id": "b74f8c0c6a92f3006483840cf27372fd"
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "previews": {
+    "vars": {
+      "SKVALLERBYTTAN_GITHUB_OWNER": "blixten85"
+    },
+    "d1_databases": [
+      {
+        "binding": "STATS_DB"
+      }
+    ],
+    "analytics_engine_datasets": [
+      {
+        "binding": "OBSERVABILITY",
+        "dataset": "skvallerbyttan_preview"
+      }
+    ]
+  }
 }
