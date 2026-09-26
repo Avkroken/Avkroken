@@ -53,7 +53,7 @@ CF Audit Logs ──────────────┘
 
 Provider-events ska ha **en canonical ingress**: Skvallerbyttan. Fronten på `avkroken.denied.se` ska inte behöva GitHub- eller Cloudflare-webhookhemligheter för att reagera på observerade händelser.
 
-När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen deklarerar service target `avkroken` och RPC-entrypointen `DocsInvalidationService` (portalens källkod ligger i `Avkroken/Avkroken/apps/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
+När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositoryts publika default branch, signalerar Skvallerbyttan Avkroken-portalen genom Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS`. Bindingen deklarerar service target `avkroken` och RPC-entrypointen `DocsInvalidationService` (portalens källkod ligger i samma monorepo under `apps/portal`). Anropet går internt inom Cloudflare-kontot och exponerar ingen publik intern endpoint eller ytterligare secret.
 
 Repository-events signalerar också portalens dokumentationskatalog, inklusive tidigare repositorynamn vid rename. Service-signalen sker före webhook-dedupliceringen så en manuell GitHub-redelivery kan reparera en tidigare misslyckad portalinvalidering utan att dubbellagra Activity-eventet.
 
@@ -131,7 +131,7 @@ D1 api_cache["overview"]
         v
 PortalObservationsService.getPublicRepositoryCi(repo)
         |
-        +--> exact Avkroken/<repo>
+        +--> exact <configured-owner>/<repo>
         +--> visibility = public
         +--> archived != true
         +--> capability.actions = true
