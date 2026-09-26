@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { organization } from "./env";
 import {
+  getGitHubInstallationMetadataLive,
   githubListAll,
   githubOptionalJson,
   mapLimit,
@@ -50,6 +51,16 @@ function safeObject(value: unknown, depth = 0): unknown {
     output[key] = safeObject(item, depth + 1);
   }
   return output;
+}
+
+function notSupportedSection(reason = "github_user_account_has_no_organization_scope"): Record<string, unknown> {
+  return {
+    status: "not_supported",
+    available: false,
+    httpStatus: null,
+    acceptedPermissions: null,
+    reason,
+  };
 }
 
 function section<T>(result: OptionalResult<T> | ListResult<T>): Record<string, unknown> {
@@ -208,6 +219,41 @@ export function normalizeSecurityConfiguration(value: unknown): Record<string, u
 
 export async function getGitHubOrganizationGovernance(env: Env): Promise<Record<string, unknown>> {
   const org = organization(env);
+  const installation = await getGitHubInstallationMetadataLive(env);
+  if (installation.accountType?.toLowerCase() === "user") {
+    const observation = {
+      status: "not_supported" as const,
+      permissionState: "not_required" as const,
+      dataState: "not_supported" as const,
+      httpStatus: null,
+      error: "github-user-account-has-no-organization-scope",
+      acceptedPermissions: null,
+    };
+    await Promise.all([
+      recordCapabilityObservation(env, "github.avkroken.organization.actions_permissions", observation),
+      recordCapabilityObservation(env, "github.avkroken.custom_properties", observation),
+      recordCapabilityObservation(env, "github.avkroken.security_configurations", observation),
+    ]);
+    return {
+      schemaVersion: 2,
+      generatedAt: new Date().toISOString(),
+      organization: org,
+      accountType: installation.accountType,
+      actions: {
+        permissions: notSupportedSection(),
+        selectedActions: notSupportedSection(),
+        workflowPermissions: notSupportedSection(),
+      },
+      customProperties: {
+        definitions: notSupportedSection(),
+        assignments: notSupportedSection(),
+      },
+      securityConfigurations: {
+        configurations: notSupportedSection(),
+        defaults: notSupportedSection(),
+      },
+    };
+  }
   const encoded = encodeURIComponent(org);
   const [
     actionsPermissions,
@@ -276,14 +322,20 @@ export async function loadGitHubRepositoryEffectivePolicy(
   const scopeId = `${org}/${repoName}`;
   const encodedRepo = `${encodeURIComponent(org)}/${encodeURIComponent(repoName)}`;
   const retrievedAt = new Date().toISOString();
-  const [rulesets, actions, selectedActions, workflowPermissions, properties, securityConfiguration] = await Promise.all([
+  const installation = await getGitHubInstallationMetadataLive(env);
+  const organizationOwned = installation.accountType?.toLowerCase() !== "user";
+  const [rulesets, actions, selectedActions, workflowPermissions] = await Promise.all([
     githubListAll<UnknownRecord>(env, `/repos/${encodedRepo}/rulesets?includes_parents=true&per_page=100`, 5),
     githubOptionalJson<UnknownRecord>(env, `/repos/${encodedRepo}/actions/permissions`),
     githubOptionalJson<UnknownRecord>(env, `/repos/${encodedRepo}/actions/permissions/selected-actions`),
     githubOptionalJson<UnknownRecord>(env, `/repos/${encodedRepo}/actions/permissions/workflow`),
-    githubOptionalJson<unknown[]>(env, `/repos/${encodedRepo}/properties/values`),
-    githubOptionalJson<UnknownRecord>(env, `/repos/${encodedRepo}/code-security-configuration`),
   ]);
+  const [properties, securityConfiguration] = organizationOwned
+    ? await Promise.all([
+      githubOptionalJson<unknown[]>(env, `/repos/${encodedRepo}/properties/values`),
+      githubOptionalJson<UnknownRecord>(env, `/repos/${encodedRepo}/code-security-configuration`),
+    ])
+    : [null, null];
 
   let rulesetObservation = resultObservation(scopeId, rulesets);
   let normalizedRulesets: Record<string, unknown>[] = [];
@@ -325,15 +377,17 @@ export async function loadGitHubRepositoryEffectivePolicy(
     );
   }
 
-  const security = securityConfiguration.available
-    ? {
-      ...section(securityConfiguration),
-      value: {
-        status: text(securityConfiguration.value.status),
-        configuration: normalizeSecurityConfiguration(securityConfiguration.value.configuration),
-      },
-    }
-    : section(securityConfiguration);
+  const security = securityConfiguration
+    ? securityConfiguration.available
+      ? {
+        ...section(securityConfiguration),
+        value: {
+          status: text(securityConfiguration.value.status),
+          configuration: normalizeSecurityConfiguration(securityConfiguration.value.configuration),
+        },
+      }
+      : section(securityConfiguration)
+    : notSupportedSection();
 
   const value = {
     schemaVersion: 2,
@@ -356,15 +410,17 @@ export async function loadGitHubRepositoryEffectivePolicy(
         selectedActions: section(selectedActions),
         workflowPermissions: section(workflowPermissions),
       },
-      customProperties: properties.available
-        ? {
-          ...section(properties),
-          value: array(properties.value).map((propertyValue) => {
-            const item = record(propertyValue) ?? {};
-            return { property: text(item.property_name), value: safeObject(item.value), derived: false };
-          }),
-        }
-        : section(properties),
+      customProperties: properties
+        ? properties.available
+          ? {
+            ...section(properties),
+            value: array(properties.value).map((propertyValue) => {
+              const item = record(propertyValue) ?? {};
+              return { property: text(item.property_name), value: safeObject(item.value), derived: false };
+            }),
+          }
+          : section(properties)
+        : notSupportedSection(),
       securityConfiguration: security,
     },
   };
