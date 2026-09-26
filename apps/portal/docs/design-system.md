@@ -98,7 +98,19 @@ Ytor använder lågmälda borders och begränsade shadows. Accentglow ska vara s
 
 Figma-referensen använder Inter för shell och informationsytor.
 
-Nivåer:
+Runtimekontraktet finns i `public/tokens.css`:
+
+- `--ak-font-sans` — Inter med systemfontfallback;
+- `--ak-font-mono` — monospace för käll-/teknikmetadata;
+- `--ak-type-display-size`;
+- `--ak-type-heading-1-size`;
+- `--ak-type-heading-2-size`;
+- `--ak-type-body-size`;
+- `--ak-type-small-size`;
+- `--ak-type-label-size`;
+- weight- och line-height-tokens.
+
+Nivåerna är fortsatt:
 
 - Display;
 - Heading 1;
@@ -108,7 +120,34 @@ Nivåer:
 - Body Small;
 - Label.
 
-Runtime använder systemets Inter-fallbackkedja om ingen webfont är installerad.
+`public/styles.css` använder den gemensamma sans-serif-tokenen och Portal v2 använder den gemensamma monospace-tokenen där tekniska värden presenteras.
+
+## Motion
+
+Motion ska vara lågmäld och funktionell.
+
+Runtimekontraktet definierar:
+
+- `--ak-motion-duration-fast` — kort Portal-interaktion;
+- `--ak-motion-duration-standard` — delade legacy-/foundationövergångar;
+- `--ak-motion-duration-reduced` — minimal duration under reduced motion;
+- `--ak-motion-ease-standard`;
+- `--ak-motion-ease-out`.
+
+`prefers-reduced-motion: reduce` ska fortsatt stänga av panelanimation och minimera transition/animation duration.
+
+## Interaktiva semantiska tokens
+
+Komponenter ska uttrycka interaktionsavsikt semantiskt i stället för genom primitive färgnamn.
+
+Alias i runtime:
+
+- `--ak-interactive-surface`;
+- `--ak-interactive-border`;
+- `--ak-interactive-text`;
+- `--ak-interactive-accent`.
+
+De pekar på befintliga surface/border/text/accent-semantiker och kan därför förändras utan att komponenter behöver känna till primitive palette.
 
 ## Komponenter i Figma
 
