@@ -27,7 +27,7 @@ test("maps an opted-in app to its app-local documentation roots", () => {
     slug: "skvallerbyttan",
     name: "Skvallerbyttan",
     repository: "https://github.com/blixten85/Avkroken",
-    issues: "https://github.com/blixten85/blixten85/issues",
+    issues: "https://github.com/blixten85/Avkroken/issues",
     source: {
       kind: "monorepo_app",
       repository: "blixten85/Avkroken",
@@ -94,6 +94,6 @@ test("canonical URLs use the canonical repository/ref/path from the catalog entr
   };
   assert.equal(
     canonicalDocUrl(entry, "docs/API guide.md"),
-    "https://github.com/blixten85/blixten85/blob/main/apps/skvallerbyttan/docs/API%20guide.md"
+    "https://github.com/blixten85/Avkroken/blob/main/apps/skvallerbyttan/docs/API%20guide.md"
   );
 });
