@@ -8,7 +8,7 @@ permalink: /architecture/
 
 ## Mål
 
-Skvallerbyttan är repositoryts read-only observationslager och eventnav. Koden exponerar webhook-ingress för GitHub och Cloudflare, normaliserar provider-state, lagrar begränsad historik och exponerar samma normaliserade underlag till dashboard och auktoriserade maskinklienter. Faktisk webhookkonfiguration är extern providerstate. `Avkroken/Avkroken` och `avkroken.denied.se` är den centrala organisations- och frontytan, inte ett separat provider-observationslager.
+Skvallerbyttan är repositoryts read-only observationslager och eventnav. Koden exponerar webhook-ingress för GitHub och Cloudflare, normaliserar provider-state, lagrar begränsad historik och exponerar samma normaliserade underlag till dashboard och auktoriserade maskinklienter. Faktisk webhookkonfiguration är extern providerstate. `blixten85/Avkroken` och `avkroken.denied.se` är den centrala monorepo- och frontytan, inte ett separat provider-observationslager.
 
 ```text
 GitHub APIs ───────────────┐
@@ -109,7 +109,7 @@ GitHub-providerkoden använder credential-bindings med `GAMNACKEN_GITHUB_APP_*`-
 Canonical GitHub-state omfattar bland annat:
 
 - repositories, PR/issues och Actions
-- Actions organization permissions och allowed-actions/workflow-permissions
+- organization-only Actions permissions och allowed-actions/workflow-permissions (`not_supported` när current GitHub owner är ett User-konto)
 - repository effective rulesets
 - Custom Property-definitioner och assignments
 - code security configurations
@@ -217,7 +217,7 @@ Telemetry skrivs till Workers Analytics Engine. SQL-aggregat väger `_sample_int
 
 Canonical source cache ligger i D1 och har TTL per capability:
 
-- organization governance: 5 minuter
+- organization-only governance: 5 minuter när providerns account type stödjer ytan; annars `not_supported`
 - PR/issues, Actions och repository effective rulesets: 20 minuter
 - Workers/Zero Trust: 10–15 minuter
 - account/zones: 15 minuter
