@@ -12,19 +12,19 @@ Den här matrisen beskriver minsta provider-permissions för observationslagret.
 
 | Capability | Endpoint | Minsta permission | Nivå | Skvallerbyttan |
 | --- | --- | --- | --- | --- |
-| repositories | `GET /orgs/{org}/repos` | installation/repository metadata access | read | implementerad |
+| repositories | `GET /installation/repositories` | GitHub App installation repository access | read | implementerad |
 | pull requests / issues | `GET /repos/{owner}/{repo}/pulls` + `GET /repos/{owner}/{repo}/issues` | Pull requests + Issues | read | implementerad |
 | repository Actions | `GET /repos/{owner}/{repo}/actions/*` | Actions | read | implementerad |
-| organization Actions permissions | `GET /orgs/{org}/actions/permissions*` | Administration (organization) | read | implementerad |
+| organization Actions permissions | `GET /orgs/{org}/actions/permissions*` | Administration (organization) | read | implementerad för Organization; `not_supported` för User owner |
 | repository effective rulesets | `GET /repos/{owner}/{repo}/rulesets?includes_parents=true` | Metadata (repository) | read | implementerad |
-| Custom Property definitions/assignments | `GET /orgs/{org}/properties/*` | Custom properties (organization) | read | implementerad |
-| repository Custom Property values | `GET /repos/{owner}/{repo}/properties/values` | Metadata (repository) | read | implementerad |
-| security configurations | `GET /orgs/{org}/code-security/configurations*` | Administration (organization) | read | implementerad |
-| security alerts | organization/repository scanning alert endpoints | Code scanning alerts + Dependabot alerts + Secret scanning alerts | read | implementerad |
+| Custom Property definitions/assignments | `GET /orgs/{org}/properties/*` | Custom properties (organization) | read | implementerad för Organization; `not_supported` för User owner |
+| repository Custom Property values | `GET /repos/{owner}/{repo}/properties/values` | Metadata (repository) | read | läses endast för Organization-owned repositories; `not_supported` för current User owner |
+| security configurations | `GET /orgs/{org}/code-security/configurations*` | Administration (organization) | read | implementerad för Organization; `not_supported` för User owner |
+| security alerts | organization/repository scanning alert endpoints | Code scanning alerts + Dependabot alerts + Secret scanning alerts | read | organization summary `not_supported` för current User owner; repository/providerstöd verifieras separat |
 
 
 
-Gamnackens faktiska permission-state verifieras i runtime från Appens egen installationsmetadata och de kortlivade installation-tokenpermissionnivåerna. För endpoint-specifik evidens sparas även GitHubs `X-Accepted-GitHub-Permissions` när headern finns. Endast permissionnamn/nivåer exponeras; installation token, private key och credentialvärden exponeras aldrig.
+Current owner är `blixten85` (GitHub User). Gamnackens faktiska permission-state verifieras i runtime från Appens egen installationsmetadata och de kortlivade installation-tokenpermissionnivåerna. För endpoint-specifik evidens sparas även GitHubs `X-Accepted-GitHub-Permissions` när headern finns. Endast permissionnamn/nivåer exponeras; installation token, private key och credentialvärden exponeras aldrig.
 
 Repository-scopeade PR/issues, Actions och effective rulesets registreras per repository och aggregeras med explicit scope coverage. Ett lyckat repoanrop får därför inte markera hela capabilityn som available om andra förväntade repositories är denied eller felar.
 

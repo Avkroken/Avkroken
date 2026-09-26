@@ -40,7 +40,19 @@ export type PortalCiRepositoryObservation = {
   capabilities?: unknown;
 };
 
-const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9._-]+$/;
+const OWNER = /^[A-Za-z0-9_.-]+$/;
+const REPOSITORY_NAME = /^[A-Za-z0-9._-]+$/;
+
+function ownedRepository(repository: string, owner: string): boolean {
+  const normalizedOwner = owner.trim();
+  if (!OWNER.test(normalizedOwner) || normalizedOwner === "." || normalizedOwner === "..") return false;
+  const parts = repository.split("/");
+  return parts.length === 2 &&
+    parts[0].toLowerCase() === normalizedOwner.toLowerCase() &&
+    REPOSITORY_NAME.test(parts[1]) &&
+    parts[1] !== "." &&
+    parts[1] !== "..";
+}
 
 function safeText(value: unknown, maxLength: number): string | null {
   if (typeof value !== "string") return null;
@@ -84,8 +96,9 @@ function actionsAvailable(value: unknown): boolean {
 export function publicCiRepository(
   repositories: PortalCiRepositoryObservation[],
   repository: string,
+  owner: string,
 ): PortalCiRepositoryObservation | null {
-  if (!PUBLIC_REPOSITORY.test(repository)) return null;
+  if (!ownedRepository(repository, owner)) return null;
 
   return repositories.find((row) =>
     row?.fullName === repository &&
@@ -96,12 +109,13 @@ export function publicCiRepository(
 
 export function buildPortalRepositoryCiSnapshot(input: {
   generatedAt: string;
+  owner: string;
   repository: string;
   observation: PortalCiRepositoryObservation | null;
   sourceRefreshedAt: string | null;
   freshness: PortalCiFreshness;
 }): PortalRepositoryCiSnapshot {
-  if (!PUBLIC_REPOSITORY.test(input.repository)) {
+  if (!ownedRepository(input.repository, input.owner)) {
     throw new Error("invalid public repository");
   }
 

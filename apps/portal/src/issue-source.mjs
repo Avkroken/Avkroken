@@ -1,4 +1,4 @@
-const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9._-]+$/;
+import { isOwnedGitHubRepository } from "./github-scope.mjs";
 
 function safeText(value, maxLength) {
   if (typeof value !== "string") return null;
@@ -53,7 +53,7 @@ export function eligibleIssueProjects(projects, limit = 100) {
       project?.source?.provider === "github" &&
       project?.source?.kind === "repository" &&
       typeof project?.source?.repository === "string" &&
-      PUBLIC_REPOSITORY.test(project.source.repository) &&
+      isOwnedGitHubRepository(project.source.repository) &&
       typeof project?.portalUrl === "string"
     )
     .slice(0, maximum);
@@ -69,7 +69,7 @@ export function normalizePublicIssue(project, issue) {
   }
 
   const repository = safeText(project.source.repository, 160);
-  if (!repository || !PUBLIC_REPOSITORY.test(repository)) return null;
+  if (!repository || !isOwnedGitHubRepository(repository)) return null;
   if (!issue || typeof issue !== "object" || Array.isArray(issue)) return null;
   if (issue.pull_request) return null;
 

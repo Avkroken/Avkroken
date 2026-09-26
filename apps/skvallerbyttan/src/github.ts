@@ -1,4 +1,4 @@
-import { gamnackenPrivateKey, organization, type Env } from "./env";
+import { gamnackenPrivateKey, githubOwner, type Env } from "./env";
 
 const API_VERSION = "2026-03-10";
 const USER_AGENT = "Avkroken-Skvallerbyttan-dashboard";
@@ -35,6 +35,8 @@ let installationTokenCache: InstallationToken | null = null;
 let installationTokenInFlight: Promise<InstallationToken> | null = null;
 let installationMetadata: GitHubInstallationMetadata = {
   installationId: null,
+  accountLogin: null,
+  accountType: null,
   repositorySelection: null,
   permissions: {},
   tokenPermissions: {},
@@ -66,6 +68,8 @@ export type ListResult<T> = OptionalResult<T[]> & { truncated: boolean };
 
 export type GitHubInstallationMetadata = {
   installationId: number | null;
+  accountLogin: string | null;
+  accountType: string | null;
   repositorySelection: string | null;
   permissions: Record<string, string>;
   tokenPermissions: Record<string, string>;
@@ -150,9 +154,9 @@ async function appJwt(env: Env): Promise<string> {
 
 async function mintInstallationToken(env: Env): Promise<InstallationToken> {
   const jwt = await appJwt(env);
-  const org = organization(env);
+  const owner = githubOwner(env);
   const installationResponse = await fetch(
-    `https://api.github.com/orgs/${encodeURIComponent(org)}/installation`,
+    `https://api.github.com/repos/${encodeURIComponent(owner)}/Avkroken/installation`,
     {
       headers: {
         Accept: "application/vnd.github+json",
@@ -169,6 +173,7 @@ async function mintInstallationToken(env: Env): Promise<InstallationToken> {
   }
   const installation = await installationResponse.json<{
     id?: number;
+    account?: { login?: string; type?: string };
     permissions?: Record<string, unknown>;
     repository_selection?: string;
   }>();
@@ -177,6 +182,8 @@ async function mintInstallationToken(env: Env): Promise<InstallationToken> {
   }
   installationMetadata = {
     installationId: Number(installation.id),
+    accountLogin: typeof installation.account?.login === "string" ? installation.account.login : null,
+    accountType: typeof installation.account?.type === "string" ? installation.account.type : null,
     repositorySelection: typeof installation.repository_selection === "string"
       ? installation.repository_selection
       : null,
@@ -228,6 +235,11 @@ async function installationToken(env: Env): Promise<string> {
   });
   installationTokenCache = await installationTokenInFlight;
   return installationTokenCache.value;
+}
+
+export async function getGitHubInstallationMetadataLive(env: Env): Promise<GitHubInstallationMetadata> {
+  await installationToken(env);
+  return getGitHubInstallationMetadata();
 }
 
 function numericHeader(response: Response, name: string): number | null {
@@ -364,6 +376,65 @@ export async function githubListAll<T>(
       }
       const page = await response.json<T[]>();
       items.push(...page);
+      path = nextPath(response.headers.get("link"));
+      pages += 1;
+    }
+  } catch (error) {
+    return {
+      available: false,
+      value: null,
+      status: 0,
+      reason: error instanceof Error ? error.message : String(error),
+      acceptedPermissions,
+      truncated: false,
+    };
+  }
+
+  return {
+    available: true,
+    value: items,
+    status: 200,
+    acceptedPermissions,
+    truncated: path !== null,
+  };
+}
+
+export async function githubInstallationRepositories<T>(
+  env: Env,
+  maxPages = 10,
+): Promise<ListResult<T>> {
+  const items: T[] = [];
+  let path: string | null = "/installation/repositories?per_page=100";
+  let pages = 0;
+  let acceptedPermissions: string | null = null;
+
+  try {
+    while (path && pages < maxPages) {
+      const response = await githubResponse(env, path);
+      acceptedPermissions = response.headers.get("x-accepted-github-permissions")?.trim()
+        || acceptedPermissions;
+      if (!response.ok) {
+        return {
+          available: false,
+          value: null,
+          status: response.status,
+          reason: (await response.text()).slice(0, 220) || `GitHub API ${response.status}`,
+          acceptedPermissions,
+          truncated: false,
+        };
+      }
+      const page = await response.json<{ repositories?: T[] }>();
+      if (!Array.isArray(page.repositories)) {
+        return {
+          available: false,
+          value: null,
+          status: response.status,
+          reason: "GitHub installation repositories payload missing repositories",
+          acceptedPermissions,
+          truncated: false,
+        };
+      }
+      items.push(...page.repositories);
       path = nextPath(response.headers.get("link"));
       pages += 1;
     }

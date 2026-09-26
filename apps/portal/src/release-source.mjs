@@ -1,4 +1,4 @@
-const PUBLIC_REPOSITORY = /^Avkroken\/[A-Za-z0-9._-]+$/;
+import { isOwnedGitHubRepository } from "./github-scope.mjs";
 
 const RELEASE_CATEGORY_HEADINGS = new Map([
   ["feature", "features"],
@@ -76,7 +76,7 @@ export function eligibleReleaseProjects(projects, limit = 24) {
       project?.source?.provider === "github" &&
       project?.source?.kind === "repository" &&
       typeof project?.source?.repository === "string" &&
-      PUBLIC_REPOSITORY.test(project.source.repository) &&
+      isOwnedGitHubRepository(project.source.repository) &&
       typeof project?.portalUrl === "string"
     )
     .slice(0, maximum);
@@ -92,7 +92,7 @@ export function normalizePublicRelease(project, release) {
   }
 
   const repository = safeText(project.source.repository, 160);
-  if (!repository || !PUBLIC_REPOSITORY.test(repository)) return null;
+  if (!repository || !isOwnedGitHubRepository(repository)) return null;
   if (!release || typeof release !== "object" || Array.isArray(release)) return null;
   if (release.draft === true) return null;
 

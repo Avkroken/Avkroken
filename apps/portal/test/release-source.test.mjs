@@ -14,11 +14,11 @@ function project(overrides = {}) {
     slug: "Bastion",
     name: "Bastion",
     portalUrl: "/projekt/Bastion",
-    repository: "https://github.com/Avkroken/Bastion",
+    repository: "https://github.com/blixten85/Bastion",
     source: {
       provider: "github",
       kind: "repository",
-      repository: "Avkroken/Bastion",
+      repository: "blixten85/Bastion",
       ref: "main"
     },
     ...overrides
@@ -33,7 +33,7 @@ function release(overrides = {}) {
     draft: false,
     prerelease: false,
     published_at: "2026-09-07T04:33:03Z",
-    html_url: "https://github.com/Avkroken/Bastion/releases/tag/v0.24.1",
+    html_url: "https://github.com/blixten85/Bastion/releases/tag/v0.24.1",
     body: "must not be copied",
     author: { login: "must-not-be-copied" },
     assets: [{ name: "must-not-be-copied" }],
@@ -50,11 +50,11 @@ test("normalizes a published release to the minimal public Changelog contract", 
     projectSlug: "Bastion",
     projectName: "Bastion",
     projectUrl: "/projekt/Bastion",
-    repository: "Avkroken/Bastion",
+    repository: "blixten85/Bastion",
     tag: "v0.24.1",
     name: "v0.24.1",
     publishedAt: "2026-09-07T04:33:03Z",
-    url: "https://github.com/Avkroken/Bastion/releases/tag/v0.24.1",
+    url: "https://github.com/blixten85/Bastion/releases/tag/v0.24.1",
     categories: ["releases"],
     prerelease: false
   });
@@ -102,7 +102,7 @@ test("rejects drafts, malformed source projects and non-canonical release URLs",
   assert.equal(normalizePublicRelease(project(), release({ draft: true })), null);
   assert.equal(
     normalizePublicRelease(
-      project({ type: "app", source: { provider: "github", kind: "monorepo_app", repository: "Avkroken/Avkroken" } }),
+      project({ type: "app", source: { provider: "github", kind: "monorepo_app", repository: "blixten85/Avkroken" } }),
       release()
     ),
     null
@@ -119,7 +119,7 @@ test("rejects drafts, malformed source projects and non-canonical release URLs",
     null
   );
   assert.equal(
-    normalizePublicRelease(project(), release({ html_url: "https://github.com/Avkroken/Other/releases/tag/v0.24.1" })),
+    normalizePublicRelease(project(), release({ html_url: "https://github.com/blixten85/Other/releases/tag/v0.24.1" })),
     null
   );
 });
@@ -141,7 +141,7 @@ test("repository projects are the only eligible release sources", () => {
       source: {
         provider: "github",
         kind: "repository",
-        repository: "Avkroken/Produkter",
+        repository: "blixten85/Produkter",
         ref: "main"
       }
     }),
@@ -153,7 +153,7 @@ test("repository projects are the only eligible release sources", () => {
       source: {
         provider: "github",
         kind: "monorepo_app",
-        repository: "Avkroken/Avkroken",
+        repository: "blixten85/Avkroken",
         path: "apps/skvallerbyttan"
       }
     }),
@@ -178,9 +178,9 @@ test("repository projects are the only eligible release sources", () => {
 
 test("sorts releases newest first with a hard result cap", () => {
   const items = normalizePublicReleases(project(), [
-    release({ id: 1, tag_name: "v1", name: "v1", published_at: "2026-09-01T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/releases/tag/v1" }),
-    release({ id: 2, tag_name: "v2", name: "v2", published_at: "2026-09-03T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/releases/tag/v2" }),
-    release({ id: 3, tag_name: "v3", name: "v3", published_at: "2026-09-02T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/releases/tag/v3" })
+    release({ id: 1, tag_name: "v1", name: "v1", published_at: "2026-09-01T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/releases/tag/v1" }),
+    release({ id: 2, tag_name: "v2", name: "v2", published_at: "2026-09-03T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/releases/tag/v2" }),
+    release({ id: 3, tag_name: "v3", name: "v3", published_at: "2026-09-02T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/releases/tag/v3" })
   ]);
 
   assert.deepEqual(sortPublicReleases(items, 2).map(item => item.tag), ["v2", "v3"]);

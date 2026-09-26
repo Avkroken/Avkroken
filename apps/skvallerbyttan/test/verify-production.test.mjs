@@ -143,3 +143,20 @@ test("rejects the wrong receiver entrypoint", () => {
 test("repository wrangler config satisfies the deployment contract", async () => {
   await verifyProductionContract();
 });
+
+
+test("repository Preview config stays fail-closed without production provider state", async () => {
+  const raw = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  );
+  const value = JSON.parse(raw);
+
+  assert.equal(value.previews?.d1_databases, undefined);
+  assert.deepEqual(value.previews?.analytics_engine_datasets, [
+    { binding: "OBSERVABILITY", dataset: "skvallerbyttan_preview" }
+  ]);
+  assert.equal(value.previews?.vars?.SKVALLERBYTTAN_GITHUB_OWNER, "blixten85");
+  assert.equal(value.previews?.services, undefined);
+  assert.equal(value.previews?.secrets_store_secrets, undefined);
+  assert.equal(value.previews?.vars?.CLOUDFLARE_ACCOUNT_ID, undefined);
+});

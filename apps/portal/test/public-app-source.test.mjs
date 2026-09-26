@@ -7,8 +7,8 @@ import {
 
 const context = {
   sourcePath: "apps/skvallerbyttan",
-  repositoryName: "Avkroken/Avkroken",
-  repository: "https://github.com/Avkroken/Avkroken",
+  repositoryName: "blixten85/Avkroken",
+  repository: "https://github.com/blixten85/Avkroken",
   ref: "main",
   hasDiscussions: true,
   updatedAt: "2026-09-25T10:00:00Z",
@@ -47,7 +47,7 @@ test("normalizes an explicitly opted-in public app without inventing a public en
   assert.equal(project.source.path, "apps/skvallerbyttan");
   assert.equal(
     project.sourceUrl,
-    "https://github.com/Avkroken/Avkroken/tree/main/apps/skvallerbyttan"
+    "https://github.com/blixten85/Avkroken/tree/main/apps/skvallerbyttan"
   );
 });
 
@@ -91,7 +91,7 @@ test("source location is controlled by discovery context, not manifest payload",
     context
   );
   assert.equal(project.source.path, "apps/skvallerbyttan");
-  assert.equal(project.source.repository, "Avkroken/Avkroken");
+  assert.equal(project.source.repository, "blixten85/Avkroken");
   assert.equal(project.source.ref, "main");
 });
 

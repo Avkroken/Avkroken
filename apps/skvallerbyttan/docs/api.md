@@ -51,7 +51,7 @@ För en autentiserad dashboard-session kan `GET /api/v1/capabilities?refresh=1` 
 - `GET /api/v1/github/org/state`
 - `GET /api/v1/github/repos/:repo/effective-policy`
 
-Organization state innehåller read-only Actions permissions, Custom Properties och security configurations. GitHub-ytor som kräver provider-write ingår inte i observations-API:t.
+Organization-state-endpointen innehåller read-only Actions permissions, Custom Properties och security configurations när providerns account type stödjer organization-scope. För current GitHub User-owner returneras dessa organization-only ytor explicit som `not_supported`. GitHub-ytor som kräver provider-write ingår inte i observations-API:t.
 
 Repository effective policy innehåller:
 

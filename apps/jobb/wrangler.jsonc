@@ -74,5 +74,10 @@
       "pattern": "jobb.denied.se",
       "custom_domain": true
     }
-  ]
+  ],
+  "previews": {
+    "browser": {
+      "binding": "BROWSER"
+    }
+  }
 }

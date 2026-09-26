@@ -8,7 +8,7 @@ import {
 
 function observation(overrides: Partial<PortalCiRepositoryObservation> = {}): PortalCiRepositoryObservation {
   return {
-    fullName: "Avkroken/Bastion",
+    fullName: "blixten85/Bastion",
     visibility: "public",
     archived: false,
     actions: {
@@ -41,28 +41,29 @@ function observation(overrides: Partial<PortalCiRepositoryObservation> = {}): Po
 
 test("Portal CI selector requires a public non-archived cached repository row", () => {
   const rows = [
-    observation({ fullName: "Avkroken/Private", visibility: "private" }),
-    observation({ fullName: "Avkroken/Archived", archived: true }),
+    observation({ fullName: "blixten85/Private", visibility: "private" }),
+    observation({ fullName: "blixten85/Archived", archived: true }),
     observation(),
   ];
 
-  assert.equal(publicCiRepository(rows, "Avkroken/Private"), null);
-  assert.equal(publicCiRepository(rows, "Avkroken/Archived"), null);
-  assert.equal(publicCiRepository(rows, "Other/Bastion"), null);
-  assert.equal(publicCiRepository(rows, "Avkroken/Bastion")?.fullName, "Avkroken/Bastion");
+  assert.equal(publicCiRepository(rows, "blixten85/Private", "blixten85"), null);
+  assert.equal(publicCiRepository(rows, "blixten85/Archived", "blixten85"), null);
+  assert.equal(publicCiRepository(rows, "Other/Bastion", "blixten85"), null);
+  assert.equal(publicCiRepository(rows, "blixten85/Bastion", "blixten85")?.fullName, "blixten85/Bastion");
 });
 
 test("Portal CI snapshot exposes only public-safe sampled summary fields", () => {
   const snapshot = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
-    repository: "Avkroken/Bastion",
+    owner: "blixten85",
+    repository: "blixten85/Bastion",
     observation: observation(),
     sourceRefreshedAt: "2026-09-25T16:10:00Z",
     freshness: "fresh",
   });
 
   assert.equal(snapshot.schemaVersion, 1);
-  assert.equal(snapshot.repository, "Avkroken/Bastion");
+  assert.equal(snapshot.repository, "blixten85/Bastion");
   assert.equal(snapshot.available, true);
   assert.equal(snapshot.status, "available");
   assert.equal(snapshot.freshness, "fresh");
@@ -95,7 +96,8 @@ test("Portal CI snapshot exposes only public-safe sampled summary fields", () =>
 test("Portal CI snapshot reports stale state without hiding the cached sample", () => {
   const snapshot = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
-    repository: "Avkroken/Bastion",
+    owner: "blixten85",
+    repository: "blixten85/Bastion",
     observation: observation(),
     sourceRefreshedAt: "2026-09-25T08:00:00Z",
     freshness: "stale",
@@ -111,7 +113,8 @@ test("Portal CI snapshot reports stale state without hiding the cached sample", 
 test("Portal CI snapshot distinguishes unavailable Actions from missing observation", () => {
   const unavailable = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
-    repository: "Avkroken/Bastion",
+    owner: "blixten85",
+    repository: "blixten85/Bastion",
     observation: observation({
       actions: null,
       capabilities: { actions: false, reason: "SECRET_PROVIDER_REASON" },
@@ -127,7 +130,8 @@ test("Portal CI snapshot distinguishes unavailable Actions from missing observat
 
   const missing = buildPortalRepositoryCiSnapshot({
     generatedAt: "2026-09-25T16:15:00Z",
-    repository: "Avkroken/Bastion",
+    owner: "blixten85",
+    repository: "blixten85/Bastion",
     observation: null,
     sourceRefreshedAt: null,
     freshness: "unknown",
@@ -139,11 +143,12 @@ test("Portal CI snapshot distinguishes unavailable Actions from missing observat
   assert.equal(missing.coverage, null);
 });
 
-test("Portal CI snapshot rejects repositories outside the Avkroken namespace", () => {
+test("Portal CI snapshot rejects repositories outside the configured owner", () => {
   let rejected = false;
   try {
     buildPortalRepositoryCiSnapshot({
       generatedAt: "2026-09-25T16:15:00Z",
+      owner: "blixten85",
       repository: "Other/Private",
       observation: observation(),
       sourceRefreshedAt: "2026-09-25T16:10:00Z",

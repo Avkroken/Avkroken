@@ -1,6 +1,8 @@
 import type { Env } from "./env";
 import { organization } from "./env";
 import {
+  getGitHubInstallationMetadataLive,
+  githubInstallationRepositories,
   githubJson,
   githubListAll,
   githubOptionalJson,
@@ -104,7 +106,10 @@ function bump(target: Record<string, number>, severity: string | null | undefine
   target[key] = (target[key] ?? 0) + 1;
 }
 
-function capability<T>(key: string, result: OptionalResult<T>): Record<string, unknown> {
+function capability<T>(
+  key: string,
+  result: OptionalResult<T>,
+): SecurityOverview["capabilities"][number] {
   return {
     key,
     available: result.available,
@@ -113,8 +118,63 @@ function capability<T>(key: string, result: OptionalResult<T>): Record<string, u
   };
 }
 
+function githubProviderFailure(error: unknown): OptionalResult<never> {
+  return {
+    available: false,
+    value: null,
+    status: 0,
+    reason: error instanceof Error ? error.message : String(error),
+    acceptedPermissions: null,
+  };
+}
+
 async function getSecurityOverview(env: Env): Promise<SecurityOverview> {
   const org = organization(env);
+  let installation: Awaited<ReturnType<typeof getGitHubInstallationMetadataLive>>;
+  try {
+    installation = await getGitHubInstallationMetadataLive(env);
+  } catch (error) {
+    const unavailable = githubProviderFailure(error);
+    return {
+      codeScanning: { available: false, count: 0, severities: {}, truncated: false },
+      dependabot: { available: false, count: 0, severities: {}, truncated: false },
+      secretScanning: { available: false, count: 0, truncated: false },
+      byRepo: {},
+      capabilities: [
+        capability("code-scanning", unavailable),
+        capability("dependabot", unavailable),
+        capability("secret-scanning", unavailable),
+      ],
+      observations: [
+        readObservation(org, unavailable),
+        readObservation(org, unavailable),
+        readObservation(org, unavailable),
+      ],
+    };
+  }
+  if (installation.accountType?.toLowerCase() === "user") {
+    const unsupported = (): CapabilityScopeObservationInput => ({
+      scopeId: org,
+      status: "not_supported",
+      permissionState: "not_required",
+      dataState: "not_supported",
+      httpStatus: null,
+      error: "github-user-account-has-no-organization-security-scope",
+      acceptedPermissions: null,
+    });
+    return {
+      codeScanning: { available: false, count: 0, severities: {}, truncated: false },
+      dependabot: { available: false, count: 0, severities: {}, truncated: false },
+      secretScanning: { available: false, count: 0, truncated: false },
+      byRepo: {},
+      capabilities: [
+        { key: "code-scanning", available: false, status: 0, reason: "not_supported_for_user_account" },
+        { key: "dependabot", available: false, status: 0, reason: "not_supported_for_user_account" },
+        { key: "secret-scanning", available: false, status: 0, reason: "not_supported_for_user_account" },
+      ],
+      observations: [unsupported(), unsupported(), unsupported()],
+    };
+  }
   const [code, dependabot, secret] = await Promise.all([
     githubListAll<CodeAlert>(env, `/orgs/${encodeURIComponent(org)}/code-scanning/alerts?state=open&per_page=100`, 20),
     githubListAll<DependabotAlert>(env, `/orgs/${encodeURIComponent(org)}/dependabot/alerts?state=open&per_page=100`, 20),
@@ -385,10 +445,13 @@ async function getActions(env: Env, fullName: string): Promise<{
 
 export async function getOverview(env: Env): Promise<Record<string, unknown>> {
   const org = organization(env);
-  const reposResult = await githubListAll<Repo>(env, `/orgs/${encodeURIComponent(org)}/repos?type=all&sort=full_name&per_page=100`, 10);
+  const reposResult = await githubInstallationRepositories<Repo>(env, 10);
   if (!reposResult.available) throw new Error(`Could not list repositories: ${reposResult.status} ${reposResult.reason}`);
 
-  const repos = reposResult.value.filter((repo) => !repo.disabled);
+  const ownerPrefix = org.toLowerCase() + "/";
+  const repos = reposResult.value.filter((repo) =>
+    !repo.disabled && repo.full_name.toLowerCase().startsWith(ownerPrefix)
+  );
   await recordCapabilityObservation(env, "github.avkroken.repositories", {
     status: "available",
     permissionState: "granted",

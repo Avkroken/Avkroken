@@ -1,3 +1,4 @@
+import { githubPagesUrl, isOwnedGitHubRepository } from "./github-scope.mjs";
 const REPOSITORY_NAME = /^[A-Za-z0-9._-]+$/;
 const APP_SOURCE_PATH = /^apps\/[A-Za-z0-9._-]+$/;
 
@@ -34,9 +35,7 @@ export function repositoryDocsSource(repo) {
     updatedAt: repo?.pushed_at || repo?.updated_at || null,
     defaultBranch,
     hasPages: repo?.has_pages === true,
-    pagesUrl: repo?.has_pages === true
-      ? "https://avkroken.github.io/" + encodeURIComponent(name) + "/"
-      : null
+    pagesUrl: repo?.has_pages === true ? githubPagesUrl(name) : null
   };
 }
 
@@ -55,8 +54,8 @@ export function appDocsSource(project) {
   }
   if (!APP_SOURCE_PATH.test(sourcePath)) return null;
 
+  if (!isOwnedGitHubRepository(sourceRepositoryFullName)) return null;
   const parts = sourceRepositoryFullName.split("/");
-  if (parts.length !== 2 || parts[0] !== "Avkroken" || !REPOSITORY_NAME.test(parts[1])) return null;
 
   return {
     key,

@@ -1,13 +1,12 @@
 import {
   cloudflareApiToken,
   gamnackenPrivateKey,
-  organization,
   resolveSecretValue,
   type Env,
   type RuntimeHeartbeatChecks,
 } from "./env";
 import { authConfigured } from "./auth";
-import { githubResponse } from "./github";
+import { githubInstallationRepositories } from "./github";
 import {
   CloudflareApiError,
   getCloudflareAccount,
@@ -78,30 +77,17 @@ async function observeCloudflareProbe(
 }
 
 async function observeGitHubProbe(env: Env): Promise<boolean> {
-  try {
-    const response = await githubResponse(
-      env,
-      `/orgs/${encodeURIComponent(organization(env))}/repos?per_page=1`,
-    );
-    const denied = response.status === 401 || response.status === 403;
-    await recordCapabilityObservation(env, "github.avkroken.repositories", {
-      status: response.ok ? "available" : denied ? "permission_denied" : "error",
-      permissionState: response.ok ? "granted" : denied ? "permission_denied" : "unknown",
-      dataState: response.ok ? "available" : "unavailable",
-      httpStatus: response.status,
-      error: response.ok ? null : `github-http-${response.status}`,
-    });
-    return response.ok;
-  } catch {
-    await recordCapabilityObservation(env, "github.avkroken.repositories", {
-      status: "error",
-      permissionState: "unknown",
-      dataState: "error",
-      httpStatus: 0,
-      error: "github-provider-request-failed",
-    });
-    return false;
-  }
+  const result = await githubInstallationRepositories<unknown>(env, 1);
+  const denied = !result.available && (result.status === 401 || result.status === 403);
+  await recordCapabilityObservation(env, "github.avkroken.repositories", {
+    status: result.available ? "available" : denied ? "permission_denied" : "error",
+    permissionState: result.available ? "granted" : denied ? "permission_denied" : "unknown",
+    dataState: result.available ? "available" : denied ? "unavailable" : "error",
+    httpStatus: result.status,
+    error: result.available ? null : result.status === 0 ? "github-provider-request-failed" : `github-http-${result.status}`,
+    acceptedPermissions: result.acceptedPermissions,
+  });
+  return result.available;
 }
 
 const defaultProbes: RuntimeReadinessProbes = {

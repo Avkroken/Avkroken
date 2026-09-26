@@ -135,7 +135,8 @@ export async function getPortalRepositoryCiSnapshot(
   const repositories = Array.isArray(cached?.value?.repositories)
     ? cached.value.repositories
     : [];
-  const observation = publicCiRepository(repositories, repository);
+  const owner = organization(env);
+  const observation = publicCiRepository(repositories, repository, owner);
 
   const stale = cached
     ? sourceCacheInvalidated(cached) ||
@@ -144,6 +145,7 @@ export async function getPortalRepositoryCiSnapshot(
 
   return buildPortalRepositoryCiSnapshot({
     generatedAt: new Date().toISOString(),
+    owner,
     repository,
     observation,
     sourceRefreshedAt: cached?.refreshedAt ?? null,

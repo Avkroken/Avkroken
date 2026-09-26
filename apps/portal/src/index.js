@@ -1,5 +1,12 @@
 import { isRetiredRepository } from "./repository-policy.mjs";
 import {
+  GITHUB_OWNER,
+  githubRepositoryApiBase,
+  githubUserRepositoriesApi,
+  isOwnedGitHubRepository,
+  repositoryNameFromOwnedFullName
+} from "./github-scope.mjs";
+import {
   appDocsSource,
   canonicalDocUrl,
   docsContentLocation,
@@ -30,8 +37,7 @@ import {
 } from "./issue-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
-const GITHUB_API =
-  "https://api.github.com/orgs/Avkroken/repos?type=public&per_page=100&sort=full_name&direction=asc";
+const GITHUB_API = githubUserRepositoriesApi();
 
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
@@ -143,7 +149,7 @@ async function fetchGitHubJson(url, env) {
 
 async function scanMarkdownDocs(repo, env, path = "docs", depth = 0) {
   if (depth > MAX_DOC_DEPTH) return [];
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(repo.name) +
+  const endpoint = githubRepositoryApiBase(repo.name) +
     "/contents/" + encodedPath(path) + "?ref=" + encodeURIComponent(repo.default_branch);
   const result = await fetchGitHubJson(endpoint, env);
   if (!result.ok || !Array.isArray(result.data)) return [];
@@ -164,7 +170,7 @@ async function scanMarkdownDocs(repo, env, path = "docs", depth = 0) {
 }
 
 async function readmePage(repo, env) {
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(repo.name) +
+  const endpoint = githubRepositoryApiBase(repo.name) +
     "/readme?ref=" + encodeURIComponent(repo.default_branch);
   const result = await fetchGitHubJson(endpoint, env);
   if (!result.ok || !result.data || typeof result.data.path !== "string") return null;
@@ -173,7 +179,7 @@ async function readmePage(repo, env) {
 }
 
 async function markdownFilePage(repo, env, path, label) {
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(repo.name) +
+  const endpoint = githubRepositoryApiBase(repo.name) +
     "/contents/" + encodedPath(path) + "?ref=" + encodeURIComponent(repo.default_branch);
   const result = await fetchGitHubJson(endpoint, env);
 
@@ -339,7 +345,7 @@ async function getDocContent(requestUrl, env) {
     });
   }
 
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(location.repository) +
+  const endpoint = githubRepositoryApiBase(location.repository) +
     "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
   const github = await fetch(endpoint, {
     headers: githubHeaders(env, "application/vnd.github.raw+json")
@@ -488,7 +494,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v7");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v8");
   const cached = await cache.match(cacheKey);
 
   if (cached) {
@@ -502,7 +508,7 @@ async function getPublicProjects(env, ctx) {
     const body = JSON.stringify({
       source: {
         provider: "github",
-        scope: "Avkroken",
+        scope: GITHUB_OWNER,
         coverage: "active_public_repositories_and_opt_in_apps",
         appDiscovery: catalog.appDiscovery
       },
@@ -562,7 +568,7 @@ async function fetchSearchDocument(task, env) {
     return { searchEntry: null, failed: true, truncated: false };
   }
 
-  const endpoint = "https://api.github.com/repos/Avkroken/" + encodeURIComponent(location.repository) +
+  const endpoint = githubRepositoryApiBase(location.repository) +
     "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
   const response = await fetch(endpoint, {
     headers: githubHeaders(env, "application/vnd.github.raw+json")
@@ -637,7 +643,7 @@ async function loadSearchIndex(env) {
     generatedAt: new Date().toISOString(),
     source: {
       provider: "github",
-      scope: "Avkroken",
+      scope: GITHUB_OWNER,
       input: "public_project_catalog_intersect_public_docs_catalog",
       coverage,
       appDiscovery: projectCatalog.appDiscovery,
@@ -737,7 +743,7 @@ function publicBuildProject(projects, projectSlug) {
     project?.source?.provider === "github" &&
     project?.source?.kind === "repository" &&
     typeof project?.source?.repository === "string" &&
-    /^Avkroken\/[A-Za-z0-9._-]+$/.test(project.source.repository) &&
+    isOwnedGitHubRepository(project.source.repository) &&
     typeof project?.buildsPortalUrl === "string" &&
     typeof project?.builds === "string"
   ) || null;
@@ -794,7 +800,8 @@ async function getPublicProjectBuilds(requestUrl, env) {
     }
 
     const repository = project.source.repository;
-    const repoName = repository.slice("Avkroken/".length);
+    const repoName = repositoryNameFromOwnedFullName(repository);
+    if (!repoName) throw new Error("invalid repository owner");
     const ci = await service.getPublicRepositoryCi(repoName);
 
     if (
@@ -883,7 +890,7 @@ function publicActivityProjects(projects) {
     project?.source?.provider === "github" &&
     project?.source?.kind === "repository" &&
     typeof project?.source?.repository === "string" &&
-    /^Avkroken\/[A-Za-z0-9._-]+$/.test(project.source.repository) &&
+    isOwnedGitHubRepository(project.source.repository) &&
     typeof project?.activityPortalUrl === "string" &&
     typeof project?.portalUrl === "string"
   );
@@ -1111,9 +1118,9 @@ async function getPublicActivity(requestUrl, env) {
       });
     }
 
-    const repositoryNames = selected.map(project =>
-      project.source.repository.slice("Avkroken/".length)
-    );
+    const repositoryNames = selected
+      .map(project => repositoryNameFromOwnedFullName(project.source.repository))
+      .filter(Boolean);
     const snapshot = await service.getPublicActivity(repositoryNames, days);
 
     if (!snapshot || typeof snapshot !== "object" || snapshot.schemaVersion !== 1) {
@@ -1158,14 +1165,10 @@ async function getPublicActivity(requestUrl, env) {
 
 async function fetchProjectIssues(project, env) {
   const repository = String(project?.source?.repository || "");
-  const parts = repository.split("/");
-  if (parts.length !== 2 || parts[0] !== "Avkroken" || !parts[1]) {
-    return { issues: [], failed: true };
-  }
+  const repoName = repositoryNameFromOwnedFullName(repository);
+  if (!repoName) return { issues: [], failed: true };
 
-  const endpoint =
-    "https://api.github.com/repos/" + encodeURIComponent(parts[0]) + "/" +
-    encodeURIComponent(parts[1]) +
+  const endpoint = githubRepositoryApiBase(repoName) +
     "/issues?state=all&sort=updated&direction=desc&per_page=" +
     PROJECT_ISSUES_LIMIT;
   const result = await fetchGitHubJson(endpoint, env);
@@ -1283,14 +1286,10 @@ async function getPublicProjectIssues(requestUrl, env) {
 
 async function fetchProjectReleases(project, env) {
   const repository = String(project?.source?.repository || "");
-  const parts = repository.split("/");
-  if (parts.length !== 2 || parts[0] !== "Avkroken" || !parts[1]) {
-    return { releases: [], failed: true };
-  }
+  const repoName = repositoryNameFromOwnedFullName(repository);
+  if (!repoName) return { releases: [], failed: true };
 
-  const endpoint =
-    "https://api.github.com/repos/" + encodeURIComponent(parts[0]) + "/" +
-    encodeURIComponent(parts[1]) + "/releases?per_page=" +
+  const endpoint = githubRepositoryApiBase(repoName) + "/releases?per_page=" +
     CHANGELOG_RELEASES_PER_REPOSITORY;
   const result = await fetchGitHubJson(endpoint, env);
 

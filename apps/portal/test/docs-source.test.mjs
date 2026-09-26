@@ -10,7 +10,7 @@ import {
 test("maps repository documentation to its canonical repository source", () => {
   const source = repositoryDocsSource({
     name: "Bastion",
-    html_url: "https://github.com/Avkroken/Bastion",
+    html_url: "https://github.com/blixten85/Bastion",
     default_branch: "main",
     has_pages: true,
     language: "Swift"
@@ -26,11 +26,11 @@ test("maps an opted-in app to its app-local documentation roots", () => {
     type: "app",
     slug: "skvallerbyttan",
     name: "Skvallerbyttan",
-    repository: "https://github.com/Avkroken/Avkroken",
-    issues: "https://github.com/Avkroken/Avkroken/issues",
+    repository: "https://github.com/blixten85/Avkroken",
+    issues: "https://github.com/blixten85/Avkroken/issues",
     source: {
       kind: "monorepo_app",
-      repository: "Avkroken/Avkroken",
+      repository: "blixten85/Avkroken",
       ref: "main",
       path: "apps/skvallerbyttan"
     }
@@ -48,10 +48,10 @@ test("rejects non-app and nested arbitrary source paths", () => {
     type: "app",
     slug: "jobb",
     name: "Jobb",
-    repository: "https://github.com/Avkroken/Avkroken",
+    repository: "https://github.com/blixten85/Avkroken",
     source: {
       kind: "monorepo_app",
-      repository: "Avkroken/Avkroken",
+      repository: "blixten85/Avkroken",
       ref: "main",
       path: "apps/skvallerbyttan/../jobb"
     }
@@ -64,7 +64,7 @@ test("content locations require an exact page already present in the public cata
     sourceRepository: "Avkroken",
     sourcePath: "apps/skvallerbyttan",
     defaultBranch: "main",
-    repository: "https://github.com/Avkroken/Avkroken",
+    repository: "https://github.com/blixten85/Avkroken",
     pages: [
       { path: "README.md" },
       { path: "docs/architecture.md" }
@@ -89,11 +89,11 @@ test("canonical URLs use the canonical repository/ref/path from the catalog entr
     sourceRepository: "Avkroken",
     sourcePath: "apps/skvallerbyttan",
     defaultBranch: "main",
-    repository: "https://github.com/Avkroken/Avkroken",
+    repository: "https://github.com/blixten85/Avkroken",
     pages: [{ path: "docs/API guide.md" }]
   };
   assert.equal(
     canonicalDocUrl(entry, "docs/API guide.md"),
-    "https://github.com/Avkroken/Avkroken/blob/main/apps/skvallerbyttan/docs/API%20guide.md"
+    "https://github.com/blixten85/Avkroken/blob/main/apps/skvallerbyttan/docs/API%20guide.md"
   );
 });

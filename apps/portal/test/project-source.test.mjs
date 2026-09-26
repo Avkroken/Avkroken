@@ -8,12 +8,12 @@ import {
 function repo(overrides = {}) {
   return {
     name: "Bastion",
-    full_name: "Avkroken/Bastion",
+    full_name: "blixten85/Bastion",
     visibility: "public",
     archived: false,
     topics: ["portal-project", "portal-blue"],
     homepage: "https://bastion.denied.se",
-    html_url: "https://github.com/Avkroken/Bastion",
+    html_url: "https://github.com/blixten85/Bastion",
     default_branch: "main",
     has_pages: true,
     has_discussions: true,
@@ -34,14 +34,14 @@ test("normalizes active public repositories even without a published endpoint", 
   assert.equal(project.portalPublished, false);
   assert.equal(project.portalUrl, "/projekt/Bastion");
   assert.equal(project.documentation, "/projekt/Bastion/dokumentation");
-  assert.equal(project.source.repository, "Avkroken/Bastion");
-  assert.equal(project.wiki, "https://github.com/Avkroken/Bastion/wiki");
+  assert.equal(project.source.repository, "blixten85/Bastion");
+  assert.equal(project.wiki, "https://github.com/blixten85/Bastion/wiki");
   assert.equal(project.wikiPortalUrl, "/projekt/Bastion/wiki");
-  assert.equal(project.releases, "https://github.com/Avkroken/Bastion/releases");
+  assert.equal(project.releases, "https://github.com/blixten85/Bastion/releases");
   assert.equal(project.releasesPortalUrl, "/projekt/Bastion/releases");
-  assert.equal(project.issues, "https://github.com/Avkroken/Bastion/issues");
+  assert.equal(project.issues, "https://github.com/blixten85/Bastion/issues");
   assert.equal(project.issuesPortalUrl, "/projekt/Bastion/issues");
-  assert.equal(project.builds, "https://github.com/Avkroken/Bastion/actions");
+  assert.equal(project.builds, "https://github.com/blixten85/Bastion/actions");
   assert.equal(project.buildsPortalUrl, "/projekt/Bastion/builds");
   assert.equal(project.activityPortalUrl, "/projekt/Bastion/aktivitet");
 });
@@ -75,7 +75,7 @@ test("preserves the old published-site contract as an explicit derived flag", ()
 test("marks independent products without changing their runtime identity", () => {
   for (const name of ["Politiker", "Klarsprak", "Produkter"]) {
     assert.equal(
-      normalizePublicRepository(repo({ name, full_name: "Avkroken/" + name })).independentProduct,
+      normalizePublicRepository(repo({ name, full_name: "blixten85/" + name })).independentProduct,
       true
     );
   }
@@ -84,9 +84,9 @@ test("marks independent products without changing their runtime identity", () =>
 
 test("returns a stable sorted public project catalog", () => {
   const projects = normalizePublicRepositories([
-    repo({ name: "Produkter", full_name: "Avkroken/Produkter" }),
+    repo({ name: "Produkter", full_name: "blixten85/Produkter" }),
     repo({ name: ".github" }),
-    repo({ name: "Bastion", full_name: "Avkroken/Bastion" })
+    repo({ name: "Bastion", full_name: "blixten85/Bastion" })
   ]);
   assert.deepEqual(projects.map(project => project.name), ["Bastion", "Produkter"]);
 });
