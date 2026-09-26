@@ -413,7 +413,7 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 
 ### 0. Slutför Del 1-blockers
 
-1. Fastställ avsedd GitHub owner/topologi utifrån den verifierade flytten/resolveringen från `Avkroken/*` till `blixten85/*`.
+1. Fastställ avsedd GitHub owner/topologi utifrån den verifierade current-owner/resolveringen från `Avkroken/*` till `blixten85/*`.
 2. Först därefter: besluta om Portal/Skvallerbyttans organization-scoped discovery ska återställas eller ersättas av en user-owner-kompatibel modell.
 3. Verifiera Cloudflare live-state: Worker deployments, custom domains/routes, Service Bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
 4. Verifiera Figma-referensen när connectorn åter tillåter reads.
