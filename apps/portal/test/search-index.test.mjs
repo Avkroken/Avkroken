@@ -89,6 +89,42 @@ test("searchable docs are the intersection of public project and docs catalogs",
   );
 });
 
+test("protected docs are removed before title, snippet, metadata, URL, or cache-shaped payload can enter search work", () => {
+  const protectedMarkers = [
+    "PROTECTED_TITLE",
+    "PROTECTED_SNIPPET",
+    "PROTECTED_METADATA",
+    "https://jobb.denied.se/private",
+    "PROTECTED_CACHE_PAYLOAD"
+  ];
+  const docs = [
+    {
+      key: "Bastion",
+      name: "Bastion",
+      pages: [{ path: "docs/index.md", label: "Dokumentation" }]
+    },
+    {
+      key: "jobb",
+      name: "PROTECTED_TITLE",
+      description: "PROTECTED_SNIPPET",
+      metadata: "PROTECTED_METADATA",
+      canonicalUrl: "https://jobb.denied.se/private",
+      cachePayload: "PROTECTED_CACHE_PAYLOAD",
+      pages: [{ path: "private.md", label: "PROTECTED_METADATA" }]
+    }
+  ];
+
+  const filtered = filterSearchableDocs([{ slug: "Bastion" }], docs);
+  const tasks = selectSearchDocumentTasks(filtered, 10);
+  const serialized = JSON.stringify({ filtered, tasks });
+
+  assert.deepEqual(filtered.map(entry => entry.key), ["Bastion"]);
+  assert.deepEqual(tasks.map(task => task.entry.key), ["Bastion"]);
+  for (const marker of protectedMarkers) {
+    assert.equal(serialized.includes(marker), false, marker);
+  }
+});
+
 test("builds document results with Portal and canonical source URLs", () => {
   const entry = {
     key: "Bastion",
