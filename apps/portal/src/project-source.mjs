@@ -1,3 +1,4 @@
+import { GITHUB_OWNER, githubPagesUrl, isOwnedGitHubRepository } from "./github-scope.mjs";
 import { documentationPath, projectActivityPath, projectBuildsPath, projectIssuesPath, projectPath, projectReleasesPath, wikiPath } from "./portal-routes.mjs";
 import { isRetiredRepository } from "./repository-policy.mjs";
 
@@ -51,7 +52,7 @@ function repositoryUrl(repo) {
   if (typeof repo?.html_url === "string" && repo.html_url.startsWith("https://github.com/")) {
     return repo.html_url;
   }
-  return "https://github.com/Avkroken/" + encodeURIComponent(String(repo?.name || ""));
+  return "https://github.com/" + encodeURIComponent(GITHUB_OWNER) + "/" + encodeURIComponent(String(repo?.name || ""));
 }
 
 export function normalizePublicRepository(repo) {
@@ -59,6 +60,9 @@ export function normalizePublicRepository(repo) {
   if (!name) return null;
   if (repo?.visibility !== "public" || repo?.archived === true) return null;
   if (isRetiredRepository(name) || RESERVED_REPOSITORIES.has(name)) return null;
+
+  const fullName = typeof repo?.full_name === "string" ? repo.full_name : GITHUB_OWNER + "/" + name;
+  if (!isOwnedGitHubRepository(fullName)) return null;
 
   const topics = Array.isArray(repo?.topics) ? repo.topics : [];
   const homepage = publicHomepage(repo?.homepage);
@@ -89,9 +93,7 @@ export function normalizePublicRepository(repo) {
     releasesPortalUrl: projectReleasesPath(name),
     portalUrl: projectPath(name),
     documentation: documentationPath(name),
-    pages: repo?.has_pages === true
-      ? "https://avkroken.github.io/" + encodeURIComponent(name) + "/"
-      : null,
+    pages: repo?.has_pages === true ? githubPagesUrl(name) : null,
     language: typeof repo?.language === "string" ? repo.language : null,
     repoSizeKb: Number.isFinite(repo?.size) ? repo.size : null,
     updatedAt: repo?.pushed_at || repo?.updated_at || null,
@@ -99,7 +101,7 @@ export function normalizePublicRepository(repo) {
     source: {
       provider: "github",
       kind: "repository",
-      repository: repo?.full_name || "Avkroken/" + name,
+      repository: fullName,
       ref: repo?.default_branch || "main"
     }
   };
