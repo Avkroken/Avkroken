@@ -17,7 +17,7 @@ function project(overrides = {}) {
     source: {
       provider: "github",
       kind: "repository",
-      repository: "Avkroken/Bastion",
+      repository: "blixten85/Bastion",
       ref: "main"
     },
     ...overrides
@@ -32,7 +32,7 @@ function issue(overrides = {}) {
     state: "open",
     created_at: "2026-09-20T10:00:00Z",
     updated_at: "2026-09-25T10:30:00Z",
-    html_url: "https://github.com/Avkroken/Bastion/issues/42",
+    html_url: "https://github.com/blixten85/Bastion/issues/42",
     comments: 3,
     labels: [
       { name: "bug", color: "ff0000", description: "must-not-be-copied" },
@@ -54,7 +54,7 @@ test("normalizes a GitHub Issue to the minimal public Portal contract", () => {
     projectSlug: "Bastion",
     projectName: "Bastion",
     projectUrl: "/projekt/Bastion",
-    repository: "Avkroken/Bastion",
+    repository: "blixten85/Bastion",
     number: 42,
     title: "Fix portal route",
     state: "open",
@@ -62,7 +62,7 @@ test("normalizes a GitHub Issue to the minimal public Portal contract", () => {
     updatedAt: "2026-09-25T10:30:00Z",
     comments: 3,
     labels: ["bug", "portal"],
-    url: "https://github.com/Avkroken/Bastion/issues/42"
+    url: "https://github.com/blixten85/Bastion/issues/42"
   });
 
   const serialized = JSON.stringify(item);
@@ -89,7 +89,7 @@ test("filters pull requests returned by GitHub's Issues endpoint", () => {
 test("rejects malformed projects, issue states and non-canonical issue URLs", () => {
   assert.equal(
     normalizePublicIssue(
-      project({ type: "app", source: { provider: "github", kind: "monorepo_app", repository: "Avkroken/Avkroken" } }),
+      project({ type: "app", source: { provider: "github", kind: "monorepo_app", repository: "blixten85/Avkroken" } }),
       issue()
     ),
     null
@@ -103,7 +103,7 @@ test("rejects malformed projects, issue states and non-canonical issue URLs", ()
   );
   assert.equal(normalizePublicIssue(project(), issue({ state: "draft" })), null);
   assert.equal(
-    normalizePublicIssue(project(), issue({ html_url: "https://github.com/Avkroken/Other/issues/42" })),
+    normalizePublicIssue(project(), issue({ html_url: "https://github.com/blixten85/Other/issues/42" })),
     null
   );
 });
@@ -119,7 +119,7 @@ test("repository projects are the only eligible Issue sources", () => {
       source: {
         provider: "github",
         kind: "repository",
-        repository: "Avkroken/Produkter",
+        repository: "blixten85/Produkter",
         ref: "main"
       }
     }),
@@ -131,7 +131,7 @@ test("repository projects are the only eligible Issue sources", () => {
       source: {
         provider: "github",
         kind: "monorepo_app",
-        repository: "Avkroken/Avkroken"
+        repository: "blixten85/Avkroken"
       }
     })
   ];
@@ -144,9 +144,9 @@ test("repository projects are the only eligible Issue sources", () => {
 
 test("sorts Issues by latest update with a hard cap", () => {
   const items = normalizePublicIssues(project(), [
-    issue({ number: 1, updated_at: "2026-09-20T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/issues/1" }),
-    issue({ number: 2, updated_at: "2026-09-23T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/issues/2" }),
-    issue({ number: 3, updated_at: "2026-09-22T00:00:00Z", html_url: "https://github.com/Avkroken/Bastion/issues/3" })
+    issue({ number: 1, updated_at: "2026-09-20T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/issues/1" }),
+    issue({ number: 2, updated_at: "2026-09-23T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/issues/2" }),
+    issue({ number: 3, updated_at: "2026-09-22T00:00:00Z", html_url: "https://github.com/blixten85/Bastion/issues/3" })
   ]);
 
   assert.deepEqual(sortPublicIssues(items, 2).map(item => item.number), [2, 3]);
