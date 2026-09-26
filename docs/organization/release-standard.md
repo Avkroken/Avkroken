@@ -1,8 +1,8 @@
-# Release- och versionsstandard — Avkroken/Avkroken
+# Release- och versionsstandard — blixten85/Avkroken
 
 **Senast verifierad:** 2026-09-25
 
-Det här dokumentet gäller **Avkroken/Avkroken-monorepot**. Fristående repositories äger sina egna motsvarande releasekontrakt och ska inte behandla den här filen som sin tekniska source of truth.
+Det här dokumentet gäller **blixten85/Avkroken-monorepot**. Fristående repositories äger sina egna motsvarande releasekontrakt och ska inte behandla den här filen som sin tekniska source of truth.
 
 ## Syfte
 
