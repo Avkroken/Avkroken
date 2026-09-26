@@ -1,4 +1,4 @@
-# Dokumentationsmodell för Avkroken/Avkroken
+# Dokumentationsmodell för blixten85/Avkroken
 
 **Scope:** endast detta monorepo.
 
@@ -27,7 +27,7 @@ För en icke-trivial app används normalt:
 
 Appens egna tekniska fakta ska ligga nära appen.
 
-`docs/organization/` får endast innehålla sådant som verkligen delas av flera appar i `Avkroken/Avkroken` eller gäller rootens repositorystruktur/workflows.
+`docs/organization/` får endast innehålla sådant som verkligen delas av flera appar i `blixten85/Avkroken` eller gäller rootens repositorystruktur/workflows.
 
 Det får inte innehålla central current-state för fristående repositories.
 
@@ -47,7 +47,7 @@ Wiki är presentation/navigation. Den får inte bli enda platsen för teknisk cu
 
 ## Samlad organisationsvy
 
-`Avkroken/.github` kan automatiskt spegla dokumentation från repositories och deras Wikis. Spegeln ska alltid länka till ursprungskällan och får aldrig bli canonical.
+`blixten85/.github` kan automatiskt spegla dokumentation från repositories och deras Wikis. Spegeln ska alltid länka till ursprungskällan och får aldrig bli canonical.
 
 ## Säkerhet
 
