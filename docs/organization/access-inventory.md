@@ -1,6 +1,6 @@
 # Access-klassificering för Avkrokens webbappar
 
-> **Scope:** Detta dokument gäller webbappar i `Avkroken/Avkroken`-monorepot. Fristående Avkroken-repositories äger sin egen accessdokumentation och styrs inte av denna fil.
+> **Scope:** Detta dokument gäller webbappar i `blixten85/Avkroken`-monorepot. Fristående Avkroken-repositories äger sin egen accessdokumentation och styrs inte av denna fil.
 
 
 Det här dokumentet beskriver **klassificeringsmodellen**, inte den aktuella operativa hostinventeringen. Grundregeln är **privat tills motsatsen är uttryckligen beslutad**.
