@@ -21,7 +21,7 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--ak-font-sans);
   color: var(--text);
   background:
     radial-gradient(circle at 14% 8%, rgba(36,231,232,.11), transparent 27rem),
@@ -179,7 +179,7 @@ h1 {
   letter-spacing: .15em;
   color: #b6c8df;
   text-decoration: none;
-  transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
+  transition: border-color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), background var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), box-shadow var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 .manifesto a:nth-child(1) { color: #4ce9e6; }
 .manifesto a:nth-child(2) { color: #62aefa; }
@@ -246,7 +246,7 @@ h1 {
   background: linear-gradient(155deg, rgba(13,23,41,.86), rgba(6,11,20,.72));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
   text-decoration: none;
-  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+  transition: transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), border-color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), background var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 
 .card::after {
@@ -286,7 +286,7 @@ h1 {
 .arrow {
   color: #6d86a5;
   font-size: 1.15rem;
-  transition: transform .18s ease, color .18s ease;
+  transition: transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 .card:hover .arrow { transform: translate(2px,-2px); color: var(--cyan); }
 
@@ -334,7 +334,7 @@ h1 {
   text-decoration: none;
   font: 650 .66rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   letter-spacing: .04em;
-  transition: border-color .18s ease, background .18s ease, color .18s ease, transform .18s ease;
+  transition: border-color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), background var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 
 .card-action.primary {

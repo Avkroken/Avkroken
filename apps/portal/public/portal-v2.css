@@ -187,7 +187,7 @@ body.portal-v2::before {
 }
 
 .portal-route-panel {
-  animation: portal-panel-in .16s ease-out;
+  animation: portal-panel-in var(--ak-motion-duration-fast) var(--ak-motion-ease-out);
 }
 
 @keyframes portal-panel-in {
@@ -318,7 +318,7 @@ body.portal-v2::before {
 
 a.portal-summary-card,
 a.portal-product-card {
-  transition: border-color .16s ease, transform .16s ease, background .16s ease;
+  transition: border-color var(--ak-motion-duration-fast) var(--ak-motion-ease-standard), transform var(--ak-motion-duration-fast) var(--ak-motion-ease-standard), background var(--ak-motion-duration-fast) var(--ak-motion-ease-standard);
 }
 
 a.portal-summary-card:hover,
@@ -970,7 +970,7 @@ a.portal-product-card:hover {
 }
 
 .operations-capability-key {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ak-font-mono);
 }
 
 .operations-capability-state {
@@ -1311,7 +1311,7 @@ a.portal-product-card:hover {
 .activity-row-meta span:last-child {
   padding-right: 0;
   border-right: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ak-font-mono);
 }
 
 .activity-row-time {
@@ -1327,7 +1327,7 @@ a.portal-product-card:hover {
 .activity-row-time span {
   max-width: 260px;
   overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--ak-font-mono);
 }
 
 .portal-v2 footer {
@@ -1360,7 +1360,7 @@ a.portal-product-card:hover {
 .home-control-card {
   display: block;
   min-height: 154px;
-  transition: border-color .16s ease, transform .16s ease, background .16s ease;
+  transition: border-color var(--ak-motion-duration-fast) var(--ak-motion-ease-standard), transform var(--ak-motion-duration-fast) var(--ak-motion-ease-standard), background var(--ak-motion-duration-fast) var(--ak-motion-ease-standard);
 }
 
 .home-control-card:hover {
@@ -1739,8 +1739,8 @@ a.portal-product-card:hover {
   .portal-v2 *::before,
   .portal-v2 *::after {
     scroll-behavior: auto !important;
-    transition-duration: .01ms !important;
-    animation-duration: .01ms !important;
+    transition-duration: var(--ak-motion-duration-reduced) !important;
+    animation-duration: var(--ak-motion-duration-reduced) !important;
     animation-iteration-count: 1 !important;
   }
 }
