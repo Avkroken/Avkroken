@@ -1,9 +1,9 @@
 name: Provision Worker Preview resources
 
 on:
-  push:
+  pull_request:
     branches:
-      - chatgpt/portal-v2-architecture/2026-09-26/14-18-del1
+      - main
     paths:
       - .github/workflows/provision-worker-previews.yml
 
@@ -17,6 +17,7 @@ concurrency:
 jobs:
   provision:
     name: Provision isolated Preview resources
+    if: ${{ github.head_ref == 'chatgpt/portal-v2-architecture/2026-09-26/14-18-del1' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
