@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot public-safe observerad Activity-integration: 2026-09-25.
+Senast verifierad mot Portal v2 design-tokenkontrakt och public-safe observerad integration: 2026-09-26.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -40,7 +40,7 @@ Worker-koden innehåller idag:
 - path-baserad klientnavigation i `public/shell.js`;
 - server-side shell fallback för kända Portal-dokumentroutes;
 - stabila dokumentations-URL:er;
-- Portal v2 design tokens och shell-CSS;
+- Portal v2 design tokens för semantic/interactive colors, typography, spacing, form, elevation, focus, motion och responsive reference values samt shell-CSS;
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
 - projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
 - Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
