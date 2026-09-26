@@ -1,6 +1,6 @@
 # Portal v2 — Del 1: verifierad arkitekturbas
 
-**Status:** pågående; repository-/GitHub-state och current GitHub owner-modell är verifierade och implementerade på arbetsgrenarna, men Del 1 är ännu inte Definition of Done eftersom Cloudflare live-state, Figma-liveinspektion och full release/tag-liveinventering inte kunde verifieras från tillgängliga verktyg.
+**Status:** pågående; repository-/GitHub-state och current GitHub owner-modell är verifierade och implementerade på arbetsgrenarna. Cloudflare Workers Preview-felet är verifierat till saknade `previews`-block, men säkra Preview-resurser är ännu inte verifierade/tillgängliga. Del 1 är därför ännu inte Definition of Done; Figma-liveinspektion och full release/tag-liveinventering återstår också.
 
 **Verifieringsdatum:** 2026-09-26
 
@@ -204,7 +204,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
 | GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
-| Cloudflare live deployment | Repository-konfiguration är läst och GitHub CI/dry-run är grön, men Cloudflare Workers Builds preview fallerar på samma PR-head för `avkroken`, `skvallerbyttan` och `jobb`; buildlogg/account/Worker/routes/Access/service bindings/D1 jurisdiction kan inte läsas live från tillgängliga verktyg | Verifiera Cloudflare buildlogg och live-state före merge/driftändring | Portal + Skvallerbyttan + Jobb | hög; gemensamt provider-/previewlager är misstänkt men rotorsak är inte verifierad | Del 1/3 blocker |
+| Cloudflare Workers Previews | Buildloggarna för `avkroken`, `skvallerbyttan` och `jobb` visar samma deterministiska fel: `npx wrangler preview` stoppar eftersom respektive Wrangler-konfiguration saknar ett `previews`-block. GitHub CI/dry-run är grön. Cloudflare Preview är separat från production och kräver preview-safe vars/bindings; repo innehåller inga verifierade preview-D1/R2/Secrets Store/Analytics Engine-resurser att binda | Skapa eller verifiera separata preview-resurser i Cloudflare, lägg därefter in fullständig `previews`-konfiguration per app och verifiera Preview-build/runtime | Portal + Skvallerbyttan + Jobb | hög om production-resurser återanvänds; risk för state-/secret-läckage eller falskt grön men ofullständig Preview | Del 1/3 blocker |
 | Figma live reference | Runtime-designsystem och repo-dokumentation är läst; Figma MCP stoppades av verktygets plan/rate limit | Figma-referensens aktuella pages/components/tokens verifierade när connectorn åter är tillgänglig | Portal design | låg för runtime, eftersom Git är runtime source of truth; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
 | Releaseautomation | Conventional Commit-/SemVer-kontrakt finns, men full release-PR-automation är avsiktligt ej aktiverad | CI-kompatibel least-privilege releaseidentitet eller annan verifierad modell | monorepo + valda repos | write-permission/CI-bypass-risk | Del 3 |
@@ -425,7 +425,7 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 ### 0. Slutför Del 1-blockers
 
 1. GitHub owner/topologi: **löst** — `blixten85` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
-2. Verifiera Cloudflare live-state och de aktuella failed Workers Builds-previewkörningarna för `avkroken`, `skvallerbyttan` och `jobb`: buildkommando, previewkommando, root directory/watch paths, Worker deployments, custom domains/routes, Service Bindings, preview-bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
+2. Cloudflare Preview-rootorsak är verifierad: alla tre builds kör `npx wrangler preview` och saknar app-local `previews`-block. Nästa providersteg är att verifiera eller skapa separata preview-safe resurser innan config skrivs: Jobb behöver minst preview-D1, preview-R2 och säkra Preview-bindings för Secrets Store/Browser/Email/Workflow; Skvallerbyttan behöver preview-D1, preview Analytics Engine och Preview Secrets Store-bindings; Portal behöver Preview-vars/Email och verifierad Preview-modell för Service Binding, medan Durable Objects isoleras enligt Cloudflares Preview-modell. Produktionens dataresurser får inte återanvändas som genväg.
 3. Verifiera Figma-referensen när connectorn åter tillåter reads.
 4. Komplettera live release/tag-inventering för de repos som faktiskt ska vara versionsbara.
 5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `blixten85` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
@@ -468,7 +468,7 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | designsystemplan | verifierad i repo, Figma live blockerad | runtime Git är source of truth |
 | releaseinventering | delvis verifierad | kontrakt/config inventerade; full provider tag/releasehistorik kvar |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
-| blockers dokumenterade | verifierad | Cloudflare live/Workers Builds preview, Figma live och full release/tag-liveinventering återstår; GitHub owner/scope är löst |
+| blockers dokumenterade | verifierad | Cloudflare Workers Preview-rootorsak är verifierad men säkra Preview-resurser saknas; Figma live och full release/tag-liveinventering återstår; GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
 
 Del 1 får **inte** markeras klar förrän de blockerande live-state-punkterna ovan är verifierade eller uttryckligen lösta genom ett förankrat arkitekturbeslut.
