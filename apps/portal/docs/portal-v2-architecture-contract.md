@@ -1,6 +1,6 @@
 # Portal v2 — Del 1: verifierad arkitekturbas
 
-**Status:** pågående; repository-/GitHub-state är verifierad, men Del 1 är ännu inte Definition of Done eftersom Cloudflare live-state och Figma-liveinspektion inte kunde verifieras från tillgängliga verktyg och GitHub owner/scope kräver ett uttryckligt arkitekturbeslut innan providerberoende kod ändras.
+**Status:** pågående; repository-/GitHub-state och current GitHub owner-modell är verifierade och implementerade på arbetsgrenarna, men Del 1 är ännu inte Definition of Done eftersom Cloudflare live-state, Figma-liveinspektion och full release/tag-liveinventering inte kunde verifieras från tillgängliga verktyg.
 
 **Verifieringsdatum:** 2026-09-26
 
@@ -28,18 +28,29 @@ GitHub-connectorn visar följande åtkomliga repositories:
 
 Inget av de repositories som connectorn returnerade var arkiverat.
 
-### 1.1 Kritisk GitHub owner/scope-avvikelse
+### 1.1 GitHub owner/account-modell — beslutad och implementerad
 
-Det finns en verifierad konflikt mellan aktuell GitHub-providerstate och current `main`:
+Projektbeslut 2026-09-26:
 
-- GitHub-resolvering av `https://github.com/Avkroken/Avkroken`, `/Bastion` och `/.github` returnerar samma repository-ID:n men med aktuell owner `blixten85`.
-- Den anslutna GitHub-identiteten rapporterar inga organisationsmedlemskap.
-- Portalens current `main` anropar fortfarande `https://api.github.com/orgs/Avkroken/repos`.
-- Skvallerbyttan har fortfarande `SKVALLERBYTTAN_ORG = Avkroken` och använder organization-scoped GitHub App-installationsuppslag.
+- aktuell canonical GitHub owner är användarkontot `blixten85`;
+- account type är **User**, inte GitHub Organization;
+- kontots login planeras bytas från `blixten85` till `Avkroken` omkring 6–7 oktober 2026;
+- namnbytet är en separat senare migrering och ska inte förhandsimplementeras som om `Avkroken` redan vore current owner.
 
-Detta ska behandlas som en blocker, inte döljas genom automatisk omskrivning. En ändring från organization-scoped GitHub-modell till user-scoped modell påverkar discovery, GitHub App-installation, webhooks, permissions och eventuellt governance-capabilities. Den ändringen är därför materiell arkitektur och får inte göras som en opportunistisk fix.
+Live-resolveringen av tidigare `Avkroken/*`-URL:er till samma repository-ID:n under `blixten85/*` bekräftade current repository ownership. Den tidigare runtimekoden var däremot fortfarande organization-scoped.
 
-Före providerberoende implementation måste den avsedda GitHub-topologin fastställas: antingen återställs/fortsätter en faktisk organisation `Avkroken`, eller så beslutas och implementeras en verifierad user-owner-modell. Portal och Skvallerbyttan ska därefter använda samma canonical scope.
+User-owner-modellen är därför implementerad på Del 1-arbetet:
+
+- Portal har en central current-owner-konstant `blixten85` och listar publika repositories via user-owner-scope;
+- canonical repository-, docs-, Issues-, Releases-, Builds- och Activity-validering använder samma ownerkontrakt;
+- Portalens projektcache har versionshöjts så äldre `Avkroken/*`-state inte överlever en deployment;
+- Skvallerbyttan använder GitHub App-installationens `GET /installation/repositories` för repository inventory i stället för organization repository listing;
+- GitHub App-installationen valideras genom current canonical repository `blixten85/Avkroken`;
+- `SKVALLERBYTTAN_GITHUB_OWNER=blixten85` är current config, med legacy `SKVALLERBYTTAN_ORG` endast som kompatibilitetsfallback;
+- organization-only Actions policies, Custom Properties och organization security configuration markeras explicit `not_supported` när GitHub App-installationens account type är User, i stället för att 404 behandlas som okänd providerstate;
+- motsvarande Pages/Wiki-spegeländring ligger separat i `blixten85/.github` PR #89.
+
+Det planerade username-bytet omkring 6–7 oktober ändrar inte account type. Om kontot fortsatt är ett GitHub User-konto ska organization-only capabilities därför fortsatt vara `not_supported` efter namnbytet. Oktoberjobbet ska huvudsakligen uppdatera current owner-värden/canonical länkar och därefter verifiera GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden.
 
 ### 1.2 Branch- och PR-state
 
@@ -184,7 +195,7 @@ Verifierad `wiki-sync.yml` finns i current repositories för bland annat monorep
 - publicerar en genererad läsvy;
 - är inte canonical;
 - exkluderar monorepots generiska `apps/**`-innehåll;
-- exkluderar `Avkroken/Avkroken` från den generiska sökindexvägen eftersom monorepot innehåller både publika och skyddade appytor.
+- exkluderar `blixten85/Avkroken` från den generiska sökindexvägen eftersom monorepot innehåller både publika och skyddade appytor.
 
 Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske genom uttrycklig app-policy, inte genom en generell Pages-indexerare.
 
@@ -192,7 +203,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
-| GitHub owner/scope | Provider-resolvering returnerar `blixten85/*`, medan Portal/Skvallerbyttan använder `Avkroken` organization-scope | En canonical och live-verifierad GitHub-topologi som både Portal och Skvallerbyttan använder | Portal + Skvallerbyttan | hög; discovery/auth/webhooks/governance kan annars läsa fel scope | Del 1 blocker |
+| GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och spegeln på `.github` PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
 | Cloudflare live deployment | Repository-konfiguration är läst, men account/Worker/routes/Access/service bindings/D1 jurisdiction kunde inte läsas live från tillgängliga verktyg | Live-state verifierad mot Cloudflare före driftändringar | Portal + Skvallerbyttan + Jobb | hög vid driftändring | Del 3 blocker |
 | Figma live reference | Runtime-designsystem och repo-dokumentation är läst; Figma MCP stoppades av verktygets plan/rate limit | Figma-referensens aktuella pages/components/tokens verifierade när connectorn åter är tillgänglig | Portal design | låg för runtime, eftersom Git är runtime source of truth; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
@@ -413,11 +424,11 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 
 ### 0. Slutför Del 1-blockers
 
-1. Fastställ avsedd GitHub owner/topologi utifrån den verifierade current-owner/resolveringen från `Avkroken/*` till `blixten85/*`.
-2. Först därefter: besluta om Portal/Skvallerbyttans organization-scoped discovery ska återställas eller ersättas av en user-owner-kompatibel modell.
-3. Verifiera Cloudflare live-state: Worker deployments, custom domains/routes, Service Bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
-4. Verifiera Figma-referensen när connectorn åter tillåter reads.
-5. Komplettera live release/tag-inventering för de repos som faktiskt ska vara versionsbara.
+1. GitHub owner/topologi: **löst** — `blixten85` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
+2. Verifiera Cloudflare live-state: Worker deployments, custom domains/routes, Service Bindings, Access-gränser, D1 jurisdiction/migrationsstate och relevanta credentials/permissions utan att skriva ut hemligheter.
+3. Verifiera Figma-referensen när connectorn åter tillåter reads.
+4. Komplettera live release/tag-inventering för de repos som faktiskt ska vara versionsbara.
+5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `blixten85` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
 
 ### 1. Del 2 — Shell/design/docs som audit
 
@@ -442,7 +453,7 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 
 | Krav | Status | Evidens/kommentar |
 | --- | --- | --- |
-| relevant GitHub live-state | delvis verifierad | repos/default branches/PRs/branches och owner-resolvering verifierade; GitHub owner/topologi konflikt kvar |
+| relevant GitHub live-state | verifierad för current owner-modell | repos/default branches/PRs/branches, current User-owner `blixten85`, resolvering och account-type-konsekvens verifierade; runtime user-owner-stöd är CI-verifierat på arbetsgren |
 | current default branch läst | verifierad | `main` och relevanta appdocs/config lästa |
 | öppna relevanta PRs/branches inventerade | verifierad | inga öppna PRs; stale/supersederade Portal-grenar identifierade |
 | Portal current architecture | verifierad i repository | runtime/routes/adapters/cache/docs lästa |
@@ -457,7 +468,7 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | designsystemplan | verifierad i repo, Figma live blockerad | runtime Git är source of truth |
 | releaseinventering | delvis verifierad | kontrakt/config inventerade; full provider tag/releasehistorik kvar |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
-| blockers dokumenterade | verifierad | GitHub owner/scope, Cloudflare live, Figma live, release live |
+| blockers dokumenterade | verifierad | Cloudflare live, Figma live och full release/tag-liveinventering återstår; GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
 
 Del 1 får **inte** markeras klar förrän de blockerande live-state-punkterna ovan är verifierade eller uttryckligen lösta genom ett förankrat arkitekturbeslut.
