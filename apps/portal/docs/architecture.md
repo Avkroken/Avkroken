@@ -62,7 +62,7 @@ Monorepo-appar publiceras med explicit opt-in via en appägd `portal.public.json
 
 Discovery-flödet:
 
-1. Portalen hittar det publika `Avkroken/Avkroken`-repositoryt i den redan hämtade organisationslistan.
+1. Portalen hittar det publika `blixten85/Avkroken`-repositoryt i den redan hämtade organisationslistan.
 2. Portalen listar endast toppnivån `apps/` internt.
 3. För varje appkatalog försöker den läsa exakt `portal.public.json`.
 4. `404` betyder “inte publicerad” och genererar ingen publik projektpost.
@@ -365,7 +365,7 @@ Ingen Portal-sidvisning startar en Actions-providerrefresh.
 
 Katalog och innehåll har sex timmars CDN-cache och cache tags.
 
-Appdokument använder source-repositoryts tagg. Skvallerbyttans appdokument i `Avkroken/Avkroken` taggas därför som `docs-repo-avkroken`, så befintlig push-signal från monorepot invalidaterar rätt katalog/innehåll.
+Appdokument använder source-repositoryts tagg. Skvallerbyttans appdokument i `blixten85/Avkroken` taggas därför som `docs-repo-avkroken`, så befintlig push-signal från monorepot invalidaterar rätt katalog/innehåll.
 
 `DocsInvalidationService` tillåter intern, explicit invalidering för berörda repositories.
 

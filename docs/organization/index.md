@@ -1,6 +1,6 @@
-# Delad dokumentation för Avkroken/Avkroken
+# Delad dokumentation för blixten85/Avkroken
 
-> **Scope:** Den här katalogen gäller endast `Avkroken/Avkroken` och apparna i detta monorepo. Den är inte source of truth för fristående Avkroken-repositories.
+> **Scope:** Den här katalogen gäller endast `blixten85/Avkroken` och apparna i detta monorepo. Den är inte source of truth för fristående Avkroken-repositories.
 
 ## Delade monorepodokument
 
@@ -23,7 +23,7 @@
 
 Bastion, Docker-idempotent-update, Klarsprak, Pastebinit, Politiker och Produkter äger själva sin dokumentation, Wiki, Issues och Discussions. Denna katalog ska inte duplicera eller styra deras tekniska current-state.
 
-Den samlade organisationsvyn kan byggas automatiskt i `Avkroken/.github`, men den vyn är endast en lässpegel.
+Den samlade organisationsvyn kan byggas automatiskt i `blixten85/.github`, men den vyn är endast en lässpegel.
 
 ## Grundregel
 

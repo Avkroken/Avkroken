@@ -1,6 +1,6 @@
-# Dokumentationsintegration i Avkroken/Avkroken
+# Dokumentationsintegration i blixten85/Avkroken
 
-Detta dokument beskriver **endast monorepot `Avkroken/Avkroken`**.
+Detta dokument beskriver **endast monorepot `blixten85/Avkroken`**.
 
 ## Ansvar
 
@@ -36,7 +36,7 @@ Varje app under `apps/*` äger:
 
 Det finns ingen central engineeringkälla som fristående repositories måste läsa.
 
-### Avkroken/.github
+### blixten85/.github
 
 Får bära organisationsprofil, community health och en **genererad lässpegel** av dokumentation. Spegeln är navigation, inte source of truth.
 

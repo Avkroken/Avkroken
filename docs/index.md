@@ -1,6 +1,6 @@
 # Dokumentation
 
-Det här är dokumentationskartan för `Avkroken/Avkroken`.
+Det här är dokumentationskartan för `blixten85/Avkroken`.
 
 ## Appar
 
@@ -25,4 +25,4 @@ Varje fristående repository äger själv:
 - Discussions,
 - repo-specifika tekniska instruktioner.
 
-Den samlade organisationsvyn kan speglas automatiskt via `Avkroken/.github`, men spegeln är inte canonical.
+Den samlade organisationsvyn kan speglas automatiskt via `blixten85/.github`, men spegeln är inte canonical.
