@@ -55,10 +55,10 @@ jobs:
             existing="$(jq -r --arg name "$name" '.[] | select(.name == $name) | (.uuid // .id)' /tmp/d1-list.json | head -n1)"
 
             if [[ -z "$existing" || "$existing" == "null" ]]; then
-              echo "Creating D1 database: $name"
-              npx --yes "wrangler@${WRANGLER_VERSION}" d1 create "$name" --jurisdiction eu
+              echo "Creating D1 database: $name" >&2
+              npx --yes "wrangler@${WRANGLER_VERSION}" d1 create "$name" --jurisdiction eu >&2
             else
-              echo "Reusing D1 database: $name"
+              echo "Reusing D1 database: $name" >&2
             fi
 
             npx --yes "wrangler@${WRANGLER_VERSION}" d1 info "$name" --json
