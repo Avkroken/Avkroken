@@ -47,7 +47,7 @@ test("normalizes an explicitly opted-in public app without inventing a public en
   assert.equal(project.source.path, "apps/skvallerbyttan");
   assert.equal(
     project.sourceUrl,
-    "https://github.com/blixten85/blixten85/tree/main/apps/skvallerbyttan"
+    "https://github.com/blixten85/Avkroken/tree/main/apps/skvallerbyttan"
   );
 });
 
