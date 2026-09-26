@@ -244,7 +244,7 @@ export async function handleGitHubWebhook(request: Request, env: Env): Promise<R
 
   const signature = request.headers.get("x-hub-signature-256");
   if (!(await verifyWebhookSignature(body, signature, secret))) {
-    console.warn("github organization webhook signature rejected", {
+    console.warn("github webhook signature rejected", {
       hookId: hookId || null,
       hookTargetType: hookTargetType || null,
       event: event || null,
@@ -266,7 +266,7 @@ export async function handleGitHubWebhook(request: Request, env: Env): Promise<R
   const repo = repoFromPayload(payload);
   const owner = ownerFromPayload(payload);
   if (owner && owner.toLowerCase() !== organization(env).toLowerCase()) {
-    return response({ ok: true, ignored: "different organization" }, 202);
+    return response({ ok: true, ignored: "different owner" }, 202);
   }
 
   const docsInvalidation = portalDocsInvalidation(event, payload);
