@@ -77,7 +77,7 @@ Faktisk GitHub App-installation, secret-/variable-provisionering och eventuell �
 
 ### Runtime secret-sync
 
-`../../../.github/workflows/sync-skvallerbyttan-runtime-secrets.yml` är endast `workflow_dispatch` och delar concurrency-grupp med produktionsdeploy. Före någon Worker-binding skrivs validerar workflowen Skvallerbyttans Client ID och private key mot GitHub som App och mot Avkrokens App-installation. Ett ogiltigt eller mismatchat client-id/private-key-värde stoppar synken före mutation.
+`../../../.github/workflows/sync-skvallerbyttan-runtime-secrets.yml` är endast `workflow_dispatch` och delar concurrency-grupp med produktionsdeploy. Före någon Worker-binding skrivs validerar workflowen Skvallerbyttans Client ID och private key mot GitHub som App och mot GitHub App-installationen för current owner/repository. Ett ogiltigt eller mismatchat client-id/private-key-värde stoppar synken före mutation.
 
 Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den ensam äger på runtime-sidan:
 
@@ -85,24 +85,24 @@ Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den
 - `GAMNACKEN_GITHUB_APP_PRIVATE_KEY` från GitHub Actions-secret
 - valfri `SKVALLERBYTTAN_READ_API_TOKEN`
 
-`SKVALLERBYTTAN_WEBHOOK_SECRET` ingår avsiktligt **inte** i den generella runtime-secret-syncen. GitHub-webhookens secret är ett kopplat provider-/runtimevärde: om endast Worker-sidan skrivs om bryts HMAC-verifieringen för alla GitHub-leveranser. En rotation ska därför göras som en samordnad driftåtgärd där samma värde sätts på GitHub organization webhook och Worker-secretet och därefter verifieras med en signerad leverans som returnerar HTTP 202.
+`SKVALLERBYTTAN_WEBHOOK_SECRET` ingår avsiktligt **inte** i den generella runtime-secret-syncen. GitHub-webhookens secret är ett kopplat provider-/runtimevärde: om endast Worker-sidan skrivs om bryts HMAC-verifieringen för alla GitHub-leveranser. En rotation ska därför göras som en samordnad driftåtgärd där samma värde sätts på den aktuella GitHub provider-webhooken och Worker-secretet och därefter verifieras med en signerad leverans som returnerar HTTP 202.
 
 R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets Store.
 
-Runtimekoden verifierar organization-webhookpayloads med `SKVALLERBYTTAN_WEBHOOK_SECRET`. Gamnacken används av koden för read-auth; faktisk App-/organization-webhookkonfiguration är extern GitHub-state. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
+Runtimekoden verifierar signerade GitHub provider-webhookpayloads med `SKVALLERBYTTAN_WEBHOOK_SECRET` och accepterar endast events vars owner matchar current owner-konfigurationen när owner finns i payloaden. Gamnacken används av koden för read-auth; faktisk App-/webhookkonfiguration är extern GitHub-state. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
 
 ### Återställning vid GitHub-webhookstorm
 
 Om Workers Logs visar stora mängder `POST /webhooks/github` ska hook-targeten avgöra åtgärden:
 
 - `integration`: runtime behandlar GitHub App-webhookingress som migrations-/legacyinput. Vilka Apps eller webhooks som faktiskt finns i GitHub måste verifieras externt.
-- `organization` med `invalid webhook signature`: verifiera att GitHub-webhooken och Worker-runtime använder samma HMAC-secret utan att skriva ut värdet.
+- icke-`integration` med `invalid webhook signature`: verifiera att den aktuella GitHub provider-webhooken och Worker-runtime använder samma HMAC-secret utan att skriva ut värdet.
 - Vid rotation måste provider- och runtime-sidan uppdateras samordnat och därefter verifieras med en signerad leverans.
 - Skicka eller dokumentera aldrig själva secretvärdet i repository, PR, logg eller chatt.
 
 GitHub-webhookkoden kan trigga portalens dokumentationsfreshness. På docs-relevanta `push`-events på publik default branch samt `repository`-events anropar Skvallerbyttan `AVKROKEN_PORTAL_DOCS.invalidateDocs(...)`. RPC-anropet kräver ingen ytterligare secret och går inte via publik HTTP. Tre korta retryförsök görs; vid fortsatt fel loggas signalfelet medan GitHub-eventet fortfarande kan lagras och portalens edge-TTL fungerar som fallback.
 
-Webhooken lagrar alla signerade, organisationsmatchande leveranser som reducerad Activity. Händelser som motsvarar canonical dashboard-state invalidaterar dessutom berörda source-cacher. `custom_property` och `custom_property_values` invalidaterar governance/effective-policy så ändrade Custom Properties blir synliga utan att vänta på TTL. Issue-relation events klassificeras under den gemensamma pull-request/issues-capabilityn utan att råpayload sparas.
+Webhooken lagrar alla signerade, owner-matchande leveranser som reducerad Activity. Händelser som motsvarar canonical dashboard-state invalidaterar dessutom berörda source-cacher. `custom_property` och `custom_property_values` invalidaterar governance/effective-policy så ändrade Custom Properties blir synliga utan att vänta på TTL. Issue-relation events klassificeras under den gemensamma pull-request/issues-capabilityn utan att råpayload sparas.
 
 Deploy av en Worker med Secrets Store-bindings kräver att W1 täcker Secrets Store Write. Varje bunden secret måste dessutom vara scope:ad för `workers`.
 
@@ -186,7 +186,7 @@ Var 15:e minut gör runtime en intern readiness-probe och levererar resultatet v
 - Cloudflare R2-probe via Account
 - Cloudflare R3-probe via Tunnels
 
-Heartbeat-leveransen skickas även när readiness är false. GitHub-proben skriver `github.avkroken.repositories` och Cloudflare R1/R2/R3-proberna skriver sina reducerade resultat till `capability_observations`, så provider-health överlever Worker-isolatgränser och kan skilja `available`, `permission_denied`, `error` och verkligt `not_observed`. En capability-specifik 403 från exempelvis organization governance får därmed inte felaktigt klassificera hela GitHub-providern som auth-fel. Mottagarsidan avgör liveness utifrån egen mottagningstid.
+Heartbeat-leveransen skickas även när readiness är false. GitHub-proben skriver `github.avkroken.repositories` och Cloudflare R1/R2/R3-proberna skriver sina reducerade resultat till `capability_observations`, så provider-health överlever Worker-isolatgränser och kan skilja `available`, `permission_denied`, `error` och verkligt `not_observed`. En capability-specifik 403 från exempelvis organization-only governance får därmed inte felaktigt klassificera hela GitHub-providern som auth-fel. Mottagarsidan avgör liveness utifrån egen mottagningstid.
 
 Avkroken-portalen lagrar heartbeat i ett separat Durable Object, förväntar leverans var 15:e minut och larmar via Cloudflare Email Service om ingen leverans har mottagits inom 35 minuter. Portalens watchdog kör var 10:e minut. När leveransen återkommer efter stale skickas återställningsnotis. Inga providercredentials eller providerpayloads ingår i heartbeat.
 
@@ -247,14 +247,14 @@ Cron var 15:e minut:
 - kör GitHub repository inventory
 - läser verkliga öppna pull requests och issues per repository
 - läser Actions runs per repository
-- läser organization code scanning, Dependabot och secret scanning alerts
+- läser organization security alerts endast när provider/account type stödjer ytan; User-owner returnerar `not_supported`
 - läser och normaliserar repository effective rulesets med bounded concurrency
 - uppdaterar repository-scope coverage och capability freshness
 
 Cron var sjätte timme fortsätter som bredare safety net:
 
 - uppdaterar GitHub overview
-- uppdaterar GitHub organization governance där read-permission finns
+- uppdaterar GitHub organization-only governance endast när provider/account type stödjer ytan
 - uppdaterar Cloudflare account/zones/Workers
 - uppdaterar D1/KV/R2 inventories
 - uppdaterar Access applications och Tunnels
