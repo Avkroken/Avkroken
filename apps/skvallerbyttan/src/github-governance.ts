@@ -53,6 +53,16 @@ function safeObject(value: unknown, depth = 0): unknown {
   return output;
 }
 
+function githubProviderFailure(error: unknown): OptionalResult<never> {
+  return {
+    available: false,
+    value: null,
+    status: 0,
+    reason: error instanceof Error ? error.message : String(error),
+    acceptedPermissions: null,
+  };
+}
+
 function notSupportedSection(reason = "github_user_account_has_no_organization_scope"): Record<string, unknown> {
   return {
     status: "not_supported",
@@ -219,7 +229,36 @@ export function normalizeSecurityConfiguration(value: unknown): Record<string, u
 
 export async function getGitHubOrganizationGovernance(env: Env): Promise<Record<string, unknown>> {
   const org = organization(env);
-  const installation = await getGitHubInstallationMetadataLive(env);
+  let installation: Awaited<ReturnType<typeof getGitHubInstallationMetadataLive>>;
+  try {
+    installation = await getGitHubInstallationMetadataLive(env);
+  } catch (error) {
+    const unavailable = githubProviderFailure(error);
+    await Promise.all([
+      observeResult(env, "github.avkroken.organization.actions_permissions", unavailable),
+      observeResult(env, "github.avkroken.custom_properties", unavailable),
+      observeResult(env, "github.avkroken.security_configurations", unavailable),
+    ]);
+    return {
+      schemaVersion: 2,
+      generatedAt: new Date().toISOString(),
+      organization: org,
+      accountType: null,
+      actions: {
+        permissions: section(unavailable),
+        selectedActions: section(unavailable),
+        workflowPermissions: section(unavailable),
+      },
+      customProperties: {
+        definitions: section(unavailable),
+        assignments: section(unavailable),
+      },
+      securityConfigurations: {
+        configurations: section(unavailable),
+        defaults: section(unavailable),
+      },
+    };
+  }
   if (installation.accountType?.toLowerCase() === "user") {
     const observation = {
       status: "not_supported" as const,
@@ -322,7 +361,32 @@ export async function loadGitHubRepositoryEffectivePolicy(
   const scopeId = `${org}/${repoName}`;
   const encodedRepo = `${encodeURIComponent(org)}/${encodeURIComponent(repoName)}`;
   const retrievedAt = new Date().toISOString();
-  const installation = await getGitHubInstallationMetadataLive(env);
+  let installation: Awaited<ReturnType<typeof getGitHubInstallationMetadataLive>>;
+  try {
+    installation = await getGitHubInstallationMetadataLive(env);
+  } catch (error) {
+    const unavailable = githubProviderFailure(error);
+    const rulesetObservation = resultObservation(scopeId, unavailable);
+    return {
+      value: {
+        schemaVersion: 2,
+        generatedAt: retrievedAt,
+        organization: org,
+        repository: repoName,
+        effectiveGovernance: {
+          rulesets: section(unavailable),
+          actions: {
+            permissions: section(unavailable),
+            selectedActions: section(unavailable),
+            workflowPermissions: section(unavailable),
+          },
+          customProperties: section(unavailable),
+          securityConfiguration: section(unavailable),
+        },
+      },
+      rulesetObservation,
+    };
+  }
   const organizationOwned = installation.accountType?.toLowerCase() !== "user";
   const [rulesets, actions, selectedActions, workflowPermissions] = await Promise.all([
     githubListAll<UnknownRecord>(env, `/repos/${encodedRepo}/rulesets?includes_parents=true&per_page=100`, 5),
