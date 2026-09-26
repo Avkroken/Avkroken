@@ -72,6 +72,7 @@ export interface Env {
   CLOUDFLARE_API_TOKEN_R3?: SecretValue;
 
   SKVALLERBYTTAN_ALLOWED_GITHUB_IDS?: string;
+  SKVALLERBYTTAN_GITHUB_OWNER?: string;
   SKVALLERBYTTAN_ORG?: string;
 }
 
@@ -124,6 +125,11 @@ export async function cloudflareApiToken(
   return resolveSecretValue(classToken(env, credentialClass));
 }
 
+export function githubOwner(env: Env): string {
+  return env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || env.SKVALLERBYTTAN_ORG?.trim() || "blixten85";
+}
+
+// Compatibility alias while older callers and fixtures still use organization terminology.
 export function organization(env: Env): string {
-  return env.SKVALLERBYTTAN_ORG?.trim() || "Avkroken";
+  return githubOwner(env);
 }
