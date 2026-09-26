@@ -42,6 +42,7 @@ async function githubGet(fetchImpl, path, jwt) {
 export async function verifyGitHubAppSource({
   clientId,
   privateKeyPem,
+  owner,
   organization,
   fetchImpl = fetch,
   nowSeconds,
@@ -58,17 +59,17 @@ export async function verifyGitHubAppSource({
     throw new Error("GitHub App credential validation returned a different client id");
   }
 
-  const org = organization?.trim();
-  if (!org) throw new Error("GitHub organization is missing");
+  const accountOwner = owner?.trim() || organization?.trim();
+  if (!accountOwner) throw new Error("GitHub owner is missing");
 
   const installationResponse = await githubGet(
     fetchImpl,
-    `/orgs/${encodeURIComponent(org)}/installation`,
+    `/repos/${encodeURIComponent(accountOwner)}/Avkroken/installation`,
     jwt,
   );
   if (!installationResponse.ok) {
     throw new Error(
-      `GitHub App installation validation failed for ${org} (HTTP ${installationResponse.status})`,
+      `GitHub App installation validation failed for ${accountOwner}/Avkroken (HTTP ${installationResponse.status})`,
     );
   }
 
@@ -84,16 +85,20 @@ export async function verifyConfiguredGitHubAppSource() {
   const raw = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   const config = JSON.parse(raw);
   const clientId = String(process.env.GAMNACKEN_GITHUB_APP_CLIENT_ID || "").trim();
-  const organization = String(config?.vars?.SKVALLERBYTTAN_ORG || "Avkroken").trim();
+  const owner = String(
+    config?.vars?.SKVALLERBYTTAN_GITHUB_OWNER ||
+    config?.vars?.SKVALLERBYTTAN_ORG ||
+    "blixten85"
+  ).trim();
   const privateKeyPem = String(process.env.GAMNACKEN_GITHUB_APP_PRIVATE_KEY || "");
 
   await verifyGitHubAppSource({
     clientId,
     privateKeyPem,
-    organization,
+    owner,
   });
 
-  console.log(`Gamnacken GitHub App source credential validated for ${organization}.`);
+  console.log(`Gamnacken GitHub App source credential validated for ${owner}/Avkroken.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
