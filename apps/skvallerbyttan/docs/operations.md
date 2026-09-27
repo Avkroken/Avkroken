@@ -64,7 +64,7 @@ Vanliga Worker runtime-bindings/secrets:
 
 Gamnackens GitHub App-identitet består i runtime av `GAMNACKEN_GITHUB_APP_CLIENT_ID` och `GAMNACKEN_GITHUB_APP_PRIVATE_KEY`. GitHub Actions-workflows refererar till samma bindingnamn. App-JWT signeras med RS256; private key måste höra till Gamnacken. Koden accepterar PKCS#1 `RSA PRIVATE KEY` och PKCS#8 `PRIVATE KEY`; PKCS#1 wrap:as till PKCS#8 i minnet före Web Crypto-import. GitHub App client secret behövs inte för installation-auth-flödet. Repositorykoden använder dessa bindingnamn för GitHub App-auth.
 
-GitHub Actions som muterar Cloudflare använder endast `CLOUDFLARE_API_TOKEN_W1`. Wrangler får värdet via den miljövariabel som verktyget kräver, `CLOUDFLARE_API_TOKEN`, men det finns inget generiskt org-secret med det namnet.
+Cloudflare-mutationer för deployment utförs av Workers Builds med Cloudflare-ägd buildidentitet; GitHub Actions bär ingen Cloudflare deploycredential.
 
 ### Runtime credential contract
 
@@ -75,21 +75,15 @@ Repositoryt deklarerar GitHub App-bindings med namnen:
 
 Faktisk GitHub App-installation, secret-/variable-provisionering och eventuell äldre App-state är extern GitHub/Cloudflare-state och dokumenteras inte här.
 
-### Runtime secret-sync
+### Runtime secrets
 
-`../../../.github/workflows/sync-skvallerbyttan-runtime-secrets.yml` är endast `workflow_dispatch` och delar concurrency-grupp med produktionsdeploy. Före någon Worker-binding skrivs validerar workflowen Skvallerbyttans Client ID och private key mot GitHub som App och mot GitHub App-installationen för current owner/repository. Ett ogiltigt eller mismatchat client-id/private-key-värde stoppar synken före mutation.
+GitHub Actions synkar inte längre Worker-runtime-secrets till Cloudflare. Runtime-secretvärden ägs på Cloudflare-sidan och ska inte dupliceras i GitHub.
 
-Workflowen använder W1 och synkar endast Worker-lokala bindings/secrets som den ensam äger på runtime-sidan:
+R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets Store enligt `wrangler.jsonc`. Övriga deklarerade Worker-secrets är extern Cloudflare runtime-state tills de uttryckligen migreras till Secrets Store.
 
-- `GAMNACKEN_GITHUB_APP_CLIENT_ID` från GitHub Actions-variable
-- `GAMNACKEN_GITHUB_APP_PRIVATE_KEY` från GitHub Actions-secret
-- valfri `SKVALLERBYTTAN_READ_API_TOKEN`
+`SKVALLERBYTTAN_WEBHOOK_SECRET` är fortsatt ett kopplat provider-/runtimevärde. Rotation ska göras samordnat mellan GitHub-webhooken och Cloudflare-runtime och verifieras med en signerad leverans som returnerar HTTP 202.
 
-`SKVALLERBYTTAN_WEBHOOK_SECRET` ingår avsiktligt **inte** i den generella runtime-secret-syncen. GitHub-webhookens secret är ett kopplat provider-/runtimevärde: om endast Worker-sidan skrivs om bryts HMAC-verifieringen för alla GitHub-leveranser. En rotation ska därför göras som en samordnad driftåtgärd där samma värde sätts på den aktuella GitHub provider-webhooken och Worker-secretet och därefter verifieras med en signerad leverans som returnerar HTTP 202.
-
-R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets Store.
-
-Runtimekoden verifierar signerade GitHub provider-webhookpayloads med `SKVALLERBYTTAN_WEBHOOK_SECRET` och accepterar endast events vars owner matchar current owner-konfigurationen när owner finns i payloaden. Gamnacken används av koden för read-auth; faktisk App-/webhookkonfiguration är extern GitHub-state. Runtime identifierar en kvarvarande App-webhook primärt via GitHubs `X-GitHub-Hook-Installation-Target-Type: integration` och använder payloadens `installation` endast som fallback. Sådana leveranser kvitteras tyst med HTTP 202 och får inte skapa Activity, cacheinvalidations, säkerhetsledger eller en extra warning-logg per leverans. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
+Runtimekoden verifierar signerade GitHub provider-webhookpayloads och accepterar endast events vars owner matchar current owner-konfigurationen när owner finns i payloaden. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
 
 ### Återställning vid GitHub-webhookstorm
 
@@ -297,23 +291,27 @@ Cloudflare sparar Ratelimit/Ratelimit-Policy/Retry-After och throttlingstate fr�
 Insyn visar denna senaste observerade budgetstate. Avsaknad av tidigare anrop är `not_observed`, inte healthy.
 
 
-## Explicit produktionsdeploy
+## Produktionsdeploy
 
-`.github/workflows/deploy-production.yml` är den reproducerbara vägen för att föra en redan mergad version till produktion. Workflowen är endast `workflow_dispatch`, vägrar köra från annat ref än `main` och kör i ordning:
+Cloudflare Workers Builds äger produktionsdeploymenten. GitHub Actions används endast för repository-CI och bär ingen Cloudflare deploycredential.
 
-1. `npm run check`
-2. valfri, default-på `wrangler d1 migrations apply STATS_DB --remote` för alla väntande versionerade D1-migrationer
-3. `npm run deploy`
-4. `npm run verify:production` som verifierar den versionsstyrda push-monitoring-konfigurationen (heartbeat-cron + intern receiver-binding)
+Workers Builds ska använda app-roten `apps/skvallerbyttan` och produktionskommandot:
 
-Workflowen använder W1 genom `CLOUDFLARE_API_TOKEN_W1`. Wrangler exponeras värdet som `CLOUDFLARE_API_TOKEN`, vilket är verktygets fasta miljövariabelnamn och inte ett separat generiskt org-secret.
+```bash
+npm run deploy:workers-builds
+```
 
-W1 behöver täcka Worker deployment/routes och D1 Write när remote migration körs. Eftersom Worker-konfigurationen innehåller Secrets Store-bindings kräver Cloudflare dessutom Secrets Store Write på deploytokenet. W1 distribueras inte till observationsruntime som providercredential.
+Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main` och kör i ordning:
 
-Migrationerna `0001`–`0005` använder defensiva `CREATE ... IF NOT EXISTS` där tabeller/index skapas. `0006_capability_scope_observations.sql` är däremot en normal versionsstyrd engångsmigration: den utökar den befintliga `capability_observations`-tabellen med `ALTER TABLE ... ADD COLUMN` och skapar därefter den nya scope-tabellen/indexen. Den ska därför appliceras genom Wranglers migrationsregister, som kör endast väntande migrationsfiler och inte applicerar en redan registrerad migration igen.
+1. `npm run check`;
+2. `wrangler d1 migrations apply STATS_DB --remote`;
+3. `npm run deploy`;
+4. `npm run verify:production`.
+
+Migrationerna `0001`–`0005` använder defensiva `CREATE ... IF NOT EXISTS` där tabeller/index skapas. `0006_capability_scope_observations.sql` är en normal versionsstyrd engångsmigration och ska appliceras genom Wranglers migrationsregister.
 
 Repositoryts livenessmodell bygger på receiver-observerad heartbeat snarare än ett post-deploy GET-anrop.
 
 ## Deploymentgräns
 
-`npm run deploy` är en explicit produktionsåtgärd. Kodmerge, D1 migration, secret-provisionering, provider-permissionändringar och Worker deployment är separata steg och ska verifieras var för sig.
+Merge till `main` kan utlösa Cloudflare Workers Builds och därmed produktionsdeployment. D1-migration, Worker-deploy och produktionsverifiering hålls i samma versionsstyrda Workers Builds-script. Secret-provisionering och provider-permissionändringar ligger fortsatt utanför Git och sker separat i respektive provider.

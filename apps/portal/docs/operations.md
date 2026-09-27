@@ -33,21 +33,17 @@ Den här gaten verifierar repositoryimplementationen. Den ersätter inte produkt
 
 ## Deployment
 
-Repositoryts `.github/workflows/deploy-portal.yml` är produktionsflödet för Portal.
+Cloudflare Workers Builds äger Portalens produktionsdeployment. GitHub Actions kör repository-CI men bär ingen Cloudflare deploycredential.
 
-Aktuellt versionsstyrt kontrakt:
+Workers Builds ska använda app-roten `apps/portal` och produktionskommandot:
 
-- workflow startas manuellt;
-- deployjobbet använder `apps/portal` som working directory;
-- production deployment måste köras från `main`;
-- befintlig repository secret mappas till `CLOUDFLARE_API_TOKEN`;
-- workflow kör Wrangler dry-run före deployment;
-- deployment kör `npm run deploy`.
+```bash
+npm run deploy:workers-builds
+```
 
-Feature branches ska inte deploya produktion.
+Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör Portalens Node-tester och Wrangler dry-run före `npm run deploy`. Feature branches får inte använda produktionsscriptet.
 
-När Builds/CI- och Activity-integrationen senare rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Därefter kan Portal-versionen som anropar metoderna deployas. Service Bindingens target/entrypoint ändras inte och ingen ny secret behövs.
-
+När Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Service Bindingens target/entrypoint ändras inte och ingen GitHub-secret behövs.
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
 
@@ -306,7 +302,7 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 6. deep links returnerar Portal-shell;
 7. `/projekt/Bastion` och `/projekt/skvallerbyttan` renderar projektdetalj från den publika katalogen utan extra providerfetch; Skvallerbyttans detalj visar appens canonical source-path men ingen privat dashboard-payload;
 8. `/projekt/Bastion/wiki` renderar Wiki-presentation från publika Portal-kataloger och länkar till original-Wikin; `/projekt/skvallerbyttan/wiki` publiceras inte eftersom appen inte har eget Wiki-kontrakt;
-9. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `blixten85/Avkroken`;
+9. `/projekt/skvallerbyttan/dokumentation` renderar app-lokal README/docs med source-path-oberoende URL och “Visa original” till `Avkroken/Avkroken`;
 10. en godtycklig Jobb-path mot `/api/docs/content` ger inte en publik dokumentträff;
 11. `/auth/jobb[/...]` redirectar till Jobbs skyddade origin och Jobb-data går inte att hämta genom publika Portal-routes;
 12. sök på ett publikt dokument ger Portal-resultat + canonical original, medan `jobb` inte kan ge skyddad Jobb-dokumentation genom indexet;

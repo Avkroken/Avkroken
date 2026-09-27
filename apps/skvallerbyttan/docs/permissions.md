@@ -24,7 +24,7 @@ Den här matrisen beskriver minsta provider-permissions för observationslagret.
 
 
 
-Current owner är `blixten85` (GitHub User). Gamnackens faktiska permission-state verifieras i runtime från Appens egen installationsmetadata och de kortlivade installation-tokenpermissionnivåerna. För endpoint-specifik evidens sparas även GitHubs `X-Accepted-GitHub-Permissions` när headern finns. Endast permissionnamn/nivåer exponeras; installation token, private key och credentialvärden exponeras aldrig.
+Current owner är `Avkroken` (GitHub User). Gamnackens faktiska permission-state verifieras i runtime från Appens egen installationsmetadata och de kortlivade installation-tokenpermissionnivåerna. För endpoint-specifik evidens sparas även GitHubs `X-Accepted-GitHub-Permissions` när headern finns. Endast permissionnamn/nivåer exponeras; installation token, private key och credentialvärden exponeras aldrig.
 
 Repository-scopeade PR/issues, Actions och effective rulesets registreras per repository och aggregeras med explicit scope coverage. Ett lyckat repoanrop får därför inte markera hela capabilityn som available om andra förväntade repositories är denied eller felar.
 

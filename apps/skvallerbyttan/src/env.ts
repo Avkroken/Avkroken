@@ -126,7 +126,7 @@ export async function cloudflareApiToken(
 }
 
 export function githubOwner(env: Env): string {
-  return env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || env.SKVALLERBYTTAN_ORG?.trim() || "blixten85";
+  return env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || env.SKVALLERBYTTAN_ORG?.trim() || "Avkroken";
 }
 
 // Compatibility alias while older callers and fixtures still use organization terminology.

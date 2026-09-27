@@ -24,18 +24,17 @@ Det kör `@avkroken/web`-paketets Wrangler-baserade devscript.
 
 ## Deployment
 
-Det versionsstyrda produktionskommandot är:
+Cloudflare Workers Builds äger produktionsdeploymenten. GitHub Actions används endast för repository-CI och behöver ingen Cloudflare deploy-secret.
+
+Workers Builds ska använda app-roten `apps/jobb` och:
 
 ```bash
-pnpm deploy:cloudflare
+pnpm deploy:workers-builds
 ```
 
-Enligt `apps/jobb/package.json` gör kommandot två saker i ordning:
+Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör `pnpm typecheck` och `pnpm test`, och anropar därefter `pnpm deploy:cloudflare`.
 
-1. applicerar D1-migrationer remote via `apps/jobb/wrangler.jsonc`;
-2. deployar Workern med samma Wrangler-konfiguration.
-
-Hur ett externt CI/CD-system triggar detta kommando är inte canonical repo-state och ska inte hårdkodas i detta dokument.
+`pnpm deploy:cloudflare` applicerar D1-migrationer remote via `apps/jobb/wrangler.jsonc` och deployar därefter Workern med samma konfiguration.
 
 ## D1 data locality
 

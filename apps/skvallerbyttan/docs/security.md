@@ -59,7 +59,7 @@ Klasserna är partitionerade och rangordnade utan arv. Ett R3-token ersätter d�
 
 Worker-runtime får `CLOUDFLARE_API_TOKEN_R1`, `CLOUDFLARE_API_TOKEN_R2` och `CLOUDFLARE_API_TOKEN_R3` som Cloudflare Secrets Store-bindings. Koden hämtar värdet asynkront via bindingens `get()` och har ingen generisk Cloudflare-tokenfallback. De bundna secreten ska vara scope:ade för `workers`.
 
-Produktionsdeploy och explicit secret-sync använder W1 som operationscredential genom `CLOUDFLARE_API_TOKEN_W1`. W1 distribueras inte till observationsruntime som providercredential. Deploycredentialen behöver de rättigheter som Cloudflare kräver för de operationer workflowen kör; faktisk tokenpermission-state dokumenteras inte här.
+Produktionsdeploy ägs av Cloudflare Workers Builds med Cloudflare-ägd buildidentitet. GitHub Actions lagrar eller distribuerar ingen Cloudflare deploycredential och synkar inte runtime-secrets till Workern. Faktisk build-tokenpermission-state är extern Cloudflare-state.
 
 Observationskoden får inte använda W1/O1 som fallback vid 403. En saknad providerpermission ska i stället rapporteras som capability-/permission-state.
 

@@ -4,7 +4,7 @@
 
 **Verifieringsdatum:** 2026-09-26
 
-**Verifierad Git-bas:** `blixten85/Avkroken@86fd260d156a88357614d7ddb0329736d4128e0b` på `main`.
+**Verifierad Git-bas:** `Avkroken/Avkroken@86fd260d156a88357614d7ddb0329736d4128e0b` på `main`.
 
 Det här dokumentet är Del 1-leveransen för Portal v2 och ska läsas tillsammans med Portalens övriga appdokumentation. Det beskriver verifierad current state, identifierade gap och beslutad arkitekturriktning. Extern provider-state som inte har kunnat läsas verifierbart markeras som blockerad eller okänd; den ersätts inte med antaganden från äldre dokument.
 
@@ -16,14 +16,14 @@ GitHub-connectorn visar följande åtkomliga repositories:
 
 | Repository | Visibility | Default branch | Roll i Portal v2 |
 | --- | --- | --- | --- |
-| `blixten85/Avkroken` | public | `main` | monorepo för Portal, Skvallerbyttan och Jobb |
-| `blixten85/.github` | public | `main` | GitHub-profil/community health och genererad dokumentationsspegel |
-| `blixten85/Bastion` | public | `main` | fristående projekt |
-| `blixten85/Produkter` | public | `main` | självständig publik produkt |
-| `blixten85/Klarsprak` | public | `main` | självständig publik produkt |
-| `blixten85/Politiker` | public | `main` | självständig publik produkt |
-| `blixten85/Pastebinit` | public | `main` | fristående repository |
-| `blixten85/Docker-idempotent-update` | public | `main` | fristående repository |
+| `Avkroken/Avkroken` | public | `main` | monorepo för Portal, Skvallerbyttan och Jobb |
+| `Avkroken/.github` | public | `main` | GitHub-profil/community health och genererad dokumentationsspegel |
+| `Avkroken/Bastion` | public | `main` | fristående projekt |
+| `Avkroken/Produkter` | public | `main` | självständig publik produkt |
+| `Avkroken/Klarsprak` | public | `main` | självständig publik produkt |
+| `Avkroken/Politiker` | public | `main` | självständig publik produkt |
+| `Avkroken/Pastebinit` | public | `main` | fristående repository |
+| `Avkroken/Docker-idempotent-update` | public | `main` | fristående repository |
 
 Inget av de repositories som connectorn returnerade var arkiverat.
 
@@ -31,29 +31,29 @@ Inget av de repositories som connectorn returnerade var arkiverat.
 
 Projektbeslut 2026-09-26:
 
-- aktuell canonical GitHub owner är användarkontot `blixten85`;
+- aktuell canonical GitHub owner är användarkontot `Avkroken`;
 - account type är **User**, inte GitHub Organization;
-- kontots login planeras bytas från `blixten85` till `Avkroken` omkring 6–7 oktober 2026;
+- kontots login planeras bytas från `Avkroken` till `Avkroken` omkring 6–7 oktober 2026;
 - namnbytet är en separat senare migrering och ska inte förhandsimplementeras som om `Avkroken` redan vore current owner.
 
-Live-resolveringen av tidigare `Avkroken/*`-URL:er till samma repository-ID:n under `blixten85/*` bekräftade current repository ownership. Den tidigare runtimekoden var däremot fortfarande organization-scoped.
+Live-resolveringen av tidigare `Avkroken/*`-URL:er till samma repository-ID:n under `Avkroken/*` bekräftade current repository ownership. Den tidigare runtimekoden var däremot fortfarande organization-scoped.
 
 User-owner-modellen är därför implementerad på Del 1-arbetet:
 
-- Portal har en central current-owner-konstant `blixten85` och listar publika repositories via user-owner-scope;
+- Portal har en central current-owner-konstant `Avkroken` och listar publika repositories via user-owner-scope;
 - canonical repository-, docs-, Issues-, Releases-, Builds- och Activity-validering använder samma ownerkontrakt;
 - Portalens projektcache har versionshöjts så äldre `Avkroken/*`-state inte överlever en deployment;
 - Skvallerbyttan använder GitHub App-installationens `GET /installation/repositories` för repository inventory i stället för organization repository listing;
-- GitHub App-installationen valideras genom current canonical repository `blixten85/Avkroken`;
-- `SKVALLERBYTTAN_GITHUB_OWNER=blixten85` är current config, med legacy `SKVALLERBYTTAN_ORG` endast som kompatibilitetsfallback;
+- GitHub App-installationen valideras genom current canonical repository `Avkroken/Avkroken`;
+- `SKVALLERBYTTAN_GITHUB_OWNER=Avkroken` är current config, med legacy `SKVALLERBYTTAN_ORG` endast som kompatibilitetsfallback;
 - organization-only Actions policies, Custom Properties och organization security configuration markeras explicit `not_supported` när GitHub App-installationens account type är User, i stället för att 404 behandlas som okänd providerstate;
-- motsvarande Pages/Wiki-spegeländring är mergad i `blixten85/.github` via PR #89.
+- motsvarande Pages/Wiki-spegeländring är mergad i `Avkroken/.github` via PR #89.
 
 Det planerade username-bytet omkring 6–7 oktober ändrar inte account type. Om kontot fortsatt är ett GitHub User-konto ska organization-only capabilities därför fortsatt vara `not_supported` efter namnbytet. Oktoberjobbet ska huvudsakligen uppdatera current owner-värden/canonical länkar och därefter verifiera GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden.
 
 ### 1.2 Branch- och PR-state
 
-`blixten85/Avkroken` hade inga öppna pull requests vid verifieringen.
+`Avkroken/Avkroken` hade inga öppna pull requests vid verifieringen.
 
 Portal v2 har däremot redan implementerats i betydande omfattning på `main` genom tidigare mergade PR:er, bland annat shell/routing, project source, app-discovery, dokumentation, Wiki, global sök, Drift & insyn, Changelog, Releases, Issues, Builds/CI, Activity, accessibility och design-tokenkontrakt.
 
@@ -188,13 +188,13 @@ Repository-Wiki är presentation/navigation, inte canonical teknisk source of tr
 
 Verifierad `wiki-sync.yml` finns i current repositories för bland annat monorepot, Bastion, Produkter och Klarspråk. Ytterligare fristående repositories har också repo-lokala Wiki-flöden.
 
-`blixten85/.github` innehåller den automatiska dokumentationsspegeln och Pages-workflowen. Den spegeln:
+`Avkroken/.github` innehåller den automatiska dokumentationsspegeln och Pages-workflowen. Den spegeln:
 
 - läser publik repositorydokumentation/Wikis;
 - publicerar en genererad läsvy;
 - är inte canonical;
 - exkluderar monorepots generiska `apps/**`-innehåll;
-- exkluderar `blixten85/Avkroken` från den generiska sökindexvägen eftersom monorepot innehåller både publika och skyddade appytor.
+- exkluderar `Avkroken/Avkroken` från den generiska sökindexvägen eftersom monorepot innehåller både publika och skyddade appytor.
 
 Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske genom uttrycklig app-policy, inte genom en generell Pages-indexerare.
 
@@ -202,13 +202,13 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
-| GitHub owner/login | Current owner är verifierat User-kontot `blixten85`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `blixten85` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
+| GitHub owner/login | Current owner är verifierat User-kontot `Avkroken`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `Avkroken` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
 | Cloudflare Workers Previews | Grundfelet var saknade `previews`-block. Nu har alla tre appar explicit Preview-konfiguration och Workers Builds är verifierat gröna på samma branch-head. Portal använder isolerad Preview-Durable Object. Jobb och Skvallerbyttan är medvetet fail-closed utan production-D1/R2/Secrets Store/Service Bindings/Workflows; Skvallerbyttan använder separat Preview Analytics Engine-dataset | Behåll grön fail-closed Preview som säker bas. Om full stateful Preview behövs: provisionera separata D1/R2-resurser via verifierad provider-write-kanal, applicera migrationer och bind dem explicit utan att återanvända production-state | Portal + Skvallerbyttan + Jobb | låg för nuvarande fail-closed build; hög om production-state senare återanvänds som genväg | Del 1 löst för build, Del 3 för stateful Preview |
 | Figma reference | Current `main` identifierar designfilen `https://www.figma.com/design/AuxqvEggmZa2DW5OgizhCj`. Figma är referens-/designsystemverktyg; Git/runtime är source of truth | Verifiera aktuell Figma-access och läsbar designstate hos providern när Del 2 genomför designaudit. Providerplan, seat och quota versionsstyrs inte här | Portal design | låg för runtime; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
 | Releaseautomation | Conventional Commit-/SemVer-kontrakt finns, men full release-PR-automation är avsiktligt ej aktiverad | CI-kompatibel least-privilege releaseidentitet eller annan verifierad modell | monorepo + valda repos | write-permission/CI-bypass-risk | Del 3 |
 | Releasekontrakt skiljer mellan repos | Bastion/Politiker/Pastebinit/Docker-idempotent-update har verifierade release-/PR-title-kontrakt; Produkter/Klarspråk har release notes config/Wiki men saknar motsvarande verifierat release-standard/pr-title-kontrakt | Endast faktiskt versionsbara repos får ett konsekvent, repoägt releasekontrakt | fristående repos | inkonsekventa releases | Del 3 |
-| Faktisk tag/releasehistorik | Providerverifierad 2026-09-26 via tillfällig read-only GitHub Actions-inventering mot exakta `blixten85/*`-repos. Ingen publik repo träffade 100-resultatsgränsen. Avkroken 0 releases/0 tags; Bastion 54/54, latest `v0.24.1`; Politiker 72/73, latest `v0.10.5`, extra tag `deployed`; Pastebinit 41/47, latest `v2.4.6`, sex äldre taggar utan Release; Docker-idempotent-update 24/24, latest `v3.3.5`; Produkter 45/46, latest `v1.4.5`, extra tag `deployed`; Klarsprak 7/7, latest `v1.0.6`; `.github` 0/0. Inga draft/prerelease Releases observerades i inventeringen | Använd denna live-bas när Del 3 klassificerar faktisk releaseautomation. Taggar utan Release får inte automatiskt presenteras som officiella Releases | versionsbara repos + publik stöd/governance | låg för historikbasen; kvarvarande risk är att framtida state ändras före Del 3 | Del 3 |
+| Faktisk tag/releasehistorik | Providerverifierad 2026-09-26 via tillfällig read-only GitHub Actions-inventering mot exakta `Avkroken/*`-repos. Ingen publik repo träffade 100-resultatsgränsen. Avkroken 0 releases/0 tags; Bastion 54/54, latest `v0.24.1`; Politiker 72/73, latest `v0.10.5`, extra tag `deployed`; Pastebinit 41/47, latest `v2.4.6`, sex äldre taggar utan Release; Docker-idempotent-update 24/24, latest `v3.3.5`; Produkter 45/46, latest `v1.4.5`, extra tag `deployed`; Klarsprak 7/7, latest `v1.0.6`; `.github` 0/0. Inga draft/prerelease Releases observerades i inventeringen | Använd denna live-bas när Del 3 klassificerar faktisk releaseautomation. Taggar utan Release får inte automatiskt presenteras som officiella Releases | versionsbara repos + publik stöd/governance | låg för historikbasen; kvarvarande risk är att framtida state ändras före Del 3 | Del 3 |
 | Gamnacken som fristående komponent | Namnet används i Skvallerbyttans GitHub App-bindings, men något fristående current repo/app syns inte i den installerade repositorylistan | Dokumentera endast den faktiska kvarvarande rollen efter live-verifiering av GitHub App/providerstate | Skvallerbyttan | stale arkitekturbild | Del 1/3 |
 
 ## 4. C — Beslutad informationsarkitektur
@@ -418,11 +418,11 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 
 ### 0. Slutför Del 1-blockers
 
-1. GitHub owner/topologi: **löst** — `blixten85` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
+1. GitHub owner/topologi: **löst** — `Avkroken` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
 2. Cloudflare Workers Preview-buildarna är lösta: `avkroken`, `skvallerbyttan` och `jobb` bygger grönt med fail-closed Preview-konfiguration. Portal har isolerad Durable Object-binding; Jobb exponerar endast Browser API-binding; Skvallerbyttan har current owner-var och separat Analytics Engine-dataset. Production-D1/R2/Secrets Store/Service Bindings/Workflows/Email är inte bundna i Preview. Full stateful Preview flyttas till Del 3 och kräver separat provider-resource-provisionering/migrering.
 3. Figma-referensen är identifierad. Del 2 ska verifiera aktuell provideraccess och designstate vid audit-tillfället; runtime-arkitekturen blockeras inte eftersom Git är uttrycklig source of truth.
 4. Releaseklassificering och full publik tag/GitHub Release-inventering är providerverifierad 2026-09-26. Del 3 ska utgå från denna bas men göra en ny live-read före automation, eftersom providerstate kan ändras.
-5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `blixten85` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
+5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `Avkroken` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
 
 ### 1. Del 2 — Shell/design/docs som audit
 
@@ -447,7 +447,7 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 
 | Krav | Status | Evidens/kommentar |
 | --- | --- | --- |
-| relevant GitHub live-state | verifierad för current owner-modell | repos/default branches/PRs/branches, current User-owner `blixten85`, resolvering och account-type-konsekvens verifierade; runtime user-owner-stöd är CI-verifierat på arbetsgren |
+| relevant GitHub live-state | verifierad för current owner-modell | repos/default branches/PRs/branches, current User-owner `Avkroken`, resolvering och account-type-konsekvens verifierade; runtime user-owner-stöd är CI-verifierat på arbetsgren |
 | current default branch läst | verifierad | `main` och relevanta appdocs/config lästa |
 | öppna relevanta PRs/branches inventerade | verifierad | inga öppna PRs; stale/supersederade Portal-grenar identifierade |
 | Portal current architecture | verifierad i repository | runtime/routes/adapters/cache/docs lästa |

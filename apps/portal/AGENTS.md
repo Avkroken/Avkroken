@@ -52,4 +52,4 @@ npm test
 npx wrangler deploy --dry-run --config wrangler.jsonc
 ```
 
-Kör dessutom relevanta branch/PR-checks. Production deployas endast från verifierad `main` enligt repositoryts deployworkflow.
+Kör dessutom relevanta branch/PR-checks. Production deployas endast från verifierad `main` via Cloudflare Workers Builds.
