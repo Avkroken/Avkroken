@@ -94,3 +94,33 @@ test("operations client clears previously rendered observations on failure", () 
   assert.ok(client.includes("errorState.hidden = false"));
 });
 
+test("operations client exposes the full Del 3 status and freshness vocabulary", () => {
+  for (const [statusValue, label] of [
+    ["available", "Tillgänglig"],
+    ["stale", "Inaktuell"],
+    ["not_observed", "Ej observerad"],
+    ["not_configured", "Ej konfigurerad"],
+    ["permission_denied", "Behörighet saknas"],
+    ["unavailable", "Otillgänglig"],
+    ["error", "Fel"],
+    ["unknown", "Okänd"],
+    ["not_supported", "Stöds inte"],
+    ["not_exposed_by_provider", "Exponeras inte av provider"]
+  ]) {
+    assert.ok(client.includes(`${statusValue}: "${label}"`), statusValue);
+  }
+
+  for (const [freshnessValue, label] of [
+    ["fresh", "Aktuell"],
+    ["stale", "Inaktuell"],
+    ["unknown", "Okänd"]
+  ]) {
+    assert.ok(client.includes(`${freshnessValue}: "${label}"`), freshnessValue);
+  }
+
+  assert.ok(client.includes("statusBadge(provider.status)"));
+  assert.ok(client.includes("statusBadge(item.status)"));
+  assert.ok(client.includes("freshnessLabel(item.freshness)"));
+  assert.ok(client.includes("formatDate(item.lastSuccessAt)"));
+});
+
