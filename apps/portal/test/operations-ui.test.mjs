@@ -61,3 +61,36 @@ test("Portal operations API uses the dedicated Skvallerbyttan RPC binding", () =
     entrypoint: "PortalObservationsService"
   });
 });
+
+test("operations API exposes explicit fail-closed degraded states", () => {
+  const start = worker.indexOf("async function getPublicOperations(env)");
+  const end = worker.indexOf("function operationalWatchdogStub", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const handler = worker.slice(start, end);
+
+  assert.ok(handler.includes('status: "not_configured"'));
+  assert.ok(handler.includes('error: "operations_not_configured"'));
+  assert.ok(handler.includes("status: 503"));
+
+  assert.ok(handler.includes('status: "error"'));
+  assert.ok(handler.includes('error: "operations_unavailable"'));
+  assert.ok(handler.includes("status: 502"));
+
+  assert.ok(handler.includes('available: false'));
+  assert.ok(handler.includes('"Cache-Control": "no-store"'));
+  assert.ok(handler.includes('"X-Content-Type-Options": "nosniff"'));
+  assert.equal(handler.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
+  assert.equal(handler.includes("/api/v1"), false);
+});
+
+test("operations client clears previously rendered observations on failure", () => {
+  assert.ok(client.includes('if (payload.available !== true) throw new Error("operations unavailable")'));
+  assert.ok(client.includes('status.textContent = "Otillgänglig"'));
+  assert.ok(client.includes("clear(providerGrid)"));
+  assert.ok(client.includes("clear(capabilitiesTarget)"));
+  assert.ok(client.includes('capabilitySummary.textContent = "—"'));
+  assert.ok(client.includes("errorState.hidden = false"));
+});
+
