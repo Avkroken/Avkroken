@@ -44,6 +44,9 @@ Portal v2 etablerar:
 - global och projektspecifik observerad Activity från Skvallerbyttans repositoryfiltrerade eventledger, med explicit coverage och utan resource-ID:n;
 - publika ytor för Drift & insyn, Changelog, Aktivitet, Auth och Sök utan fabricerad data;
 - strukturell separation mellan publik Auth-ingång och skyddad Jobb-origin.
+- stabila, statiska denied-routes för generell fallback, Access identity, Access policy och Gateway;
+- delad temaarkitektur via `data-theme` och samma token-/komponentlager för Avkroken, Legacy och Blackout;
+- fail-closed publik logo-read boundary på `/media/logos/<asset-id>` med fast R2-keyprefix och utan kataloglistning.
 
 Vyer med ännu ej inkopplad datakälla visar uttryckligen att integrationen ligger i ett senare arbete.
 
@@ -64,6 +67,11 @@ Portalen känner bland annat igen:
 - `/tjanster`
 - `/auth` — publik Auth-ingång.
 - `/auth/jobb[/...]` — server-side `302` till befintliga skyddade `https://jobb.denied.se/` före Portal-shell.
+- `/access-denied/` — generell statisk fallback.
+- `/access-denied/identity/` — Access identity-/autentiseringsfel.
+- `/access-denied/non-identity/` — Access deny efter identity-/policyutvärdering.
+- `/access-denied/gateway/` — separat Gateway-blocksida.
+- `/media/logos/<asset-id>` — publik read-only GET/HEAD för exakt logo-asset; är inte en katalogroute och ingår inte i SPA-fallback.
 - `/drift[/...]`
 - `/changelog`
 - `/aktivitet`
@@ -99,6 +107,22 @@ Monorepo-appar publiceras endast genom explicit opt-in. Portalen listar `apps/` 
 Manifestet får inte styra source-path, repository eller ref; de värdena kommer från discovery-konteksten. Okända manifestfält kopieras inte till den publika projektmodellen.
 
 För en opt-in-app använder samma manifestgräns även dokumentationsadaptern. Appens publika URL är source-path-oberoende, exempelvis `/projekt/skvallerbyttan/dokumentation/docs/architecture.md`, medan provideradaptern internt mappar den till `apps/skvallerbyttan/docs/architecture.md`. `Visa original` pekar på canonical GitHub-path.
+
+## Logo-assets och tema
+
+Den publika logo-routen accepterar endast ett validerat single-segment `asset-id` och mappar det internt till exakt R2-key `logos/<asset-id>`. Workern använder endast `get`; ingen publik listning eller godtycklig R2-key exponeras. Tillåtna svarstyper är avgränsade till bildformat och GET/HEAD-responser sätter `nosniff`, bounded publik cache och ETag när R2 tillhandahåller den. Matchande `If-None-Match` använder weak ETag comparison och returnerar `304` utan body.
+
+Källkoden förväntar sig en Worker-binding med namnet `PORTAL_LOGOS`, men checked-in `wrangler.jsonc` definierar ännu ingen sådan binding. Fram till att faktisk bucket och provider-state har verifierats returnerar logo-routen därför fail-closed `503`; inget bucketnamn hårdkodas eller antas i repositoryt.
+
+Admin/control plane för logotyper är inte implementerad i denna del. Repositoryt bevisar idag endast Jobbs separata skyddade auth-origin via `/auth/jobb`, inte en generell Portal-adminsession. `/admin/logos` och `/api/admin/logos/*` ska därför inte införas förrän den riktiga server-side identity/session-gränsen har lokaliserats och verifierats.
+
+Portalens tre shell-teman använder samma HTML, komponenter och semantiska tokens:
+
+- `forest` — Avkroken/Wrong Turn/Forest och default;
+- `legacy` — den tidigare blåare Portal-tonen;
+- `blackout` — neutral, mycket mörk variant.
+
+Teman väljs med `data-theme` på dokumentroten. Endast primitive färgtokens override:as; semantic/component tokens och accessibilitykontrakt delas.
 
 ## Källdata och ansvar
 

@@ -5,16 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#080b09">
-  <title>Åtkomst nekad — AVKROKEN</title>
+  <title>Åtkomst nekad av policy — AVKROKEN</title>
   <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="denied-page" data-denied-kind="general">
+<body class="denied-page" data-denied-kind="non-identity">
   <main class="denied-panel" aria-labelledby="denied-title">
-    <div class="denied-kicker">ACCESS / DENIED</div>
-    <h1 id="denied-title">Åtkomst nekad</h1>
-    <p class="denied-copy">Du kan inte nå den här resursen från den aktuella åtkomstvägen.</p>
-    <p class="denied-detail">Det här är Portalens generella fallback. Identity-, policy- och Gateway-fel har separata adresser så att rätt säkerhetslager kan hänvisa till rätt sida.</p>
+    <div class="denied-kicker">ACCESS / POLICY</div>
+    <h1 id="denied-title">Åtkomst nekad av policy</h1>
+    <p class="denied-copy">Identitetssteget nåddes, men den aktuella Access-policyn tillät inte begäran.</p>
+    <p class="denied-detail">Den här sidan är avsedd för Access deny efter identity- eller policyutvärdering. Gateway och originens egna 401/403 är separata lager.</p>
     <div class="denied-actions">
       <a class="button" href="/">Till AVKROKEN</a>
     </div>
