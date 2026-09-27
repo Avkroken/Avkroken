@@ -33,21 +33,17 @@ Den här gaten verifierar repositoryimplementationen. Den ersätter inte produkt
 
 ## Deployment
 
-Repositoryts `.github/workflows/deploy-portal.yml` är produktionsflödet för Portal.
+Cloudflare Workers Builds äger Portalens produktionsdeployment. GitHub Actions kör repository-CI men bär ingen Cloudflare deploycredential.
 
-Aktuellt versionsstyrt kontrakt:
+Workers Builds ska använda app-roten `apps/portal` och produktionskommandot:
 
-- workflow startas manuellt;
-- deployjobbet använder `apps/portal` som working directory;
-- production deployment måste köras från `main`;
-- befintlig repository secret mappas till `CLOUDFLARE_API_TOKEN`;
-- workflow kör Wrangler dry-run före deployment;
-- deployment kör `npm run deploy`.
+```bash
+npm run deploy:workers-builds
+```
 
-Feature branches ska inte deploya produktion.
+Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör Portalens Node-tester och Wrangler dry-run före `npm run deploy`. Feature branches får inte använda produktionsscriptet.
 
-När Builds/CI- och Activity-integrationen senare rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Därefter kan Portal-versionen som anropar metoderna deployas. Service Bindingens target/entrypoint ändras inte och ingen ny secret behövs.
-
+När Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Service Bindingens target/entrypoint ändras inte och ingen GitHub-secret behövs.
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
 
