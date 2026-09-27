@@ -122,6 +122,29 @@ body.portal-v2::before {
   border-left: 1px solid var(--line);
 }
 
+.portal-theme-control {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ak-space-2);
+  padding-left: var(--ak-space-2);
+  color: var(--ak-text-tertiary);
+  font: 650 .68rem/1 var(--ak-font-mono);
+  letter-spacing: .06em;
+}
+
+.portal-theme-control select {
+  min-height: 34px;
+  max-width: 9rem;
+  padding: 0 var(--ak-space-2);
+  border: 1px solid var(--ak-border-default);
+  border-radius: var(--ak-radius-2);
+  color: var(--ak-text-primary);
+  background: var(--ak-surface-default);
+  font: inherit;
+  cursor: pointer;
+}
+
 .portal-nav a {
   min-height: 40px;
   display: inline-flex;
