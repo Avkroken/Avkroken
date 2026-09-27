@@ -99,3 +99,28 @@ test("Changelog response is not persisted in Cache API", () => {
 test("Changelog has a dedicated API route", () => {
   assert.ok(worker.includes('url.pathname === "/api/changelog"'));
 });
+
+test("Changelog API fails closed with a bounded public error contract", () => {
+  const handler = section(
+    worker,
+    "async function getPublicChangelog(env)",
+    "async function getPublicOperations(env)"
+  );
+
+  assert.ok(handler.includes('status: "error"'));
+  assert.ok(handler.includes('error: "changelog_unavailable"'));
+  assert.ok(handler.includes("status: 502"));
+  assert.ok(handler.includes('"Cache-Control": "no-store"'));
+  assert.ok(handler.includes('"X-Content-Type-Options": "nosniff"'));
+  assert.equal(handler.includes("error.stack"), false);
+  assert.equal(handler.includes("providerError"), false);
+});
+
+test("Changelog client clears stale release state when upstream is unavailable", () => {
+  assert.ok(client.includes('if (payload.status !== "available") throw new Error("changelog unavailable")'));
+  assert.ok(client.includes('status.textContent = "Otillgänglig"'));
+  assert.ok(client.includes("currentReleases = []"));
+  assert.ok(client.includes("clear()"));
+  assert.ok(client.includes("errorState.hidden = false"));
+});
+
