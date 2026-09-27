@@ -13,6 +13,20 @@ const origin = `http://127.0.0.1:${serverPort}`;
 const driverOrigin = `http://127.0.0.1:${driverPort}`;
 const now = "2026-09-25T18:30:00Z";
 
+const topLevelRoutes = [
+  "/",
+  "/projekt",
+  "/dokumentation",
+  "/tjanster",
+  "/drift",
+  "/changelog",
+  "/aktivitet",
+  "/auth",
+  "/om",
+  "/sok",
+];
+
+
 const mime = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -269,18 +283,7 @@ async function main() {
     };
 
     await setViewport(1280, 900);
-    for (const path of [
-      "/",
-      "/projekt",
-      "/dokumentation",
-      "/tjanster",
-      "/drift",
-      "/changelog",
-      "/aktivitet",
-      "/auth",
-      "/om",
-      "/sok",
-    ]) {
+    for (const path of topLevelRoutes) {
       await runAxe(path);
     }
 
@@ -317,7 +320,7 @@ async function main() {
     assert.equal(active.visible, 1);
 
     await setViewport(390, 844);
-    for (const path of ["/", "/dokumentation", "/aktivitet"]) {
+    for (const path of topLevelRoutes) {
       await runAxe(path);
       const overflow = await execute(
         `var viewport = document.documentElement.clientWidth;
