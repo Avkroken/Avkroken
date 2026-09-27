@@ -310,6 +310,11 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/tjanster` — publika tjänster/produkter.
 - `/auth` — publik auth-ingång utan skyddad payload.
 - `/auth/jobb[/...]` — server-side redirect till Jobbs befintliga skyddade origin före Portal-shell.
+- `/access-denied/` — generell statisk denial-fallback.
+- `/access-denied/identity/` — Access identity/authentication failure.
+- `/access-denied/non-identity/` — Access deny efter identity-/policyutvärdering.
+- `/access-denied/gateway/` — Cloudflare Gateway-block; separat från Access och originfel.
+- `/media/logos/<asset-id>` — publik GET/HEAD för exakt asset, hanteras före SPA/static fallback och erbjuder ingen kataloglistning.
 - `/drift[/...]` — Drift & insyn från den sanerade Skvallerbyttan-snapshoten.
 - `/changelog` — officiella publicerade GitHub Releases för Portalens publika repositoryprojekt.
 - `/aktivitet` — observerad GitHub repositoryaktivitet för Portalens live-publika repositoryprojekt, med explicit coverage.
@@ -317,6 +322,35 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/om` — produkt- och ägarskapskontext.
 
 Klienten kan fortfarande tolka äldre `#docs/...`-länkar för migration/bakåtkompatibilitet.
+
+## Logo-assetgräns
+
+Logo-assets är ett separat publikt dataplan, inte en del av Portalens dokument-SPA:
+
+```text
+/media/logos/<asset-id>
+        |
+        v
+servePublicLogo()
+        |
+        +--> asset id: lowercase [a-z0-9_-], max 64
+        +--> storage key: logos/<asset-id>
+        +--> GET/HEAD only
+        +--> image MIME allowlist
+        |
+        v
+PORTAL_LOGOS.get(exact key)
+```
+
+Den publika routen har ingen `list`-operation, accepterar inte godtycklig R2-key och använder inte D1. R2 HTTP-metadata får inte skriva över routens publika cachepolicy. SVG får dessutom restriktiv CSP och samtliga svar använder `X-Content-Type-Options: nosniff`.
+
+`PORTAL_LOGOS` är medvetet inte definierad i checked-in Wrangler-konfiguration förrän den faktiska Cloudflare-bucketen och bindingen är providerverifierad. Saknad binding failar med `503` utan fallback till ASSETS eller SPA.
+
+Admin/control plane är en separat framtida gräns. Den får inte implementeras förrän Portalens riktiga server-side auth/session contract är verifierat. Jobbs authcookie eller publik Portal-JavaScript får inte återanvändas som ersättning.
+
+## Temaarkitektur
+
+Portal-shellen har ett gemensamt komponent- och tokenlager. Dokumentroten bär `data-theme` och `tokens.css` override:ar endast primitive färgtokens för `forest`, `legacy` och `blackout`. Semantic tokens, layout, fokus, keyboardbeteende och reduced-motion-kontrakt är gemensamma.
 
 ## Repository-, app- och dokumentationsadapter
 
