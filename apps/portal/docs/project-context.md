@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Portal v2 design-tokenkontrakt och public-safe observerad integration: 2026-09-26.
+Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening och public-safe observerad integration: 2026-09-27.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -51,7 +51,9 @@ Worker-koden innehåller idag:
 - projektspecifik Issues-vy för repositoryprojekt via public-only Issue-sanitizer med explicit PR-filtrering;
 - projektspecifik Builds / CI-vy för repositoryprojekt via Skvallerbyttans cacheade public-safe Actions-summary;
 - global och projektspecifik Activity-vy från Skvallerbyttans repositoryfiltrerade observerade eventledger.
-- startsidans kontrollpanel som återanvänder endast Portalens public-safe `/api/projects`, `/api/operations` och `/api/activity?days=7`, degraderar källor oberoende och märker aktivitet som observerad/coverage-begränsad.
+- startsidans kontrollpanel som återanvänder endast Portalens public-safe `/api/projects`, `/api/operations` och `/api/activity?days=7`, degraderar källor oberoende och märker aktivitet som observerad/coverage-begränsad;
+- Del 3-regressionsskydd för public/protected Auth-gräns, Drift/Changelog/Issues/Releases/Builds/Activity/Search/Home degraded states samt full status-/freshness-vokabulär;
+- browserverifiering med axe WCAG 2.2 A/AA och horisontell overflow-kontroll på samtliga top-level-routes i både desktop- och mobilviewport.
 
 
 ## Startsida / kontrollpanel
@@ -375,20 +377,35 @@ Portalens statiska och klientdrivna shell verifieras i två lager:
 - `npm test` låser HTML-/shellkontrakt för skip-link, SPA-fokus och mobilmenyn;
 - `npm run test:browser` startar en lokal fixture-server, kör Portalens faktiska HTML/CSS/JS i headless Google Chrome via ChromeDriver och injicerar `axe-core`.
 
-Browsergaten kör WCAG A/AA-regler från axe på samtliga top-level-routes i desktopläge samt representativa mobilroutes. Den verifierar dessutom:
+Browsergaten kör WCAG 2.2 A/AA-regler från axe på samtliga top-level-routes i både desktop- och mobilläge. Den verifierar dessutom:
 
 - skip-link är första tabb-stopp och flyttar fokus till `#portal-content`;
 - SPA-navigation flyttar fokus till den nya aktiva sidans `h1`;
 - `aria-current="page"` följer aktiv route;
 - exakt en route-panel är synlig efter navigation;
 - Escape stänger öppen mobilnavigation och återför fokus till menyknappen;
-- representativa mobilroutes saknar horisontell dokumentoverflow.
+- samtliga top-level-routes saknar horisontell dokumentoverflow i mobilviewport.
 
 `#portal-content` är `tabindex="-1"` för deterministisk skip-link-fokus. Route-`h1` får temporärt `tabindex="-1"` när shellen flyttar fokus och återställs vid blur.
 
 CI använder Chrome/ChromeDriver som redan finns i GitHubs `ubuntu-latest` runner image. Inga browsercredentials eller provideranrop används; API-responser i browsertestet är syntetiska publika tom-fixtures.
 
 Detta verifierar repositoryimplementationen i browser. Produktionens faktiska Cloudflare-deployment, provider live-state och externa nätverksvägar ligger fortsatt utanför denna gate.
+
+## Del 3 — verifierad slutstate 2026-09-27
+
+Repositoryhardening som är mergad på `main`:
+
+- PR #55 låser public/protected Auth-gränsen och verifierar att `/auth/jobb` redirectas före Portal-shell/assets samt att publika assets inte bär Jobbs auth/session-/secretkontrakt.
+- PR #56 låser Driftens fail-closed-modell: `operations_not_configured`, `operations_unavailable`, `no-store`, `nosniff` och klientrensning av tidigare observerad state.
+- PR #57 låser Changelogets `changelog_unavailable`-kontrakt och klientrensning utan providerstack/payloadläckage.
+- PR #58 låser degraded klientbeteende för Issues, Releases, Builds, Activity, Search och startsidans public-safe källor.
+- PR #59 kör samma top-level-routeuppsättning genom axe WCAG 2.2 A/AA och overflow-kontroll i både desktop- och mobilviewport.
+- PR #60 låser hela Drift-status-/freshness-vokabulären, inklusive `permission_denied`, `not_configured`, `not_observed`, `stale`, `unavailable`, `error`, `unknown`, `not_supported` och `not_exposed_by_provider`.
+
+Cloudflare Workers Builds rapporterade under Del 3 lyckad **production** build för `avkroken`, `jobb` och `skvallerbyttan` från `main`; check-outputen innehöll separata Build IDs och Version IDs. Detta verifierar repository → Workers Builds → production-version-ledet. Det verifierar inte i sig custom-domain HTTP, Service Binding-data, authsessioner, D1/R2-state eller annan runtime/providerstate efter deployment.
+
+Releaseklassificeringen är verifierad repo-för-repo. Bastion, Politiker, Pastebinit och Docker-idempotent-update har repoägda releasekontrakt på `main`. Produkter PR #751 och Klarspråk PR #193 innehåller motsvarande repoägda kontrakt och PR-title-validering men är Draft/blockerade: live-ruleseten kräver CodeQL/code scanning medan GitHub inte skapar någon `github-advanced-security` check-suite för deras current heads. Rulesets, CodeQL-konfiguration och providerpermissions har inte ändrats som workaround. De röda Cloudflare Workers Builds-checkarna i dessa två repos är separat pre-existing providerstate och observerades även på respektive senast mergade baseline-PR.
 
 ## Kända gap
 
@@ -397,7 +414,8 @@ Följande är medvetet inte löst ännu:
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
-- releaseautomation;
-- produktionsdeployment och provider live-verifiering.
+- full releaseautomation, eftersom en CI-kompatibel least-privilege write-identitet ännu inte är verifierad;
+- merge av Produkter/Klarspråks repoägda releasekontrakt, blockerad av utebliven GHAS/CodeQL-suite på current PR-heads;
+- custom-domain HTTP-, Auth-, Service Binding- och övrig provider live-verifiering efter production build, eftersom den aktuella verktygsmiljön saknar läsbar Cloudflare-connector och inte kan nå `*.denied.se` för acceptance-test.
 
 Varje nytt arbete ska göras i separat branch/PR enligt repositoryts arbetsregler.
