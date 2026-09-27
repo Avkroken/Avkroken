@@ -51,6 +51,38 @@ function logoContentType(object) {
   return PUBLIC_LOGO_CONTENT_TYPES.has(value) ? value : null;
 }
 
+function parseEntityTagList(value) {
+  const tags = [];
+  let start = 0;
+  let quoted = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === '"') quoted = !quoted;
+    if (value[index] === "," && !quoted) {
+      tags.push(value.slice(start, index).trim());
+      start = index + 1;
+    }
+  }
+
+  tags.push(value.slice(start).trim());
+  return tags.filter(Boolean);
+}
+
+function weakEntityTag(tag) {
+  const value = String(tag || "").trim();
+  return value.startsWith("W/") ? value.slice(2).trim() : value;
+}
+
+function ifNoneMatchMatches(headerValue, currentEtag) {
+  if (!headerValue || !currentEtag) return false;
+
+  const current = weakEntityTag(currentEtag);
+  return parseEntityTagList(String(headerValue)).some(candidate => {
+    if (candidate === "*") return true;
+    return weakEntityTag(candidate) === current;
+  });
+}
+
 export async function servePublicLogo(request, bucket) {
   const url = new URL(request.url);
   if (!isPublicLogoRoute(url.pathname)) return null;
@@ -95,6 +127,13 @@ export async function servePublicLogo(request, bucket) {
 
   if (object.httpEtag) {
     headers.set("ETag", object.httpEtag);
+  }
+
+  if (ifNoneMatchMatches(request.headers.get("If-None-Match"), object.httpEtag)) {
+    return new Response(null, {
+      status: 304,
+      headers
+    });
   }
 
   if (contentType === "image/svg+xml") {
