@@ -59,7 +59,7 @@ test("OAuth flow uses state and PKCE and creates an allowlisted signed session",
     }
     if (url === "https://api.github.com/user") {
       assert.equal(new Headers(init?.headers).get("authorization"), "Bearer gho_test");
-      return new Response(JSON.stringify({ id: 36226327, login: "blixten85" }), {
+      return new Response(JSON.stringify({ id: 36226327, login: "Avkroken" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
