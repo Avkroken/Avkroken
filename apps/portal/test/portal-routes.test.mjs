@@ -69,6 +69,12 @@ test("does not rewrite API, assets, unknown routes, or protected Jobb paths", ()
     "/project-builds.js",
     "/activity.js",
     "/favicon.ico",
+    "/media/logos",
+    "/media/logos/asset-1",
+    "/access-denied",
+    "/access-denied/identity",
+    "/access-denied/non-identity",
+    "/access-denied/gateway",
     "/not-a-portal-route",
     "/auth/jobb",
     "/auth/jobb/dashboard"
