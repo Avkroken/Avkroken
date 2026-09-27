@@ -129,15 +129,15 @@ export async function servePublicLogo(request, bucket) {
     headers.set("ETag", object.httpEtag);
   }
 
+  if (contentType === "image/svg+xml") {
+    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+  }
+
   if (ifNoneMatchMatches(request.headers.get("If-None-Match"), object.httpEtag)) {
     return new Response(null, {
       status: 304,
       headers
     });
-  }
-
-  if (contentType === "image/svg+xml") {
-    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox");
   }
 
   return new Response(request.method === "HEAD" ? null : object.body, {
