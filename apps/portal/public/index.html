@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="sv">
+<html lang="sv" data-theme="forest">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -35,6 +35,14 @@
         <div class="portal-nav-utility">
           <a href="/auth" data-portal-route data-nav-view="auth">Auth</a>
           <a href="/om" data-portal-route data-nav-view="about">Om</a>
+          <label class="portal-theme-control" for="portal-theme">
+            <span>Tema</span>
+            <select id="portal-theme" name="portal-theme" aria-label="Portaltema">
+              <option value="forest">Avkroken</option>
+              <option value="legacy">Legacy</option>
+              <option value="blackout">Blackout</option>
+            </select>
+          </label>
         </div>
       </nav>
 
