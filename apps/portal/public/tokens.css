@@ -103,3 +103,51 @@
   --ak-breakpoint-tablet: 820px;
   --ak-breakpoint-desktop: 1180px;
 }
+
+
+/* Theme variants override primitives only; semantic/component tokens stay shared. */
+:root[data-theme="forest"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="legacy"] {
+  --ak-ink-950: #04070e;
+  --ak-ink-900: #050912;
+  --ak-ink-850: #09111f;
+  --ak-ink-800: #0d182c;
+  --ak-ink-700: #213652;
+  --ak-ink-600: #385475;
+  --ak-mist-500: #6f88a7;
+  --ak-mist-300: #a8bad0;
+  --ak-mist-100: #d9e6f7;
+  --ak-paper-50: #f5f8fc;
+  --ak-moss-500: #6f9f8a;
+  --ak-moss-300: #9ec7b4;
+  --ak-brass-500: #4fa8df;
+  --ak-brass-300: #86c8ef;
+  --ak-ember-500: #c56f7d;
+  --ak-ember-300: #e2a0aa;
+  --ak-sky-500: #4f91c8;
+  --ak-sky-300: #8ec1e7;
+}
+
+:root[data-theme="blackout"] {
+  --ak-ink-950: #000000;
+  --ak-ink-900: #030303;
+  --ak-ink-850: #070707;
+  --ak-ink-800: #0d0d0d;
+  --ak-ink-700: #1a1a1a;
+  --ak-ink-600: #333333;
+  --ak-mist-500: #777777;
+  --ak-mist-300: #b5b5b5;
+  --ak-mist-100: #dedede;
+  --ak-paper-50: #f6f6f3;
+  --ak-moss-500: #6f7c71;
+  --ak-moss-300: #a9b2aa;
+  --ak-brass-500: #a8a8a0;
+  --ak-brass-300: #ddddcf;
+  --ak-ember-500: #9b6d6d;
+  --ak-ember-300: #c99a9a;
+  --ak-sky-500: #767d83;
+  --ak-sky-300: #aeb4b8;
+}
