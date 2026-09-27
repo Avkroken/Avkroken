@@ -8,7 +8,8 @@
     "verify:production": "node scripts/verify-production.mjs",
     "test": "tsx --test test/*.test.ts test/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "validate:worker": "wrangler deploy --dry-run"
+    "validate:worker": "wrangler deploy --dry-run",
+    "deploy:workers-builds": "node scripts/workers-build-production.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260923.1",
