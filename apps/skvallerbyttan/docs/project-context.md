@@ -10,7 +10,7 @@ Senast verifierad för GitHub owner-/Portalintegrationen: 2026-09-26.
 
 ## Repository
 
-- repository: `blixten85/Avkroken`
+- repository: `Avkroken/Avkroken`
 - app path: `apps/skvallerbyttan`
 - default branch: `main`
 - runtime: TypeScript Cloudflare Worker
@@ -44,7 +44,7 @@ Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per f
 
 - **GitHub App-auth:** koden använder `GAMNACKEN_GITHUB_APP_*`-bindings för read-only GitHub-observationer. Faktisk App-installation och eventuell äldre App-state är extern GitHub-state.
 - **GitHub OAuth:** interaktiv login går direkt mot GitHub med state, PKCE S256 och numerisk GitHub-ID-allowlist.
-- **GitHub webhook-ingress:** runtime verifierar signerade provider-webhooks och begränsar accepterade repositoryevents till konfigurerad owner `blixten85` via `organization.login` eller `repository.owner.login`; faktisk hookkonfiguration är extern GitHub-state.
+- **GitHub webhook-ingress:** runtime verifierar signerade provider-webhooks och begränsar accepterade repositoryevents till konfigurerad owner `Avkroken` via `organization.login` eller `repository.owner.login`; faktisk hookkonfiguration är extern GitHub-state.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
 - **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en public-safe snapshot av provider health och capability status/dataState/freshness/last-success.
