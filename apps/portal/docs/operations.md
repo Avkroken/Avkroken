@@ -47,6 +47,19 @@ När Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versi
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
 
+### Verifierad production-buildsignal 2026-09-27
+
+Under Del 3 rapporterade Cloudflare Workers Builds lyckad **production** build från `main` för alla tre monorepoapparna:
+
+- `avkroken`;
+- `jobb`;
+- `skvallerbyttan`.
+
+GitHub-checkoutputen från Cloudflare innehöll separata Build IDs och Version IDs för respektive Worker. Detta verifierar kedjan repository → Workers Builds → producerad production-version.
+
+Det är inte samma sak som ett end-to-end runtime-test. Buildsignalen verifierar inte custom-domain HTTP, Cloudflare Access, Jobb-sessioner, Service Binding-data, D1/R2-innehåll, DNS eller övrig privat providerstate efter deployment.
+
+
 ## Worker-konfiguration
 
 `wrangler.jsonc` definierar bland annat:
@@ -292,7 +305,7 @@ Service binding används i stället för att exponera en publik administrationse
 
 ## Efter deployment
 
-En framtida produktiondeployment ska verifieras mot faktisk provider-state:
+Efter en produktiondeployment ska faktisk provider-/runtime-state verifieras:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
@@ -322,4 +335,6 @@ En framtida produktiondeployment ska verifieras mot faktisk provider-state:
 26. `/api/activity` är `no-store`, bounded till 50 repositories/30 dagar och en tom/ogiltig intern repositorylista kan inte falla tillbaka till organisationsomfattande Activity;
 27. cache-/heartbeat-beteende har inte regresserat.
 
-Kalla inte deployment klar innan den verifieringen är gjord.
+Status 2026-09-27: Workers Builds-delen i punkt 1 är providerverifierad grön under Del 3 och repository-/browserkontrakten bakom flera övriga punkter är CI-verifierade. Den aktuella exekveringsmiljön kan däremot inte nå `*.denied.se` och saknar en läsbar Cloudflare-connector, så custom-domain HTTP och privat runtime/providerstate i punkterna ovan är inte markerade som live-verifierade.
+
+Kalla inte end-to-end production acceptance klar innan den externa HTTP/providerverifieringen är gjord.
