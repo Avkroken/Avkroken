@@ -54,6 +54,10 @@ Worker-koden innehåller idag:
 - startsidans kontrollpanel som återanvänder endast Portalens public-safe `/api/projects`, `/api/operations` och `/api/activity?days=7`, degraderar källor oberoende och märker aktivitet som observerad/coverage-begränsad;
 - Del 3-regressionsskydd för public/protected Auth-gräns, Drift/Changelog/Issues/Releases/Builds/Activity/Search/Home degraded states samt full status-/freshness-vokabulär;
 - browserverifiering med axe WCAG 2.2 A/AA och horisontell overflow-kontroll på samtliga top-level-routes i både desktop- och mobilviewport.
+- statiska `/access-denied/`, `/access-denied/identity/`, `/access-denied/non-identity/` och `/access-denied/gateway/` med separata Access-/Gateway-semantiker och `noindex,nofollow`;
+- gemensam `data-theme`-arkitektur med `forest`, `legacy` och `blackout` ovanpå samma primitive → semantic tokenkedja;
+- public logo-read boundary i `src/logo-assets.mjs`: exakt `/media/logos/<asset-id>`, GET/HEAD, fast `logos/`-keyprefix, MIME-allowlist, `nosniff`, bounded publik cache och ingen listning;
+- fail-closed logo-storage: Worker-koden läser valfri `PORTAL_LOGOS`, men current checked-in `wrangler.jsonc` saknar R2-binding och inget bucketnamn är därför antaget i Git.
 
 
 ## Startsida / kontrollpanel
@@ -369,6 +373,30 @@ Skyddad Jobb-data:
 - får inte hämtas före server-side auktorisering.
 
 Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
+
+## Portal-admin, logo-assets och R2
+
+Current repository-state bevisar **inte** en generell Portal-adminsession eller en server-side identity contract för `/admin/*`. Portalens enda verifierade skyddade authövergång är `/auth/jobb[/...]`, som redirectar till Jobbs separat skyddade origin före Portal-shell.
+
+Därför finns ännu ingen `/admin/logos/` eller `/api/admin/logos/*`. Att återanvända Jobbs lokala session, införa client-only auth eller skapa en parallell OAuth-/Accesslösning skulle bryta den verifierade säkerhetsgränsen.
+
+Den publika delen är däremot avgränsad i källkod:
+
+```text
+GET|HEAD /media/logos/<asset-id>
+          |
+          +--> strikt asset-id-validering
+          |
+          +--> key = logos/<asset-id>
+          |
+          +--> PORTAL_LOGOS.get(key)
+          |
+          +--> MIME allowlist + public cache + nosniff
+```
+
+Ingen route accepterar bucket-key från klienten och ingen `list()` används. Saknad `PORTAL_LOGOS` ger `503`, storagefel `502`, saknat/ogiltigt asset `404` och otillåten MIME `415`.
+
+Current `apps/portal/wrangler.jsonc` definierar ingen R2-binding. Den faktiska bucketen, eventuell tidigare användning samt r2.dev/custom-domain-public-state måste verifieras hos Cloudflare innan binding läggs till. Den här exekveringsmiljön har ingen läsbar Cloudflare-connector och kunde inte nå `*.denied.se`; provider/runtime-state är därför fortsatt okänd och inte härledd från äldre dokument.
 
 ## Accessibility och browserverifiering
 
