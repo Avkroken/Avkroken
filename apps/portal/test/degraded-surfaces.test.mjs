@@ -62,7 +62,7 @@ test("Search fails closed to an empty public result state without protected fall
   assert.ok(search.includes('freshness.textContent = ""'));
   assert.ok(search.includes('emptyState('));
   assert.ok(search.includes('"Sökindexet kunde inte läsas."'));
-  assert.ok(search.includes('"Ingen skyddad källa används som fallback."'));
+  assert.ok(search.includes("Ingen skyddad källa används som fallback."));
   assert.equal(search.includes("/auth/jobb"), false);
   assert.equal(search.includes("Bearer "), false);
   assert.equal(search.includes("api.github.com"), false);
