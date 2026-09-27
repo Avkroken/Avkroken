@@ -73,9 +73,24 @@ Det är inte samma sak som ett end-to-end runtime-test. Buildsignalen verifierar
 - e-postbinding för operativa notifieringar;
 - `SKVALLERBYTTAN_OBSERVATIONS` — intern Service Binding till `skvallerbyttan`/`PortalObservationsService`.
 
+Current checked-in `wrangler.jsonc` har **ingen** R2-binding för Portal-logotyper. Koden känner till det avsedda bindingnamnet `PORTAL_LOGOS`, men bucketnamn och provider-side public access ska inte läggas in förrän de har verifierats mot Cloudflare live-state. Utan binding svarar `/media/logos/<asset-id>` fail-closed med `503`.
+
 Credentialvärden dokumenteras inte här.
 
 ## Felmodell
+
+### Publika logo-assets
+
+`GET|HEAD /media/logos/<asset-id>` använder följande fail-closed modell:
+
+- ogiltig/listningslik path eller saknat objekt: `404`;
+- annan metod: `405` + `Allow: GET, HEAD`;
+- saknad `PORTAL_LOGOS`-binding: `503`;
+- R2-readfel: `502`;
+- objekt med icke-allowlistad Content-Type: `415`;
+- giltigt asset: `200` med explicit Content-Type, `nosniff`, ETag där tillgänglig och bounded publik cache.
+
+Asset-ID mappas alltid till `logos/<asset-id>`. Ingen publik listning, direkt bucket-key eller D1-katalog finns i detta steg.
 
 ### Projektkatalog
 
@@ -301,6 +316,8 @@ Service binding används i stället för att exponera en publik administrationse
 - Activity får endast läsa Skvallerbyttans separata repository-allowlistade Activity-RPC efter live public-project-lookup; explicit tom repositoryscope ska fail-closed och monorepo-appar får inte ärva source-repositoryts eventström.
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
+- Publik logo-serving får endast läsa exakt `logos/<asset-id>`; ingen bucket-listning eller godtycklig key får exponeras.
+- `/admin/logos` och `/api/admin/logos/*` införs inte innan en faktisk generell Portal-auth/session är server-side verifierad.
 - DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
 
 ## Efter deployment
@@ -309,6 +326,8 @@ Efter en produktiondeployment ska faktisk provider-/runtime-state verifieras:
 
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
+2a. denied-routes kan direktnavigeras separat för general/identity/non-identity/gateway och är `noindex,nofollow`;
+2b. när `PORTAL_LOGOS` väl har providerverifierats och bundits: en giltig `/media/logos/<asset-id>` fungerar utan login för GET/HEAD, katalog-/traversalförsök misslyckas och responseheaders följer logo-kontraktet;
 3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion`, `/api/builds?project=Bastion` och `/api/activity?project=Bastion&days=7` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;
