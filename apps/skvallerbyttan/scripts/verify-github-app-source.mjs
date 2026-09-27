@@ -88,7 +88,7 @@ export async function verifyConfiguredGitHubAppSource() {
   const owner = String(
     config?.vars?.SKVALLERBYTTAN_GITHUB_OWNER ||
     config?.vars?.SKVALLERBYTTAN_ORG ||
-    "blixten85"
+    "Avkroken"
   ).trim();
   const privateKeyPem = String(process.env.GAMNACKEN_GITHUB_APP_PRIVATE_KEY || "");
 
