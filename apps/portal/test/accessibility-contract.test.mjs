@@ -60,3 +60,26 @@ test("mobile page titles cannot force horizontal overflow", () => {
     /\.portal-page-head h1\s*\{\s*font-size:\s*clamp\(1\.7rem,\s*7vw,\s*3\.4rem\);\s*overflow-wrap:\s*anywhere;\s*\}/
   );
 });
+
+test("browser gate applies axe and overflow checks to every top-level route on mobile", () => {
+  for (const route of [
+    "/",
+    "/projekt",
+    "/dokumentation",
+    "/tjanster",
+    "/drift",
+    "/changelog",
+    "/aktivitet",
+    "/auth",
+    "/om",
+    "/sok"
+  ]) {
+    assert.ok(browser.includes(`"${route}"`), route);
+  }
+
+  assert.equal(
+    (browser.match(/for \(const path of topLevelRoutes\)/g) || []).length,
+    2
+  );
+});
+
