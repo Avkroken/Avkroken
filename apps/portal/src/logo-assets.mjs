@@ -89,6 +89,7 @@ export async function servePublicLogo(request, bucket) {
   if (typeof object.writeHttpMetadata === "function") {
     object.writeHttpMetadata(headers);
   }
+  headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=60");
   headers.set("Content-Type", contentType);
   headers.set("X-Content-Type-Options", "nosniff");
 
