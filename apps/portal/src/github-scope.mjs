@@ -1,4 +1,4 @@
-export const GITHUB_OWNER = "blixten85";
+export const GITHUB_OWNER = "Avkroken";
 
 const REPOSITORY_NAME = /^[A-Za-z0-9._-]+$/;
 
