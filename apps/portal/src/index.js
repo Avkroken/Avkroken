@@ -13,6 +13,7 @@ import {
   repositoryDocsSource
 } from "./docs-source.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
+import { servePublicLogo } from "./logo-assets.mjs";
 import {
   mergePublicProjectCatalog,
   normalizePublicAppManifest,
@@ -1910,6 +1911,9 @@ export default {
       }
       return getPublicActivity(url, env);
     }
+
+    const publicLogoResponse = await servePublicLogo(request, env.PORTAL_LOGOS);
+    if (publicLogoResponse) return publicLogoResponse;
 
     const isRead = request.method === "GET" || request.method === "HEAD";
     const protectedRedirect = protectedRedirectForPath(url.pathname);
