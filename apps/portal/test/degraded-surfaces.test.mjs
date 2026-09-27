@@ -87,11 +87,11 @@ test("Activity clears event rows and exposes explicit unavailable state", () => 
   );
 
   assert.ok(loader.includes('if (payload.status !== "available") throw new Error("activity unavailable")'));
+  assert.ok(loader.includes('observedCount.textContent = "—"'));
+  assert.ok(loader.includes('repositoryCount.textContent = "—"'));
+  assert.ok(loader.includes('coverageSummary.textContent = "—"'));
   assert.ok(failure.includes('status.textContent = "Otillgänglig"'));
   assert.ok(failure.includes('generated.textContent = ""'));
-  assert.ok(failure.includes('observedCount.textContent = "—"'));
-  assert.ok(failure.includes('repositoryCount.textContent = "—"'));
-  assert.ok(failure.includes('coverageSummary.textContent = "—"'));
   assert.ok(failure.includes("clear()"));
   assert.ok(failure.includes("original.hidden = true"));
   assert.ok(failure.includes("errorState.hidden = false"));
@@ -120,17 +120,32 @@ test("home dashboard degrades public sources independently instead of fabricatin
     "async function loadHomeDashboard({ force = false } = {})",
     'window.addEventListener("portal:routechange"'
   );
+  const operationsUnavailable = section(
+    home,
+    "function renderOperations(payload)",
+    "function eventLabel(value)"
+  );
+  const activityUnavailable = section(
+    home,
+    "function renderActivity(payload)",
+    "function failedCard("
+  );
 
   assert.ok(loader.includes("Promise.allSettled(["));
   assert.ok(loader.includes('readJson("/api/projects")'));
   assert.ok(loader.includes('readJson("/api/operations")'));
   assert.ok(loader.includes('readJson("/api/activity?days=7")'));
 
-  assert.ok(loader.includes('failedCard(projectCount, projectCopy, "Projektkatalogen är tillfälligt otillgänglig.")'));
-  assert.ok(loader.includes('failedCard(providerStatus, providerCopy, "Driftöversikten är tillfälligt otillgänglig.")'));
-  assert.ok(loader.includes('failedCard(activityCount, activityCopy, "Aktivitetsunderlaget är tillfälligt otillgängligt.")'));
-  assert.ok(home.includes('"Portalen fabricerar inte provider- eller capability-status."'));
-  assert.ok(loader.includes('"Ingen aktivitet antas när observationskällan saknas."'));
+  assert.ok(operationsUnavailable.includes("if (payload?.available !== true)"));
+  assert.ok(operationsUnavailable.includes('attentionCount.textContent = "—"'));
+  assert.ok(operationsUnavailable.includes("emptyRow("));
+  assert.ok(operationsUnavailable.includes("attentionList"));
+
+  assert.ok(activityUnavailable.includes("if (activity.available !== true)"));
+  assert.ok(activityUnavailable.includes('activityCount.textContent = "—"'));
+  assert.ok(activityUnavailable.includes('activity.status === "not_observed"'));
+  assert.ok(activityUnavailable.includes("emptyRow("));
+  assert.ok(activityUnavailable.includes("recentActivity"));
 
   assert.equal(home.includes(DIRECT_GITHUB_API_HOST), false);
   assert.equal(home.includes("skvallerbyttan.denied.se"), false);
