@@ -34,20 +34,20 @@ test("indexes public project and Wiki presentation metadata separately", () => {
     category: "Projekt",
     description: "SSH-kärna",
     portalUrl: "/projekt/Bastion",
-    repository: "https://github.com/blixten85/Bastion",
-    wiki: "https://github.com/blixten85/Bastion/wiki",
+    repository: "https://github.com/Avkroken/Bastion",
+    wiki: "https://github.com/Avkroken/Bastion/wiki",
     wikiPortalUrl: "/projekt/Bastion/wiki",
     source: {
       provider: "github",
       kind: "repository",
-      repository: "blixten85/Bastion",
+      repository: "Avkroken/Bastion",
       ref: "main"
     }
   }]);
 
   assert.deepEqual(entries.map(entry => entry.kind), ["project", "wiki"]);
   assert.equal(entries[1].url, "/projekt/Bastion/wiki");
-  assert.equal(entries[1].canonicalUrl, "https://github.com/blixten85/Bastion/wiki");
+  assert.equal(entries[1].canonicalUrl, "https://github.com/Avkroken/Bastion/wiki");
 });
 
 test("does not invent a Wiki search entry for an app without Wiki publication", () => {
@@ -56,13 +56,13 @@ test("does not invent a Wiki search entry for an app without Wiki publication", 
     slug: "skvallerbyttan",
     name: "Skvallerbyttan",
     portalUrl: "/projekt/skvallerbyttan",
-    repository: "https://github.com/blixten85/Avkroken",
+    repository: "https://github.com/Avkroken/Avkroken",
     wiki: null,
     wikiPortalUrl: null,
     source: {
       provider: "github",
       kind: "monorepo_app",
-      repository: "blixten85/Avkroken",
+      repository: "Avkroken/Avkroken",
       ref: "main",
       path: "apps/skvallerbyttan"
     }
@@ -139,7 +139,7 @@ test("builds document results with Portal and canonical source URLs", () => {
     entry,
     page,
     "# Arkitektur\nSSH transport och nyckelhantering.",
-    "https://github.com/blixten85/Bastion/blob/main/docs/architecture.md"
+    "https://github.com/Avkroken/Bastion/blob/main/docs/architecture.md"
   );
 
   assert.equal(result.kind, "document");
