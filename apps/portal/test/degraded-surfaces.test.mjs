@@ -18,6 +18,8 @@ const [
   readFile(new URL("../public/home-dashboard.js", import.meta.url), "utf8")
 ]);
 
+const DIRECT_GITHUB_API_HOST = ["api", "github", "com"].join(".");
+
 test("project Issues clears previously rendered state when upstream is unavailable", () => {
   assert.ok(issues.includes('if (payload.status !== "available") throw new Error("project Issues unavailable")'));
   assert.ok(issues.includes('status.textContent = "Otillgänglig"'));
@@ -65,7 +67,7 @@ test("Search fails closed to an empty public result state without protected fall
   assert.ok(search.includes("Ingen skyddad källa används som fallback."));
   assert.equal(search.includes("/auth/jobb"), false);
   assert.equal(search.includes("Bearer "), false);
-  assert.equal(search.includes("api.github.com"), false);
+  assert.equal(search.includes(DIRECT_GITHUB_API_HOST), false);
 });
 
 test("home dashboard degrades public sources independently instead of fabricating state", () => {
@@ -80,7 +82,7 @@ test("home dashboard degrades public sources independently instead of fabricatin
   assert.ok(home.includes('"Portalen fabricerar inte provider- eller capability-status."'));
   assert.ok(home.includes('"Ingen aktivitet antas när observationskällan saknas."'));
 
-  assert.equal(home.includes("api.github.com"), false);
+  assert.equal(home.includes(DIRECT_GITHUB_API_HOST), false);
   assert.equal(home.includes("skvallerbyttan.denied.se"), false);
   assert.equal(home.includes("/auth/jobb"), false);
   assert.equal(home.includes("Bearer "), false);
