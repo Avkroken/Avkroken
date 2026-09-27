@@ -88,7 +88,7 @@ Credentialvärden dokumenteras inte här.
 - saknad `PORTAL_LOGOS`-binding: `503`;
 - R2-readfel: `502`;
 - objekt med icke-allowlistad Content-Type: `415`;
-- giltigt asset: `200` med explicit Content-Type, `nosniff`, ETag där tillgänglig och bounded publik cache.
+- giltigt asset: `200` med explicit Content-Type, `nosniff`, ETag där tillgänglig och bounded publik cache; matchande `If-None-Match` ger `304` med samma cache-/ETag-kontrakt.
 
 Asset-ID mappas alltid till `logos/<asset-id>`. Ingen publik listning, direkt bucket-key eller D1-katalog finns i detta steg.
 
