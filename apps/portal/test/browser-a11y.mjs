@@ -24,6 +24,10 @@ const topLevelRoutes = [
   "/auth",
   "/om",
   "/sok",
+  "/access-denied/",
+  "/access-denied/identity/",
+  "/access-denied/non-identity/",
+  "/access-denied/gateway/",
 ];
 
 
@@ -133,6 +137,19 @@ async function startFixtureServer() {
             });
             res.end(body);
             return;
+          }
+          if (info.isDirectory()) {
+            const indexCandidate = join(candidate, "index.html");
+            const indexInfo = await stat(indexCandidate);
+            if (indexInfo.isFile()) {
+              const body = await readFile(indexCandidate);
+              res.writeHead(200, {
+                "Content-Type": "text/html; charset=utf-8",
+                "Cache-Control": "no-store",
+              });
+              res.end(body);
+              return;
+            }
           }
         } catch {
           // Fall through to SPA document.
@@ -318,6 +335,16 @@ async function main() {
     assert.equal(active.id, "public-sites");
     assert.equal(active.current, "page");
     assert.equal(active.visible, 1);
+
+    await navigate("/access-denied/identity/");
+    await press("\uE004");
+    active = await execute(
+      "return { className: document.activeElement && document.activeElement.className, " +
+      "href: document.activeElement && document.activeElement.getAttribute('href') };"
+    );
+    assert.equal(active.className, "button");
+    assert.equal(active.href, "/");
+    await clearActions();
 
     await setViewport(390, 844);
     for (const path of topLevelRoutes) {
