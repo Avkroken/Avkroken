@@ -26,6 +26,15 @@ test("denied routes are static noindex documents with shared token styling", asy
   }
 });
 
+test("404 keeps stylesheet links inside head without literal escape text", async () => {
+  const html = await readFile(publicFile("404.html"), "utf8");
+  assert.match(
+    html,
+    /href="\/tokens\.css">\n\s*<link rel="stylesheet" href="\/styles\.css">/
+  );
+  assert.doesNotMatch(html, /tokens\.css">\\n/);
+});
+
 test("Access and Gateway denial semantics remain distinct", async () => {
   const identity = await readFile(publicFile("access-denied/identity/index.html"), "utf8");
   const policy = await readFile(publicFile("access-denied/non-identity/index.html"), "utf8");
@@ -45,4 +54,8 @@ test("denied component keeps visible focus and responsive token-driven layout", 
   assert.match(css, /outline:\s*var\(--ak-border-2\) solid var\(--ak-focus-ring\)/);
   assert.match(css, /padding:\s*clamp\(20px, 5vw, 48px\)/);
   assert.match(css, /var\(--ak-surface-canvas\)/);
+  assert.match(
+    css,
+    /\.denied-detail\s*\{[\s\S]*?color:\s*var\(--ak-text-secondary\)/
+  );
 });
