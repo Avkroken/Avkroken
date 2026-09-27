@@ -3,6 +3,33 @@
   const routeLinks = [...document.querySelectorAll("[data-portal-route]")];
   const menu = document.querySelector("#portal-navigation");
   const menuToggle = document.querySelector("#portal-menu-toggle");
+  const themeSelect = document.querySelector("#portal-theme");
+  const themes = new Set(["forest", "legacy", "blackout"]);
+  const themeStorageKey = "avkroken.portal.theme";
+
+  function applyTheme(value, { persist = false } = {}) {
+    const theme = themes.has(value) ? value : "forest";
+    document.documentElement.dataset.theme = theme;
+    if (themeSelect) themeSelect.value = theme;
+
+    if (persist) {
+      try {
+        localStorage.setItem(themeStorageKey, theme);
+      } catch {
+        // Storage may be unavailable; the current document theme still applies.
+      }
+    }
+
+    return theme;
+  }
+
+  let initialTheme = document.documentElement.dataset.theme || "forest";
+  try {
+    initialTheme = localStorage.getItem(themeStorageKey) || initialTheme;
+  } catch {
+    // Keep the server-provided default.
+  }
+  applyTheme(initialTheme);
 
   function normalizePath(pathname) {
     const value = String(pathname || "/").replace(/\/+$/, "");
@@ -125,6 +152,10 @@
     menuToggle.setAttribute("aria-expanded", open ? "true" : "false");
   });
 
+  themeSelect?.addEventListener("change", () => {
+    applyTheme(themeSelect.value, { persist: true });
+  });
+
   document.addEventListener("keydown", event => {
     if (event.key !== "Escape") return;
     if (closeMenu({ restoreFocus: true })) event.preventDefault();
@@ -137,7 +168,8 @@
     setView,
     viewForPath,
     applyRoute,
-    focusViewHeading
+    focusViewHeading,
+    applyTheme
   };
 
   applyRoute({ dispatch: false });
