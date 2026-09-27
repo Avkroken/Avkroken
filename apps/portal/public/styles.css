@@ -457,7 +457,7 @@ footer .shell {
 .denied-detail {
   max-width: 64ch;
   margin: var(--ak-space-4) auto 0;
-  color: var(--ak-text-tertiary);
+  color: var(--ak-text-secondary);
   font-size: var(--ak-type-small-size);
   line-height: var(--ak-line-height-reading);
 }
