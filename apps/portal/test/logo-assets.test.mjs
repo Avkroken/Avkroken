@@ -64,6 +64,57 @@ test("GET serves only the prefixed R2 object with bounded public caching", async
   assert.equal(await response.text(), "image-bytes");
 });
 
+test("conditional logo reads return 304 using weak ETag comparison", async () => {
+  const bucket = fakeBucket({ "logos/abc-123": fakeObject("image/png") });
+
+  for (const ifNoneMatch of [
+    '"etag-1"',
+    'W/"etag-1"',
+    '"miss", W/"etag-1"',
+    "*"
+  ]) {
+    const response = await servePublicLogo(
+      new Request("https://avkroken.denied.se/media/logos/abc-123", {
+        headers: { "If-None-Match": ifNoneMatch }
+      }),
+      bucket
+    );
+
+    assert.equal(response.status, 304, ifNoneMatch);
+    assert.equal(response.headers.get("etag"), '"etag-1"');
+    assert.equal(
+      response.headers.get("cache-control"),
+      "public, max-age=300, stale-while-revalidate=60"
+    );
+    assert.equal(await response.text(), "");
+  }
+
+  const miss = await servePublicLogo(
+    new Request("https://avkroken.denied.se/media/logos/abc-123", {
+      headers: { "If-None-Match": '"other"' }
+    }),
+    bucket
+  );
+  assert.equal(miss.status, 200);
+  assert.equal(await miss.text(), "image-bytes");
+});
+
+test("If-None-Match parsing keeps commas inside quoted entity-tags", async () => {
+  const object = fakeObject("image/png");
+  object.httpEtag = '"tag,one"';
+  const bucket = fakeBucket({ "logos/comma-tag": object });
+
+  const response = await servePublicLogo(
+    new Request("https://avkroken.denied.se/media/logos/comma-tag", {
+      headers: { "If-None-Match": '"tag,one", "other"' }
+    }),
+    bucket
+  );
+
+  assert.equal(response.status, 304);
+  assert.equal(response.headers.get("etag"), '"tag,one"');
+});
+
 test("HEAD returns metadata without a response body", async () => {
   const bucket = fakeBucket({ "logos/abc-123": fakeObject("image/webp") });
   const response = await servePublicLogo(
