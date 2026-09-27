@@ -155,7 +155,7 @@ test("repository Preview config stays fail-closed without production provider st
   assert.deepEqual(value.previews?.analytics_engine_datasets, [
     { binding: "OBSERVABILITY", dataset: "skvallerbyttan_preview" }
   ]);
-  assert.equal(value.previews?.vars?.SKVALLERBYTTAN_GITHUB_OWNER, "blixten85");
+  assert.equal(value.previews?.vars?.SKVALLERBYTTAN_GITHUB_OWNER, "Avkroken");
   assert.equal(value.previews?.services, undefined);
   assert.equal(value.previews?.secrets_store_secrets, undefined);
   assert.equal(value.previews?.vars?.CLOUDFLARE_ACCOUNT_ID, undefined);
