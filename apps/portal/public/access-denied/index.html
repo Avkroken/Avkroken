@@ -1,16 +1,20 @@
 <!doctype html>
-<html lang="sv">
+<html lang="sv" data-theme="forest">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#050912">
-  <title>Access denied — AVKROKEN</title>
+  <meta name="theme-color" content="#080b09">
+  <title>Åtkomst nekad — AVKROKEN</title>
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body class="denied-page">
-  <main class="denied-panel">
-    <img src="/access-denied.svg" alt="Access denied. Du har inte behörighet att komma åt den här resursen.">
+<body class="denied-page" data-denied-kind="general">
+  <main class="denied-panel" aria-labelledby="denied-title">
+    <div class="denied-kicker">ACCESS / DENIED</div>
+    <h1 id="denied-title">Åtkomst nekad</h1>
+    <p class="denied-copy">Du kan inte nå den här resursen från den aktuella åtkomstvägen.</p>
+    <p class="denied-detail">Det här är Portalens generella fallback. Identity-, policy- och Gateway-fel har separata adresser så att rätt säkerhetslager kan hänvisa till rätt sida.</p>
     <div class="denied-actions">
       <a class="button" href="/">Till AVKROKEN</a>
     </div>
