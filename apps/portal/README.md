@@ -110,7 +110,7 @@ För en opt-in-app använder samma manifestgräns även dokumentationsadaptern. 
 
 ## Logo-assets och tema
 
-Den publika logo-routen accepterar endast ett validerat single-segment `asset-id` och mappar det internt till exakt R2-key `logos/<asset-id>`. Workern använder endast `get`; ingen publik listning eller godtycklig R2-key exponeras. Tillåtna svarstyper är avgränsade till bildformat och GET/HEAD-responser sätter `nosniff`, bounded publik cache och ETag när R2 tillhandahåller den.
+Den publika logo-routen accepterar endast ett validerat single-segment `asset-id` och mappar det internt till exakt R2-key `logos/<asset-id>`. Workern använder endast `get`; ingen publik listning eller godtycklig R2-key exponeras. Tillåtna svarstyper är avgränsade till bildformat och GET/HEAD-responser sätter `nosniff`, bounded publik cache och ETag när R2 tillhandahåller den. Matchande `If-None-Match` använder weak ETag comparison och returnerar `304` utan body.
 
 Källkoden förväntar sig en Worker-binding med namnet `PORTAL_LOGOS`, men checked-in `wrangler.jsonc` definierar ännu ingen sådan binding. Fram till att faktisk bucket och provider-state har verifierats returnerar logo-routen därför fail-closed `503`; inget bucketnamn hårdkodas eller antas i repositoryt.
 
