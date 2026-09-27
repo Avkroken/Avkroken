@@ -71,7 +71,7 @@ Provider-reads är partitionerade och rangordnade utan arv:
 
 Runtime binder `CLOUDFLARE_API_TOKEN_R1`, `CLOUDFLARE_API_TOKEN_R2` och `CLOUDFLARE_API_TOKEN_R3` direkt från Cloudflare Secrets Store utan generisk tokenfallback.
 
-GitHub Actions som muterar Cloudflare använder W1-credentialen när den finns. Runtime-secret-sync kopierar inte längre R1/R2/R3 från GitHub till vanliga Worker secrets.
+Produktionsdeployment utförs av Cloudflare Workers Builds med Cloudflare-ägd buildidentitet. GitHub Actions bär ingen Cloudflare deploycredential och synkar inte runtime-secrets till Workern.
 
 Cloudflare-account-ID är versionerad icke-hemlig config. GitHub- och Cloudflare-webhooks använder var sitt canonical secret; Notifications och CASB delar Cloudflare-webhooksecretet. Runtime implementerar push-ingress för Cloudflare Notifications/CASB samt read-paths för Audit Logs och reconciliation. Faktisk Cloudflare webhookkonfiguration är extern providerstate. Observationskoden använder inga provider-write-operationer.
 
@@ -142,17 +142,12 @@ Read telemetry ligger i Analytics Engine; detailed events ligger i D1.
 
 Analytics Engine har tre månaders retention. SQL-queries väger `_sample_interval` för sampled data. Nuvarande faktiska volume/cost kan först verifieras efter deployment och ska inte uppskattas som live-fakta i förväg.
 
-## Deploymentstatus för detta arkitekturarbete
+## Deploymentmodell
 
-Repositorykod och dokumentation kan mergeas utan att automatiskt:
+Merge till `main` kan utlösa Cloudflare Workers Builds. Repositoryts produktionskommando är `npm run deploy:workers-builds` och gör verifiering, väntande D1-migrationer, Worker-deploy och produktionskontraktsverifiering i ordning.
 
-- migrera produktions-D1
-- skapa machine token
-- ändra GitHub App permissions
-- ändra Cloudflare API-token permissions
-- deploya Worker
+Secret-provisionering, GitHub App-permissions och Cloudflare provider-tokenpermissions ändras inte av repositorydeployen och förblir separat providerstate.
 
-Dessa är separata efterföljande driftåtgärder.
 ## Observability
 
 Skvallerbyttans Wrangler-konfiguration använder Cloudflare-native observability utan externa telemetry-sinks.
