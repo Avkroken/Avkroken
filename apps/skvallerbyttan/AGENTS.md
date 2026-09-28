@@ -8,7 +8,7 @@
 
 ## Invariants
 
-- Utgå från monorepots aktuella default branch och arbeta i separat gren enligt `{agent}/{feature}/{YYYY-MM-DD}/{HH-mm}-{id}`.
+- Utgå från monorepots aktuella default branch och arbeta i separat gren enligt `{agent}/{feature}/{YYYY-MM-DD}`.
 - Kör `npm run check` före merge.
 - Deploya inte och ändra inte Cloudflare-resurser utan uttryckligt scope.
 - Skvallerbyttans providerarkitektur är read-only. Begär, konfigurera eller använd inte provider-write-permissions för observationsfunktioner.
