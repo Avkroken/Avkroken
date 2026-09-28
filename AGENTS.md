@@ -16,3 +16,14 @@
 - Skvallerbyttans providerarkitektur ska fortsatt vara read-only.
 - Root-workflows får inte ersätta applikationsspecifik validering med generiska kontroller; Portal, Skvallerbyttan och Jobb ska köra respektive apps verifierade gate. `Krosa-Maja` är tills vidare en ruleset-kompatibel retirement guard.
 - `Avkroken/Avkroken` är ett publikt repository. Arbeta via PR och följ de checks och skydd som GitHub faktiskt visar för ändringen; repositoryt dokumenterar inte extern plan-/ruleset-live-state som canonical fakta.
+
+## Agent skills
+
+### Issue tracker
+
+Use this repository's GitHub Issues for issues and specifications. Read `docs/agents/issue-tracker.md` before reading, creating, or publishing tickets.
+
+### Domain docs
+
+This is a multi-context monorepo. Route domain and technical context through the affected application's own `AGENTS.md` and `docs/project-context.md` as described in `docs/agents/domain.md`.
+
