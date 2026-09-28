@@ -1,16 +1,16 @@
 # Release- och versionsstandard — Avkroken/Avkroken
 
-**Senast verifierad:** 2026-09-25
+**Senast verifierad:** 2026-09-28
 
-Det här dokumentet gäller **Avkroken/Avkroken-monorepot**. Fristående repositories äger sina egna motsvarande releasekontrakt och ska inte behandla den här filen som sin tekniska source of truth.
+Det här dokumentet gäller **Avkroken/Avkroken-monorepot**. Fristående repositories äger sina egna releasekontrakt.
 
 ## Syfte
 
-Repositoryts squash-mergehistorik ska vara maskinläsbar för SemVer, release notes och framtida releaseautomation utan att varje merge automatiskt blir en release.
+Repositoryts historik ska vara maskinläsbar för SemVer och GitHub Releases. GitHub Releases med immutable SemVer-taggar är den kanoniska versionerade releasehistoriken.
 
-GitHub Releases är den officiella releasehistoriken som Avkroken Portalens Changelog kan konsumera.
+Releaseautomation är repo-lokal och får inte vara beroende av organisationsgemensamma workflows, organisationssecrets eller bypass.
 
-## PR-titlar och squash commits
+## PR-titlar och merge queue
 
 Pull request-titlar ska följa Conventional Commits:
 
@@ -18,137 +18,126 @@ Pull request-titlar ska följa Conventional Commits:
 <type>[optional scope][!]: <description>
 ```
 
-Tillåtna typer:
+Tillåtna typer är `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` och `revert`.
 
-- `feat` — ny funktion;
-- `fix` — buggfix;
-- `perf` — prestandaförändring;
-- `refactor` — beteendebevarande omstrukturering;
-- `docs` — dokumentation;
-- `test` — tester;
-- `build` — build-/paketeringssystem;
-- `ci` — CI/CD;
-- `chore` — underhåll utan produktfunktion;
-- `revert` — återställning av tidigare förändring.
+Scope är valfri och ska vara tekniskt relevant, exempelvis `portal`, `jobb` eller `skvallerbyttan`.
 
-Scope är valfri och ska vara kort och tekniskt relevant, exempelvis `portal`, `jobb` eller `skvallerbyttan`.
+`!` eller en `BREAKING CHANGE:`-footer markerar breaking change.
 
-`!` markerar en breaking change:
-
-```text
-feat(portal)!: replace public route contract
-```
-
-Workflow `.github/workflows/pr-title.yml` validerar detta på `pull_request`. Workflown använder inga secrets, checkar inte ut repositoryt och har `permissions: {}`.
+`.github/workflows/pr-title.yml` validerar titeln på pull request-event. På `merge_group` gör workflown en pass-through eftersom titeln redan verifierats på pull requesten. Workflown använder inga secrets och har `permissions: {}`.
 
 ## SemVer-kontrakt
 
-När en versionerad release skapas gäller:
+Vid automatisk versionsberäkning gäller:
 
-- breaking change (`!` eller motsvarande uttrycklig breaking release-not) → **major**;
-- `feat` → normalt **minor**;
-- `fix` → normalt **patch**;
-- `docs`, `test`, `chore`, `ci` och `build` skapar normalt inte en release ensamma;
-- `perf` och `refactor` bedöms utifrån faktisk releaseeffekt. De får inte automatiskt beskrivas som en feature enbart för att tvinga versionshöjning.
+- breaking change → **major**;
+- `feat` → **minor**;
+- `fix`, `perf` och `revert` → **patch**;
+- `refactor`, `docs`, `test`, `build`, `ci` och `chore` skapar normalt ingen release ensamma;
+- `Release-As: major|minor|patch|none` får användas för explicit klassificering men får aldrig sänka en breaking change under major.
 
-Versionsnummer är releasekontrakt, inte deployräknare. Produktionsdeployment och GitHub Release är separata operationer om repositoryts runtimeflöde kräver det.
+Versionsnummer är releasekontrakt, inte deployräknare. Apparnas egna build-/packageversioner ändras inte automatiskt av repositoryreleasen.
 
-## När en release ska ske
+## Automatiskt releaseflöde
 
-Release ska vara kuraterad, inte ske på varje merge.
+`.github/workflows/release.yml` är den repo-lokala releaseprocessen.
 
-En release är motiverad när minst ett av följande gäller:
-
-- en användar- eller operatörsrelevant funktion är redo;
-- en fix bör få en officiell versionspunkt;
-- en breaking förändring behöver ett tydligt kompatibilitetsankare;
-- flera färdiga förändringar ska samlas till en begriplig produkt-/repositoryrelease.
-
-Dokumentations-, test- eller CI-underhåll behöver normalt ingen egen version om det inte finns en konkret konsumenteffekt som kräver en release.
-
-## Release-PR-modell
-
-Målflödet är:
+Normal väg:
 
 ```text
-main changes
-  -> Conventional Commit-historik
-  -> release-PR
-  -> CHANGELOG/version
-  -> gröna relevanta checks
-  -> merge av release-PR
-  -> tag
+PR
+  -> Conventional Commit-kompatibel PR-titel
+  -> ordinarie CI/review
+  -> merge till main
+  -> samma main-SHA verifieras av push-CI
+  -> semantic release beräknar högsta nödvändiga SemVer-bump
+  -> immutable SemVer-tagg
   -> GitHub Release
 ```
 
-Release-PR får inte mergeas för att "komma runt" CI, review eller repositoryregler. Ingen bypass används.
+En merge utan releasevärdig förändring skapar ingen release.
 
-## Automation — verifierad current state
+Releasejobbet:
 
-Automatisk release-PR är **inte aktiverad ännu**.
+- kör endast mot `refs/heads/main`;
+- serialiserar releasekörningar så att samtidiga push- och manuella körningar inte kan skapa konkurrerande taggar;
+- kräver de checks som listas i `.github/release-required-checks`;
+- publicerar aldrig innan dessa checks observerats och passerat på release-target SHA;
+- vägrar avancera från en SemVer-tagg som saknar motsvarande GitHub Release;
+- använder full Git-historik och endast releaseankare som är nåbara från release-target.
 
-Release Please är tekniskt väl lämpat för målflödet och stödjer Conventional Commits, release-PR, CHANGELOG, SemVer-taggar och GitHub Releases. Men den normala GitHub Actions-integrationen med repositoryts `GITHUB_TOKEN` skapar PR:er/taggar som inte triggar efterföljande GitHub Actions-workflows.
+För första release i ett repository utan tidigare SemVer-tagg används `.github/release-baseline` som explicit historikgräns.
 
-Det strider mot repositoryts krav att release-PR ska kunna verifieras med normala CI-checks före merge.
+## Required checks
 
-Upstreamreferens: `https://github.com/googleapis/release-please-action#other-actions-on-release-please-prs`.
+För Avkroken/Avkroken kräver releaseprocessen push-verifiering av:
 
-Följande lösningar är därför inte tillåtna som genväg:
+- Portal;
+- Skvallerbyttan;
+- Krosa-Maja retirement guard;
+- Jobb.
 
-- skapa en ny PAT utan separat godkänt credentialbeslut;
-- återanvända eller utöka Skvallerbyttans/Gamnackens read-only GitHub App för release-write;
-- lätta CI-/review-/branchskydd;
-- mergea en botgenererad release-PR utan relevant verifiering.
+Dependency review är en PR/merge-group-kontroll och körs inte på vanlig main-push.
 
-Full releaseautomation är blockerad tills ett least-privilege write-identitetsflöde eller en annan CI-kompatibel automationsmodell är uttryckligen vald.
-
-## Repositoryversion kontra appversion
-
-Monorepot innehåller flera appar med egna runtimekontrakt. En framtida repositoryrelease får därför inte automatiskt skriva över apparnas package-/buildversioner.
-
-Innan full automation aktiveras ska releasekonfigurationen uttryckligen ange om versionen gäller:
-
-- hela repositoryt;
-- en specifik app/komponent;
-- eller flera manifestkomponenter.
-
-Inför inte en generell `version.txt` som ny canonical version enbart för att ett releaseverktyg kräver det.
+Releaseprocessen får inte användas för att kringgå PR-checks, reviews, rulesets eller andra repositoryskydd.
 
 ## Prereleases
 
-Prereleases skapas endast när en konkret distributionsmodell kräver dem. Använd SemVer-suffix, exempelvis `-rc.1`, och dokumentera vilken publik/kanal som förväntas konsumera prereleasen.
+Manuell `workflow_dispatch` kan skapa release candidates i formen:
 
-Prerelease är inte default för vanlig main-release.
+```text
+vMAJOR.MINOR.PATCH-rc.N
+```
 
-## Hotfix
+RC-numret sorteras numeriskt. Om en starkare SemVer-förändring tillkommer efter en aktiv RC startas en ny RC-serie på den högre versionskärnan.
 
-Hotfix utgår normalt från aktuell `main` och använder `fix:` om ändringen är bakåtkompatibel.
+Promotion från RC till stable ska alltid tagga **samma commit som den aktiva RC-taggen**. Senare commits på `main` får inte smygas in i promotionen.
 
-Separat maintenance branch införs inte ad hoc. Om en äldre major/minor måste stödjas parallellt är det ett explicit release-/branchbeslut.
+## Release notes
 
-## Rollback och korrigering
+Varje commit placeras i exakt en release-note-kategori. Breaking changes behåller sin grundkategori, exempelvis Features eller Fixes, och markeras samtidigt som breaking i texten.
 
-Publicerade taggar och GitHub Releases ska inte skrivas om för att dölja ett fel.
+Detta bevarar Portalens changelog-filter utan att samma commit dupliceras i flera sektioner.
 
-Vid felaktig release:
+GitHub Releases är canonical. Inför inte en konkurrerande manuellt underhållen global changelog eller `version.txt` för repositoryversionen.
 
-1. återställ koden via vanlig PR om rollback behövs;
+## Credentials och permissions
+
+Normal release använder repositoryts GitHub Actions `GITHUB_TOKEN` med minsta permissions för releasejobbet:
+
+- `contents: write` för tagg/GitHub Release;
+- `actions: read`, `checks: read` och `statuses: read` för release-gaten.
+
+Övriga jobb behåller read-only eller tomma permissions efter behov.
+
+Ingen PAT, bypass eller utökad provider-writeidentitet ska införas för releaseflödet utan separat arkitekturbeslut.
+
+## Deployment
+
+GitHub Release och runtime-deployment är separata operationer. En repositoryrelease får inte implicit deploya Portal, Jobb, Skvallerbyttan eller annan runtime om inte respektive deployments kontrakt uttryckligen säger det.
+
+## Hotfix och rollback
+
+Hotfix utgår normalt från aktuell `main` och använder `fix:` när ändringen är bakåtkompatibel.
+
+Publicerade taggar och GitHub Releases skrivs inte om. Vid felaktig release:
+
+1. korrigera eller revert:a via vanlig PR;
 2. kör normal verifiering;
-3. skapa en ny korrigerande patch/minor/major enligt ändringens SemVer-effekt;
-4. dokumentera relationen till den felaktiga releasen i den nya release-noten.
+3. mergea till `main`;
+4. låt releaseprocessen skapa en ny korrigerande SemVer-version.
 
-Tag history rewrite och force-push används inte.
+Force-push och tag history rewrite används inte.
 
 ## Verifiering
 
 Vid förändring av releasekontraktet ska minst följande verifieras:
 
-- PR-title-workflowens regex och events;
-- att workflown saknar secrets och write-permissions;
-- att squash-merge ger en Conventional Commit-kompatibel commitrubrik;
-- att releaseverktygets framtida credentialmodell inte försvagar CI eller repositoryregler;
-- att GitHub Release fortsatt är canonical releasehistorik för Portalens Changelog.
-
-## Kvarvarande blocker
-
-Full releaseautomation kräver ett separat, verifierat beslut om write-identitet eller en alternativ modell som kan skapa release-PR **och** få normal CI att köras utan ny osäker credential eller bypass.
+- PR-title-workflow på pull request och merge queue;
+- release-scriptets SemVer-, RC- och breaking-logik;
+- explicit first-release-baseline där SemVer-tagg saknas;
+- push-CI för samtliga required checks;
+- att release-target SHA är samma SHA som verifierats;
+- att promotion pekar på aktiv RC-commit;
+- att gammal misslyckad releasekörning inte blockerar en senare lyckad recovery;
+- att GitHub Release fortsatt är repositoryts kanoniska versionshistorik.
