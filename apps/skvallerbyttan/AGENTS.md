@@ -8,7 +8,8 @@
 
 ## Invariants
 
-- Utgå från monorepots aktuella default branch och arbeta i separat gren enligt `{agent}/{feature}/{YYYY-MM-DD}`.
+- Utgå från monorepots aktuella default branch och arbeta i separat gren enligt `{agent}/{feature}/{date}`, där `date` skrivs som `YYYY-MM-DD`.
+- Arbetet ska vara seriellt och semantiskt per repository. Fortsätt en befintlig arbetsgren/draft/PR för samma uppgift och färdigställ den innan nästa uppgift i monorepot påbörjas; skapa inte tids-/ID-suffix för att parallellisera agentarbete.
 - Kör `npm run check` före merge.
 - Deploya inte och ändra inte Cloudflare-resurser utan uttryckligt scope.
 - Skvallerbyttans providerarkitektur är read-only. Begär, konfigurera eller använd inte provider-write-permissions för observationsfunktioner.
