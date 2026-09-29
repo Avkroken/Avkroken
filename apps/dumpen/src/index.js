@@ -1,4 +1,12 @@
 import { homePage } from "./page.js";
+import {
+  authenticatedGitHubUserId,
+  githubAuthConfigurationState,
+  handleGitHubCallback,
+  logoutGitHub,
+  renderGitHubLoginPage,
+  startGitHubLogin,
+} from "./github-auth.js";
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const MAX_BUCKET_BYTES = 500 * 1024 * 1024;
@@ -40,28 +48,27 @@ function uploadAuthorized(req, token) {
   return constantTimeEqual(auth.slice(7), token);
 }
 
-function adminAuthorized(req, env) {
-  if (!env.DUMPEN_ADMIN_USER || !env.DUMPEN_ADMIN_PASSWORD) return null;
-  const auth = req.headers.get("authorization") || "";
-  if (!auth.startsWith("Basic ")) return false;
-  try {
-    const decoded = atob(auth.slice(6));
-    const separator = decoded.indexOf(":");
-    if (separator < 0) return false;
-    return constantTimeEqual(decoded.slice(0, separator), env.DUMPEN_ADMIN_USER)
-      && constantTimeEqual(decoded.slice(separator + 1), env.DUMPEN_ADMIN_PASSWORD);
-  } catch {
-    return false;
+async function adminDenied(req, env) {
+  if (githubAuthConfigurationState(env) !== "ready") {
+    return new Response("github admin auth not configured\n", {
+      status: 503,
+      headers: { "cache-control": "no-store" },
+    });
   }
-}
-
-function adminDenied(req, env, realm = "dumpen") {
-  const authorized = adminAuthorized(req, env);
-  if (authorized === null) return new Response("admin login not configured\n", { status: 503 });
-  if (authorized) return null;
-  return new Response("nope\n", {
+  try {
+    if (await authenticatedGitHubUserId(req, env)) return null;
+  } catch (error) {
+    console.error("Dumpen GitHub session validation failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return new Response("github admin auth unavailable\n", {
+      status: 503,
+      headers: { "cache-control": "no-store" },
+    });
+  }
+  return new Response("authentication required\n", {
     status: 401,
-    headers: { "www-authenticate": `Basic realm="${realm}", charset="UTF-8"` },
+    headers: { "cache-control": "no-store" },
   });
 }
 
@@ -122,7 +129,7 @@ async function r2Text(object) {
 }
 
 async function createUploadTicket(req, env) {
-  const denied = adminDenied(req, env, "dumpen tickets");
+  const denied = await adminDenied(req, env);
   if (denied) return denied;
 
   const token = randomHex(32);
@@ -210,7 +217,7 @@ async function capabilityUpload(req, env, token) {
 }
 
 async function downloadByName(req, env, name, url) {
-  const denied = adminDenied(req, env, "dumpen download");
+  const denied = await adminDenied(req, env);
   if (denied) return denied;
 
   const objects = contentObjects(await listAll(env.DUMPEN, { prefix: `${name}/` }));
@@ -247,9 +254,39 @@ export default {
       });
     }
 
+    if (url.pathname === "/login") {
+      if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      return renderGitHubLoginPage(req, githubAuthConfigurationState(env));
+    }
+
+    if (url.pathname === "/auth/start") {
+      if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      try {
+        return await startGitHubLogin(req, env);
+      } catch (error) {
+        console.error("Dumpen GitHub OAuth start failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return renderGitHubLoginPage(
+          new Request("https://dumpen.denied.se/login?error=config"),
+          "misconfigured",
+        );
+      }
+    }
+
+    if (url.pathname === "/auth/callback") {
+      if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      return handleGitHubCallback(req, env);
+    }
+
+    if (url.pathname === "/auth/logout") {
+      if (req.method !== "POST") return new Response("method\n", { status: 405 });
+      return logoutGitHub();
+    }
+
     if (segments[0] === "api" && segments[1] === "objects") {
       if (req.method !== "GET") return new Response("method\n", { status: 405 });
-      const denied = adminDenied(req, env, "dumpen objects");
+      const denied = await adminDenied(req, env);
       if (denied) return denied;
       return Response.json({ objects: groupedObjects(await listAll(env.DUMPEN)) }, {
         headers: { "cache-control": "no-store" },
@@ -274,13 +311,36 @@ export default {
     const name = segments[0];
     if (!name || (name === "admin" && segments.length === 1)) {
       if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      const adminPage = name === "admin";
+      if (adminPage) {
+        if (githubAuthConfigurationState(env) !== "ready") {
+          return new Response(null, {
+            status: 303,
+            headers: { location: "/login?error=config&return_to=%2Fadmin", "cache-control": "no-store" },
+          });
+        }
+        let userId = null;
+        try {
+          userId = await authenticatedGitHubUserId(req, env);
+        } catch (error) {
+          console.error("Dumpen GitHub admin validation failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        if (!userId) {
+          return new Response(null, {
+            status: 303,
+            headers: { location: "/login?return_to=%2Fadmin", "cache-control": "no-store" },
+          });
+        }
+      }
       const stats = objectStats(await listAll(env.DUMPEN));
       return new Response(homePage(stats, {
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxBucketBytes: MAX_BUCKET_BYTES,
         retentionDays: RETENTION_DAYS,
         ticketTtlMinutes: TICKET_TTL_MS / 60000,
-        adminPage: name === "admin",
+        adminPage,
       }), {
         headers: {
           "content-type": "text/html; charset=utf-8",
@@ -317,7 +377,7 @@ export default {
     }
 
     if (req.method === "GET") {
-      // Alla äldre nedladdningslänkar går genom samma Access-skyddade väg.
+      // Alla äldre nedladdningslänkar går genom samma GitHub-session-skyddade adminväg.
       // Skicka aldrig filinnehåll direkt från den publika legacy-routen.
       url.pathname = `/api/download/${name}`;
       return new Response(null, {

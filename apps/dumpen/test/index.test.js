@@ -1,10 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { claimTicket } from "../src/index.js";
+import { handleGitHubCallback, startGitHubLogin } from "../src/github-auth.js";
 
 const TOKEN = "test-token";
-const ADMIN_USER = "admin";
-const ADMIN_PASSWORD = "correct-horse";
+const GITHUB_USER_ID = 123;
+const GITHUB_CLIENT_ID = "github-client";
+const GITHUB_CLIENT_SECRET = "github-client-secret";
 const MiB = 1024 * 1024;
 
 function sizeOf(body) {
@@ -66,20 +68,55 @@ function request(path, { method = "GET", token, body, headers = {} } = {}) {
 function env(r2 = fakeR2()) {
   return {
     DUMPEN_TOKEN: TOKEN,
-    DUMPEN_ADMIN_USER: ADMIN_USER,
-    DUMPEN_ADMIN_PASSWORD: ADMIN_PASSWORD,
+    GITHUB_OAUTH_CLIENT_ID: GITHUB_CLIENT_ID,
+    GITHUB_OAUTH_CLIENT_SECRET: GITHUB_CLIENT_SECRET,
+    DUMPEN_ALLOWED_GITHUB_IDS: String(GITHUB_USER_ID),
     DUMPEN: r2,
   };
 }
 
-function basic(user = ADMIN_USER, password = ADMIN_PASSWORD) {
-  return `Basic ${btoa(`${user}:${password}`)}`;
+function cookiePair(setCookie, name) {
+  const match = setCookie.match(new RegExp(`${name}=([^;,\\s]+)`));
+  if (!match) throw new Error(`cookie ${name} missing`);
+  return `${name}=${match[1]}`;
 }
 
-async function mintTicket(e) {
+async function createAdminSessionCookie() {
+  const e = env();
+  const start = await startGitHubLogin(
+    new Request("https://dumpen.denied.se/auth/start?return_to=%2Fadmin"),
+    e,
+  );
+  const authorize = new URL(start.headers.get("location"));
+  const state = authorize.searchParams.get("state");
+  const oauthCookie = cookiePair(start.headers.get("set-cookie"), "__Host-dumpen_oauth");
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    if (url === "https://github.com/login/oauth/access_token") return Response.json({ access_token: "gho_test" });
+    if (url === "https://api.github.com/user") return Response.json({ id: GITHUB_USER_ID });
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const callback = await handleGitHubCallback(
+      new Request(`https://dumpen.denied.se/auth/callback?code=abc&state=${encodeURIComponent(state)}`, {
+        headers: { Cookie: oauthCookie },
+      }),
+      e,
+    );
+    assert.equal(callback.status, 303);
+    return cookiePair(callback.headers.get("set-cookie"), "__Host-dumpen_session");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+const ADMIN_COOKIE = await createAdminSessionCookie();
+
+async function mintTicket(e, adminCookie = ADMIN_COOKIE) {
   const response = await worker.fetch(request("/api/tickets", {
     method: "POST",
-    headers: { authorization: basic() },
+    headers: { cookie: adminCookie },
   }), e);
   assert.equal(response.status, 201);
   return response.json();
@@ -139,14 +176,14 @@ test("legacy PUT över 500 MB totalt ger 507", async () => {
   assert.equal(response.status, 507);
 });
 
-test("publik nedladdning kräver lösenord bakom Access", async () => {
+test("publik nedladdning kräver GitHub-session", async () => {
   const response = await worker.fetch(request("/api/download/regelverk"), env(fakeR2(versions)));
   assert.equal(response.status, 401);
-  assert.match(response.headers.get("www-authenticate"), /Basic/);
+  assert.equal(response.headers.get("www-authenticate"), null);
 });
 
 test("autentiserad GET returnerar nyaste", async () => {
-  const response = await worker.fetch(request("/api/download/regelverk", { headers: { authorization: basic() } }), env(fakeR2(versions)));
+  const response = await worker.fetch(request("/api/download/regelverk", { headers: { cookie: ADMIN_COOKIE } }), env(fakeR2(versions)));
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "new");
   assert.equal(response.headers.get("x-dumpen-key"), "regelverk/3000.zip");
@@ -154,13 +191,13 @@ test("autentiserad GET returnerar nyaste", async () => {
 });
 
 test("autentiserad ?n=2 returnerar näst nyaste", async () => {
-  const response = await worker.fetch(request("/api/download/regelverk?n=2", { headers: { authorization: basic() } }), env(fakeR2(versions)));
+  const response = await worker.fetch(request("/api/download/regelverk?n=2", { headers: { cookie: ADMIN_COOKIE } }), env(fakeR2(versions)));
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "middle");
 });
 
 test("autentiserad ?n=99 ger 404", async () => {
-  const response = await worker.fetch(request("/api/download/regelverk?n=99", { headers: { authorization: basic() } }), env(fakeR2(versions)));
+  const response = await worker.fetch(request("/api/download/regelverk?n=99", { headers: { cookie: ADMIN_COOKIE } }), env(fakeR2(versions)));
   assert.equal(response.status, 404);
 });
 
@@ -246,7 +283,8 @@ test("utgången ticket nekas och tas bort", async () => {
   let now = 1_800_000_000_000;
   Date.now = () => now;
   try {
-    const ticket = await mintTicket(e);
+    const adminCookie = await createAdminSessionCookie();
+    const ticket = await mintTicket(e, adminCookie);
     const path = new URL(ticket.uploadUrl).pathname;
     now += 16 * 60 * 1000;
     const response = await worker.fetch(request(path, { method: "PUT", body: "zip" }), e);
@@ -265,7 +303,7 @@ test("capability-upload är privat efter uppladdning", async () => {
   const publicRead = await worker.fetch(request(`/api/download/${name}`), e);
   assert.equal(publicRead.status, 401);
 
-  const privateRead = await worker.fetch(request(`/api/download/${name}`, { headers: { authorization: basic() } }), e);
+  const privateRead = await worker.fetch(request(`/api/download/${name}`, { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(privateRead.status, 200);
   assert.equal(await privateRead.text(), "private-data");
 });
@@ -275,8 +313,8 @@ test("objektlista kräver admininloggning", async () => {
   assert.equal(response.status, 401);
 });
 
-test("objektlista nekar fel lösenord", async () => {
-  const response = await worker.fetch(request("/api/objects", { headers: { authorization: basic(ADMIN_USER, "fel") } }), env(fakeR2(versions)));
+test("objektlista nekar ogiltig GitHub-session", async () => {
+  const response = await worker.fetch(request("/api/objects", { headers: { cookie: "__Host-dumpen_session=invalid" } }), env(fakeR2(versions)));
   assert.equal(response.status, 401);
 });
 
@@ -284,7 +322,7 @@ test("objektlista grupperar versioner och döljer intern ticket-metadata", async
   const r2 = fakeR2([...versions, { key: "backup/4000.zip", uploaded: new Date(4000), body: "backup" }]);
   const e = env(r2);
   await mintTicket(e);
-  const response = await worker.fetch(request("/api/objects", { headers: { authorization: basic() } }), e);
+  const response = await worker.fetch(request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.equal(data.objects.length, 2);
@@ -292,17 +330,16 @@ test("objektlista grupperar versioner och döljer intern ticket-metadata", async
   assert.equal(data.objects.find((x) => x.name === "regelverk").versions, 3);
 });
 
-test("objektlista ger 503 om adminsecrets saknas", async () => {
+test("objektlista ger 503 om GitHub OAuth-secret saknas", async () => {
   const e = env();
-  delete e.DUMPEN_ADMIN_USER;
-  delete e.DUMPEN_ADMIN_PASSWORD;
-  const response = await worker.fetch(request("/api/objects", { headers: { authorization: basic() } }), e);
+  delete e.GITHUB_OAUTH_CLIENT_SECRET;
+  const response = await worker.fetch(request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(response.status, 503);
 });
 
 
-test("legacy GET skickar även autentiserade besökare via MFA-vägen utan R2-läsning", async () => {
-  for (const headers of [{}, { authorization: basic() }]) {
+test("legacy GET skickar även autentiserade besökare via GitHub-skyddad adminväg utan R2-läsning", async () => {
+  for (const headers of [{}, { cookie: ADMIN_COOKIE }]) {
     const response = await worker.fetch(request("/regelverk?n=2", { headers }), env({
       list() { throw new Error("Legacy route must not read storage"); },
       get() { throw new Error("Legacy route must not read storage"); },
@@ -317,7 +354,7 @@ test("legacy GET skickar även autentiserade besökare via MFA-vägen utan R2-l�
 
 test("dubbla snedstreck kan inte kringgå Access-routens sökväg", async () => {
   for (const path of ["//api/download/regelverk", "/api//download/regelverk", "/api//tickets"]) {
-    const response = await worker.fetch(request(path, { headers: { authorization: basic() } }), env({
+    const response = await worker.fetch(request(path, { headers: { cookie: ADMIN_COOKIE } }), env({
       list() { throw new Error("Noncanonical route must not read storage"); },
     }));
     assert.equal(response.status, 307);
@@ -326,12 +363,19 @@ test("dubbla snedstreck kan inte kringgå Access-routens sökväg", async () => 
 });
 
 
-test("publik startsida leder till Access innan lösenordsformuläret visas", async () => {
+test("publik startsida leder till GitHub Auth före privata kontrollpanelen", async () => {
   const publicPage = await worker.fetch(request("/"), env());
   const publicHtml = await publicPage.text();
   assert.match(publicHtml, /href="\/admin"/);
   assert.doesNotMatch(publicHtml, /<form id="login"/);
-  const adminPage = await worker.fetch(request("/admin"), env());
+
+  const adminRedirect = await worker.fetch(request("/admin"), env());
+  assert.equal(adminRedirect.status, 303);
+  assert.equal(adminRedirect.headers.get("location"), "/login?return_to=%2Fadmin");
+
+  const adminPage = await worker.fetch(request("/admin", { headers: { cookie: ADMIN_COOKIE } }), env());
   assert.equal(adminPage.status, 200);
-  assert.match(await adminPage.text(), /<form id="login"/);
+  const adminHtml = await adminPage.text();
+  assert.doesNotMatch(adminHtml, /<form id="login"/);
+  assert.match(adminHtml, /GitHub Auth verifierad/);
 });

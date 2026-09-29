@@ -4,6 +4,7 @@
 - Dumpen ägs av `Avkroken/Avkroken` under `apps/dumpen`; rootens `AGENTS.md`, `.github/workflows/ci.yml` och monorepostandarder gäller tillsammans med denna appkontext.
 - Arbeta i separat gren enligt rootkontraktet `{agent}/{feature}/{YYYY-MM-DD}` och fortsätt befintlig arbetslinje i stället för att skapa suffixvarianter.
 - Bevara access-lagrets adminrouting, noindex- och cache-policy.
+- Adminytan använder GitHub OAuth via Krösa-Maja med state/PKCE, signerad `__Host-`-session och numerisk GitHub-ID-allowlist; återintroducera inte Basic Auth som parallell adminväg.
 - Kör `npm run check` före merge; produktion deployas inte som bieffekt av vanlig verifiering.
 - `wrangler.jsonc` beskriver repositoryts deklarerade target; verifiera alltid Cloudflare live-state separat. Live-verifiering 2026-09-29 fann ingen aktiv `dumpen` Worker, så providerprovisionering/cutover ingår inte implicit i repoarbete.
 - När runtime väl är explicit provisionerad ägs produktionsdeployment av Cloudflare Workers Builds och får endast gå via `npm run deploy:workers-builds` på `main`.

@@ -19,6 +19,11 @@ src/access.js
       v
 src/index.js
       |
+      +--> GitHub OAuth via Krösa-Maja
+      |     +-- PKCE + state
+      |     +-- numeric GitHub ID allowlist
+      |     +-- signed __Host session cookie
+      |
       +--> R2 bucket via DUMPEN
 ```
 
@@ -52,6 +57,8 @@ Applikationslagret hanterar den egentliga funktionaliteten efter accesslagret oc
 
 ### Privilegierad API-yta
 
+`/admin` och `/admin/api/*` kräver en giltig lokal session som skapas efter GitHub OAuth via Krösa-Maja. OAuth-flödet använder state + PKCE, tillåter endast versionsstyrda numeriska GitHub-ID:n och återkontrollerar allowlisten för varje session. GitHubs kortlivade provider-token används endast för `/user`-uppslag och revokeras efter callback; den lagras inte som Dumpen-session.
+
 Legacy API-paths canonicaliseras till adminnamnrymden. Accesslagret kan därefter rewrite:a internt till den path som applikationslagret förväntar sig.
 
 Det gör att extern URL-policy och intern implementation kan utvecklas separat utan att gamla interna routes blir den publika kontraktytan.
@@ -76,5 +83,7 @@ Det minskar risken att ett lagrings- eller applikationsfel felaktigt behandlas s
 
 - privilegierade routes får inte bli publikt indexerbara;
 - accesspolicy ska ligga server-side;
+- GitHub OAuth/sessionvalidering ska faila stängt om klient, Secrets Store-secret eller allowlist saknas;
+- Basic Auth ska inte återintroduceras som parallell interaktiv adminväg;
 - R2-innehåll ska inte exponeras genom generell debugfunktion;
 - query strings ska fortsatt redigeras i persistent observability.
