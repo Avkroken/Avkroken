@@ -27,7 +27,7 @@ Börja i **[dokumentationsöversikten](docs/index.md)**. Därifrån går det att
 
 README är medvetet kort. Den tekniska detaljnivån ligger under `docs/`. Appen ägs av `Avkroken/Avkroken` under `apps/dumpen`.
 
-Koden är migrerad till monorepot, men live-verifiering 2026-09-29 hittade ingen aktiv `dumpen` Worker i de Cloudflare-konton som den autentiserade Wrangler-profilen kan läsa. Repositoryts runtimekonfiguration är därför en deklarerad target, inte bevis på en aktiv deployment.
+Koden är migrerad till monorepot. Live-verifiering 2026-09-29 visade att den tidigare `dumpen`-Workern var borttagen; den ska nu återskapas från GitHub via Cloudflare Workers Builds med `apps/dumpen/wrangler.jsonc` som runtimekontrakt. Den privata adminytan använder GitHub OAuth via Krösa-Maja.
 
 ## Viktig invariant
 

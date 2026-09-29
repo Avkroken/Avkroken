@@ -23,8 +23,11 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 - R2-binding: `DUMPEN -> dumpen`
 - persistent Cloudflare observability
 - query-string-redaction
-- log sampling 0.1
-- trace sampling 0.01
+- log sampling 0.1 (10 %)
+- trace sampling 0.01 (1 %)
+- GitHub OAuth client ID via Krösa-Maja
+- GitHub OAuth client secret via Cloudflare Secrets Store
+- numerisk GitHub-ID-allowlist för adminåtkomst
 
 ## Live provider-state
 
@@ -36,7 +39,7 @@ Verifierat 2026-09-29 med den autentiserade Wrangler-profilens läsbara konton s
 - R2 i det andra tillgängliga kontot: **not_configured** — Cloudflare anger att R2 inte är aktiverat;
 - `dumpen.denied.se`: **unavailable / not_configured observed** — varken systemresolvern eller 1.1.1.1 returnerade A/AAAA-post vid verifieringen.
 
-Detta innebär att repositoryts deklarerade Worker/domain/binding är **target-state**, inte aktuell provider-state. Repo-migreringen får inte skapa Worker, R2, DNS eller runtime-secrets som bieffekt. Runtimeaktivering/provisionering kräver ett separat explicit beslut och live-verifiering av målaccount och permissions.
+Detta var providerläget efter repositorymigreringen. Ett explicit beslut togs därefter att återskapa Dumpen som en GitHub-kopplad Cloudflare Worker. Provisioneringen ska ske genom Cloudflare Workers Builds från `Avkroken/Avkroken`, branch `main`, root `apps/dumpen`; lokal `wrangler deploy` är inte skapandemekanismen. R2-state ska fortfarande verifieras separat eftersom bucket-listning saknar läsrätt i den lokala Wrangler-identiteten.
 
 ## Routinggräns
 
@@ -64,7 +67,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Root-CI kör samma appgate som checken `Dumpen`. `npm run deploy:workers-builds` är repositoryts avsedda produktionsentrypoint **när** en Dumpen-runtime uttryckligen har provisionerats och Workers Builds kopplats till `Avkroken/Avkroken` med root directory `apps/dumpen`. Scriptet accepterar endast `main`, kör `npm run check`, deployar och avslutar med `npm run verify:production`. I nuvarande live-state ska den provider-side cutovern inte utföras eftersom Workern inte finns.
+Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. Scriptet accepterar endast `main`, kör `npm run check`, deployar och avslutar med `npm run verify:production`. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
 
 ## Dokumentationsgräns
 
