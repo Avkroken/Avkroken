@@ -14,7 +14,8 @@ Publikt versionsstyrda applikationsytor omfattar:
 
 - Portal,
 - Skvallerbyttan,
-- Jobb.
+- Jobb,
+- Dumpen.
 
 Fristående publika Avkroken-repositories har sin egen kod, dokumentation, Wiki, Issues, Discussions och CI.
 
@@ -41,6 +42,7 @@ Monorepot kan innehålla repository-lokala workflows för sina appar. Workflowfi
 - `docs/organization/` innehåller endast monorepo-delad kontext;
 - Jobb äger sin appdokumentation under `apps/jobb/docs/`;
 - Skvallerbyttan äger sin appdokumentation under `apps/skvallerbyttan/docs/`.
+- Dumpen äger sin appdokumentation under `apps/dumpen/docs/`.
 
 Fristående repositories ska inte hänvisa hit för sin egen tekniska current-state.
 

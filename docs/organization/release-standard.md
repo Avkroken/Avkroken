@@ -20,7 +20,7 @@ Pull request-titlar ska följa Conventional Commits:
 
 Tillåtna typer är `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` och `revert`.
 
-Scope är valfri och ska vara tekniskt relevant, exempelvis `portal`, `jobb` eller `skvallerbyttan`.
+Scope är valfri och ska vara tekniskt relevant, exempelvis `portal`, `jobb`, `skvallerbyttan` eller `dumpen`.
 
 `!` eller en `BREAKING CHANGE:`-footer markerar breaking change.
 
@@ -75,7 +75,8 @@ För Avkroken/Avkroken kräver releaseprocessen push-verifiering av:
 - Portal;
 - Skvallerbyttan;
 - Krosa-Maja retirement guard;
-- Jobb.
+- Jobb;
+- Dumpen.
 
 Dependency review är en PR/merge-group-kontroll och körs inte på vanlig main-push.
 
@@ -114,7 +115,7 @@ Ingen PAT, bypass eller utökad provider-writeidentitet ska införas för releas
 
 ## Deployment
 
-GitHub Release och runtime-deployment är separata operationer. En repositoryrelease får inte implicit deploya Portal, Jobb, Skvallerbyttan eller annan runtime om inte respektive deployments kontrakt uttryckligen säger det.
+GitHub Release och runtime-deployment är separata operationer. En repositoryrelease får inte implicit deploya Portal, Jobb, Skvallerbyttan, Dumpen eller annan runtime om inte respektive deployments kontrakt uttryckligen säger det.
 
 ## Hotfix och rollback
 

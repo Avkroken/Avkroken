@@ -33,6 +33,22 @@ updates:
         applies-to: version-updates
         patterns: ["*"]
 
+
+  - package-ecosystem: npm
+    directory: /apps/dumpen
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "09:10"
+      timezone: Europe/Stockholm
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    open-pull-requests-limit: 3
+    groups:
+      dumpen:
+        update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

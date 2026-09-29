@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dumpen",
+  "main": "src/access.js",
+  "workers_dev": false,
+  "preview_urls": false,
+  "compatibility_date": "2026-08-26",
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true
+    }
+  },
+  "r2_buckets": [
+    { "binding": "DUMPEN", "bucket_name": "dumpen" }
+  ],
+  "routes": [
+    { "pattern": "dumpen.denied.se", "custom_domain": true }
+  ]
+}
