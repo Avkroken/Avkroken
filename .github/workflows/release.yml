@@ -7,6 +7,7 @@ on:
       - ".github/workflows/release.yml"
       - ".github/scripts/semantic_release.py"
       - ".github/scripts/wait_for_checks.py"
+      - ".github/scripts/test_wait_for_checks.py"
       - ".github/release-baseline"
       - ".github/release-required-checks"
   push:
@@ -51,7 +52,9 @@ jobs:
           test -s .github/release-required-checks
           python3 -m py_compile \
             .github/scripts/semantic_release.py \
-            .github/scripts/wait_for_checks.py
+            .github/scripts/wait_for_checks.py \
+            .github/scripts/test_wait_for_checks.py
+          python3 .github/scripts/test_wait_for_checks.py
           python3 .github/scripts/semantic_release.py \
             --forced-bump auto \
             --channel stable \

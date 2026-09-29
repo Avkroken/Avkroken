@@ -8,7 +8,8 @@ import urllib.request
 
 PASS = {"success", "neutral", "skipped"}
 FAIL = {"failure", "cancelled", "timed_out", "action_required", "stale", "startup_failure"}
-IGNORED_CHECK_NAMES = {"Semantic release", "Validate semantic release"}
+ALWAYS_IGNORED_CHECK_NAMES = {"Semantic release", "Validate semantic release"}
+IGNORED_UNLESS_REQUIRED_CHECK_NAMES = {"Dependabot"}
 
 
 def parse_args():
@@ -59,6 +60,22 @@ def load_required(path):
     if not names:
         raise SystemExit(f"Required-check configuration is empty: {config}")
     return names
+
+
+def relevant_check_runs(items, required, own_run_fragment):
+    """Filter checks that participate in the release gate."""
+    relevant = []
+    for item in items:
+        name = item.get("name", "")
+        details_url = item.get("details_url") or ""
+        if own_run_fragment in details_url:
+            continue
+        if name in ALWAYS_IGNORED_CHECK_NAMES:
+            continue
+        if name in IGNORED_UNLESS_REQUIRED_CHECK_NAMES and name not in required:
+            continue
+        relevant.append(item)
+    return relevant
 
 
 def latest_checks(items):
@@ -141,11 +158,11 @@ def main():
         if now - started > args.timeout:
             raise SystemExit("Timed out waiting for repository checks.")
 
-        raw_checks = [
-            item for item in all_check_runs(args.repository, args.sha)
-            if own_run_fragment not in (item.get("details_url") or "")
-            and item.get("name") not in IGNORED_CHECK_NAMES
-        ]
+        raw_checks = relevant_check_runs(
+            all_check_runs(args.repository, args.sha),
+            required,
+            own_run_fragment,
+        )
         checks_by_identity = latest_checks(raw_checks)
         checks = list(checks_by_identity.values())
 
