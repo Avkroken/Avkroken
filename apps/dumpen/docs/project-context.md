@@ -11,9 +11,9 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 - R2-bindingen `DUMPEN` är tjänstens persistenta objektlager.
 - den publika rooten hålls separat från privilegierad applikationsyta.
 
-## Runtime
+## Repository-deklarerad runtime target
 
-`apps/dumpen/wrangler.jsonc` definierar på `Avkroken/Avkroken`-repositoryts `main`:
+`apps/dumpen/wrangler.jsonc` är importerad från den sista fullständiga pre-retirement-snapshoten och definierar på `Avkroken/Avkroken`-repositoryts `main`:
 
 - Worker: `dumpen`
 - entrypoint: `src/access.js`
@@ -25,6 +25,18 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 - query-string-redaction
 - log sampling 0.1
 - trace sampling 0.01
+
+## Live provider-state
+
+Verifierat 2026-09-29 med den autentiserade Wrangler-profilens läsbara konton samt DNS-resolution:
+
+- Worker `dumpen`: **not_configured** — Cloudflare API returnerar uttryckligen att Workern inte finns i båda tillgängliga kontona;
+- runtime-secrets: **not_observed** — det finns ingen Worker att läsa secretnamn från;
+- R2 i kontot som `wrangler.jsonc` pekar på: **permission_denied / unknown** — bucket-listning returnerar Cloudflare authentication error, så bucketens existens får inte antas åt något håll;
+- R2 i det andra tillgängliga kontot: **not_configured** — Cloudflare anger att R2 inte är aktiverat;
+- `dumpen.denied.se`: **unavailable / not_configured observed** — varken systemresolvern eller 1.1.1.1 returnerade A/AAAA-post vid verifieringen.
+
+Detta innebär att repositoryts deklarerade Worker/domain/binding är **target-state**, inte aktuell provider-state. Repo-migreringen får inte skapa Worker, R2, DNS eller runtime-secrets som bieffekt. Runtimeaktivering/provisionering kräver ett separat explicit beslut och live-verifiering av målaccount och permissions.
 
 ## Routinggräns
 
@@ -52,7 +64,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Root-CI kör samma appgate som checken `Dumpen`. Produktion ägs av Cloudflare Workers Builds med root directory `apps/dumpen` och deploykommandot `npm run deploy:workers-builds`; scriptet accepterar endast `main`, kör `npm run check`, deployar befintlig Worker och avslutar med `npm run verify:production`.
+Root-CI kör samma appgate som checken `Dumpen`. `npm run deploy:workers-builds` är repositoryts avsedda produktionsentrypoint **när** en Dumpen-runtime uttryckligen har provisionerats och Workers Builds kopplats till `Avkroken/Avkroken` med root directory `apps/dumpen`. Scriptet accepterar endast `main`, kör `npm run check`, deployar och avslutar med `npm run verify:production`. I nuvarande live-state ska den provider-side cutovern inte utföras eftersom Workern inte finns.
 
 ## Dokumentationsgräns
 
