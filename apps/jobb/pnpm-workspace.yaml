@@ -7,3 +7,7 @@ packages:
 ignoredBuiltDependencies:
   - esbuild
   - workerd
+
+# Temporary transitive security override until Wrangler/Miniflare ships undici >= 7.29.1.
+overrides:
+  'undici@<7.29.1': 7.29.1
