@@ -315,6 +315,8 @@ API- och asset-paths är inte del av SPA-fallbacken.
 - `/access-denied/non-identity/` — Access deny efter identity-/policyutvärdering.
 - `/access-denied/gateway/` — Cloudflare Gateway-block; separat från Access och originfel.
 - `/media/logos/<asset-id>` — publik GET/HEAD för exakt asset, hanteras före SPA/static fallback och erbjuder ingen kataloglistning.
+- `/admin/logos[/...]` — Access-skyddad statisk administrationsyta, origin-verifierad med Access JWT före asset-serving.
+- `/api/admin/logos[/...]` — Access-skyddat logo-control-plane för list/upload/metadata/replace/download/delete inom fast `logos/`-prefix.
 - `/drift[/...]` — Drift & insyn från den sanerade Skvallerbyttan-snapshoten.
 - `/changelog` — officiella publicerade GitHub Releases för Portalens publika repositoryprojekt.
 - `/aktivitet` — observerad GitHub repositoryaktivitet för Portalens live-publika repositoryprojekt, med explicit coverage.
@@ -344,9 +346,9 @@ PORTAL_LOGOS.get(exact key)
 
 Den publika routen har ingen `list`-operation, accepterar inte godtycklig R2-key och använder inte D1. R2 HTTP-metadata får inte skriva över routens publika cachepolicy. SVG får dessutom restriktiv CSP och samtliga svar använder `X-Content-Type-Options: nosniff`.
 
-`PORTAL_LOGOS` är medvetet inte definierad i checked-in Wrangler-konfiguration förrän den faktiska Cloudflare-bucketen och bindingen är providerverifierad. Saknad binding failar med `503` utan fallback till ASSETS eller SPA.
+Production definierar `PORTAL_LOGOS` som en R2-binding till den dedikerade logobucketen. Preview-konfigurationen definierar medvetet ingen R2-binding, vilket hindrar branch-previews från att få production-writeväg. Saknad binding failar med `503` utan fallback till ASSETS eller SPA.
 
-Admin/control plane är en separat framtida gräns. Den får inte implementeras förrän Portalens riktiga server-side auth/session contract är verifierat. Jobbs authcookie eller publik Portal-JavaScript får inte återanvändas som ersättning.
+Admin/control plane är en separat server-side gräns ovanpå samma storage-prefix. Cloudflare Access skyddar de path-specifika admin- och API-routes före Workern; Workern verifierar därefter `Cf-Access-Jwt-Assertion` mot teamdomänens JWKS, issuer och exakt app-AUD innan R2 kan nås. Jobbs authcookie återanvänds inte. Admin-HTML/CSS/JS läses via `ASSETS` först efter origin-auth och levereras `no-store` med restriktiv CSP. API:t accepterar aldrig en rå bucket-key och writes validerar storlek, MIME och filinnehåll före `put`.
 
 ## Temaarkitektur
 

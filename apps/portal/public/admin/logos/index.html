@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="sv" data-theme="forest">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#080b09">
+  <title>Logotyper · Avkroken Admin</title>
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/portal-v2.css">
+  <link rel="stylesheet" href="/admin/logos/admin.css">
+</head>
+<body class="portal-v2 admin-logos">
+  <a class="skip-link" href="#admin-content">Hoppa till innehåll</a>
+  <header class="portal-header">
+    <div class="shell admin-header">
+      <a class="portal-brand" href="/" aria-label="Avkroken startsida">
+        <span class="portal-brand-mark" aria-hidden="true">AK</span>
+        <span>AVKROKEN</span>
+      </a>
+      <span class="admin-badge">ADMIN · LOGOTYPER</span>
+    </div>
+  </header>
+
+  <main class="shell portal-main" id="admin-content" tabindex="-1">
+    <div class="portal-page-head">
+      <div class="portal-kicker">R2 · CONTROL PLANE</div>
+      <h1>Logotyper</h1>
+      <p>Ladda upp och hantera Portalens publika logo-assets. Varje asset får en stabil publik URL.</p>
+    </div>
+
+    <section class="admin-panel" aria-labelledby="upload-title">
+      <div>
+        <h2 id="upload-title">Ladda upp</h2>
+        <p>PNG, JPEG, GIF, WebP, AVIF eller SVG. Högst 5 MiB.</p>
+      </div>
+      <form id="logo-upload-form" class="upload-form">
+        <label for="logo-file">Bildfil</label>
+        <input id="logo-file" name="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml" required>
+        <button type="submit">Ladda upp</button>
+      </form>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="assets-title">
+      <div class="asset-heading">
+        <div>
+          <h2 id="assets-title" tabindex="-1">Assets</h2>
+          <p id="asset-count">Läser in…</p>
+        </div>
+        <button id="refresh-assets" type="button" class="secondary-button">Uppdatera</button>
+      </div>
+
+      <div class="asset-controls">
+        <label for="asset-filter">Filtrera</label>
+        <input id="asset-filter" type="search" autocomplete="off" placeholder="Namn, id eller MIME-typ">
+        <label for="asset-sort">Sortera</label>
+        <select id="asset-sort">
+          <option value="updated-desc">Senast ändrad</option>
+          <option value="created-desc">Senast skapad</option>
+          <option value="name-asc">Namn A–Ö</option>
+          <option value="size-desc">Störst först</option>
+        </select>
+      </div>
+
+      <div id="asset-list" class="asset-list" aria-live="polite" aria-busy="true"></div>
+    </section>
+
+    <section class="admin-panel preview-panel" aria-labelledby="preview-title" hidden id="preview-panel">
+      <div class="asset-heading">
+        <div>
+          <h2 id="preview-title" tabindex="-1">Förhandsvisning</h2>
+          <p id="preview-caption"></p>
+        </div>
+        <button id="close-preview" type="button" class="secondary-button">Stäng</button>
+      </div>
+      <div class="preview-stage">
+        <img id="logo-preview" alt="">
+      </div>
+    </section>
+
+    <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
+  </main>
+  <script src="/admin/logos/admin.js" defer></script>
+</body>
+</html>

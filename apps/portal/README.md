@@ -112,9 +112,9 @@ För en opt-in-app använder samma manifestgräns även dokumentationsadaptern. 
 
 Den publika logo-routen accepterar endast ett validerat single-segment `asset-id` och mappar det internt till exakt R2-key `logos/<asset-id>`. Workern använder endast `get`; ingen publik listning eller godtycklig R2-key exponeras. Tillåtna svarstyper är avgränsade till bildformat och GET/HEAD-responser sätter `nosniff`, bounded publik cache och ETag när R2 tillhandahåller den. Matchande `If-None-Match` använder weak ETag comparison och returnerar `304` utan body.
 
-Källkoden förväntar sig en Worker-binding med namnet `PORTAL_LOGOS`, men checked-in `wrangler.jsonc` definierar ännu ingen sådan binding. Fram till att faktisk bucket och provider-state har verifierats returnerar logo-routen därför fail-closed `503`; inget bucketnamn hårdkodas eller antas i repositoryt.
+Production-konfigurationen binder `PORTAL_LOGOS` till den dedikerade R2-bucketen `avkroken-portal-logos`. Publik serving är fortsatt read-only och accepterar aldrig en rå bucket-key eller kataloglistning. Preview-konfigurationen är medvetet utan R2-binding och utan adminens Access-variabler, så branch-previews kan inte skriva i production-storage.
 
-Admin/control plane för logotyper är inte implementerad i denna del. Repositoryt bevisar idag endast Jobbs separata skyddade auth-origin via `/auth/jobb`, inte en generell Portal-adminsession. `/admin/logos` och `/api/admin/logos/*` ska därför inte införas förrän den riktiga server-side identity/session-gränsen har lokaliserats och verifierats.
+Logotypadministrationen finns på `/admin/logos[/...]` med API under `/api/admin/logos[/...]`. Den använder två server-side lager: en separat path-specifik Cloudflare Access-applikation framför Workern och origin-verifiering av `Cf-Access-Jwt-Assertion` mot teamets JWKS, issuer och exakt app-AUD från Worker-konfigurationen. UI/API använder `no-store`; admin-HTML får dessutom restriktiv CSP och clickjacking-skydd. API:t kan lista, ladda upp, ersätta, ladda ned och radera objekt endast under det fasta `logos/`-prefixet, med 5 MiB-gräns och MIME-/innehållskontroll. Den externa Access-policyn och R2-resursens faktiska provider-state är fortsatt live-state och ska verifieras hos Cloudflare vid driftkontroll.
 
 Portalens tre shell-teman använder samma HTML, komponenter och semantiska tokens:
 

@@ -22,8 +22,20 @@ test("portal Preview isolates Durable Object and does not bind production servic
   assert.equal(config.previews?.services, undefined);
   assert.equal(config.previews?.send_email, undefined);
   assert.equal(config.previews?.vars, undefined);
+  assert.equal(config.previews?.r2_buckets, undefined);
 });
 
+test("Portal production binds the provider-verified logo store and Access audience", async () => {
+  const config = await readWranglerConfig();
+  assert.deepEqual(config.r2_buckets, [
+    { binding: "PORTAL_LOGOS", bucket_name: "avkroken-portal-logos" }
+  ]);
+  assert.equal(config.vars?.ACCESS_TEAM_DOMAIN, "https://avkroken.cloudflareaccess.com");
+  assert.equal(
+    config.vars?.ACCESS_LOGO_ADMIN_AUD,
+    "c10cb83e06238d41b2c85f8118f91e8be5f272791c96208541734ece509fb1f4"
+  );
+});
 
 test("Portal production deploy is owned by Cloudflare Workers Builds", async () => {
   const workflow = new URL("../../../.github/workflows/deploy-portal.yml", import.meta.url);

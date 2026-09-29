@@ -28,6 +28,7 @@ const topLevelRoutes = [
   "/access-denied/identity/",
   "/access-denied/non-identity/",
   "/access-denied/gateway/",
+  "/admin/logos/",
 ];
 
 
@@ -52,6 +53,9 @@ function json(res, value, status = 200) {
 }
 
 function apiFixture(pathname) {
+  if (pathname === "/api/admin/logos") {
+    return { status: "available", assets: [] };
+  }
   if (pathname === "/api/projects") {
     return {
       source: { provider: "github", scope: "Avkroken", coverage: "active_public_repositories" },
@@ -385,6 +389,22 @@ async function main() {
     );
     assert.equal(active.className, "button");
     assert.equal(active.href, "/");
+    await clearActions();
+
+    await navigate("/admin/logos/");
+    await press("\uE004");
+    active = await execute(
+      "return { className: document.activeElement && document.activeElement.className, " +
+      "text: document.activeElement && document.activeElement.textContent.trim() };"
+    );
+    assert.equal(active.className, "skip-link");
+    assert.equal(active.text, "Hoppa till innehåll");
+    await press("\uE007");
+    active = await execute(
+      "return { id: document.activeElement && document.activeElement.id, hash: location.hash };"
+    );
+    assert.equal(active.id, "admin-content");
+    assert.equal(active.hash, "#admin-content");
     await clearActions();
 
     await setViewport(390, 844);
