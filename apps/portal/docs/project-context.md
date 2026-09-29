@@ -55,7 +55,7 @@ Worker-koden innehåller idag:
 - Del 3-regressionsskydd för public/protected Auth-gräns, Drift/Changelog/Issues/Releases/Builds/Activity/Search/Home degraded states samt full status-/freshness-vokabulär;
 - browserverifiering med axe WCAG 2.2 A/AA och horisontell overflow-kontroll på samtliga top-level-routes i både desktop- och mobilviewport.
 - statiska `/access-denied/`, `/access-denied/identity/`, `/access-denied/non-identity/` och `/access-denied/gateway/` med separata Access-/Gateway-semantiker och `noindex,nofollow`;
-- gemensam `data-theme`-arkitektur med `forest`, `legacy` och `blackout` ovanpå samma primitive → semantic tokenkedja;
+- gemensam `data-theme`-arkitektur med `legacy`, `forest` och `blackout` ovanpå samma primitive → semantic tokenkedja, där Legacy är fallback och preferensen kan delas som ren presentationsstate;
 - public logo-read boundary i `src/logo-assets.mjs`: exakt `/media/logos/<asset-id>`, GET/HEAD, fast `logos/`-keyprefix, MIME-allowlist, `nosniff`, bounded publik cache och ingen listning;
 - logo-storage med separerad public/admin-gräns: production binder `PORTAL_LOGOS` till den dedikerade logobucketen, public route är read-only och admin-write kräver Cloudflare Access + origin-JWT; branch-previews saknar medvetet R2/admin-Access-bindings och failar därmed stängt.
 

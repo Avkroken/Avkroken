@@ -118,11 +118,11 @@ Logotypadministrationen finns på `/admin/logos[/...]` med API under `/api/admin
 
 Portalens tre shell-teman använder samma HTML, komponenter och semantiska tokens:
 
-- `forest` — Avkroken/Wrong Turn/Forest och default;
-- `legacy` — den tidigare blåare Portal-tonen;
+- `legacy` — den tidigare blåare Portal-tonen och runtime-default;
+- `forest` — Avkroken/Wrong Turn/Forest;
 - `blackout` — neutral, mycket mörk variant.
 
-Teman väljs med `data-theme` på dokumentroten. Endast primitive färgtokens override:as; semantic/component tokens och accessibilitykontrakt delas.
+Teman väljs med `data-theme` på dokumentroten. Endast primitive färgtokens override:as; semantic/component tokens och accessibilitykontrakt delas. Valet använder monorepots gemensamma presentationskontrakt `avkroken.theme` / `avkroken_theme`; den äldre `avkroken.portal.theme` läses endast som migrationskälla.
 
 ## Källdata och ansvar
 

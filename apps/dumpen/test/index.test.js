@@ -136,7 +136,8 @@ test("root visar privat dashboard och engångsticket-flöde", async () => {
   assert.match(html, /Privat kontrollpanel/);
   assert.match(html, /engångsticket/i);
   assert.match(html, /Vanlig GET är privat/);
-  assert.match(html, /--bg:#050505/);
+  assert.match(html, /--bg:#04070e/);
+  assert.match(html, /value="legacy">Legacy/);
   assert.match(html, /20 MB per fil/);
   assert.match(html, /500 MB totalt/);
 });

@@ -1,4 +1,5 @@
 export type AuthMode = "github" | "misconfigured" | "unconfigured";
+type Theme = "legacy" | "forest" | "blackout";
 
 export interface ErrorPageOptions {
   status: number;
@@ -44,6 +45,7 @@ export function renderAuthLoginPage(
 
   const html = pageShell({
     title: "Logga in",
+    theme: themeFromRequest(request),
     body: `
       <section class="auth-layout">
         <div class="intro">
@@ -127,14 +129,25 @@ export function renderAuthStyles(): Response {
   });
 }
 
-function pageShell(options: { title: string; body: string }): string {
+function themeFromRequest(request: Request): Theme {
+  const value = (request.headers.get("cookie") ?? "")
+    .split(";")
+    .map(part => part.trim())
+    .find(part => part.startsWith("avkroken_theme="))
+    ?.slice("avkroken_theme=".length);
+  return value === "forest" || value === "blackout" ? value : "legacy";
+}
+
+function pageShell(options: { title: string; body: string; theme?: Theme }): string {
+  const theme = options.theme ?? "legacy";
+  const themeColor = theme === "legacy" ? "#04070e" : theme === "forest" ? "#080b09" : "#000000";
   return `<!doctype html>
-<html lang="sv">
+<html lang="sv" data-theme="${theme}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#090c11">
+<meta name="theme-color" content="${themeColor}">
 <title>${escapeHtml(options.title)} · Jobb · Avkroken</title>
 <link rel="stylesheet" href="/assets/auth.css">
 </head>
@@ -187,20 +200,33 @@ const AUTH_CSS = `
 :root{
   color-scheme:dark;
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:#090c11;
-  color:#f5f7fb;
-  --bg:#090c11;
-  --panel:#10151d;
-  --panel-2:#0d1219;
-  --line:#202a37;
-  --line-strong:#344257;
-  --muted:#98a5b7;
-  --muted-2:#738197;
-  --text:#f5f7fb;
+  --bg:#04070e;
+  --bg-soft:#050912;
+  --panel:#09111f;
+  --panel-2:#0d182c;
+  --line:#213652;
+  --line-strong:#385475;
+  --muted:#a8bad0;
+  --muted-2:#6f88a7;
+  --text:#f5f8fc;
   --accent:#7dd3fc;
   --accent-2:#a7f3d0;
   --danger:#fda4af;
-  --shadow:0 28px 80px rgba(0,0,0,.38)
+  --control:#f5f8fc;
+  --control-text:#08111c;
+  --shadow:0 28px 80px rgba(0,0,0,.38);
+  background:var(--bg);
+  color:var(--text)
+}
+:root[data-theme="forest"]{
+  --bg:#080b09;--bg-soft:#0c100d;--panel:#111713;--panel-2:#171f19;
+  --line:#263129;--line-strong:#3b493e;--muted:#a6b1aa;--muted-2:#718077;
+  --text:#f3f5f1;--control:#f3f5f1;--control-text:#101612
+}
+:root[data-theme="blackout"]{
+  --bg:#000;--bg-soft:#030303;--panel:#070707;--panel-2:#0d0d0d;
+  --line:#1a1a1a;--line-strong:#333;--muted:#b5b5b5;--muted-2:#777;
+  --text:#f6f6f3;--control:#f6f6f3;--control-text:#090909
 }
 *{box-sizing:border-box}
 html{min-height:100%;background:var(--bg)}
@@ -209,9 +235,9 @@ body{
   margin:0;
   padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
   background:
-    radial-gradient(circle at 16% 8%,rgba(52,118,156,.20),transparent 34rem),
-    radial-gradient(circle at 82% 18%,rgba(44,125,107,.12),transparent 28rem),
-    linear-gradient(180deg,#0b1017 0%,#090c11 56%,#080a0e 100%);
+    radial-gradient(circle at 16% 8%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 34rem),
+    radial-gradient(circle at 82% 18%,color-mix(in srgb,var(--accent-2) 10%,transparent),transparent 28rem),
+    linear-gradient(180deg,var(--bg-soft) 0%,var(--bg) 72%);
 }
 body:before{
   content:"";
@@ -239,23 +265,23 @@ body:before{
 }
 .brand-lockup{display:flex;align-items:baseline;gap:10px;margin-bottom:44px}
 .brand-kicker{font-size:.78rem;font-weight:850;letter-spacing:.22em;color:var(--accent)}
-.brand-product{font-size:.92rem;font-weight:750;color:#d6dee9}
+.brand-product{font-size:.92rem;font-weight:750;color:var(--text)}
 .status-pill{
   display:inline-flex;
   align-items:center;
   gap:9px;
   border:1px solid var(--line);
-  background:rgba(16,21,29,.7);
+  background:color-mix(in srgb,var(--panel) 72%,transparent);
   border-radius:999px;
   padding:8px 12px;
-  color:#cbd5e1;
+  color:var(--text);
   font-size:.78rem;
   font-weight:700;
   margin-bottom:20px
 }
 .status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 0 4px rgba(167,243,208,.08)}
 h1{font-size:clamp(3rem,7vw,5.8rem);line-height:.94;letter-spacing:-.055em;margin:0;max-width:740px}
-.lead{font-size:clamp(1rem,2vw,1.22rem);line-height:1.65;color:#b3bfce;max-width:620px;margin:24px 0 0}
+.lead{font-size:clamp(1rem,2vw,1.22rem);line-height:1.65;color:var(--muted);max-width:620px;margin:24px 0 0}
 .trust-row{display:flex;flex-wrap:wrap;gap:9px;color:var(--muted-2);font-size:.78rem;font-weight:650;margin-top:32px}
 .auth-card{
   min-height:430px;
@@ -266,7 +292,7 @@ h1{font-size:clamp(3rem,7vw,5.8rem);line-height:.94;letter-spacing:-.055em;margi
   padding:clamp(24px,4vw,38px);
   border:1px solid var(--line);
   border-radius:24px;
-  background:linear-gradient(180deg,rgba(19,26,36,.96),rgba(13,18,25,.94));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 96%,transparent),color-mix(in srgb,var(--panel-2) 94%,transparent));
   box-shadow:var(--shadow);
   backdrop-filter:blur(20px)
 }
@@ -285,14 +311,14 @@ h2{font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.08;letter-spacing:-.035em;m
   font-weight:820;
   transition:transform .15s ease,border-color .15s ease,background .15s ease
 }
-.primary-action{background:#f4f7fb;color:#0a0f16;border:1px solid #f4f7fb}
-.primary-action:hover{transform:translateY(-1px);background:#fff}
+.primary-action{background:var(--control);color:var(--control-text);border:1px solid var(--control)}
+.primary-action:hover{transform:translateY(-1px);background:var(--text)}
 .primary-action:focus-visible,.secondary-action:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
-.secondary-action{background:transparent;color:#d9e2ec;border:1px solid var(--line-strong)}
-.secondary-action:hover{border-color:#63748a;background:#121923}
+.secondary-action{background:transparent;color:var(--text);border:1px solid var(--line-strong)}
+.secondary-action:hover{border-color:var(--line-strong);background:var(--panel-2)}
 .action-mark{
   width:28px;height:28px;border-radius:8px;display:grid;place-items:center;
-  background:#0d141d;color:#fff;font-size:.9rem
+  background:var(--panel-2);color:var(--text);font-size:.9rem
 }
 .support-copy{font-size:.82rem;color:var(--muted-2);margin:0;text-align:center}
 .security-note{
@@ -300,7 +326,7 @@ h2{font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.08;letter-spacing:-.035em;m
   border-top:1px solid var(--line);padding-top:18px;color:var(--muted-2)
 }
 .security-note p{margin:0;font-size:.76rem;line-height:1.55}
-.security-note strong{color:#b9c5d4}
+.security-note strong{color:var(--text)}
 .shield{color:var(--accent-2);font-size:.72rem;margin-top:3px}
 .inline-alert{
   display:flex;flex-direction:column;gap:5px;
@@ -332,7 +358,7 @@ h2{font-size:clamp(1.65rem,4vw,2.3rem);line-height:1.08;letter-spacing:-.035em;m
   padding-top:24px;
   border-top:1px solid rgba(255,255,255,.06);
   display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;
-  color:#59677a;font-size:.72rem;font-weight:650
+  color:var(--muted-2);font-size:.72rem;font-weight:650
 }
 @media(max-width:820px){
   body{padding-left:18px;padding-right:18px}

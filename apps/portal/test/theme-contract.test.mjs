@@ -20,14 +20,17 @@ test("Portal exposes Forest, Legacy and Blackout through one shared token layer"
   assert.match(tokens, /:root\[data-theme="legacy"\]/);
   assert.match(tokens, /:root\[data-theme="blackout"\]/);
 
-  assert.match(html, /<html lang="sv" data-theme="forest">/);
+  assert.match(html, /<html lang="sv" data-theme="legacy">/);
   assert.match(html, /<select id="portal-theme"/);
-  assert.match(html, /<option value="forest">Avkroken<\/option>/);
-  assert.match(html, /<option value="legacy">Legacy<\/option>/);
+  assert.match(html, /<option value="legacy">Legacy<\/option>[\s\S]*<option value="forest">Avkroken<\/option>/);
   assert.match(html, /<option value="blackout">Blackout<\/option>/);
 
-  assert.match(shell, /new Set\(\["forest", "legacy", "blackout"\]\)/);
+  assert.match(shell, /new Set\(\["legacy", "forest", "blackout"\]\)/);
+  assert.match(shell, /const defaultTheme = "legacy"/);
+  assert.match(shell, /avkroken\.theme/);
   assert.match(shell, /avkroken\.portal\.theme/);
+  assert.match(shell, /avkroken_theme/);
+  assert.match(shell, /Domain=\.denied\.se/);
   assert.match(shell, /document\.documentElement\.dataset\.theme = theme/);
   assert.match(shell, /localStorage\.setItem\(themeStorageKey, theme\)/);
 

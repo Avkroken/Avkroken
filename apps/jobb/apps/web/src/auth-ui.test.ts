@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderAuthStyles, renderErrorPage } from "./auth-ui";
+import { renderAuthLoginPage, renderAuthStyles, renderErrorPage } from "./auth-ui";
 
 describe("auth UI", () => {
   it("renders a styled standard error page with safe diagnostics", async () => {
@@ -21,6 +21,7 @@ describe("auth UI", () => {
 
     const html = await response.text();
     expect(html).toContain("/assets/auth.css");
+    expect(html).toContain('<html lang="sv" data-theme="legacy">');
     expect(html).toContain("ref-123");
     expect(html).toContain("unexpected");
     expect(html).toContain("Försök igen");
@@ -34,5 +35,18 @@ describe("auth UI", () => {
     const css = await response.text();
     expect(css).toContain(".auth-layout");
     expect(css).toContain(".error-layout");
+    expect(css).toContain(':root[data-theme="forest"]');
+    expect(css).toContain(':root[data-theme="blackout"]');
+    expect(css).toContain("--accent:#7dd3fc");
+    expect(css).toContain("--accent-2:#a7f3d0");
+  });
+
+  it("uses the shared presentation theme on the GitHub login page", async () => {
+    const request = new Request("https://jobb.denied.se/login", {
+      headers: { cookie: "avkroken_theme=forest" },
+    });
+    const html = await renderAuthLoginPage(request, "github", "/").text();
+    expect(html).toContain('<html lang="sv" data-theme="forest">');
+    expect(html).toContain('<meta name="theme-color" content="#080b09">');
   });
 });

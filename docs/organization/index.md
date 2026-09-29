@@ -12,6 +12,7 @@
 | [Access inventory](access-inventory.md) | publik klassificeringsmodell för monorepots webbappar |
 | [Access path standard](access-path-standard.md) | accessprinciper för monorepots webbappar |
 | [Cloudflare credential model](cloudflare-credential-standard.md) | stabil kod-/credentialmodell som används av monorepots berörda appar |
+| [Temastandard](theme-standard.md) | gemensam temafamilj och presentationspersistens utan visuell homogenisering |
 
 ## Appdokumentation
 

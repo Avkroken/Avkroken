@@ -352,7 +352,7 @@ Admin/control plane är en separat server-side gräns ovanpå samma storage-pref
 
 ## Temaarkitektur
 
-Portal-shellen har ett gemensamt komponent- och tokenlager. Dokumentroten bär `data-theme` och `tokens.css` override:ar endast primitive färgtokens för `forest`, `legacy` och `blackout`. Semantic tokens, layout, fokus, keyboardbeteende och reduced-motion-kontrakt är gemensamma.
+Portal-shellen har ett gemensamt komponent- och tokenlager. Dokumentroten bär `data-theme` och `tokens.css` override:ar endast primitive färgtokens för `legacy`, `forest` och `blackout`. Semantic tokens, layout, fokus, keyboardbeteende och reduced-motion-kontrakt är gemensamma.
 
 ## Repository-, app- och dokumentationsadapter
 

@@ -40,6 +40,8 @@ Top-level navigation:
 
 Navigationen är tangentbordsnavigerbar, deep-linkbar och data lazy-laddas per flik.
 
+Dashboarden erbjuder `legacy`, `forest` (visas som **Avkroken**) och `blackout` via samma presentationskontrakt som Portal, med Legacy som fallback. Skvallerbyttans cyanblå observationsaccent och informationshierarki är app-lokala och behålls. `avkroken_theme` är endast presentationsstate och påverkar aldrig dashboard-auth, machine API eller providerbehörigheter.
+
 ## GitHub integrationer
 
 - **GitHub App-auth:** koden använder `GAMNACKEN_GITHUB_APP_*`-bindings för read-only GitHub-observationer. Faktisk App-installation och eventuell äldre App-state är extern GitHub-state.

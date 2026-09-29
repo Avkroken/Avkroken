@@ -54,6 +54,12 @@ Detta var providerläget efter repositorymigreringen. Ett explicit beslut togs d
 
 Detta är server-side guarantees. Frontendkod får inte vara enda platsen som upprätthåller dem.
 
+## Tema
+
+Dumpens svart/gröna terminalidentitet behålls som produktaccent, men ytorna använder monorepots gemensamma teman `legacy`, `forest` (visas som **Avkroken**) och `blackout`. `legacy` är fallback.
+
+Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, presentationscookien `avkroken_theme`. Cookien är inte autentiserings- eller auktorisationsstate och får aldrig påverka Dumpens GitHub-session, upload-tickets eller access-routing.
+
 ## Storage
 
 R2-bucketen `dumpen` är durable object storage för applikationen. Dokumentation, debugoutput och loggning får inte dumpa objektinnehåll som en generell felsökningsmekanism.
