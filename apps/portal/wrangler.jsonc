@@ -61,8 +61,16 @@
   ],
   "vars": {
     "OPS_NOTIFY_TO": "anders.eriksson@denied.se",
-    "OPS_NOTIFY_FROM": "noreply@denied.se"
+    "OPS_NOTIFY_FROM": "noreply@denied.se",
+    "ACCESS_TEAM_DOMAIN": "https://avkroken.cloudflareaccess.com",
+    "ACCESS_LOGO_ADMIN_AUD": "c10cb83e06238d41b2c85f8118f91e8be5f272791c96208541734ece509fb1f4"
   },
+  "r2_buckets": [
+    {
+      "binding": "PORTAL_LOGOS",
+      "bucket_name": "avkroken-portal-logos"
+    }
+  ],
   "services": [
     {
       "binding": "SKVALLERBYTTAN_OBSERVATIONS",

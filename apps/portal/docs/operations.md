@@ -73,9 +73,9 @@ Det är inte samma sak som ett end-to-end runtime-test. Buildsignalen verifierar
 - e-postbinding för operativa notifieringar;
 - `SKVALLERBYTTAN_OBSERVATIONS` — intern Service Binding till `skvallerbyttan`/`PortalObservationsService`.
 
-Current checked-in `wrangler.jsonc` har **ingen** R2-binding för Portal-logotyper. Koden känner till det avsedda bindingnamnet `PORTAL_LOGOS`, men bucketnamn och provider-side public access ska inte läggas in förrän de har verifierats mot Cloudflare live-state. Utan binding svarar `/media/logos/<asset-id>` fail-closed med `503`.
+Current checked-in `wrangler.jsonc` binder production-`PORTAL_LOGOS` till `avkroken-portal-logos` och innehåller den icke-hemliga Access team domain + app-AUD som origin-verifieringen kräver. `previews` innehåller varken `r2_buckets` eller adminens Access-`vars`, så branch-previews får ingen production-writeväg och adminytan failar stängt. Den externa bucketens existens/public-access-state och Access-app/policy är privat provider-state och ska verifieras live; konfigurationsfilen ensam räcker inte som driftbevis.
 
-Credentialvärden dokumenteras inte här.
+Credentialvärden dokumenteras inte här. Access-AUD är en verifieringsidentifierare och inte en credential.
 
 ## Felmodell
 
@@ -91,6 +91,25 @@ Credentialvärden dokumenteras inte här.
 - giltigt asset: `200` med explicit Content-Type, `nosniff`, ETag där tillgänglig och bounded publik cache; matchande `If-None-Match` ger `304` med samma cache-/ETag-kontrakt.
 
 Asset-ID mappas alltid till `logos/<asset-id>`. Ingen publik listning, direkt bucket-key eller D1-katalog finns i detta steg.
+
+### Skyddad logotypadministration
+
+`/admin/logos[/...]` och `/api/admin/logos[/...]` kräver först Cloudflare Access på providerlagret och därefter giltig `Cf-Access-Jwt-Assertion` i Workern. Origin-verifieringen låser issuer till `ACCESS_TEAM_DOMAIN` och audience till `ACCESS_LOGO_ADMIN_AUD`.
+
+API-kontraktet är fail-closed:
+
+- saknad/ogiltig Access-konfiguration: `503 access_not_configured`;
+- saknad Access assertion: `401 access_token_missing`;
+- ogiltig/utgången assertion eller fel issuer/AUD: `403 access_token_invalid`;
+- saknad production-R2-binding: `503 logo_storage_not_configured`;
+- storage/providerfel: `502 logo_storage_unavailable` utan rå providerfeltext;
+- unsupported MIME eller filsignatur/content mismatch: `415`;
+- tom fil: `400`;
+- fil större än 5 MiB: `413`;
+- saknad asset: `404`;
+- otillåten metod: `405` med explicit `Allow`.
+
+Adminlistning använder endast prefixet `logos/`; upload genererar server-side asset-id, replace behåller asset-id/public URL, och delete/download accepterar endast validerade single-segment-id:n. Alla adminresponser är `no-store`. Admin-HTML har dessutom `noindex,nofollow`, restriktiv CSP, `frame-ancestors 'none'` och `X-Frame-Options: DENY`.
 
 ### Projektkatalog
 
@@ -317,8 +336,8 @@ Service binding används i stället för att exponera en publik administrationse
 - Skvallerbyttans providerintegration förblir read-only.
 - Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - Publik logo-serving får endast läsa exakt `logos/<asset-id>`; ingen bucket-listning eller godtycklig key får exponeras.
-- `/admin/logos` och `/api/admin/logos/*` införs inte innan en faktisk generell Portal-auth/session är server-side verifierad.
-- DNS, Cloudflare Access, Worker permissions och credentialscope är arkitekturkrav och ändras inte som sidoeffekt av UI-arbete.
+- Logotypadmin får endast nå R2 efter både provider-side Access och origin-JWT-verifiering; writes ska stanna inom `logos/`, och Preview får inte bindas till production-bucketen.
+- DNS, Cloudflare Access, R2-bucket/public-access, Worker permissions och credentialscope är provider-state och ska live-verifieras; de får inte antas från repositorydokumentation.
 
 ## Efter deployment
 
@@ -327,7 +346,9 @@ Efter en produktiondeployment ska faktisk provider-/runtime-state verifieras:
 1. deployworkflow/checks är gröna;
 2. Worker-route och custom domain svarar enligt avsett URL-kontrakt;
 2a. denied-routes kan direktnavigeras separat för general/identity/non-identity/gateway och är `noindex,nofollow`;
-2b. när `PORTAL_LOGOS` väl har providerverifierats och bundits: en giltig `/media/logos/<asset-id>` fungerar utan login för GET/HEAD, katalog-/traversalförsök misslyckas och responseheaders följer logo-kontraktet;
+2b. production-`PORTAL_LOGOS`: en saknad, men syntaktiskt giltig `/media/logos/<asset-id>` ger `404` (inte binding-`503`), vilket verifierar att Worker kan nå den bundna bucketen utan att skapa testdata; katalog-/traversalförsök ska fortsatt misslyckas;
+2c. `/admin/logos`, `/admin/logos/`, `/api/admin/logos` och en item-underpath fångas av den path-specifika Access-appen före origin; redirect/login-metadata ska bära det konfigurerade app-AUD:t och den publika startsidan ska fortsatt vara oskyddad;
+2d. med en legitim interaktiv Access-session: admin-UI läser listan, upload/replace/download/delete fungerar, publika asset-URL:er är stabila och adminresponses förblir `no-store`. Skapa inte service token enbart för denna verifiering;
 3. `/api/projects`, `/api/sites`, `/api/docs`, `/api/search?q=arkitektur`, `/api/operations`, `/api/changelog`, `/api/releases?project=Bastion`, `/api/issues?project=Bastion`, `/api/builds?project=Bastion` och `/api/activity?project=Bastion&days=7` fungerar utan att exponera credentials, rå Skvallerbyttan-state eller rå providerpayload;
 4. `/api/projects` inkluderar aktiva publika repositories utan krav på homepage men exkluderar `.github` och retired sources;
 5. Skvallerbyttans opt-in-manifest ger en app-post utan att skapa en publik dashboard-länk, medan Jobb saknar app-post;

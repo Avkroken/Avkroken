@@ -1,7 +1,7 @@
 const PUBLIC_LOGO_ROUTE_PREFIX = "/media/logos";
-const STORAGE_LOGO_KEY_PREFIX = "logos/";
-const LOGO_ASSET_ID_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
-const PUBLIC_LOGO_CONTENT_TYPES = new Set([
+export const STORAGE_LOGO_KEY_PREFIX = "logos/";
+export const LOGO_ASSET_ID_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
+export const PUBLIC_LOGO_CONTENT_TYPES = new Set([
   "image/avif",
   "image/gif",
   "image/jpeg",

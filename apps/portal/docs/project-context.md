@@ -57,7 +57,7 @@ Worker-koden innehåller idag:
 - statiska `/access-denied/`, `/access-denied/identity/`, `/access-denied/non-identity/` och `/access-denied/gateway/` med separata Access-/Gateway-semantiker och `noindex,nofollow`;
 - gemensam `data-theme`-arkitektur med `forest`, `legacy` och `blackout` ovanpå samma primitive → semantic tokenkedja;
 - public logo-read boundary i `src/logo-assets.mjs`: exakt `/media/logos/<asset-id>`, GET/HEAD, fast `logos/`-keyprefix, MIME-allowlist, `nosniff`, bounded publik cache och ingen listning;
-- fail-closed logo-storage: Worker-koden läser valfri `PORTAL_LOGOS`, men current checked-in `wrangler.jsonc` saknar R2-binding och inget bucketnamn är därför antaget i Git.
+- logo-storage med separerad public/admin-gräns: production binder `PORTAL_LOGOS` till den dedikerade logobucketen, public route är read-only och admin-write kräver Cloudflare Access + origin-JWT; branch-previews saknar medvetet R2/admin-Access-bindings och failar därmed stängt.
 
 
 ## Startsida / kontrollpanel
@@ -376,11 +376,11 @@ Jobbs app äger sin egen autentiserings- och BankID-/e-identitetsmodell.
 
 ## Portal-admin, logo-assets och R2
 
-Current repository-state bevisar **inte** en generell Portal-adminsession eller en server-side identity contract för `/admin/*`. Portalens enda verifierade skyddade authövergång är `/auth/jobb[/...]`, som redirectar till Jobbs separat skyddade origin före Portal-shell.
+Logotypadministrationen är en separat skyddad kontrollplansyta och återanvänder inte Jobbs authcookie eller någon client-only session. `/admin/logos[/...]` och `/api/admin/logos[/...]` ligger bakom en path-specifik Cloudflare Access-applikation. Workern gör dessutom egen origin-verifiering av `Cf-Access-Jwt-Assertion` mot teamdomänens JWKS, issuer och exakt `ACCESS_LOGO_ADMIN_AUD`. Saknad authkonfiguration failar med `503`, saknad assertion med `401` och ogiltig assertion med `403`.
 
-Därför finns ännu ingen `/admin/logos/` eller `/api/admin/logos/*`. Att återanvända Jobbs lokala session, införa client-only auth eller skapa en parallell OAuth-/Accesslösning skulle bryta den verifierade säkerhetsgränsen.
+Den skyddade API-ytan kan lista, ladda upp, läsa metadata, ersätta, ladda ned och radera logo-assets. Alla storageoperationer är låsta till `logos/`, uppladdningar är max 5 MiB och måste passa både allowlistad MIME och filsignatur/validering. Providerfel saneras till bounded felkontrakt och adminrespons lagras inte i cache. Admin-HTML är `noindex,nofollow`, `no-store` och levereras med restriktiv CSP, `frame-ancestors 'none'` och `X-Frame-Options: DENY`.
 
-Den publika delen är däremot avgränsad i källkod:
+Den publika delen är fortsatt strikt read-only:
 
 ```text
 GET|HEAD /media/logos/<asset-id>
@@ -396,7 +396,7 @@ GET|HEAD /media/logos/<asset-id>
 
 Ingen route accepterar bucket-key från klienten och ingen `list()` används. Saknad `PORTAL_LOGOS` ger `503`, storagefel `502`, saknat/ogiltigt asset `404` och otillåten MIME `415`.
 
-Current `apps/portal/wrangler.jsonc` definierar ingen R2-binding. Den faktiska bucketen, eventuell tidigare användning samt r2.dev/custom-domain-public-state måste verifieras hos Cloudflare innan binding läggs till. Den här exekveringsmiljön har ingen läsbar Cloudflare-connector och kunde inte nå `*.denied.se`; provider/runtime-state är därför fortsatt okänd och inte härledd från äldre dokument.
+Current `apps/portal/wrangler.jsonc` definierar production-bindingen `PORTAL_LOGOS -> avkroken-portal-logos` samt Access team domain och app-AUD. `previews` definierar varken `r2_buckets` eller adminens Access-`vars`, så branch-previews kan inte skriva till production-bucketen och adminytan failar stängt där. Bucketens public-access-state, Access-appens policy och övrig privat Cloudflare-state är fortfarande provider-state och ska live-verifieras; repositorykonfigurationen är inte bevis för att de externa objekten existerar.
 
 ## Accessibility och browserverifiering
 

@@ -15,6 +15,12 @@ import {
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import { servePublicLogo } from "./logo-assets.mjs";
 import {
+  isAdminLogoApi,
+  isAdminLogoPage,
+  serveAdminLogoApi,
+  serveAdminLogoPage
+} from "./admin-logos.mjs";
+import {
   mergePublicProjectCatalog,
   normalizePublicAppManifest,
   normalizePublicRepositories
@@ -1834,6 +1840,14 @@ export default {
 
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (isAdminLogoApi(url.pathname)) {
+      return serveAdminLogoApi(request, env);
+    }
+
+    if (isAdminLogoPage(url.pathname)) {
+      return serveAdminLogoPage(request, env);
+    }
 
     if (url.pathname === "/api/projects") {
       if (request.method !== "GET" && request.method !== "HEAD") {
