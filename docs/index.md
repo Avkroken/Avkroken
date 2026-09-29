@@ -7,6 +7,7 @@ Det här är dokumentationskartan för `Avkroken/Avkroken`.
 - [Jobb](../apps/jobb/README.md) — appens egen README och `apps/jobb/docs/`.
 - [Skvallerbyttan](../apps/skvallerbyttan/README.md) — appens egen README och `apps/skvallerbyttan/docs/`.
 - [Portal](../apps/portal/README.md) — appens egen README och `apps/portal/docs/`.
+- [Dumpen](../apps/dumpen/README.md) — appens egen README och `apps/dumpen/docs/`.
 
 ## Delad monorepo-kontext
 

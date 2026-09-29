@@ -6,5 +6,8 @@ Current-state import created 2026-09-24 from these source revisions:
 - Skvallerbyttan: `Avkroken/Skvallerbyttan@e8a88fd6d15024c566390765c1417981c0198753`
 - Krosa-Maja: `Avkroken/Krosa-Maja@b7661ca69eead758de3cd1e4a0697c9cfd38fbd5`
 - Jobb: `Avkroken/Jobb@627dfe380a953adc18a6bc6b31d9230166633afc`
+- Dumpen: `Avkroken/Dumpen@0abccebdc148427a4c9d07a2d19a7348c8efcd6b` — sista fullständiga pre-retirement-snapshoten före source-repositoryts retirement-tombstone
 
 The import preserves current files under app-specific prefixes. Source repository Git histories remain in the source repositories; they are not rewritten into this repository.
+
+Dumpen importeras utan source-repositoryts `.github/`-kontrollplan; rooten i `Avkroken/Avkroken` äger CI, Dependabot och labeler. Källsnapshoten hade ingen `portal.public.json`, så migreringen skapar inte en ny publik Portal-identitet. Runtime-identiteten (`dumpen`, `dumpen.denied.se`, `DUMPEN -> dumpen`) bevaras.

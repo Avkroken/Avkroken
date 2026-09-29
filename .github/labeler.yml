@@ -18,3 +18,8 @@ jobb:
   - changed-files:
       - any-glob-to-any-file:
           - "apps/jobb/**"
+
+dumpen:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/dumpen/**"

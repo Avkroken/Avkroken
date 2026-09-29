@@ -7,6 +7,7 @@ Avkrokens samlade applikationsrepository.
 - `apps/portal` — avkroken.denied.se
 - `apps/skvallerbyttan` — observationslager och dashboard
 - `apps/jobb` — Jobb-applikationen
+- `apps/dumpen` — Dumpen Worker och R2-baserad lagring
 
 ## Dokumentation
 

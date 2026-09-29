@@ -1,0 +1,21 @@
+{
+  "name": "dumpen",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test",
+    "check": "npm test && npm run validate:worker",
+    "validate:worker": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy --strict",
+    "verify:production": "node scripts/verify-production.mjs",
+    "deploy:workers-builds": "node scripts/workers-build-production.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.135.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260825.1": true
+  }
+}

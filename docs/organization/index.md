@@ -18,6 +18,7 @@
 - [Jobb](../../apps/jobb/README.md)
 - [Skvallerbyttan](../../apps/skvallerbyttan/README.md)
 - Portal: `apps/portal/`
+- [Dumpen](../../apps/dumpen/README.md)
 
 ## Fristående repositories
 
