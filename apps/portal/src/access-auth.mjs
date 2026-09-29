@@ -3,7 +3,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 const jwksCache = new Map();
 
 function normalizedTeamDomain(value) {
-  const raw = String(value || "").trim().replace(/\/+$/, "");
+  const raw = String(value || "").trim();
   if (!raw) return null;
 
   let url;

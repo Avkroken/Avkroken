@@ -23,6 +23,7 @@ test("Access config accepts only an HTTPS team origin and a non-empty audience",
     "",
     "http://avkroken.cloudflareaccess.com",
     TEAM_DOMAIN + "/path",
+    TEAM_DOMAIN + "//",
     TEAM_DOMAIN + "?query=1",
     "not-a-url"
   ]) {
