@@ -68,7 +68,12 @@ function metric(label, value) {
     </div>`;
 }
 
-function projectCard(project) {
+function projectCard(project, { service = false } = {}) {
+  const cardTarget = service && project.url ? project.url : project.portalUrl;
+  const cardLink = cardTarget
+    ? `<a class="card-hit-area"${service && project.url ? ' target="_blank" rel="noopener noreferrer"' : " data-portal-route"} href="${escapeHtml(cardTarget)}" aria-label="${escapeHtml(service && project.url ? `Öppna tjänsten ${project.name}` : `Öppna översikten för ${project.name}`)}"></a>`
+    : "";
+
   const overviewLink = project.portalUrl
     ? `<a class="card-action primary" data-portal-route href="${escapeHtml(project.portalUrl)}">Översikt</a>`
     : "";
@@ -101,6 +106,7 @@ function projectCard(project) {
   return `
     <article class="card"
        style="--glow:${accentColor(project.accent)};--accent:${accentSolid(project.accent)}">
+      ${cardLink}
       <div class="card-top">
         <span class="badge">${escapeHtml(project.category || "Projekt")}</span>
         <span class="arrow" aria-hidden="true">↗</span>
@@ -131,7 +137,8 @@ function renderCollection(target, projects, emptyMessage) {
     target.innerHTML = `<div class="empty"><strong>${escapeHtml(emptyMessage)}</strong></div>`;
     return;
   }
-  target.innerHTML = projects.map(projectCard).join("");
+  const service = target === serviceGrid;
+  target.innerHTML = projects.map(project => projectCard(project, { service })).join("");
 }
 
 function projectSlugFromLocation() {

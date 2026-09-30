@@ -7,6 +7,7 @@ import { getObservedActivity } from "./activity";
 import {
   githubInstallationRepositories,
   githubListAll,
+  githubOptionalJson,
   mapLimit,
 } from "./github";
 import {
@@ -38,6 +39,12 @@ import {
   type PortalReleaseDeploymentRequest,
   type PortalReleaseDeploymentsSnapshot,
 } from "./portal-release-deployment-model";
+import {
+  normalizePortalReleaseCandidates,
+  publicMarkdownPaths,
+  type PortalDocumentationIndexSnapshot,
+  type PortalReleaseSnapshot,
+} from "./portal-github-public-model";
 
 export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOperationsSnapshot> {
   const capabilitySnapshot = await getCapabilities(env);
@@ -290,6 +297,81 @@ export async function getPortalReleaseDeploymentsSnapshot(
   };
 }
 
+type GitTreePayload = {
+  truncated?: boolean;
+  tree?: unknown[];
+};
+
+async function requestedPublicRepositories(
+  env: Env,
+  repositoryNames: string[],
+) {
+  const requested = new Set(requestedRepositoryNames(repositoryNames));
+  const snapshot = await getPortalPublicRepositoriesSnapshot(env);
+  return snapshot.repositories.filter(repository => requested.has(repository.name));
+}
+
+export async function getPortalDocumentationIndexSnapshot(
+  env: Env,
+  repositoryNames: string[],
+): Promise<PortalDocumentationIndexSnapshot> {
+  const owner = organization(env);
+  const repositories = await requestedPublicRepositories(env, repositoryNames);
+  const rows = await mapLimit(repositories, 4, async repository => {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository.name)}/git/trees/${encodeURIComponent(repository.default_branch)}?recursive=1`;
+    const result = await githubOptionalJson<GitTreePayload>(env, path);
+    const failed =
+      !result.available ||
+      !result.value ||
+      result.value.truncated === true ||
+      !Array.isArray(result.value.tree);
+
+    return {
+      repository: repository.name,
+      defaultBranch: repository.default_branch,
+      paths: failed ? [] : publicMarkdownPaths(result.value?.tree),
+      failed,
+    };
+  });
+
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    status: "available",
+    repositories: rows,
+  };
+}
+
+export async function getPortalReleaseSnapshot(
+  env: Env,
+  repositoryNames: string[],
+  perRepositoryLimit = 10,
+): Promise<PortalReleaseSnapshot> {
+  const owner = organization(env);
+  const limit = Math.max(1, Math.min(Math.trunc(perRepositoryLimit) || 10, 20));
+  const repositories = await requestedPublicRepositories(env, repositoryNames);
+  const rows = await mapLimit(repositories, 4, async repository => {
+    const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository.name)}/releases?per_page=${limit}`;
+    const result = await githubOptionalJson<unknown[]>(env, path);
+    const failed = !result.available || !Array.isArray(result.value);
+
+    return {
+      repository: repository.name,
+      releases: failed
+        ? []
+        : normalizePortalReleaseCandidates(owner, repository.name, result.value, limit),
+      failed,
+    };
+  });
+
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    status: "available",
+    repositories: rows,
+  };
+}
+
 export async function getPortalRepositoryCiSnapshot(
   env: Env,
   repoName: string,
@@ -333,6 +415,25 @@ export class PortalObservationsService extends WorkerEntrypoint<Env> {
       throw new Error("invalid release deployment requests");
     }
     return getPortalReleaseDeploymentsSnapshot(this.env, requests);
+  }
+
+  async getPublicDocumentationIndex(
+    repositoryNames: string[],
+  ): Promise<PortalDocumentationIndexSnapshot> {
+    if (!Array.isArray(repositoryNames)) {
+      throw new Error("invalid repository names");
+    }
+    return getPortalDocumentationIndexSnapshot(this.env, repositoryNames);
+  }
+
+  async getPublicRepositoryReleases(
+    repositoryNames: string[],
+    perRepositoryLimit = 10,
+  ): Promise<PortalReleaseSnapshot> {
+    if (!Array.isArray(repositoryNames)) {
+      throw new Error("invalid repository names");
+    }
+    return getPortalReleaseSnapshot(this.env, repositoryNames, perRepositoryLimit);
   }
 
   async getPublicActivity(

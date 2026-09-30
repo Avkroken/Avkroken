@@ -92,7 +92,7 @@ Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkon
 
 Live-verifiering 2026-09-30 visar att `dumpen` är provisionerad i det repository-deklarerade Cloudflare-kontot. Wrangler visar aktiva deployments/versioner och `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200. Den lokala Wrangler-identiteten får däremot `403` mot Workers Builds logg-API och kan inte separat inventera R2-bucketen; dessa delar ska därför fortsatt markeras `permission_denied`/`unknown` i stället för att antas.
 
-`wrangler.jsonc` binder den befintliga Krösa-Maja OAuth-klientens publika client ID och Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindingen förblir `DUMPEN -> dumpen`; den separata bucket-inventeringen är fortfarande permission-denied för den lokala identiteten.
+`wrangler.jsonc` binder den befintliga delade GitHub OAuth-klientens publika client ID och den neutralt namngivna Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; bindingen återanvänder den redan existerande OAuth-hemligheten i samma store i stället för att skapa en ny credential. Adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindingen förblir `DUMPEN -> dumpen`; den separata bucket-inventeringen är fortfarande permission-denied för den lokala identiteten.
 
 ## GitHub Auth
 

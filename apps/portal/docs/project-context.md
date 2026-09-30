@@ -162,9 +162,9 @@ Skvallerbyttan är därför fortsatt utan separat app-Wiki-yta. Jobb påverkas i
 
 ### `/api/docs`
 
-Bygger en katalog från publika, aktiva repositories samt app-lokal README/`docs/` för appar som redan har ett giltigt publikt manifest.
+Bygger en katalog från publika, aktiva repositories samt app-lokal README/`docs/` för appar som redan har ett giltigt publikt manifest. Repositoryns Markdown-inventory hämtas primärt via `PortalObservationsService.getPublicDocumentationIndex()`, som använder Skvallerbyttans befintliga read-only GitHub App bakom samma publiceringsgrind som repositoryinventoryn. Portalens credential-fria Git-tree-read finns kvar endast som rollout/degraded fallback.
 
-Repositoryposter använder repositorynamnet som katalognyckel. Appposter använder manifestets stabila slug, exempelvis `skvallerbyttan`.
+Repositoryposter använder repositorynamnet som katalognyckel. Appposter använder manifestets stabila slug, exempelvis `skvallerbyttan`. Root `README.md` presenteras som `Översikt`, medan `docs/index.md` presenteras som `Dokumentation`; de två får inte ge dubbla `Översikt`-flikar.
 
 Appens publika dokumentpath är relativ till app-roten och låser därmed inte Portalens URL till `apps/<name>`-strukturen.
 
@@ -178,7 +178,7 @@ Tar katalognyckel + route-path, kräver exakt träff i den publika katalogposten
 
 Changelog byggs från aktuell public project-state, men endast poster med `type = repository`, `source.provider = github`, `source.kind = repository` och ett source-repository som matchar Portalens current owner-kontrakt i `github-scope.mjs` får användas.
 
-För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
+För varje valt repository läses högst 10 GitHub Releases. Releasekandidaterna hämtas primärt genom `PortalObservationsService.getPublicRepositoryReleases()`, som använder Skvallerbyttans befintliga read-only GitHub App; Portalens credential-fria Releases-read är rollout/degraded fallback. Adapterpolicyn:
 
 - filtrerar alltid bort `draft = true`, även om den använda GitHub-credentialen skulle kunna se drafts;
 - kräver en canonical `https://github.com/<current-owner>/<repo>/releases/tag/...`-URL som exakt matchar projektpostens repository;
@@ -192,7 +192,7 @@ Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concu
 
 Eligibility för Changelog, projektspecifika Releases och Issues kommer från en repository-only publiceringsgate. I nuvarande credential-fria Portal-runtime får gaten återanvändas i högst 60 sekunder; normalfallet är live-inventory från Skvallerbyttans read-only GitHub App via Service Binding och Portalens publika GitHub REST används endast som fallback. Om en Portal-credential konfigureras kringgås eligibility-cachen. Själva Changelog-snapshoten och release-/issue-payloads lagras inte persistent i Cache API. Samtidiga Changelog-builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
 
-Changelog-klienten filtrerar den redan sanerade snapshoten lokalt med `Alla`, `Features`, `Fixes`, `Security`, `Documentation` och `Releases`. Det skapar inga ytterligare providerreads. `Deployments` publiceras inte som filter eftersom releaseadaptern ännu saknar en verifierad canonical deploymentrelation; Portalen fabricerar inte den kopplingen från taggar eller tidsnärhet.
+Changelog-klienten filtrerar den redan sanerade snapshoten lokalt med `Alla`, `Features`, `Fixes`, `Security`, `Documentation` och `Releases`. Det skapar inga ytterligare providerreads. Release→deployment-korrelation kommer från Skvallerbyttans separata `getPublicReleaseDeployments()`-RPC och matchar endast exakta commit-SHA:n mot bounded GitHub Deployments; frånvaro, ofullständig täckning och providerfel visas explicit som `not_observed`, `unknown` respektive `unavailable` i stället för att infereras från tidsnärhet.
 
 ### `/api/releases?project=...`
 

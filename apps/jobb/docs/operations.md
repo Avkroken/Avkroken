@@ -72,7 +72,7 @@ Vid browser/providerfel:
 Vid loginfel verifiera:
 
 - GitHub OAuth client ID,
-- Secrets Store-binding för client secret,
+- Secrets Store-binding `GITHUB_OAUTH_CLIENT_SECRET` för client secret. Bindingnamnet är neutralt, men production återanvänder den befintliga delade OAuth-hemligheten i Secrets Store; skapa inte en ny OAuth-secret enbart för Jobb,
 - att exakt callback `https://jobb.denied.se/auth/callback` är registrerad på OAuth-klienten,
 - `JOBB_ALLOWED_GITHUB_IDS`,
 - PKCE/state-validering och GitHub `/user`-uppslag.

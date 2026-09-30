@@ -93,7 +93,7 @@ test("project Issues API is no-store and has explicit invalid/not-found/upstream
   const handler = section(
     worker,
     "async function getPublicProjectIssues(requestUrl, env)",
-    "async function fetchProjectReleases(project, env)"
+    "async function loadServiceReleaseCandidates(projects, env)"
   );
 
   assert.ok(handler.includes('"invalid_project"'));

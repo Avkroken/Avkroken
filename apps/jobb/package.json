@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.17.1",
   "scripts": {
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "test": "node --test test/*.test.mjs && pnpm -r test",
     "dev": "pnpm --filter @avkroken/web dev",
     "deploy": "pnpm --filter @avkroken/web deploy",
     "deploy:cloudflare": "pnpm --filter @avkroken/web exec wrangler d1 migrations apply DB --remote --config ../../wrangler.jsonc && pnpm --filter @avkroken/web exec wrangler deploy --config ../../wrangler.jsonc",

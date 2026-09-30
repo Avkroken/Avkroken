@@ -11,6 +11,10 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
 
   const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
   assert.deepEqual(wrangler.previews, {});
+  const oauthSecret = wrangler.secrets_store_secrets?.find(
+    item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
+  );
+  assert.equal(oauthSecret?.secret_name, "KROSA_MAJA_CLIENT_SECRET");
 
   const script = await readFile(new URL("../scripts/workers-build-production.mjs", import.meta.url), "utf8");
   assert.match(script, /WORKERS_CI !== "1"/);

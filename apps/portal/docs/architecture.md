@@ -99,7 +99,7 @@ När användaren navigerar till en projektdetalj återanvänds den redan laddade
 
 ### Changelog / Releases
 
-Changelog är en separat publik GitHub-adapter ovanpå samma projektpubliceringspolicy som Projekt-vyn.
+Changelog är en separat publik releaseadapter ovanpå samma projektpubliceringspolicy som Projekt-vyn. Repositoryeligibility kommer från Portalens public-safe projektmodell, medan releasekandidater primärt läses genom Skvallerbyttans autentiserade read-only GitHub App-RPC. Portalens credential-fria GitHub Releases-read finns endast som rollout/degraded fallback.
 
 ```text
 GitHub public org repositories
@@ -260,7 +260,7 @@ GET /api/operations
 Drift & insyn
 ```
 
-Portalen har ingen parallell GitHub-/Cloudflare-providerklient för operativ state. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret. Samma RPC äger nu även den sanerade autentiserade repositoryinventeringen genom `getPublicRepositories()`; Portal behåller endast en credential-fri publik GitHub REST-fallback för rollout/degraded state.
+Portalen har ingen parallell bred GitHub-/Cloudflare-providerklient för operativ state. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret. Samma RPC äger den sanerade autentiserade repositoryinventeringen (`getPublicRepositories()`), dokumentationsinventoryn (`getPublicDocumentationIndex()`), releasekandidaterna (`getPublicRepositoryReleases()`) och release→deployment-korrelationen (`getPublicReleaseDeployments()`). Portal behåller endast snäva credential-fria GitHub-fallbacks för repository/docs/releases under rollout/degraded state.
 
 RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort:
 
@@ -361,13 +361,13 @@ Portal-shellen har ett gemensamt komponent- och tokenlager. Dokumentroten bär `
 
 ## Repository-, app- och dokumentationsadapter
 
-`src/docs-source.mjs` separerar Portalens route-identitet från providerkoordinaterna.
+`src/docs-source.mjs` separerar Portalens route-identitet från providerkoordinaterna. Själva repository-inventoryn för README/`docs/` kommer primärt från `PortalObservationsService.getPublicDocumentationIndex()`, som gör autentiserade read-only Git-tree-läsningar i Skvallerbyttan och returnerar endast sanerade Markdown-paths. Portalens egen credential-fria Git-tree-läsning är fallback.
 
 Dokumentationsadaptern:
 
 1. filtrerar till publik, aktiv och icke-retired repository-state;
 2. lägger till endast monorepo-appar som redan har ett giltigt `portal.public.json`;
-3. söker repositoryts README/`docs/` eller appens app-lokala README/`docs/` till begränsat djup;
+3. söker repositoryts root `README.md` och `docs/` eller appens app-lokala README/`docs/` till begränsat djup; root README etiketteras `Översikt` medan `docs/index.md` etiketteras `Dokumentation` så navigationen inte får dubbla översiktsflikar;
 4. bygger katalogposter med stabil `key`, canonical source repository/ref och tillåtna route-paths;
 5. validerar att vald route-path exakt finns i katalogpostens `pages` före providerfetch;
 6. mappar appens route-path, exempelvis `docs/architecture.md`, till provider-path `apps/skvallerbyttan/docs/architecture.md` först efter allowlistkontrollen;
