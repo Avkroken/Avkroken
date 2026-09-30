@@ -43,21 +43,22 @@ npm run deploy:workers-builds
 
 Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör Portalens Node-tester och Wrangler dry-run före `npm run deploy`. Feature branches får inte använda produktionsscriptet.
 
-När public repository inventory-, Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Service Bindingens target/entrypoint ändras inte och ingen GitHub-secret behöver läggas i Portal.
+Production 2026-09-30 kör Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicRepositoryCi` och `getPublicActivity`. Service Bindingens target/entrypoint är oförändrad och Portal har ingen egen GitHub-secret för repositoryinventory.
 
-Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
+Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state ska fortfarande verifieras hos providern före framtida driftändringar.
 
-### Verifierad production-buildsignal 2026-09-27
+### Verifierad production-build och runtime 2026-09-30
 
-Under Del 3 rapporterade Cloudflare Workers Builds lyckad **production** build från `main` för alla tre monorepoapparna:
+Efter merge av PR #87 rapporterade Cloudflare Workers Builds lyckad **production** build från samma `main`-commit för:
 
 - `avkroken`;
+- `dumpen`;
 - `jobb`;
 - `skvallerbyttan`.
 
-GitHub-checkoutputen från Cloudflare innehöll separata Build IDs och Version IDs för respektive Worker. Detta verifierar kedjan repository → Workers Builds → producerad production-version.
+Skvallerbyttans live-tail observerade därefter `PortalObservationsService.getPublicRepositories - Ok` samtidigt som Portalens första v9-`/api/projects`-build returnerade 200 och åtta förväntade publika projekt. Production acceptance mot custom domain gav 59/59 godkända kontroller.
 
-Det är inte samma sak som ett end-to-end runtime-test. Buildsignalen verifierar inte custom-domain HTTP, Cloudflare Access, Jobb-sessioner, Service Binding-data, D1/R2-innehåll, DNS eller övrig privat providerstate efter deployment.
+Verifieringen omfattade routing/deep links, Auth/Jobb-gränsen, denied/noindex, R2 read-boundary, Cloudflare Access-intercept, public-safe API-kontrakt, Changelog/Releases/Issues/Builds/Activity och tio separata sökningar utan tidigare intermittenta GitHub-403/502. Den interaktiva logo-adminmutationen kräver fortsatt en legitim Cloudflare Access-session och verifierades inte genom att skapa en särskild service token.
 
 
 ## Worker-konfiguration
@@ -379,6 +380,6 @@ Efter en produktiondeployment ska faktisk provider-/runtime-state verifieras:
 26. `/api/activity` är `no-store`, bounded till 50 repositories/30 dagar och en tom/ogiltig intern repositorylista kan inte falla tillbaka till organisationsomfattande Activity;
 27. cache-/heartbeat-beteende har inte regresserat.
 
-Status 2026-09-27: Workers Builds-delen i punkt 1 är providerverifierad grön under Del 3 och repository-/browserkontrakten bakom flera övriga punkter är CI-verifierade. Den aktuella exekveringsmiljön kan däremot inte nå `*.denied.se` och saknar en läsbar Cloudflare-connector, så custom-domain HTTP och privat runtime/providerstate i punkterna ovan är inte markerade som live-verifierade.
+Status 2026-09-30: punkt 1–27 är verifierade genom kombinationen av grön PR #87-CI/CodeQL/Workers Builds och 59/59 livekontroller mot production, med det uttryckliga undantaget punkt 2d som kräver en legitim interaktiv Access-session. Repositoryinventoryns nya interna väg är dessutom verifierad genom samtidig Skvallerbyttan-tail av `PortalObservationsService.getPublicRepositories - Ok` och lyckad v9-`/api/projects`-build. Fem `arkitektur`- och fem `jobb`-sökningar returnerade 200 utan GitHub-403/502 och utan skyddad `apps/jobb/**`-source.
 
-Kalla inte end-to-end production acceptance klar innan den externa HTTP/providerverifieringen är gjord.
+Punkt 2d är den enda separat noterade operativa begränsningen: den interaktiva logo-adminmutationen har inte körts eftersom verifieringsmiljön saknar en legitim interaktiv Cloudflare Access-session. Ingen service token skapades enbart för acceptance. Punkt 2c, origin-authkontraktet, R2-bindingen och fail-closed public/admin paths är verifierade.
