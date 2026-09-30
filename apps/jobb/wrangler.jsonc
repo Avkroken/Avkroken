@@ -78,13 +78,6 @@
   "previews": {
     "browser": {
       "binding": "BROWSER"
-    },
-    "r2_buckets": [
-      {
-        "binding": "EVIDENCE",
-        "bucket_name": "jobb-evidence-preview",
-        "jurisdiction": "eu"
-      }
-    ]
+    }
   }
 }
