@@ -10,6 +10,10 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   assert.equal(pkg.scripts["deploy:workers-builds"], "node scripts/workers-build-production.mjs");
 
   const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+  assert.equal(wrangler.name, "dumpen");
+  assert.equal(wrangler.observability?.enabled, true);
+  assert.ok(wrangler.r2_buckets?.some(binding => binding.binding === "DUMPEN"));
+  assert.ok(wrangler.routes?.some(route => route.pattern === "dumpen.denied.se"));
   assert.deepEqual(wrangler.previews, {});
   const oauthSecret = wrangler.secrets_store_secrets?.find(
     item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
