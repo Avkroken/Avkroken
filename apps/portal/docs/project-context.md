@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening, public-safe observerad integration och search/provider-budget: 2026-09-30.
+Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening, public-safe observerad integration, search/provider-budget och production acceptance: 2026-09-30.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -422,30 +422,30 @@ CI använder Chrome/ChromeDriver som redan finns i GitHubs `ubuntu-latest` runne
 
 Detta verifierar repositoryimplementationen i browser. Produktionens faktiska Cloudflare-deployment, provider live-state och externa nätverksvägar ligger fortsatt utanför denna gate.
 
-## Del 3 — verifierad slutstate 2026-09-27
+## Del 3 — verifierad slutstate 2026-09-30
 
-Repositoryhardening som är mergad på `main`:
+Repositoryhardening och productionfixar som är mergade på `main`:
 
-- PR #55 låser public/protected Auth-gränsen och verifierar att `/auth/jobb` redirectas före Portal-shell/assets samt att publika assets inte bär Jobbs auth/session-/secretkontrakt.
-- PR #56 låser Driftens fail-closed-modell: `operations_not_configured`, `operations_unavailable`, `no-store`, `nosniff` och klientrensning av tidigare observerad state.
-- PR #57 låser Changelogets `changelog_unavailable`-kontrakt och klientrensning utan providerstack/payloadläckage.
-- PR #58 låser degraded klientbeteende för Issues, Releases, Builds, Activity, Search och startsidans public-safe källor.
-- PR #59 kör samma top-level-routeuppsättning genom axe WCAG 2.2 A/AA och overflow-kontroll i både desktop- och mobilviewport.
-- PR #60 låser hela Drift-status-/freshness-vokabulären, inklusive `permission_denied`, `not_configured`, `not_observed`, `stale`, `unavailable`, `error`, `unknown`, `not_supported` och `not_exposed_by_provider`.
+- PR #55–#60 låser Auth/Jobb-gränsen, degraded states, browser/a11y-gaten och Driftens fulla status-/freshness-vokabulär;
+- PR #82 fixar server-side shell fallback så Portalens deep links inte canonicaliseras till `/`;
+- PR #86 reducerar publika GitHub-providerbursts genom bounded katalog-/tree-läsningar och återanvändning av public-safe cachegates;
+- PR #87 flyttar public repository inventory till `PortalObservationsService.getPublicRepositories()`, som använder Skvallerbyttans befintliga read-only GitHub App och sanerar payloaden före Service Binding-svaret. Portalens credential-fria GitHub REST finns endast som rollout/degraded fallback.
 
-Cloudflare Workers Builds rapporterade under Del 3 lyckad **production** build för `avkroken`, `jobb` och `skvallerbyttan` från `main`; check-outputen innehöll separata Build IDs och Version IDs. Detta verifierar repository → Workers Builds → production-version-ledet. Det verifierar inte i sig custom-domain HTTP, Service Binding-data, authsessioner, D1/R2-state eller annan runtime/providerstate efter deployment.
+Efter merge av PR #87 rapporterade Cloudflare Workers Builds lyckad **production** build från samma `main`-commit för `avkroken`, `dumpen`, `jobb` och `skvallerbyttan`. En live-tail på Skvallerbyttan observerade därefter `PortalObservationsService.getPublicRepositories - Ok` samtidigt som Portalens första v9-katalogbuild returnerade åtta förväntade publika projekt. Det verifierar den account-interna repositoryvägen end-to-end utan ny Portal-credential.
 
-Releaseklassificeringen är verifierad repo-för-repo. Bastion, Politiker, Pastebinit och Docker-idempotent-update har repoägda releasekontrakt på `main`. Produkter PR #751 och Klarspråk PR #193 innehåller motsvarande repoägda kontrakt och PR-title-validering men är Draft/blockerade: live-ruleseten kräver CodeQL/code scanning medan GitHub inte skapar någon `github-advanced-security` check-suite för deras current heads. Rulesets, CodeQL-konfiguration och providerpermissions har inte ändrats som workaround. De röda Cloudflare Workers Builds-checkarna i dessa två repos är separat pre-existing providerstate och observerades även på respektive senast mergade baseline-PR.
+Production acceptance kördes mot `https://avkroken.denied.se` efter deployment och gav 59/59 godkända kontroller. Verifieringen omfattade huvudroutes/deep links, Auth/Jobb-redirect, denied-routes/noindex, R2 read-boundary, Cloudflare Access-intercept för logo-admin, projekt/docs, Drift, Changelog, Releases, Issues, Builds/CI och Activity samt monorepo-appens fail-closed arv. Tio separata sökningar — fem för `arkitektur` och fem för `jobb` — returnerade 200 utan tidigare intermittenta GitHub-403/502; inga sökresultat hade skyddad `apps/jobb/**` som source.
+
+PR #87:s Portal-CI var grön. Portal-jobbet kör `npm test`, Chrome/ChromeDriver-baserad `npm run test:browser` med axe WCAG 2.2 A/AA samt Wrangler dry-run, så browser-/responsive-kontraktet verifierades i CI även om MP100 saknar lokal ChromeDriver.
+
+Releaseautomation verifierades live repo-för-repo 2026-09-30. `Avkroken`, `Bastion`, `Docker-idempotent-update`, `Klarsprak`, `Pastebinit`, `Politiker` och `Produkter` har alla repoägd `.github/workflows/release.yml` på `main`, och respektive senaste release-workflow var `success`. Äldre dokumentation om blockerade Produkter-/Klarspråk-release-PR:er är därmed supersederad.
 
 ## Kända gap
 
-Följande är medvetet inte löst ännu:
+Följande ligger utanför den nu verifierade Portal v2-kärnan eller saknar nödvändig interaktiv åtkomst för separat acceptance:
 
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
-- full releaseautomation, eftersom en CI-kompatibel least-privilege write-identitet ännu inte är verifierad;
-- merge av Produkter/Klarspråks repoägda releasekontrakt, blockerad av utebliven GHAS/CodeQL-suite på current PR-heads;
-- custom-domain HTTP-, Auth-, Service Binding- och övrig provider live-verifiering efter production build, eftersom den aktuella verktygsmiljön saknar läsbar Cloudflare-connector och inte kan nå `*.denied.se` för acceptance-test.
+- logo-admins interaktiva upload/replace/download/delete-flöde har inte muterats i production eftersom verifieringsmiljön saknar en legitim interaktiv Cloudflare Access-session. Edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är verifierade; ingen service token skapades enbart för test.
 
 Varje nytt arbete ska göras i separat branch/PR enligt repositoryts arbetsregler.

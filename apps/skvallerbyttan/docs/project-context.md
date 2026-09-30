@@ -6,7 +6,7 @@ permalink: /project-context/
 
 # Projektkontext
 
-Senast verifierad för GitHub owner-/Portalintegrationen: 2026-09-26.
+Senast verifierad för GitHub owner-/Portalintegrationen och Portalens public-safe repository-RPC: 2026-09-30.
 
 ## Repository
 
@@ -50,7 +50,7 @@ Dashboarden erbjuder `legacy`, `forest` (visas som **Avkroken**) och `blackout` 
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
 - **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa public-safe downstreammodeller.
-- **Portal repository-inventory:** samma named entrypoint exponerar `getPublicRepositories()`. Metoden läser GitHub App-installationens repositoryinventory med befintlig read-only auth och returnerar endast sanerad publik repositorymetadata som Portalens publiceringsadapter behöver; private/archived/annan owner, permissions, rate-limit/budget, installationmetadata och credentials lämnar inte observationslagret.
+- **Portal repository-inventory:** samma named entrypoint exponerar `getPublicRepositories()`. Metoden läser GitHub App-installationens repositoryinventory med befintlig read-only auth och returnerar endast sanerad publik repositorymetadata som Portalens publiceringsadapter behöver; private/archived/annan owner, permissions, rate-limit/budget, installationmetadata och credentials lämnar inte observationslagret. Productionvägen verifierades 2026-09-30 genom samtidig Worker-tail (`PortalObservationsService.getPublicRepositories - Ok`) och Portalens lyckade första v9-projektkatalogbuild.
 - **Portal repository-CI:** samma named entrypoint exponerar `getPublicRepositoryCi(repoName)`, som endast läser canonical `overview` source cache, kräver en cachead publik/icke-arkiverad repositoryrad och returnerar en sanerad sampled Actions-summary med explicit freshness. Metoden gör ingen GitHub-providerrequest.
 - **Portal repository-Activity:** samma named entrypoint exponerar `getPublicActivity(repositoryNames, days)`. Metoden intersectar en bounded repositorylista med cachead publik/icke-arkiverad `overview`-state och queryar därefter endast D1 `observation_events` för `provider = github` och de godkända repositorykortnamnen. Ingen providerrequest görs; public snapshot saknar resource-ID:n, actors, permissions, providerfel och rå webhookpayload.
 
