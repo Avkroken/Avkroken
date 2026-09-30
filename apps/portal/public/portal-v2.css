@@ -29,6 +29,28 @@ body.portal-v2::before {
   mask-image: linear-gradient(to bottom, #000 0 55%, transparent 92%);
 }
 
+:root[data-theme="legacy"] body.portal-v2 {
+  --cyan: #24e7e8;
+  --blue: #2d9bff;
+  --violet: #7757ff;
+  --magenta: #d51dcb;
+  --pink: #ff438b;
+  background:
+    radial-gradient(circle at 14% 8%, rgb(36 231 232 / 11%), transparent 27rem),
+    radial-gradient(circle at 86% 18%, rgb(213 29 203 / 10%), transparent 30rem),
+    radial-gradient(circle at 50% 100%, rgb(45 155 255 / 8%), transparent 35rem),
+    linear-gradient(180deg, #050912 0%, #03060c 100%);
+}
+
+:root[data-theme="legacy"] body.portal-v2::before {
+  opacity: .18;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 2.5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 2.5%) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, #000, transparent 82%);
+}
+
 .portal-v2 a,
 .portal-v2 button,
 .portal-v2 input {

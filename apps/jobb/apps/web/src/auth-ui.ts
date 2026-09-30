@@ -202,13 +202,13 @@ const AUTH_CSS = `
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   --bg:#04070e;
   --bg-soft:#050912;
-  --panel:#09111f;
+  --panel:#09101e;
   --panel-2:#0d182c;
-  --line:#213652;
-  --line-strong:#385475;
-  --muted:#a8bad0;
+  --line:rgba(137,167,207,.18);
+  --line-strong:rgba(137,167,207,.34);
+  --muted:#91a8c6;
   --muted-2:#6f88a7;
-  --text:#f5f8fc;
+  --text:#f5f3ee;
   --accent:#7dd3fc;
   --accent-2:#a7f3d0;
   --danger:#fda4af;
@@ -248,6 +248,17 @@ body:before{
   background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
   background-size:42px 42px;
   mask-image:linear-gradient(to bottom,#000,transparent 72%);
+}
+:root[data-theme="legacy"] body{
+  background:
+    radial-gradient(circle at 14% 8%,rgba(36,231,232,.11),transparent 27rem),
+    radial-gradient(circle at 86% 18%,rgba(213,29,203,.10),transparent 30rem),
+    radial-gradient(circle at 50% 100%,rgba(45,155,255,.08),transparent 35rem),
+    linear-gradient(180deg,#050912 0%,#03060c 100%);
+}
+:root[data-theme="legacy"] body:before{
+  opacity:.18;
+  mask-image:linear-gradient(to bottom,#000,transparent 82%);
 }
 .page-shell{
   width:min(1120px,100%);

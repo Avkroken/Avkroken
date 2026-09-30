@@ -19,6 +19,10 @@ test("Portal exposes Forest, Legacy and Blackout through one shared token layer"
   assert.match(tokens, /:root\[data-theme="forest"\]/);
   assert.match(tokens, /:root\[data-theme="legacy"\]/);
   assert.match(tokens, /:root\[data-theme="blackout"\]/);
+  const legacy = themeBody(tokens, "legacy");
+  assert.match(legacy, /--ak-brass-500:\s*#24e7e8/);
+  assert.match(legacy, /--ak-ember-500:\s*#d51dcb/);
+  assert.match(legacy, /--ak-sky-500:\s*#2d9bff/);
 
   assert.match(html, /<html lang="sv" data-theme="legacy">/);
   assert.match(html, /<select id="portal-theme"/);
@@ -54,6 +58,15 @@ test("theme variants override primitive colors without duplicating semantic comp
     assert.doesNotMatch(body, /--ak-space-/);
     assert.doesNotMatch(body, /--ak-radius-/);
   }
+});
+
+test("Legacy preserves the pre-v2 Avkroken glow and grid language", async () => {
+  const css = await readFile(publicFile("portal-v2.css"), "utf8");
+  assert.match(css, /:root\[data-theme="legacy"\] body\.portal-v2/);
+  assert.match(css, /#24e7e8/);
+  assert.match(css, /#7757ff/);
+  assert.match(css, /#d51dcb/);
+  assert.match(css, /background-size:\s*42px 42px/);
 });
 
 test("theme control is labeled and uses shared focusable native controls", async () => {
