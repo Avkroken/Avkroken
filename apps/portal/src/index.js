@@ -27,6 +27,7 @@ import {
 } from "./project-source.mjs";
 import {
   buildDocumentSearchEntry,
+  buildIssueSearchEntries,
   buildProjectSearchEntries,
   filterSearchableDocs,
   searchEntries,
@@ -54,6 +55,9 @@ const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
 const SEARCH_FETCH_CONCURRENCY = 4;
+const SEARCH_ISSUE_REPOSITORY_LIMIT = 8;
+const SEARCH_ISSUES_PER_REPOSITORY = 8;
+const SEARCH_ISSUE_FETCH_CONCURRENCY = 2;
 const GITHUB_CATALOG_CONCURRENCY = 2;
 const PUBLIC_REPOSITORY_GATE_CACHE_SECONDS = 60;
 const PUBLIC_REPOSITORY_GATE_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-public-repositories-v1");
@@ -768,6 +772,25 @@ async function fetchSearchDocuments(tasks, env) {
   return results;
 }
 
+async function fetchSearchIssues(projects, env) {
+  const eligible = eligibleIssueProjects(projects, 100);
+  const selected = eligible.slice(0, SEARCH_ISSUE_REPOSITORY_LIMIT);
+  const fetched = await mapWithConcurrency(
+    selected,
+    SEARCH_ISSUE_FETCH_CONCURRENCY,
+    project => fetchProjectIssuesWithLimit(project, env, SEARCH_ISSUES_PER_REPOSITORY)
+  );
+
+  return {
+    discoveredRepositories: eligible.length,
+    selectedRepositories: selected.length,
+    failedRepositories: fetched.filter(result => result.failed).length,
+    entries: fetched.flatMap(result =>
+      result.failed ? [] : buildIssueSearchEntries(result.issues)
+    )
+  };
+}
+
 let pendingSearchIndex = null;
 
 async function loadSearchIndex(env, ctx) {
@@ -794,6 +817,7 @@ async function loadSearchIndex(env, ctx) {
   const tasks = selectSearchDocumentTasks(searchableDocs, MAX_SEARCH_DOCUMENTS);
   const limited = discoveredDocuments > tasks.length;
   const fetched = await fetchSearchDocuments(tasks, env);
+  const issueSearch = await fetchSearchIssues(projects, env);
 
   const documentEntries = fetched
     .map(result => result.searchEntry)
@@ -810,6 +834,8 @@ async function loadSearchIndex(env, ctx) {
     limited ||
     failedDocuments > 0 ||
     truncatedDocuments > 0 ||
+    issueSearch.failedRepositories > 0 ||
+    issueSearch.discoveredRepositories > issueSearch.selectedRepositories ||
     appDiscoveryIncomplete
       ? "partial"
       : "bounded";
@@ -819,7 +845,7 @@ async function loadSearchIndex(env, ctx) {
     source: {
       provider: "github",
       scope: GITHUB_OWNER,
-      input: "public_project_catalog_intersect_public_docs_catalog",
+      input: "public_project_catalog_intersect_public_docs_catalog_with_bounded_issues",
       coverage,
       appDiscovery,
       documents: {
@@ -829,11 +855,25 @@ async function loadSearchIndex(env, ctx) {
         truncated: truncatedDocuments,
         limit: MAX_SEARCH_DOCUMENTS,
         catalogDepth: MAX_DOC_DEPTH
+      },
+      issues: {
+        repositoriesDiscovered: issueSearch.discoveredRepositories,
+        repositoriesIndexed: issueSearch.selectedRepositories,
+        failedRepositories: issueSearch.failedRepositories,
+        repositoryLimit: SEARCH_ISSUE_REPOSITORY_LIMIT,
+        perRepositoryLimit: SEARCH_ISSUES_PER_REPOSITORY,
+        indexed: issueSearch.entries.length,
+        pullRequestsFiltered: true
+      },
+      discussions: {
+        surfacesIndexed: projects.filter(project => Boolean(project?.discussions)).length,
+        contentIndexed: false
       }
     },
     entries: [
       ...buildProjectSearchEntries(projects),
-      ...documentEntries
+      ...documentEntries,
+      ...issueSearch.entries
     ]
   };
 }
@@ -1339,13 +1379,18 @@ async function getPublicActivity(requestUrl, env) {
 }
 
 async function fetchProjectIssues(project, env) {
+  return fetchProjectIssuesWithLimit(project, env, PROJECT_ISSUES_LIMIT);
+}
+
+async function fetchProjectIssuesWithLimit(project, env, limit) {
   const repository = String(project?.source?.repository || "");
   const repoName = repositoryNameFromOwnedFullName(repository);
   if (!repoName) return { issues: [], failed: true };
 
+  const boundedLimit = Math.max(1, Math.min(Number(limit) || PROJECT_ISSUES_LIMIT, PROJECT_ISSUES_LIMIT));
   const endpoint = githubRepositoryApiBase(repoName) +
     "/issues?state=all&sort=updated&direction=desc&per_page=" +
-    PROJECT_ISSUES_LIMIT;
+    boundedLimit;
   const result = await fetchGitHubJson(endpoint, env);
 
   if (!result.ok || !Array.isArray(result.data)) {
@@ -1355,7 +1400,7 @@ async function fetchProjectIssues(project, env) {
   return {
     issues: sortPublicIssues(
       normalizePublicIssues(project, result.data),
-      PROJECT_ISSUES_LIMIT
+      boundedLimit
     ),
     failed: false
   };

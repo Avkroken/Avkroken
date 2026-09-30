@@ -1,4 +1,4 @@
-import { documentationPath } from "./portal-routes.mjs";
+import { documentationPath, projectIssuesPath } from "./portal-routes.mjs";
 
 function normalized(value) {
   return String(value || "")
@@ -139,9 +139,106 @@ export function buildProjectSearchEntries(projects) {
         ].filter(Boolean).join(" "))
       });
     }
+
+    if (project.issues && project.issuesPortalUrl) {
+      entries.push({
+        id: "issues:" + project.id,
+        kind: "issues",
+        title: (project.name || project.slug) + " Issues",
+        subtitle: "Issues",
+        snippet: snippet("Publik issueyta för fel, förbättringar och repositoryarbete."),
+        url: project.issuesPortalUrl,
+        canonicalUrl: project.issues,
+        source,
+        searchText: normalized([
+          project.name,
+          project.slug,
+          "issues",
+          "ärenden",
+          "fel",
+          "förbättringar",
+          description,
+          source?.repository
+        ].filter(Boolean).join(" "))
+      });
+    }
+
+    if (project.discussions) {
+      entries.push({
+        id: "discussions:" + project.id,
+        kind: "discussions",
+        title: (project.name || project.slug) + " Discussions",
+        subtitle: "Discussions",
+        snippet: snippet("Publik diskussionsyta i projektets canonical GitHub-källa."),
+        url: project.portalUrl,
+        canonicalUrl: project.discussions,
+        source,
+        searchText: normalized([
+          project.name,
+          project.slug,
+          "discussions",
+          "diskussioner",
+          "samtal",
+          description,
+          source?.repository
+        ].filter(Boolean).join(" "))
+      });
+    }
   }
 
   return entries;
+}
+
+export function buildIssueSearchEntries(issues) {
+  if (!Array.isArray(issues)) return [];
+
+  return issues.flatMap(issue => {
+    if (
+      !issue ||
+      typeof issue.id !== "string" ||
+      typeof issue.projectSlug !== "string" ||
+      typeof issue.projectName !== "string" ||
+      typeof issue.repository !== "string" ||
+      !Number.isInteger(issue.number) ||
+      typeof issue.title !== "string" ||
+      typeof issue.url !== "string"
+    ) {
+      return [];
+    }
+
+    const labels = Array.isArray(issue.labels)
+      ? issue.labels.filter(label => typeof label === "string").slice(0, 8)
+      : [];
+
+    return [{
+      id: issue.id,
+      kind: "issue",
+      title: issue.projectName + " #" + issue.number + " · " + issue.title,
+      subtitle: "Issue · " + (issue.state === "closed" ? "stängd" : "öppen"),
+      snippet: snippet(labels.length ? "Labels: " + labels.join(", ") : "Publikt GitHub Issue."),
+      url: projectIssuesPath(issue.projectSlug),
+      canonicalUrl: issue.url,
+      source: {
+        provider: "github",
+        kind: "repository",
+        repository: issue.repository,
+        ref: null,
+        path: null
+      },
+      searchText: normalized([
+        issue.projectName,
+        issue.projectSlug,
+        issue.repository,
+        "issue",
+        "issues",
+        "ärende",
+        issue.number,
+        issue.title,
+        issue.state,
+        ...labels
+      ].filter(Boolean).join(" "))
+    }];
+  });
 }
 
 export function buildDocumentSearchEntry(entry, page, markdown, canonicalUrl) {

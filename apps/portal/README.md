@@ -162,9 +162,11 @@ Indexet innehåller:
 
 - projektmetadata;
 - repository-Wiki som presentationspost när `wikiPortalUrl` finns;
-- allowlistad README/docs-Markdown för publicerade repository-/appkällor.
+- allowlistad README/docs-Markdown för publicerade repository-/appkällor;
+- publika Issues-ytor samt bounded, sanerade Issue-titlar/nummer/state/labels;
+- canonical Discussions-ytor för projekt där GitHub rapporterar Discussions-stöd.
 
-Issues och Discussions indexeras inte i den nuvarande versionen.
+Discussion-innehåll indexeras inte eftersom den nuvarande least-privilege-modellen inte begär en separat Discussions-providerpermission.
 
 Dokumentindexeringen är medvetet budgeterad och rapporterar `bounded` eller `partial` coverage. Indexet byggs vid sökrequest och lagras inte i Cache API; samtidiga kalla byggen i samma isolate kollapsas till ett gemensamt in-flight Promise. Klienten får endast rankade resultat för aktuell fråga, inte hela råindexet.
 

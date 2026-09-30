@@ -316,18 +316,21 @@ Nuvarande indexkategorier:
 
 - `project` — projektnamn, beskrivning och publik source-metadata;
 - `wiki` — repository-Wiki som presentationspost när projektet har `wikiPortalUrl`;
-- `document` — allowlistad README/docs-Markdown samt canonical source URL.
+- `document` — allowlistad README/docs-Markdown samt canonical source URL;
+- `issues` — projektets publika Issues-yta;
+- `issue` — bounded, sanerade Issue-poster med titel, nummer, state och labels men utan body/author/assignee;
+- `discussions` — projektets canonical Discussions-yta. Discussion-innehåll läses inte.
 
 Jobb saknar publik app-post och app-docs-källa och kan därför inte nå indexbyggaren. `.github` är inte ett publicerat projekt och filtreras bort även om publika docs skulle finnas i docs-katalogen.
 
-Sökindexeringen återanvänder den cacheade publika projektkatalogen som första säkerhetsgrind och bygger dokumentationskatalogen endast från de redan publicerade projekten. Dokumentupptäckten gör ett rekursivt Git-tree-read per unikt repository/ref, deduplicerar repositoryprojekt och opt-in-appar med samma source-repository och begränsar tree-reads till concurrency 2. Felresponser konsumeras/cancelas explicit så att olästa bodies inte blockerar Workers request-budget. Exakt allowlistad Markdown hämtas därefter från GitHubs raw-content-origin; ingen godtycklig provider-path kan konstrueras från klientinput. Indexet använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor, concurrency 4 för själva innehållsläsningen och max 120 000 tecken per dokument. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
+Sökindexeringen återanvänder den cacheade publika projektkatalogen som första säkerhetsgrind och bygger dokumentationskatalogen endast från de redan publicerade projekten. Dokumentupptäckten gör ett rekursivt Git-tree-read per unikt repository/ref, deduplicerar repositoryprojekt och opt-in-appar med samma source-repository och begränsar tree-reads till concurrency 2. Felresponser konsumeras/cancelas explicit så att olästa bodies inte blockerar Workers request-budget. Exakt allowlistad Markdown hämtas därefter från GitHubs raw-content-origin; ingen godtycklig provider-path kan konstrueras från klientinput. Indexet använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor, concurrency 4 för själva innehållsläsningen och max 120 000 tecken per dokument. Därutöver indexeras högst åtta repositoryprojekt och högst åtta sanerade Issues per repository med concurrency 2. GitHub Issues-endpointens pull requests filtreras bort före indexering. Discussion-innehåll hämtas inte eftersom ingen ny Discussions-providerpermission införs; endast redan publik canonical Discussion-URL från projektmodellen indexeras. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
 
 Coverage rapporteras som:
 
 - `bounded` — indexet byggdes inom den definierade budgeten utan observerade fetch-/appdiscoveryfel;
 - `partial` — hårdgräns, dokumentfel, truncering eller ofullständig appdiscovery reducerade täckningen.
 
-Issues och Discussions ingår ännu inte i sökindexet.
+Issues ingår nu bounded i sökindexet och Issues-/Discussions-ytorna är sökbara. Discussion-innehåll indexeras medvetet inte utan ett separat, verifierat providerpermissionsbeslut.
 
 ## Cache
 
@@ -444,7 +447,7 @@ Releaseautomation verifierades live repo-för-repo 2026-09-30. `Avkroken`, `Bast
 Följande ligger utanför den nu verifierade Portal v2-kärnan eller saknar nödvändig interaktiv åtkomst för separat acceptance:
 
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
-- Issues/Discussions i global sök;
+- Discussion-innehåll i global sök är inte aktiverat eftersom det skulle kräva en separat providerpermission/GraphQL-väg; canonical Discussions-ytor är däremot sökbara;
 - Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
 - logo-admins production-CRUD kräver fortsatt en legitim interaktiv Cloudflare Access-session och kan därför inte impersoneras från den nuvarande terminalmiljön. Admin-UI:n innehåller nu ett självrensande canaryflöde som gör hela punkt 2d till ett enda autentiserat klick; edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är redan verifierade och ingen service token skapas för testet.
 
