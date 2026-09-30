@@ -117,18 +117,18 @@
   --ak-ink-800: #0d182c;
   --ak-ink-700: #213652;
   --ak-ink-600: #385475;
-  --ak-mist-500: #6f88a7;
-  --ak-mist-300: #a8bad0;
-  --ak-mist-100: #d9e6f7;
-  --ak-paper-50: #f5f8fc;
-  --ak-moss-500: #6f9f8a;
-  --ak-moss-300: #9ec7b4;
-  --ak-brass-500: #4fa8df;
-  --ak-brass-300: #86c8ef;
-  --ak-ember-500: #c56f7d;
-  --ak-ember-300: #e2a0aa;
-  --ak-sky-500: #4f91c8;
-  --ak-sky-300: #8ec1e7;
+  --ak-mist-500: #91a8c6;
+  --ak-mist-300: #b6c8df;
+  --ak-mist-100: #dce7f8;
+  --ak-paper-50: #f5f3ee;
+  --ak-moss-500: #24a978;
+  --ak-moss-300: #42e6a4;
+  --ak-brass-500: #24e7e8;
+  --ak-brass-300: #7ff7f7;
+  --ak-ember-500: #d51dcb;
+  --ak-ember-300: #ff438b;
+  --ak-sky-500: #2d9bff;
+  --ak-sky-300: #69bbff;
 }
 
 :root[data-theme="blackout"] {

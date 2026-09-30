@@ -39,6 +39,9 @@ describe("auth UI", () => {
     expect(css).toContain(':root[data-theme="blackout"]');
     expect(css).toContain("--accent:#7dd3fc");
     expect(css).toContain("--accent-2:#a7f3d0");
+    expect(css).toContain("rgba(36,231,232,.11)");
+    expect(css).toContain("rgba(213,29,203,.10)");
+    expect(css).toContain("background-size:42px 42px");
   });
 
   it("uses the shared presentation theme on the GitHub login page", async () => {

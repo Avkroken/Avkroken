@@ -57,7 +57,7 @@ Detta är server-side guarantees. Frontendkod får inte vara enda platsen som up
 
 ## Tema
 
-Dumpens svart/gröna terminalidentitet behålls som produktaccent, men ytorna använder monorepots gemensamma teman `legacy`, `forest` (visas som **Avkroken**) och `blackout`. `legacy` är fallback.
+Dumpens svart/gröna terminalidentitet behålls som produktaccent, men ytorna använder monorepots gemensamma teman `legacy`, `forest` (visas som **Avkroken**) och `blackout`. `legacy` är fallback och återger det äldre Avkroken-uttryckets mörka bas, cyan/blå/magenta glow och diskreta rutnät utan att ersätta Dumpens lime-/lila produktaccent.
 
 Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, presentationscookien `avkroken_theme`. Cookien är inte autentiserings- eller auktorisationsstate och får aldrig påverka Dumpens GitHub-session, upload-tickets eller access-routing.
 

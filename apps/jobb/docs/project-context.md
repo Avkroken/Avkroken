@@ -135,7 +135,7 @@ Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens if
 
 Dashboarden på `/` är operativt kontrollplan. Repositoryts implementation använder GitHub OAuth direkt och kräver komplett konfiguration för `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET` och `JOBB_ALLOWED_GITHUB_IDS`; ofullständig konfiguration failar stängt.
 
-Dashboarden erbjuder `legacy`, `forest` (visas som **Avkroken**) och `blackout` med Legacy som fallback. De cyan/gröna operativa accenterna förblir Jobb-specifika. Dashboarden persisterar samma presentationspreferens som övriga monorepoappar; login-sidan kan läsa `avkroken_theme` server-side för visuell kontinuitet, men cookien är aldrig auth-, CSRF- eller sessionsstate.
+Dashboarden erbjuder `legacy`, `forest` (visas som **Avkroken**) och `blackout` med Legacy som fallback. Legacy bygger på Portalens faktiska pre-v2 Avkroken-uttryck med cyan/blå/magenta glow och diskret rutnät; de cyan/gröna operativa accenterna förblir Jobb-specifika. Dashboarden persisterar samma presentationspreferens som övriga monorepoappar; login-sidan kan läsa `avkroken_theme` server-side för visuell kontinuitet, men cookien är aldrig auth-, CSRF- eller sessionsstate.
 
 Top-level-vyer:
 

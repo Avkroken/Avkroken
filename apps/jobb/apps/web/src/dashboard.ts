@@ -67,9 +67,9 @@ const DASHBOARD_HTML = `<!doctype html>
 
 const DASHBOARD_CSS = `:root{
   font-family:Inter,system-ui,sans-serif;color-scheme:dark;
-  --bg:#04070e;--bg-soft:#050912;--panel:#09111f;--panel-2:#0d182c;
-  --line:#213652;--line-strong:#385475;--text:#f5f8fc;--muted:#a8bad0;
-  --control:#d9e6f7;--control-text:#08111c;--accent:#7dd3fc;
+  --bg:#04070e;--bg-soft:#050912;--panel:#09101e;--panel-2:#0d182c;
+  --line:rgba(137,167,207,.18);--line-strong:rgba(137,167,207,.34);--text:#f5f3ee;--muted:#91a8c6;
+  --control:#dce7f8;--control-text:#08111c;--accent:#7dd3fc;
   --ok:#78dba9;--warn:#ffd166;--bad:#ff7b7b;
   background:var(--bg);color:var(--text)
 }
@@ -85,6 +85,8 @@ const DASHBOARD_CSS = `:root{
 }
 *{box-sizing:border-box}
 body{margin:0 auto;padding:24px;max-width:1280px;min-height:100vh;background:linear-gradient(180deg,var(--bg-soft),var(--bg) 34rem);color:var(--text)}
+:root[data-theme="legacy"] body{background:radial-gradient(circle at 14% 8%,rgba(36,231,232,.11),transparent 27rem),radial-gradient(circle at 86% 18%,rgba(213,29,203,.10),transparent 30rem),radial-gradient(circle at 50% 100%,rgba(45,155,255,.08),transparent 35rem),linear-gradient(180deg,#050912 0%,#03060c 100%)}
+:root[data-theme="legacy"] body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 82%)}
 h1{margin:0;font-size:clamp(30px,5vw,44px)}h2{font-size:18px;margin:0 0 12px}
 .page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.page-actions{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}.page-head form{margin:0}
 .theme-control{display:grid;gap:3px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.theme-control select{min-width:112px;background:var(--panel);color:var(--text);border:1px solid var(--line-strong);border-radius:9px;padding:9px 10px;text-transform:none;letter-spacing:normal}

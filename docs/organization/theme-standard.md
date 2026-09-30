@@ -6,11 +6,11 @@ Det här dokumentet beskriver det gemensamma temakontraktet för webbappar i `Av
 
 Gemensamma val är, i visningsordning:
 
-1. `legacy` — den tidigare blåare Avkroken-paletten och fallback för användare utan sparat val.
+1. `legacy` — det faktiska pre-v2 Avkroken-uttrycket från Portalens äldre runtime: mörk bas, cyan/blå/violett/magenta ljusaccenter, mjuka radial-glows och diskret 42 px-rutnät. Det är fallback för användare utan sparat val och ska inte reduceras till Skvallerbyttans tidigare blå dashboardpalett.
 2. `forest` — Avkrokens skogs-/mässingspalett, visad som **Avkroken** i användargränssnittet.
 3. `blackout` — neutral, mycket mörk palett.
 
-Apparna får och bör behålla egna accenter, typografi, densitet, komponentformer och informationsarkitektur. Temat ska ge en sammanhängande grund, inte göra apparna identiska.
+Apparna får och bör behålla egna accenter, typografi, densitet, komponentformer och informationsarkitektur. Legacy återanvänder färg-/ljusspråket, inte Portalens gamla layout. Temat ska ge en sammanhängande grund, inte göra apparna identiska.
 
 ## Persistens
 

@@ -4,14 +4,14 @@
   font-synthesis: none;
   --bg: #04070e;
   --bg-soft: #050912;
-  --panel: #09111f;
+  --panel: #09101e;
   --panel-strong: #0d182c;
-  --line: #213652;
-  --line-strong: #385475;
-  --text: #f5f8fc;
-  --muted: #a8bad0;
+  --line: rgba(137, 167, 207, .18);
+  --line-strong: rgba(137, 167, 207, .34);
+  --text: #f5f3ee;
+  --muted: #91a8c6;
   --muted-2: #6f88a7;
-  --control-bg: #d9e6f7;
+  --control-bg: #dce7f8;
   --control-text: #08111c;
   --accent: #7dd3fc;
   --bar: #4f91c8;
@@ -51,6 +51,25 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(circle at top, var(--bg-soft) 0, var(--bg) 34rem); min-height: 100vh; }
+:root[data-theme="legacy"] body {
+  background:
+    radial-gradient(circle at 14% 8%, rgba(36,231,232,.11), transparent 27rem),
+    radial-gradient(circle at 86% 18%, rgba(213,29,203,.10), transparent 30rem),
+    radial-gradient(circle at 50% 100%, rgba(45,155,255,.08), transparent 35rem),
+    linear-gradient(180deg, #050912 0%, #03060c 100%);
+}
+:root[data-theme="legacy"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .18;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, #000, transparent 82%);
+}
 button, input, select { font: inherit; }
 a { color: inherit; }
 .shell { width: min(1240px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 72px; }

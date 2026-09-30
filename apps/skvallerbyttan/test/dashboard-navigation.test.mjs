@@ -66,6 +66,9 @@ test("dashboard exposes the shared Avkroken theme contract without losing its ow
   assert.match(css, /:root\[data-theme="forest"\]/);
   assert.match(css, /:root\[data-theme="blackout"\]/);
   assert.match(css, /--accent:\s*#7dd3fc/);
+  assert.match(css, /rgba\(36,231,232,.11\)/);
+  assert.match(css, /rgba\(213,29,203,.10\)/);
+  assert.match(css, /background-size:\s*42px 42px/);
   assert.match(theme, /avkroken\.theme/);
   assert.match(theme, /avkroken_theme/);
   assert.match(theme, /Domain=\.denied\.se/);

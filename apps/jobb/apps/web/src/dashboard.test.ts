@@ -40,6 +40,9 @@ describe("dashboard rendering", () => {
     expect(cssText).toContain(':root[data-theme="forest"]');
     expect(cssText).toContain(':root[data-theme="blackout"]');
     expect(cssText).toContain("--accent:#7dd3fc");
+    expect(cssText).toContain("rgba(36,231,232,.11)");
+    expect(cssText).toContain("rgba(213,29,203,.10)");
+    expect(cssText).toContain("background-size:42px 42px");
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");

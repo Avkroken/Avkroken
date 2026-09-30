@@ -14,6 +14,9 @@ test("shared theme contract keeps Dumpen product accents", () => {
   assert.match(css, /:root\[data-theme="blackout"\]/);
   assert.match(css, /--accent:#6ee71e/);
   assert.match(css, /--secondary:#a66cff/);
+  assert.match(css, /rgba\(36,231,232,.11\)/);
+  assert.match(css, /rgba\(213,29,203,.10\)/);
+  assert.match(css, /background-size:42px 42px/);
   assert.match(control, /value="legacy">Legacy/);
   assert.match(control, /value="forest">Avkroken/);
   assert.match(script, /avkroken\.theme/);
