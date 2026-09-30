@@ -55,6 +55,8 @@ const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
 const SEARCH_FETCH_CONCURRENCY = 4;
 const GITHUB_CATALOG_CONCURRENCY = 2;
+const PUBLIC_REPOSITORY_GATE_CACHE_SECONDS = 60;
+const PUBLIC_REPOSITORY_GATE_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-public-repositories-v1");
 const SEARCH_RESULT_LIMIT = 24;
 const CHANGELOG_REPOSITORY_LIMIT = 24;
 const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
@@ -74,13 +76,17 @@ const WATCHED_SERVICES = ["skvallerbyttan"];
 const HEARTBEAT_EXPECTED_INTERVAL_SECONDS = 15 * 60;
 const HEARTBEAT_STALE_AFTER_SECONDS = 35 * 60;
 
+function githubCredentialConfigured(env) {
+  return typeof env.GITHUB_TOKEN === "string" && env.GITHUB_TOKEN.trim().length > 0;
+}
+
 function githubHeaders(env, accept = "application/vnd.github+json") {
   const headers = {
     "Accept": accept,
     "X-GitHub-Api-Version": "2026-03-10",
     "User-Agent": "Avkroken-Portal-Worker"
   };
-  if (env.GITHUB_TOKEN) headers.Authorization = "Bearer " + env.GITHUB_TOKEN;
+  if (githubCredentialConfigured(env)) headers.Authorization = "Bearer " + env.GITHUB_TOKEN.trim();
   return headers;
 }
 
@@ -202,55 +208,60 @@ async function fetchGitHubJson(url, env) {
   return { ok: true, status: response.status, data: await response.json() };
 }
 
-async function scanMarkdownDocs(repo, env, path = "docs", depth = 0) {
-  if (depth > MAX_DOC_DEPTH) return [];
+async function fetchRepositoryTree(repo, env) {
   const endpoint = githubRepositoryApiBase(repo.name) +
-    "/contents/" + encodedPath(path) + "?ref=" + encodeURIComponent(repo.default_branch);
+    "/git/trees/" + encodeURIComponent(repo.default_branch) + "?recursive=1";
   const result = await fetchGitHubJson(endpoint, env);
-  if (!result.ok || !Array.isArray(result.data)) return [];
-
-  const files = result.data
-    .filter(item => item && item.type === "file" && /\.(md|markdown)$/i.test(item.name || ""))
-    .map(item => ({ path: item.path, label: pageLabel(item.path) }));
-
-  if (depth < MAX_DOC_DEPTH) {
-    const directories = result.data.filter(item => item && item.type === "dir");
-    const nested = await mapWithConcurrency(
-      directories,
-      GITHUB_CATALOG_CONCURRENCY,
-      item => scanMarkdownDocs(repo, env, item.path, depth + 1)
-    );
-    nested.forEach(items => files.push(...items));
-  }
-
-  return files;
-}
-
-async function readmePage(repo, env) {
-  const endpoint = githubRepositoryApiBase(repo.name) +
-    "/readme?ref=" + encodeURIComponent(repo.default_branch);
-  const result = await fetchGitHubJson(endpoint, env);
-  if (!result.ok || !result.data || typeof result.data.path !== "string") return null;
-  if (!isPublicMarkdownPath(result.data.path)) return null;
-  return { path: result.data.path, label: "Översikt" };
-}
-
-async function markdownFilePage(repo, env, path, label) {
-  const endpoint = githubRepositoryApiBase(repo.name) +
-    "/contents/" + encodedPath(path) + "?ref=" + encodeURIComponent(repo.default_branch);
-  const result = await fetchGitHubJson(endpoint, env);
-
   if (
     !result.ok ||
     !result.data ||
-    result.data.type !== "file" ||
-    result.data.path !== path ||
-    !/\.(md|markdown)$/i.test(result.data.path)
+    result.data.truncated === true ||
+    !Array.isArray(result.data.tree)
   ) {
     return null;
   }
+  return result.data.tree;
+}
 
-  return { path: result.data.path, label };
+function repositoryTreeLoader(env) {
+  const pending = new Map();
+  return repo => {
+    const key = repo.name + "@" + repo.default_branch;
+    if (!pending.has(key)) pending.set(key, fetchRepositoryTree(repo, env));
+    return pending.get(key);
+  };
+}
+
+function treeMarkdownPages(tree, root) {
+  if (!Array.isArray(tree)) return [];
+  const prefix = String(root || "").replace(/\/+$/, "") + "/";
+  return tree
+    .filter(item => {
+      if (item?.type !== "blob" || typeof item.path !== "string") return false;
+      if (!item.path.startsWith(prefix) || !/\.(md|markdown)$/i.test(item.path)) return false;
+      const relative = item.path.slice(prefix.length);
+      return relative && relative.split("/").length - 1 <= MAX_DOC_DEPTH;
+    })
+    .map(item => ({ path: item.path, label: pageLabel(item.path) }));
+}
+
+function treeReadmePage(tree) {
+  if (!Array.isArray(tree)) return null;
+  const candidates = tree
+    .filter(item => item?.type === "blob" && typeof item.path === "string")
+    .map(item => item.path)
+    .filter(path => /(^|\/)README\.(md|markdown)$/i.test(path) && isPublicMarkdownPath(path))
+    .sort((a, b) => {
+      const rootDiff = Number(a.includes("/")) - Number(b.includes("/"));
+      return rootDiff || a.localeCompare(b, "sv");
+    });
+  return candidates.length ? { path: candidates[0], label: "Översikt" } : null;
+}
+
+function treeFilePage(tree, path, label) {
+  if (!Array.isArray(tree) || !/\.(md|markdown)$/i.test(path || "")) return null;
+  const found = tree.some(item => item?.type === "blob" && item.path === path);
+  return found ? { path, label } : null;
 }
 
 function pageSort(a, b) {
@@ -264,14 +275,13 @@ function pageSort(a, b) {
   return a.path.localeCompare(b.path, "sv");
 }
 
-async function buildDocsEntry(repo, env) {
+async function buildDocsEntry(repo, loadTree) {
   const source = repositoryDocsSource(repo);
   if (!source) return null;
 
-  const [docs, readme] = await Promise.all([
-    scanMarkdownDocs(repo, env, source.docsRoot),
-    readmePage(repo, env)
-  ]);
+  const tree = await loadTree(repo);
+  const docs = treeMarkdownPages(tree, source.docsRoot);
+  const readme = treeReadmePage(tree);
 
   const pages = [...docs];
   if (readme && !pages.some(page => page.path === readme.path)) pages.push(readme);
@@ -284,7 +294,7 @@ async function buildDocsEntry(repo, env) {
   };
 }
 
-async function buildAppDocsEntry(project, env) {
+async function buildAppDocsEntry(project, loadTree) {
   const source = appDocsSource(project);
   if (!source) return null;
 
@@ -293,10 +303,9 @@ async function buildAppDocsEntry(project, env) {
     default_branch: source.defaultBranch
   };
 
-  const [docs, readme] = await Promise.all([
-    scanMarkdownDocs(repo, env, source.docsRoot),
-    markdownFilePage(repo, env, source.readmePath, "Översikt")
-  ]);
+  const tree = await loadTree(repo);
+  const docs = treeMarkdownPages(tree, source.docsRoot);
+  const readme = treeFilePage(tree, source.readmePath, "Översikt");
 
   const sourcePages = [...docs];
   if (readme && !sourcePages.some(page => page.path === readme.path)) sourcePages.push(readme);
@@ -328,22 +337,24 @@ function repositoryProjectAsRepo(project) {
     default_branch: project.source.ref,
     has_pages: typeof project.pages === "string",
     language: project.language || null,
+    description: project.description || "",
     pushed_at: project.updatedAt || null,
     updated_at: project.updatedAt || null
   };
 }
 
-async function buildProjectDocsEntry(project, env) {
-  if (project?.type === "app") return buildAppDocsEntry(project, env);
+async function buildProjectDocsEntry(project, loadTree) {
+  if (project?.type === "app") return buildAppDocsEntry(project, loadTree);
   const repo = repositoryProjectAsRepo(project);
-  return repo ? buildDocsEntry(repo, env) : null;
+  return repo ? buildDocsEntry(repo, loadTree) : null;
 }
 
 async function loadDocsCatalog(projects, env) {
+  const loadTree = repositoryTreeLoader(env);
   const entries = await mapWithConcurrency(
     projects,
     GITHUB_CATALOG_CONCURRENCY,
-    project => buildProjectDocsEntry(project, env)
+    project => buildProjectDocsEntry(project, loadTree)
   );
 
   const unique = [];
@@ -580,6 +591,35 @@ async function loadLivePublicRepositoryProjects(env) {
   return normalizePublicRepositories(github.data);
 }
 
+async function loadPublicationRepositoryProjects(env) {
+  if (githubCredentialConfigured(env)) {
+    return loadLivePublicRepositoryProjects(env);
+  }
+
+  const cache = caches.default;
+  const cached = await cache.match(PUBLIC_REPOSITORY_GATE_CACHE_KEY);
+  if (cached) {
+    try {
+      const projects = await cached.json();
+      if (Array.isArray(projects)) return projects;
+    } catch {
+      // Ignore malformed cache and refresh from the public provider.
+    }
+  }
+
+  const projects = await loadLivePublicRepositoryProjects(env);
+  await cache.put(
+    PUBLIC_REPOSITORY_GATE_CACHE_KEY,
+    new Response(JSON.stringify(projects), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=" + PUBLIC_REPOSITORY_GATE_CACHE_SECONDS
+      }
+    })
+  );
+  return projects;
+}
+
 async function loadPublicProjects(env) {
   const github = await fetchGitHubJson(GITHUB_API, env);
   if (!github.ok || !Array.isArray(github.data)) {
@@ -717,6 +757,7 @@ async function loadSearchIndex(env, ctx) {
   }
   const projectCatalog = await projectsResponse.json();
   const projects = Array.isArray(projectCatalog.projects) ? projectCatalog.projects : [];
+  const appDiscovery = projectCatalog?.source?.appDiscovery || "unknown";
 
   const docsResponse = await getDocsCatalog(env, ctx, projects);
   if (!docsResponse.ok) {
@@ -740,9 +781,10 @@ async function loadSearchIndex(env, ctx) {
   const truncatedDocuments = fetched.filter(result => result.truncated).length;
 
   const appDiscoveryIncomplete =
-    projectCatalog.appDiscovery === "partial" ||
-    projectCatalog.appDiscovery === "unavailable" ||
-    projectCatalog.appDiscovery === "not_configured";
+    appDiscovery === "partial" ||
+    appDiscovery === "unavailable" ||
+    appDiscovery === "not_configured" ||
+    appDiscovery === "unknown";
   const coverage =
     limited ||
     failedDocuments > 0 ||
@@ -758,7 +800,7 @@ async function loadSearchIndex(env, ctx) {
       scope: GITHUB_OWNER,
       input: "public_project_catalog_intersect_public_docs_catalog",
       coverage,
-      appDiscovery: projectCatalog.appDiscovery,
+      appDiscovery,
       documents: {
         discovered: discoveredDocuments,
         indexed: documentEntries.length,
@@ -1299,8 +1341,8 @@ async function fetchProjectIssues(project, env) {
 }
 
 async function loadPublicProjectIssues(projectSlug, env) {
-  const projectCatalog = await loadPublicProjects(env);
-  const project = eligibleIssueProjects(projectCatalog.projects, 100)
+  const projects = await loadPublicationRepositoryProjects(env);
+  const project = eligibleIssueProjects(projects, 100)
     .find(item => item.slug === projectSlug);
 
   if (!project) return null;
@@ -1416,8 +1458,8 @@ async function fetchProjectReleases(project, env) {
 }
 
 async function loadPublicProjectReleases(projectSlug, env) {
-  const projectCatalog = await loadPublicProjects(env);
-  const project = eligibleReleaseProjects(projectCatalog.projects, 100)
+  const projects = await loadPublicationRepositoryProjects(env);
+  const project = eligibleReleaseProjects(projects, 100)
     .find(item => item.slug === projectSlug);
 
   if (!project) return null;
@@ -1530,8 +1572,8 @@ async function fetchChangelogReleases(projects, env) {
 }
 
 async function loadPublicChangelog(env) {
-  const projectCatalog = await loadPublicProjects(env);
-  const eligible = eligibleReleaseProjects(projectCatalog.projects, 100);
+  const projects = await loadPublicationRepositoryProjects(env);
+  const eligible = eligibleReleaseProjects(projects, 100);
   const selected = eligible.slice(0, CHANGELOG_REPOSITORY_LIMIT);
   const fetched = await fetchChangelogReleases(selected, env);
 

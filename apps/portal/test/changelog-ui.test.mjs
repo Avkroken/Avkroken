@@ -69,15 +69,29 @@ test("Changelog client reads only the Portal API and renders untrusted strings a
   assert.ok(client.includes('rel = "noopener noreferrer"'));
 });
 
-test("Changelog backend derives release eligibility from live public projects", () => {
+test("public repository gate caches only credential-free publication checks", () => {
+  const gate = section(
+    worker,
+    "async function loadPublicationRepositoryProjects(env)",
+    "async function loadPublicProjects(env)"
+  );
+
+  assert.ok(gate.includes("githubCredentialConfigured(env)"));
+  assert.ok(gate.includes("return loadLivePublicRepositoryProjects(env)"));
+  assert.ok(gate.includes("cache.match(PUBLIC_REPOSITORY_GATE_CACHE_KEY)"));
+  assert.ok(gate.includes("await cache.put("));
+  assert.ok(gate.includes("PUBLIC_REPOSITORY_GATE_CACHE_SECONDS"));
+});
+
+test("Changelog backend derives release eligibility from the bounded public repository gate", () => {
   const load = section(
     worker,
     "async function loadPublicChangelog(env)",
     "let pendingPublicChangelog = null;"
   );
 
-  assert.ok(load.includes("loadPublicProjects(env)"));
-  assert.ok(load.includes("eligibleReleaseProjects(projectCatalog.projects"));
+  assert.ok(load.includes("loadPublicationRepositoryProjects(env)"));
+  assert.ok(load.includes("eligibleReleaseProjects(projects"));
   assert.ok(load.includes("sortPublicReleases"));
   assert.ok(load.includes('"bounded"'));
   assert.ok(load.includes('"partial"'));

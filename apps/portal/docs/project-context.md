@@ -135,7 +135,7 @@ Detaljvyn visar:
 - canonical länkar till repository, Wiki där tillgängligt och Discussions;
 - intern Issues-, Releases-, Builds / CI- och Activity-navigation för repositoryprojekt.
 
-Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService`; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Releases/Issues/Changelog återanvänder en separat 60-sekunders publik repositorygate endast när Portal saknar GitHub-credential; med credential görs eligibility live. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService` efter fortsatt live repositorygate; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata.
 
 Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggregation ska fortsatt använda rätt adapter/Skvallerbyttan där modellen passar.
 
@@ -188,7 +188,7 @@ För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
 
 Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concurrency 4 och max 40 returnerade releaser. Normal coverage är därför `bounded`, aldrig komplett. Repo-cap eller individuella release-fetchfel ger `partial`.
 
-Eligibility byggs live från GitHubs publika organisationslista vid varje Changelog-build och snapshoten lagras inte persistent i Cache API. Samtidiga builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
+Eligibility för Changelog, projektspecifika Releases och Issues kommer från en repository-only publiceringsgate. I nuvarande credential-fria Portal-runtime får den gaten återanvändas i högst 60 sekunder för att dämpa GitHub-bursts; om en GitHub-credential konfigureras kringgås cachen och GitHubs publika repositorylista läses live. Själva Changelog-snapshoten och release-/issue-payloads lagras inte persistent i Cache API. Samtidiga Changelog-builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
 
 Changelog-klienten filtrerar den redan sanerade snapshoten lokalt med `Alla`, `Features`, `Fixes`, `Security`, `Documentation` och `Releases`. Det skapar inga ytterligare providerreads. `Deployments` publiceras inte som filter eftersom releaseadaptern ännu saknar en verifierad canonical deploymentrelation; Portalen fabricerar inte den kopplingen från taggar eller tidsnärhet.
 
@@ -318,7 +318,7 @@ Nuvarande indexkategorier:
 
 Jobb saknar publik app-post och app-docs-källa och kan därför inte nå indexbyggaren. `.github` är inte ett publicerat projekt och filtreras bort även om publika docs skulle finnas i docs-katalogen.
 
-Sökindexeringen återanvänder den cacheade publika projektkatalogen som första säkerhetsgrind och bygger dokumentationskatalogen endast från de redan publicerade projekten. Katalogläsningar mot GitHub REST är concurrency-begränsade till 2 och felresponser konsumeras/cancelas explicit så att olästa bodies inte blockerar Workers request-budget. Exakt allowlistad Markdown hämtas därefter från GitHubs raw-content-origin; ingen godtycklig provider-path kan konstrueras från klientinput. Indexet använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor, concurrency 4 för själva innehållsläsningen och max 120 000 tecken per dokument. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
+Sökindexeringen återanvänder den cacheade publika projektkatalogen som första säkerhetsgrind och bygger dokumentationskatalogen endast från de redan publicerade projekten. Dokumentupptäckten gör ett rekursivt Git-tree-read per unikt repository/ref, deduplicerar repositoryprojekt och opt-in-appar med samma source-repository och begränsar tree-reads till concurrency 2. Felresponser konsumeras/cancelas explicit så att olästa bodies inte blockerar Workers request-budget. Exakt allowlistad Markdown hämtas därefter från GitHubs raw-content-origin; ingen godtycklig provider-path kan konstrueras från klientinput. Indexet använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor, concurrency 4 för själva innehållsläsningen och max 120 000 tecken per dokument. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
 
 Coverage rapporteras som:
 
