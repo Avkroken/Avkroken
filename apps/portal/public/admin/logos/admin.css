@@ -215,6 +215,35 @@
   color: var(--ak-status-danger);
 }
 
+.verification-steps {
+  display: grid;
+  gap: var(--ak-space-2);
+  margin: var(--ak-space-4) 0 0;
+  padding-left: var(--ak-space-6);
+}
+
+.verification-step {
+  padding-left: var(--ak-space-1);
+}
+
+.verification-step strong {
+  margin-right: var(--ak-space-2);
+}
+
+.verification-step span {
+  color: var(--ak-text-secondary);
+}
+
+.verification-step.is-error,
+.verification-step.is-error span {
+  color: var(--ak-status-danger);
+}
+
+#run-admin-verification:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .admin-empty {
   padding: var(--ak-space-6);
   border: 1px dashed var(--ak-border-default);

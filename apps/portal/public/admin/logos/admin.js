@@ -8,18 +8,24 @@
   const previewPanel = document.querySelector("#preview-panel");
   const previewImage = document.querySelector("#logo-preview");
   const previewCaption = document.querySelector("#preview-caption");
+  const verificationButton = document.querySelector("#run-admin-verification");
+  const verificationSteps = document.querySelector("#verification-steps");
 
   function setStatus(message, error = false) {
     status.textContent = message;
     status.classList.toggle("is-error", Boolean(error));
   }
 
-  async function api(path = "", options = {}) {
-    const response = await fetch(`/api/admin/logos${path}`, {
+  async function adminFetch(path = "", options = {}) {
+    return fetch(`/api/admin/logos${path}`, {
       ...options,
       headers: { ...(options.headers || {}) },
       cache: "no-store"
     });
+  }
+
+  async function api(path = "", options = {}) {
+    const response = await adminFetch(path, options);
     if (response.status === 204) return null;
     const payload = await response.json().catch(() => ({ error: "invalid_response" }));
     if (!response.ok) throw new Error(payload.error || `request_failed_${response.status}`);
@@ -175,6 +181,140 @@
     renderAssets();
   }
 
+  function verificationSvg(marker) {
+    return new Blob([
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><title>${marker}</title><rect width="16" height="16" rx="3" fill="#111"/><path d="M4 11V5h2v2h4V5h2v6h-2V9H6v2z" fill="#fff"/></svg>`
+    ], { type: "image/svg+xml" });
+  }
+
+  function addVerificationStep(label, detail = "") {
+    const item = element("li", { className: "verification-step is-success" });
+    item.append(element("strong", {}, label));
+    if (detail) item.append(element("span", {}, detail));
+    verificationSteps.append(item);
+  }
+
+  function expectedStatus(response, status, label) {
+    if (response.status !== status) {
+      throw new Error(`${label}: HTTP ${response.status}`);
+    }
+  }
+
+  async function verifyPublicAsset(publicUrl, marker) {
+    const separator = publicUrl.includes("?") ? "&" : "?";
+    const response = await fetch(
+      `${publicUrl}${separator}verification=${encodeURIComponent(marker)}-${Date.now()}`,
+      { cache: "no-store" }
+    );
+    expectedStatus(response, 200, "Publik läsning");
+    if (!String(response.headers.get("content-type") || "").startsWith("image/svg+xml")) {
+      throw new Error("Publik läsning: oväntad MIME-typ");
+    }
+    if (!(await response.text()).includes(`<title>${marker}</title>`)) {
+      throw new Error("Publik läsning: fel canary-innehåll");
+    }
+  }
+
+  async function runAdminVerification() {
+    verificationButton.disabled = true;
+    verificationSteps.replaceChildren();
+    let assetId = null;
+    let deleted = false;
+    let primaryError = null;
+    let cleanupError = null;
+
+    try {
+      setStatus("Verifierar upload…");
+      const created = await api("", {
+        method: "POST",
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "X-File-Name": "__avkroken_logo_admin_canary__created.svg"
+        },
+        body: verificationSvg("portal-admin-canary-created")
+      });
+      assetId = created?.asset?.id || null;
+      if (created?.status !== "created" || !assetId || !created.asset.publicUrl) {
+        throw new Error("Upload: ogiltigt svar");
+      }
+      addVerificationStep("Upload", `asset-id ${assetId}`);
+
+      const listing = await api();
+      if (!listing.assets?.some(asset => asset.id === assetId)) {
+        throw new Error("Listning: testasset saknas");
+      }
+      addVerificationStep("Listning", "Testasset hittades i adminlistan.");
+
+      const metadata = await api(`/${assetId}`);
+      if (metadata?.asset?.id !== assetId) throw new Error("Metadata: fel asset-id");
+      addVerificationStep("Metadata", "Stabilt asset-id verifierat.");
+
+      await verifyPublicAsset(created.asset.publicUrl, "portal-admin-canary-created");
+      addVerificationStep("Publik URL", "Canaryn kunde läsas via public read-boundary.");
+
+      setStatus("Verifierar replace…");
+      const replaced = await api(`/${assetId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "X-File-Name": "__avkroken_logo_admin_canary__replaced.svg"
+        },
+        body: verificationSvg("portal-admin-canary-replaced")
+      });
+      if (replaced?.status !== "updated" || replaced.asset?.id !== assetId) {
+        throw new Error("Replace: asset-id ändrades");
+      }
+      await verifyPublicAsset(replaced.asset.publicUrl, "portal-admin-canary-replaced");
+      addVerificationStep("Replace", "Samma asset-id och uppdaterat publikt innehåll.");
+
+      const downloaded = await adminFetch(`/${assetId}/download`);
+      expectedStatus(downloaded, 200, "Download");
+      if (!String(downloaded.headers.get("content-disposition") || "").includes("attachment")) {
+        throw new Error("Download: Content-Disposition saknas");
+      }
+      if (!(await downloaded.text()).includes("<title>portal-admin-canary-replaced</title>")) {
+        throw new Error("Download: fel innehåll");
+      }
+      addVerificationStep("Download", "Admin-download returnerade ersatt fil.");
+
+      const removed = await adminFetch(`/${assetId}`, { method: "DELETE" });
+      expectedStatus(removed, 204, "Delete");
+      deleted = true;
+      addVerificationStep("Delete", "Testasset raderades.");
+
+      const missing = await adminFetch(`/${assetId}`);
+      expectedStatus(missing, 404, "Raderingskontroll");
+      addVerificationStep("Raderingskontroll", "Metadata är borta efter delete.");
+      setStatus("Verifiering klar: upload, listning, publik läsning, replace, download och delete fungerar.");
+    } catch (error) {
+      primaryError = error;
+      const item = element("li", { className: "verification-step is-error" });
+      item.append(element("strong", {}, "Verifiering avbruten"), element("span", {}, error.message));
+      verificationSteps.append(item);
+    } finally {
+      if (assetId && !deleted) {
+        try {
+          const cleanup = await adminFetch(`/${assetId}`, { method: "DELETE" });
+          if (cleanup.status !== 204 && cleanup.status !== 404) {
+            throw new Error(`HTTP ${cleanup.status}`);
+          }
+          addVerificationStep("Automatisk städning", "Tillfällig testasset togs bort.");
+        } catch (error) {
+          cleanupError = error;
+        }
+      }
+
+      await loadAssets().catch(() => {});
+      verificationButton.disabled = false;
+
+      if (cleanupError) {
+        setStatus(`Verifieringen misslyckades och testasset kunde inte städas: ${cleanupError.message}`, true);
+      } else if (primaryError) {
+        setStatus(`Verifieringen misslyckades: ${primaryError.message}`, true);
+      }
+    }
+  }
+
   document.querySelector("#logo-upload-form").addEventListener("submit", async event => {
     event.preventDefault();
     const input = document.querySelector("#logo-file");
@@ -195,6 +335,9 @@
     }
   });
 
+  verificationButton.addEventListener("click", () => {
+    runAdminVerification().catch(error => setStatus(error.message, true));
+  });
   document.querySelector("#refresh-assets").addEventListener("click", () => {
     loadAssets().then(() => setStatus("Listan uppdaterades.")).catch(error => setStatus(error.message, true));
   });

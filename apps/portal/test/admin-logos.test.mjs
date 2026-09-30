@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   MAX_LOGO_BYTES,
   contentMatchesType,
@@ -10,6 +11,8 @@ import {
 } from "../src/admin-logos.mjs";
 
 const ORIGIN = "https://avkroken.denied.se";
+const adminHtml = await readFile(new URL("../public/admin/logos/index.html", import.meta.url), "utf8");
+const adminClient = await readFile(new URL("../public/admin/logos/admin.js", import.meta.url), "utf8");
 const ALLOW = {
   authorize: async () => ({ ok: true, payload: { sub: "member-1" } })
 };
@@ -103,6 +106,22 @@ test("admin routing is path-bounded and does not overlap neighboring routes", ()
   assert.equal(isAdminLogoApi("/api/admin/logos/a/download"), true);
   assert.equal(isAdminLogoApi("/api/admin/logo"), false);
   assert.equal(isAdminLogoApi("/api/admin/logos-extra"), false);
+});
+
+test("admin UI exposes an authenticated self-test that exercises the real CRUD routes and cleans up", () => {
+  assert.match(adminHtml, /id="run-admin-verification"/);
+  assert.match(adminHtml, /id="verification-steps"[^>]*aria-live="polite"/);
+  assert.match(adminClient, /async function runAdminVerification\(\)/);
+  assert.match(adminClient, /method: "POST"/);
+  assert.match(adminClient, /method: "PUT"/);
+  assert.match(adminClient, /\/download/);
+  assert.match(adminClient, /method: "DELETE"/);
+  assert.match(adminClient, /verifyPublicAsset/);
+  assert.match(adminClient, /if \(assetId && !deleted\)/);
+  assert.match(adminClient, /cleanup\.status !== 204 && cleanup\.status !== 404/);
+  assert.match(adminClient, /verificationButton\.addEventListener\("click"/);
+  assert.equal(adminClient.includes("CF-Access-Client-Secret"), false);
+  assert.equal(adminClient.includes("CF-Authorization"), false);
 });
 
 test("image content validation rejects mismatches and active SVG payloads", () => {
