@@ -70,6 +70,10 @@ web_modules/
 .env.*
 !.env.example
 
+# Cloudflare local runtime state and generated types
+.wrangler/
+apps/web/worker-configuration.d.ts
+
 # Cloudflare local secrets
 .dev.vars
 .dev.vars.*
