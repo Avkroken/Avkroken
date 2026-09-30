@@ -157,7 +157,7 @@ Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte
 
 Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Om projektkatalogen eller nödvändiga GitHub-katalogläsningar inte kan genomföras returneras `502` med `github_unavailable`; UI visar ett explicit unavailable-state.
 
-GitHub REST-katalogläsningar är concurrency-begränsade till 2 och oanvändbara felresponser cancelas explicit för att inte hålla Workers HTTP-requestslots öppna. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
+Dokumentationskatalogen läser ett rekursivt Git-tree per unikt repository/ref och deduplicerar samma source-repository mellan repositoryprojekt och opt-in-appar. Tree-läsningarna är concurrency-begränsade till 2 och oanvändbara felresponser cancelas explicit för att inte hålla Workers HTTP-requestslots öppna. Det ersätter rekursiva `/contents`-anrop per mapp. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
 
 ### Dokumentinnehåll
 
@@ -180,7 +180,7 @@ Kall indexbuild är budgeterad:
 
 - public project catalog återanvänds som första säkerhetsgrind;
 - docs-katalogen återanvänds från dess tag-invaliderbara 21 600-sekunders cache;
-- GitHub REST-katalogläsningar har concurrency 2;
+- GitHub Git-tree-läsningar har concurrency 2 och dedupliceras per repository/ref;
 - max 32 Markdown-dokument;
 - round-robin över docs-källor;
 - exakt allowlistad Markdown läses från GitHubs raw-content-origin först efter publiceringsgrinden;
@@ -191,7 +191,7 @@ Kall indexbuild är budgeterad:
 
 ### Changelog
 
-`GET /api/changelog` bygger en bounded snapshot från live-publicerade repositoryprojekt.
+`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Utan GitHub-credential återanvänds en separat 60-sekunders repositorygate för eligibility; med credential läses eligibility alltid live.
 
 - projektkatalogfel: `502 changelog_unavailable`;
 - individuellt repo-releasefel: resten av snapshoten returneras med `source.coverage = partial`;
@@ -308,11 +308,11 @@ Klientresponsen kräver revalidering. Workers Cache API lagrar en separat respon
 
 Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik project/docs-state när en sökning kräver index och query-responsen använder `Cache-Control: no-store`. Projektkatalogen och den tag-invaliderbara dokumentationskatalogen får däremot återanvändas som redan public-safe metadata; search bygger inte en parallell full repositoryinventering.
 
-Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. GitHub-katalogfanout är separat begränsad till två samtidiga reads och responses som inte ska konsumeras cancelas explicit. Det reducerar både burst-dubletter och risken för stalled HTTP-responses utan att skapa en stale sökindexcache.
+Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. Dokumentupptäckten använder ett deduplicerat rekursivt Git-tree-read per repository/ref med högst två samtidiga reads; responses som inte ska konsumeras cancelas explicit. Det reducerar både API-fanout och risken för stalled HTTP-responses utan att skapa en stale sökindexcache.
 
 ### Changelog
 
-Changelog lagras inte persistent i Cache API. Eligibility och releases läses från aktuell publik GitHub-state när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
+Changelog lagras inte persistent i Cache API. När Portal saknar GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder; med credential kringgås eligibility-cachen och repositorylistan läses live. Releasepayloaden läses alltid från GitHub när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
 
 ### Dokumentation
 
@@ -333,8 +333,8 @@ Service binding används i stället för att exponera en publik administrationse
 - Monorepo-appar får endast publiceras genom det appägda, strikt validerade `portal.public.json`-kontraktet; saknat manifest får inte ge en publik post eller app-docs-källa.
 - Appdokument får endast hämtas efter exakt katalogmatchning; manifestpayload får inte styra source-repository/ref/path.
 - Jobb/Auth-data får inte passera publik Portal-cache, publik docs-katalog eller publik sök; sökindexet byggs efter publiceringsfiltrering, inte före.
-- Changelog och projektspecifika Releases får endast läsa releases för live-publicerade repositoryprojekt; filtrera drafts explicit och låt inte monorepo-appar ärva source-repositoryts releases.
-- Projektspecifika Issues får endast läsa Issues för live-publicerade repositoryprojekt; filtrera GitHub PR-poster explicit och låt inte monorepo-appar ärva source-repositoryts Issues.
+- Changelog och projektspecifika Releases får endast läsa releases för repositoryprojekt som passerat den publika repositorygaten; utan providercredential får gaten vara högst 60 sekunder gammal, medan konfigurerad credential alltid kräver live eligibility. Drafts filtreras explicit och monorepo-appar får inte ärva source-repositoryts releases.
+- Projektspecifika Issues använder samma credential-aware publika repositorygate; GitHub PR-poster filtreras explicit och monorepo-appar får inte ärva source-repositoryts Issues.
 - Projektspecifik Builds/CI får endast läsa Skvallerbyttans public-safe cache-RPC efter live public-project-lookup; Portalen får inte göra en egen GitHub Actions-read och monorepo-appar får inte ärva source-repositoryts CI.
 - Activity får endast läsa Skvallerbyttans separata repository-allowlistade Activity-RPC efter live public-project-lookup; explicit tom repositoryscope ska fail-closed och monorepo-appar får inte ärva source-repositoryts eventström.
 - Skvallerbyttans providerintegration förblir read-only.

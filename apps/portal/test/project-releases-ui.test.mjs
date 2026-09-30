@@ -61,15 +61,15 @@ test("shell maps repository release deep links to the dedicated view", () => {
   assert.ok(shell.includes('return "project-releases"'));
 });
 
-test("project Releases backend derives eligibility from the live public project catalog", () => {
+test("project Releases backend derives eligibility from the bounded public repository gate", () => {
   const load = section(
     worker,
     "async function loadPublicProjectReleases(projectSlug, env)",
     "async function getPublicProjectReleases(requestUrl, env)"
   );
 
-  assert.ok(load.includes("loadPublicProjects(env)"));
-  assert.ok(load.includes("eligibleReleaseProjects(projectCatalog.projects"));
+  assert.ok(load.includes("loadPublicationRepositoryProjects(env)"));
+  assert.ok(load.includes("eligibleReleaseProjects(projects"));
   assert.ok(load.includes("fetchProjectReleases(project, env)"));
   assert.ok(load.includes("sortPublicReleases"));
   assert.equal(load.includes("getPublicChangelog"), false);

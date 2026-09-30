@@ -61,8 +61,17 @@ test("search index is not persisted in Cache API and collapses concurrent builds
 
 test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("const GITHUB_CATALOG_CONCURRENCY = 2;"));
+  assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2")'));
+  assert.ok(worker.includes("await cache.match(DOCS_CACHE_KEY)"));
+  assert.ok(worker.includes("ctx.waitUntil(cache.put(DOCS_CACHE_KEY, cachedResponse))"));
   assert.ok(worker.includes("getDocsCatalog(env, ctx, projects)"));
+  assert.ok(worker.includes('projectCatalog?.source?.appDiscovery || "unknown"'));
   assert.ok(worker.includes("githubRawContentUrl(location.repository, location.ref, location.path)"));
+  assert.ok(worker.includes("githubRawContentUrl(repo.name, repo.default_branch, manifestPath)"));
+  assert.ok(worker.includes('"/git/trees/" + encodeURIComponent(repo.default_branch) + "?recursive=1"'));
+  assert.ok(worker.includes("repositoryTreeLoader(env)"));
   assert.ok(worker.includes("await discardResponse(response);"));
+  assert.equal(worker.includes("scanMarkdownDocs("), false);
+  assert.equal(worker.includes('"/readme?ref="'), false);
   assert.equal(worker.includes("Promise.all(publicRepositories.map"), false);
 });

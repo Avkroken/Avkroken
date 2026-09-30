@@ -122,7 +122,7 @@ GET /api/changelog
 /changelog
 ```
 
-Eligibility läses live och går inte via den femminuters `/api/projects`-cachen. Det minskar risken att en nyligen avpublicerad repositoryidentitet används för en releasefetch med en credential som fortfarande har access.
+Eligibility för Changelog samt projektspecifika Releases/Issues använder en separat 60-sekunders repositorygate när Portal saknar GitHub-credential. Gaten innehåller endast normaliserade publika repositoryprojekt och minskar bursttrycket mot GitHubs publika API. Om en GitHub-credential konfigureras kringgås denna cache helt och eligibility läses live, så en nyligen avpublicerad repositoryidentitet inte kan användas för en providerfetch med en credential som fortfarande har access. Själva release-/issue-payloaden lagras inte i denna gate.
 
 `release-source.mjs` accepterar endast repositoryprojekt som matchar Portalens current owner-kontrakt i `github-scope.mjs` (`GITHUB_OWNER/<repo>`). Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
 

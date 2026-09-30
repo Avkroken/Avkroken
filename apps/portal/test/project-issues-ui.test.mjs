@@ -63,15 +63,15 @@ test("shell maps repository Issue deep links to the dedicated view", () => {
   assert.ok(shell.includes('return "project-issues"'));
 });
 
-test("project Issues backend resolves only eligible live-public repository projects", () => {
+test("project Issues backend resolves only eligible public repository projects", () => {
   const load = section(
     worker,
     "async function loadPublicProjectIssues(projectSlug, env)",
     "async function getPublicProjectIssues(requestUrl, env)"
   );
 
-  assert.ok(load.includes("loadPublicProjects(env)"));
-  assert.ok(load.includes("eligibleIssueProjects(projectCatalog.projects"));
+  assert.ok(load.includes("loadPublicationRepositoryProjects(env)"));
+  assert.ok(load.includes("eligibleIssueProjects(projects"));
   assert.ok(load.includes("fetchProjectIssues(project, env)"));
   assert.equal(load.includes("project.source.repository +"), false);
 });
