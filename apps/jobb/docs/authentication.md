@@ -20,22 +20,22 @@ GitHub OAuth-klienthemligheten får inte loggas, returneras eller committas. Bas
 
 StudentConsulting credentials are runtime secrets, never repository configuration.
 
-Required secret names:
+Runtime names:
 
 - `STUDENTCONSULTING_EMAIL`
 - `STUDENTCONSULTING_PASSWORD`
 
-Production deployments should store these as Cloudflare Worker secrets. Local development may use `.dev.vars`, which must remain gitignored.
+Production supports two sources. Explicit Cloudflare runtime values are authoritative. When those values are absent, an authenticated user may save the credentials in System; the managed configuration is AES-GCM encrypted before it is persisted in D1. Local development may use `.dev.vars`, which must remain gitignored.
 
-The application code receives credentials through an adapter-level `CredentialsProvider`; it must not log, persist to D1/R2, return through API responses, or include credentials in screenshots/evidence.
+The application code receives effective credentials through an adapter-level `CredentialsProvider`. Plaintext credentials must never be logged, written to R2/evidence, returned through API responses, or included in screenshots. The only permitted D1 persistence is the encrypted `runtime_configuration` ciphertext; its key is HKDF-derived from the existing GitHub OAuth client secret with a separate context.
 
-Repositoryts runtimekonfiguration ska läsa applikationscredentials genom avsedd Cloudflare secretmekanism eller ignorerad lokal utvecklingskonfiguration. Externa CI/CD-credentials är inte en del av applikationens authkontrakt och dokumenteras inte här.
+Rotating the GitHub OAuth client secret invalidates the old managed ciphertext. The System configuration must then be entered and saved again. External CI/CD credentials are not part of the application auth contract.
 
 ## Arbetsförmedlingen / e-identification
 
 E-identification is user-controlled. The application may initiate an authentication session and wait for the user to complete the BankID/e-identification step. It must not store BankID credentials, attempt to automate signing, or treat an authentication request as completed until the remote service confirms the authenticated session.
 
-After successful user authentication, an ephemeral authenticated browser/session may continue the permitted workflow. Session material must be treated as sensitive and must not be written to logs or the public repository.
+After successful user authentication, an ephemeral authenticated browser/session may continue the permitted workflow. The protected dashboard exposes the ephemeral Live View link only while user action is required. Session material must be treated as sensitive and must not be written to logs or the public repository.
 
 ## Public-repository rule
 

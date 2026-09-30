@@ -4,7 +4,13 @@ import {
   type WorkflowStep,
 } from "cloudflare:workers";
 import { executeAutomation, type AutomationEnv } from "./runner";
+import {
+  resolveRuntimeConfiguration,
+  type RuntimeConfigEnv,
+} from "./runtime-config";
 import { updateRun } from "./storage";
+
+type AutomationWorkflowEnv = AutomationEnv & RuntimeConfigEnv;
 
 export interface AutomationWorkflowParams {
   mode?: "manual" | "scheduled";
@@ -13,7 +19,7 @@ export interface AutomationWorkflowParams {
 }
 
 export class JobAutomationWorkflow extends WorkflowEntrypoint<
-  AutomationEnv,
+  AutomationWorkflowEnv,
   AutomationWorkflowParams
 > {
   async run(
@@ -32,11 +38,13 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
         retries: { limit: 0, delay: "1 second" },
         timeout: "30 minutes",
       },
-      async () =>
-        executeAutomation(this.env, {
+      async () => {
+        const runtime = await resolveRuntimeConfiguration(this.env);
+        return executeAutomation(runtime.env, {
           mode: trigger.mode,
           runId: trigger.runId,
-        }),
+        });
+      },
     );
 
     if (result.status !== "skipped") {

@@ -26,7 +26,7 @@ Runtime secrets/configuration:
 - `JOB_INCLUDE_TERMS`
 - optional `JOB_EXCLUDE_TERMS`, `JOB_ALLOWED_LOCATIONS`, and `JOB_ALLOWED_COUNTRIES`
 
-Autosubmit defaults to disabled and suitability fails closed without include terms. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
+Autosubmit defaults to disabled and suitability fails closed without include terms. These values can be supplied by deployment/runtime or, when absent there, by the authenticated System configuration; deployment values take precedence. Dashboard-managed secrets are encrypted before D1 persistence and are never returned as plaintext. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
 
 ## Arbetsförmedlingen JobSearch
 
