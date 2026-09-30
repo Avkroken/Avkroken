@@ -52,7 +52,10 @@
     return {
       project: "Projekt",
       document: "Dokument",
-      wiki: "Wiki"
+      wiki: "Wiki",
+      issues: "Issues",
+      issue: "Issue",
+      discussions: "Discussions"
     }[kind] || "Resultat";
   }
 
@@ -70,7 +73,7 @@
     if (!items.length) {
       emptyState(
         "Inga träffar.",
-        "Sökningen gav ingen träff i de publika projekt-, dokumentations- eller Wiki-källorna."
+        "Sökningen gav ingen träff i de publika projekt-, dokumentations-, Wiki-, Issues- eller Discussions-källorna."
       );
       return;
     }

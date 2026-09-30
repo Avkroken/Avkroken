@@ -31,10 +31,10 @@ Inget av de repositories som connectorn returnerade var arkiverat.
 
 Projektbeslut 2026-09-26:
 
-- aktuell canonical GitHub owner är användarkontot `Avkroken`;
+- aktuell canonical GitHub owner är privatkontot/User-kontot `Avkroken`;
 - account type är **User**, inte GitHub Organization;
-- kontots login planeras bytas från `Avkroken` till `Avkroken` omkring 6–7 oktober 2026;
-- namnbytet är en separat senare migrering och ska inte förhandsimplementeras som om `Avkroken` redan vore current owner.
+- övergången från Organization till User-owner är redan genomförd;
+- kontots login är fortsatt `Avkroken`; någon separat username-/rename-migrering är inte planerad i current state.
 
 Live-resolveringen av tidigare `Avkroken/*`-URL:er till samma repository-ID:n under `Avkroken/*` bekräftade current repository ownership. Den tidigare runtimekoden var däremot fortfarande organization-scoped.
 
@@ -49,7 +49,7 @@ User-owner-modellen är därför implementerad på Del 1-arbetet:
 - organization-only Actions policies, Custom Properties och organization security configuration markeras explicit `not_supported` när GitHub App-installationens account type är User, i stället för att 404 behandlas som okänd providerstate;
 - motsvarande Pages/Wiki-spegeländring är mergad i `Avkroken/.github` via PR #89.
 
-Det planerade username-bytet omkring 6–7 oktober ändrar inte account type. Om kontot fortsatt är ett GitHub User-konto ska organization-only capabilities därför fortsatt vara `not_supported` efter namnbytet. Oktoberjobbet ska huvudsakligen uppdatera current owner-värden/canonical länkar och därefter verifiera GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden.
+Eftersom current owner är ett GitHub User-konto ska organization-only capabilities fortsatt vara `not_supported` så länge account type förblir User. Canonical owner-värden, GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden är därför verifierade mot det oförändrade loginet `Avkroken`, inte mot en framtida rename.
 
 ### 1.2 Branch- och PR-state
 
@@ -202,7 +202,7 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
-| GitHub owner/login | Current owner är verifierat User-kontot `Avkroken`; user-owner-stöd är implementerat på PR #43 och `.github`-spegeln är mergad via PR #89 | Behåll `Avkroken` som canonical owner tills det planerade username-bytet omkring 6–7 oktober; migrera därefter owner-värden och verifiera providerflöden på nytt | Portal + Skvallerbyttan + `.github` | medel vid namnbyte; canonical URLs/discovery/webhooks måste verifieras efter rename | planerad oktober-migrering |
+| GitHub owner/login | **Löst** — Organization → privat User-owner är redan genomfört, login är fortsatt `Avkroken`, user-owner-stöd är implementerat och providerflöden använder current owner | Behåll `Avkroken` som canonical owner så länge providerstate inte ändras; någon rename-migrering är inte aktuell | Portal + Skvallerbyttan + `.github` | låg; verifiera live igen endast om owner/account type faktiskt ändras | slutfört |
 | Cloudflare Workers Previews | Grundfelet var saknade `previews`-block. Nu har alla tre appar explicit Preview-konfiguration och Workers Builds är verifierat gröna på samma branch-head. Portal använder isolerad Preview-Durable Object. Jobb och Skvallerbyttan är medvetet fail-closed utan production-D1/R2/Secrets Store/Service Bindings/Workflows; Skvallerbyttan använder separat Preview Analytics Engine-dataset | Behåll grön fail-closed Preview som säker bas. Om full stateful Preview behövs: provisionera separata D1/R2-resurser via verifierad provider-write-kanal, applicera migrationer och bind dem explicit utan att återanvända production-state | Portal + Skvallerbyttan + Jobb | låg för nuvarande fail-closed build; hög om production-state senare återanvänds som genväg | Del 1 löst för build, Del 3 för stateful Preview |
 | Figma reference | Current `main` identifierar designfilen `https://www.figma.com/design/AuxqvEggmZa2DW5OgizhCj`. Figma är referens-/designsystemverktyg; Git/runtime är source of truth | Verifiera aktuell Figma-access och läsbar designstate hos providern när Del 2 genomför designaudit. Providerplan, seat och quota versionsstyrs inte här | Portal design | låg för runtime; medel för design-reference drift | Del 2 |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
@@ -418,11 +418,10 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 
 ### 0. Slutför Del 1-blockers
 
-1. GitHub owner/topologi: **löst** — `Avkroken` är current User-owner och user-owner-modellen är implementerad/verifierad i CI.
+1. GitHub owner/topologi: **löst** — övergången från Organization till privat User-owner är redan genomförd, kontonamnet är fortsatt `Avkroken`, och user-owner-modellen är implementerad/verifierad i CI.
 2. Cloudflare Workers Preview-buildarna är lösta: `avkroken`, `skvallerbyttan` och `jobb` bygger grönt med fail-closed Preview-konfiguration. Portal har isolerad Durable Object-binding; Jobb exponerar endast Browser API-binding; Skvallerbyttan har current owner-var och separat Analytics Engine-dataset. Production-D1/R2/Secrets Store/Service Bindings/Workflows/Email är inte bundna i Preview. Full stateful Preview flyttas till Del 3 och kräver separat provider-resource-provisionering/migrering.
 3. Figma-referensen är identifierad. Del 2 ska verifiera aktuell provideraccess och designstate vid audit-tillfället; runtime-arkitekturen blockeras inte eftersom Git är uttrycklig source of truth.
 4. Releaseklassificering och full publik tag/GitHub Release-inventering är providerverifierad 2026-09-26. Del 3 ska utgå från denna bas men göra en ny live-read före automation, eftersom providerstate kan ändras.
-5. Omkring 6–7 oktober: utför separat GitHub username-migrering från `Avkroken` till `Avkroken`, uppdatera current owner-värden och verifiera GitHub App/repository/webhook/Pages/Portal-flöden efter rename.
 
 ### 1. Del 2 — Shell/design/docs som audit
 

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildDocumentSearchEntry,
+  buildIssueSearchEntries,
   buildProjectSearchEntries,
   filterSearchableDocs,
   searchableMarkdown,
@@ -69,6 +70,54 @@ test("does not invent a Wiki search entry for an app without Wiki publication", 
   }]);
 
   assert.deepEqual(entries.map(entry => entry.kind), ["project"]);
+});
+
+test("indexes public Issues and Discussions surfaces without Discussion content", () => {
+  const entries = buildProjectSearchEntries([{
+    id: "repository:bastion",
+    slug: "Bastion",
+    name: "Bastion",
+    portalUrl: "/projekt/Bastion",
+    issues: "https://github.com/Avkroken/Bastion/issues",
+    issuesPortalUrl: "/projekt/Bastion/issues",
+    discussions: "https://github.com/Avkroken/Bastion/discussions",
+    source: {
+      provider: "github",
+      kind: "repository",
+      repository: "Avkroken/Bastion",
+      ref: "main"
+    }
+  }]);
+
+  assert.deepEqual(entries.map(entry => entry.kind), ["project", "issues", "discussions"]);
+  assert.equal(entries[1].url, "/projekt/Bastion/issues");
+  assert.equal(entries[1].canonicalUrl, "https://github.com/Avkroken/Bastion/issues");
+  assert.equal(entries[2].url, "/projekt/Bastion");
+  assert.equal(entries[2].canonicalUrl, "https://github.com/Avkroken/Bastion/discussions");
+});
+
+test("indexes only sanitized public Issue fields", () => {
+  const entries = buildIssueSearchEntries([{
+    id: "issue:bastion:42",
+    projectSlug: "Bastion",
+    projectName: "Bastion",
+    projectUrl: "/projekt/Bastion",
+    repository: "Avkroken/Bastion",
+    number: 42,
+    title: "Fix portal route",
+    state: "open",
+    labels: ["bug", "portal"],
+    url: "https://github.com/Avkroken/Bastion/issues/42",
+    body: "MUST_NOT_LEAK",
+    user: "MUST_NOT_LEAK"
+  }]);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].kind, "issue");
+  assert.equal(entries[0].url, "/projekt/Bastion/issues");
+  assert.equal(entries[0].canonicalUrl, "https://github.com/Avkroken/Bastion/issues/42");
+  assert.match(entries[0].title, /Fix portal route/);
+  assert.equal(JSON.stringify(entries).includes("MUST_NOT_LEAK"), false);
 });
 
 test("searchable docs are the intersection of public project and docs catalogs", () => {

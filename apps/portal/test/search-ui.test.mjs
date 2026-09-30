@@ -42,7 +42,7 @@ test("search client receives ranked results only through the Portal search API",
 
 test("search worker intersects public projects and docs before indexing", () => {
   assert.ok(worker.includes("filterSearchableDocs(projects, docsCatalog)"));
-  assert.ok(worker.includes("public_project_catalog_intersect_public_docs_catalog"));
+  assert.ok(worker.includes("public_project_catalog_intersect_public_docs_catalog_with_bounded_issues"));
   assert.ok(worker.includes('url.pathname === "/api/search"'));
 });
 
@@ -82,6 +82,11 @@ test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("githubRawContentUrl(repo.name, repo.default_branch, manifestPath)"));
   assert.ok(worker.includes('"/git/trees/" + encodeURIComponent(repo.default_branch) + "?recursive=1"'));
   assert.ok(worker.includes("repositoryTreeLoader(env)"));
+  assert.ok(worker.includes("const SEARCH_ISSUE_REPOSITORY_LIMIT = 8;"));
+  assert.ok(worker.includes("const SEARCH_ISSUES_PER_REPOSITORY = 8;"));
+  assert.ok(worker.includes("const SEARCH_ISSUE_FETCH_CONCURRENCY = 2;"));
+  assert.ok(worker.includes("fetchSearchIssues(projects, env)"));
+  assert.ok(worker.includes("fetchProjectIssuesWithLimit(project, env, SEARCH_ISSUES_PER_REPOSITORY)"));
   assert.ok(worker.includes("await discardResponse(response);"));
   assert.equal(worker.includes("scanMarkdownDocs("), false);
   assert.equal(worker.includes('"/readme?ref="'), false);
