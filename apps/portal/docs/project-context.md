@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening och public-safe observerad integration: 2026-09-27.
+Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening, public-safe observerad integration och search/provider-budget: 2026-09-30.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -318,7 +318,7 @@ Nuvarande indexkategorier:
 
 Jobb saknar publik app-post och app-docs-källa och kan därför inte nå indexbyggaren. `.github` är inte ett publicerat projekt och filtreras bort även om publika docs skulle finnas i docs-katalogen.
 
-Sökindexeringen använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor och max 120 000 tecken per dokument. Det ger rättvisare providerbudget mellan projekten och undviker att ett stort repo tar hela indexbudgeten. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
+Sökindexeringen återanvänder den cacheade publika projektkatalogen som första säkerhetsgrind och bygger dokumentationskatalogen endast från de redan publicerade projekten. Katalogläsningar mot GitHub REST är concurrency-begränsade till 2 och felresponser konsumeras/cancelas explicit så att olästa bodies inte blockerar Workers request-budget. Exakt allowlistad Markdown hämtas därefter från GitHubs raw-content-origin; ingen godtycklig provider-path kan konstrueras från klientinput. Indexet använder max 32 Markdown-dokument per build med round-robin mellan publicerade källor, concurrency 4 för själva innehållsläsningen och max 120 000 tecken per dokument. Indexet persistenteras inte i Cache API eftersom avpublicering måste slå igenom utan datacenterlokal stale-cache; samtidiga cachefria builds i samma isolate delar i stället ett in-flight Promise.
 
 Coverage rapporteras som:
 
@@ -333,7 +333,7 @@ Aktuella värden i koden:
 
 - project catalog: 300 sekunder i Workers Cache API;
 - `/api/sites`: härledd från samma project catalog;
-- dokumentationskatalog: 21 600 sekunder via Cloudflare CDN cache;
+- dokumentationskatalog: 21 600 sekunder i Workers Cache API med `docs-catalog`-tag samt motsvarande CDN-cachekontrakt;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache;
 - server-side sökindex: ingen persistent Cache API-lagring; samtidiga kalla builds i samma isolate delar ett in-flight Promise;
 - Changelog snapshot: ingen persistent Cache API-lagring; samtidiga builds i samma isolate delar ett in-flight Promise.

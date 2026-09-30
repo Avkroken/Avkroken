@@ -53,8 +53,16 @@ test("search API is not a Portal shell route", () => {
 
 test("search index is not persisted in Cache API and collapses concurrent builds per isolate", () => {
   assert.ok(worker.includes("let pendingSearchIndex = null;"));
-  assert.ok(worker.includes("pendingSearchIndex = loadSearchIndex(env).finally"));
+  assert.ok(worker.includes("pendingSearchIndex = loadSearchIndex(env, ctx).finally"));
   assert.ok(worker.includes("pendingSearchIndex = null;"));
   assert.equal(worker.includes("public-search-index-v1"), false);
   assert.equal(worker.includes("SEARCH_INDEX_CACHE_SECONDS"), false);
+});
+
+test("search reuses public gates and bounds GitHub provider reads", () => {
+  assert.ok(worker.includes("const GITHUB_CATALOG_CONCURRENCY = 2;"));
+  assert.ok(worker.includes("getDocsCatalog(env, ctx, projects)"));
+  assert.ok(worker.includes("githubRawContentUrl(location.repository, location.ref, location.path)"));
+  assert.ok(worker.includes("await discardResponse(response);"));
+  assert.equal(worker.includes("Promise.all(publicRepositories.map"), false);
 });

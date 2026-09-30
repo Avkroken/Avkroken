@@ -155,9 +155,9 @@ Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte
 
 ### Dokumentationskatalog
 
-Om GitHub-katalogen inte kan läsas returneras `502` med `github_unavailable`. UI visar ett explicit unavailable-state.
+Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Om projektkatalogen eller nödvändiga GitHub-katalogläsningar inte kan genomföras returneras `502` med `github_unavailable`; UI visar ett explicit unavailable-state.
 
-Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
+GitHub REST-katalogläsningar är concurrency-begränsade till 2 och oanvändbara felresponser cancelas explicit för att inte hålla Workers HTTP-requestslots öppna. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
 
 ### Dokumentinnehåll
 
@@ -178,10 +178,14 @@ Sökindexet byggs endast från intersektionen av publicerade projekt och publice
 
 Kall indexbuild är budgeterad:
 
+- public project catalog återanvänds som första säkerhetsgrind;
+- docs-katalogen återanvänds från dess tag-invaliderbara 21 600-sekunders cache;
+- GitHub REST-katalogläsningar har concurrency 2;
 - max 32 Markdown-dokument;
 - round-robin över docs-källor;
+- exakt allowlistad Markdown läses från GitHubs raw-content-origin först efter publiceringsgrinden;
 - max 120 000 tecken per dokument;
-- concurrency 4;
+- innehållsläsning concurrency 4;
 - coverage `bounded` eller `partial`;
 - ingen persistent sökindexcache; samtidiga builds i samma isolate kollapsas.
 
@@ -302,9 +306,9 @@ Klientresponsen kräver revalidering. Workers Cache API lagrar en separat respon
 
 ### Sökindex
 
-Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik project/docs-state när en sökning kräver index och query-responsen använder `Cache-Control: no-store`.
+Sökindexet lagras inte persistent i Cache API. Det byggs från aktuell publik project/docs-state när en sökning kräver index och query-responsen använder `Cache-Control: no-store`. Projektkatalogen och den tag-invaliderbara dokumentationskatalogen får däremot återanvändas som redan public-safe metadata; search bygger inte en parallell full repositoryinventering.
 
-Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. Det reducerar burst-dubletter utan att skapa en stale publiceringscache.
+Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-flight Promise och det Promise:t rensas när bygget lyckas eller faller. GitHub-katalogfanout är separat begränsad till två samtidiga reads och responses som inte ska konsumeras cancelas explicit. Det reducerar både burst-dubletter och risken för stalled HTTP-responses utan att skapa en stale sökindexcache.
 
 ### Changelog
 
