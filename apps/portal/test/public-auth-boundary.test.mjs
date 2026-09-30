@@ -72,3 +72,9 @@ test("protected Jobb redirect is evaluated before Portal shell or asset renderin
   assert.ok(redirect < shellRoute, "protected redirect must precede shell routing");
   assert.ok(redirect < assetFetch, "protected redirect must precede asset rendering");
 });
+
+test("Portal shell fallback fetches the asset root without exposing an index redirect", async () => {
+  const worker = await readFile(workerUrl, "utf8");
+  assert.match(worker, /const shellUrl = new URL\("\/", url\.origin\);/);
+  assert.doesNotMatch(worker, /const shellUrl = new URL\("\/index\.html", url\.origin\);/);
+});

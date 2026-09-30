@@ -1940,7 +1940,7 @@ export default {
       isRead &&
       isPortalDocumentRoute(url.pathname)
     ) {
-      const shellUrl = new URL("/index.html", url.origin);
+      const shellUrl = new URL("/", url.origin);
       return env.ASSETS.fetch(new Request(shellUrl, request));
     }
 
