@@ -2,14 +2,22 @@ const MARKDOWN_EXTENSION = /\.(md|markdown)$/i;
 
 export function pageLabel(path) {
   const value = String(path || "");
-  if (/^README\.(md|markdown)$/i.test(value)) return "Översikt";
-  if (/^docs\/index\.(md|markdown)$/i.test(value)) return "Dokumentation";
+  if (/(^|\/)README\.(md|markdown)$/i.test(value)) return "Översikt";
+  if (/(^|\/)docs\/index\.(md|markdown)$/i.test(value)) return "Dokumentation";
 
-  const name = value.split("/").pop() || value;
+  const parts = value.split("/");
+  const name = parts.pop() || value;
   const stem = name.replace(MARKDOWN_EXTENSION, "");
+  if (stem.toLowerCase() === "index") {
+    const parent = String(parts.pop() || "").toLowerCase();
+    if (parent === "organization") return "Organisation";
+    return parent
+      ? parent.replace(/[-_]+/g, " ").replace(/\b\w/g, char => char.toUpperCase())
+      : "Index";
+  }
+
   const known = {
     README: "Översikt",
-    index: "Översikt",
     architecture: "Arkitektur",
     operations: "Drift",
     security: "Säkerhet",
