@@ -48,7 +48,10 @@ D1 är canonical state för:
 - applications,
 - application attempts,
 - activity-report state,
-- notifierings- och probe-metadata enligt migrationerna.
+- notifierings- och probe-metadata enligt migrationerna,
+- dashboard-hanterad runtimekonfiguration som ett AES-GCM-krypterat dokument i `runtime_configuration`.
+
+Deployment/runtime bindings remain authoritative over dashboard-managed values. The D1 row stores ciphertext, IV, schema version and updater metadata; plaintext secrets are never queryable as D1 columns.
 
 ### R2
 

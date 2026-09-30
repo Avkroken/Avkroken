@@ -10,7 +10,7 @@ The protected dashboard is the operational control plane for the automation. It 
 - **Ansökningar** — filterable applications with run linkage, latest diagnostics and evidence count.
 - **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state.
 - **Aktivitetsrapport** — report status and per-activity `pending`, `save_attempted` and `saved` state.
-- **System** — runtime configuration booleans and notification history without secret values.
+- **System** — runtime configuration status, a protected configuration editor and notification history; write-only secrets are never read back into the browser.
 
 `GET /api/health` is minimal liveness. `GET /api/ready` performs only a read-only D1 `SELECT 1` plus a check that dashboard authentication is configured; it does not call external providers or expose credentials.
 
@@ -75,7 +75,7 @@ Run-level and Arbetsförmedlingen probe errors are also persisted and shown sepa
 
 ## Required runtime secrets/configuration
 
-Secrets should be configured in Cloudflare, never committed to the public repository.
+Secrets must never be committed to the public repository. Deployment/runtime values remain authoritative. For the fields exposed in the authenticated System view, missing deployment values may instead come from the AES-GCM-encrypted D1 runtime configuration.
 
 ```text
 GITHUB_OAUTH_CLIENT_SECRET      # Cloudflare Secrets Store in production; local string only for development
@@ -103,6 +103,8 @@ JOB_ALLOWED_COUNTRIES=SE
 
 The application engine fails closed when `JOB_INCLUDE_TERMS` is missing. This prevents a fresh public deployment from applying indiscriminately.
 
+The protected System view can manage StudentConsulting credentials, autosubmit, suitability rules, BankID notification settings and `TURNSTILE_SECRET`. The password, webhook URL and Turnstile secret are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
+
 `TURNSTILE_HOSTNAMES` is non-secret hostname configuration. Production uses `jobb.denied.se`; local development values belong in an ignored `.dev.vars` file.
 
 ## BankID notifications
@@ -127,7 +129,7 @@ The notification links to the protected dashboard. It does not expose the epheme
 
 The application can start and retain an Arbetsförmedlingen browser session and display the BankID handoff in the dashboard. The user must personally complete the BankID/e-identification step.
 
-While a handoff is active, the dashboard polls the authenticated session. After BankID succeeds, a fail-closed integration probe navigates to the activity report and stores its **form schema**, not the user's entered values. The probe records items such as headings, input/select/button names, control types, list options and sanitized link paths. It never reads or stores input values.
+While a handoff is active, the dashboard shows an **Öppna BankID** action for the ephemeral Live View URL and a separate **Jag är klar – kontrollera** action. The dashboard may also poll the authenticated session, but it never performs the BankID step for the user. After BankID succeeds, a fail-closed integration probe navigates to the activity report and stores its **form schema**, not the user's entered values. The probe records items such as headings, input/select/button names, control types, list options and sanitized link paths. It never reads or stores input values.
 
 The probe exists because the authenticated activity-report form is not publicly documented as a write API. The report adapter uses semantic labels/roles and the verified probe instead of guessing private endpoints.
 
@@ -147,6 +149,7 @@ migrations/0002_automation.sql
 migrations/0003_integration_probes.sql
 migrations/0004_monthly_application_quota.sql
 migrations/0005_activity_report_submission.sql
+migrations/0006_runtime_configuration.sql
 ```
 
 `0002_automation.sql` adds workflow/run state, notification history, BankID handoff metadata, and links applications to their automation run.
@@ -156,6 +159,8 @@ migrations/0005_activity_report_submission.sql
 `0004_monthly_application_quota.sql` enforces the ten-slot monthly submission ceiling.
 
 `0005_activity_report_submission.sql` tracks idempotent Arbetsförmedlingen activity-item saves so browser/network ambiguity cannot cause duplicate reporting actions.
+
+`0006_runtime_configuration.sql` adds the single-row encrypted dashboard-managed runtime configuration store.
 
 ## Deployment contract
 

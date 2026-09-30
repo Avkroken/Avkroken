@@ -18,6 +18,7 @@ import {
 } from "./dashboard";
 import type { EmailBinding } from "./notifier";
 import {
+  authenticatedGitHubUserId,
   classifyGitHubStartFailure,
   handleGitHubCallback,
   logoutGitHub,
@@ -31,6 +32,11 @@ import { createArbetsformedlingenProvider } from "./providers";
 import { readinessResponse } from "./readiness";
 import { requireSameOriginMutation } from "./request-security";
 import type { AutomationEnv } from "./runner";
+import {
+  resolveRuntimeConfiguration,
+  saveRuntimeConfiguration,
+  type RuntimeConfigurationUpdate,
+} from "./runtime-config";
 import { verifyTurnstile, type TurnstileEnv } from "./turnstile";
 import {
   getRun,
@@ -145,9 +151,43 @@ export default {
 
     if (request.method === "GET" && url.pathname === "/api/dashboard") {
       try {
-        return Response.json(await getDashboardData(env.DB, env));
+        const runtime = await resolveRuntimeConfiguration(env);
+        return Response.json(
+          await getDashboardData(env.DB, runtime.view),
+          { headers: { "cache-control": "no-store" } },
+        );
       } catch (error) {
         return jsonError(error, 500);
+      }
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/configuration") {
+      const body = await request
+        .json<RuntimeConfigurationUpdate>()
+        .catch(() => null);
+      if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return Response.json(
+          { error: "Ogiltig konfigurationsdata." },
+          { status: 400, headers: { "cache-control": "no-store" } },
+        );
+      }
+
+      try {
+        const userId = await authenticatedGitHubUserId(request, env);
+        if (!userId) {
+          return Response.json(
+            { error: "authentication required" },
+            { status: 401, headers: { "cache-control": "no-store" } },
+          );
+        }
+        await saveRuntimeConfiguration(env, body, userId);
+        const runtime = await resolveRuntimeConfiguration(env);
+        return Response.json(
+          { configuration: runtime.view },
+          { headers: { "cache-control": "no-store" } },
+        );
+      } catch (error) {
+        return jsonError(error, 400);
       }
     }
 
@@ -164,9 +204,22 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/runs/manual") {
-      const body: { turnstileToken?: string } = await request.json<{ turnstileToken?: string }>().catch(() => ({}));
-      if (!(await verifyTurnstile(request, env, body.turnstileToken, "manual_run"))) {
-        return Response.json({ error: "Turnstile verification failed." }, { status: 403 });
+      const body: { turnstileToken?: string } = await request
+        .json<{ turnstileToken?: string }>()
+        .catch(() => ({}));
+      const runtime = await resolveRuntimeConfiguration(env);
+      if (
+        !(await verifyTurnstile(
+          request,
+          runtime.env,
+          body.turnstileToken,
+          "manual_run",
+        ))
+      ) {
+        return Response.json(
+          { error: "Turnstile verification failed." },
+          { status: 403 },
+        );
       }
 
       const now = new Date();

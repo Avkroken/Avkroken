@@ -44,6 +44,10 @@ describe("dashboard rendering", () => {
     expect(cssText).toContain("rgba(213,29,203,.10)");
     expect(cssText).toContain("background-size:42px 42px");
     expect(jsText).toContain("/api/dashboard");
+    expect(jsText).toContain("/api/configuration");
+    expect(jsText).toContain("Spara konfiguration");
+    expect(jsText).toContain("Öppna BankID");
+    expect(jsText).toContain("Jag är klar – kontrollera");
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");
     expect(jsText).toContain("Domain=.denied.se");

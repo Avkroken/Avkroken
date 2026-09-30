@@ -42,7 +42,7 @@ Jobbs Preview är fortsatt fail-closed för provider-/side-effect-state. Den nu 
 
 Live Cloudflare-inventory 2026-09-30 verifierade att båda planerade previewresurserna saknas. Skapande med den befintliga Wrangler-profilen stoppades av provider-authz eftersom medlemsrollen är Developer Platform Editor och inte har create/delete-rätt för Developer Platform-resurser. Ingen alternativ token skapades och inga productionbindings ändrades.
 
-När en auktoriserad create-roll finns ska `jobb-preview-eu` skapas med `jurisdiction=eu`, migrationerna `0001`–`0005` appliceras, och `jobb-evidence-preview` skapas med EU-jurisdiction. Först därefter får `previews.d1_databases`/`previews.r2_buckets` läggas till. Se `../../docs/organization/preview-state-standard.md`.
+När en auktoriserad create-roll finns ska `jobb-preview-eu` skapas med `jurisdiction=eu`, migrationerna `0001`–`0006` appliceras, och `jobb-evidence-preview` skapas med EU-jurisdiction. Först därefter får `previews.d1_databases`/`previews.r2_buckets` läggas till. Se `../../docs/organization/preview-state-standard.md`.
 
 ## D1 data locality
 

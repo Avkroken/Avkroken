@@ -81,6 +81,7 @@ D1-migrationerna är canonical schemahistorik:
 - `0003_integration_probes.sql` — sanitiserade metadata för autentiserade integrationsprobes.
 - `0004_monthly_application_quota.sql` — exakt tio quota-slots per månad.
 - `0005_activity_report_submission.sql` — idempotent state för rapportaktiviteter.
+- `0006_runtime_configuration.sql` — krypterad dashboard-hanterad runtimekonfiguration.
 
 Centrala stateflöden:
 
@@ -143,7 +144,7 @@ Top-level-vyer:
 - **Ansökningar** — filtrerbar ansökningshistorik, fel, run-koppling och evidence-count.
 - **Körningar** — run history och read-only drill-down till applications, attempts, evidence, notifications och probe-state.
 - **Aktivitetsrapport** — rapportstatus och per-aktivitet `pending/save_attempted/saved`.
-- **System** — konfigurationsstatus och notifieringshistorik utan credential-värden.
+- **System** — konfigurationsstatus, skyddad konfigurationseditor och notifieringshistorik. Skrivkänsliga hemligheter visas aldrig igen efter sparning.
 
 Primära endpoints:
 
@@ -153,7 +154,8 @@ Primära endpoints:
 - `POST /auth/logout` — rensar den lokala Jobb-sessionen; kräver autentiserad same-origin request.
 - `GET /api/health` — minimal liveness.
 - `GET /api/ready` — minimal readiness; läser `SELECT 1` från D1 och verifierar att dashboard-auth är faktiskt användbar. När GitHub OAuth är aktivt läses Secrets Store-bindingen för klienthemligheten, men inga credential-värden returneras och inga externa provideranrop görs.
-- `GET /api/dashboard` — canonical dashboard read model.
+- `GET /api/dashboard` — canonical dashboard read model utan hemliga credential-värden.
+- `POST /api/configuration` — same-origin, autentiserad write av dashboard-hanterad krypterad runtimekonfiguration.
 - `GET /api/runs/:id` — read-only run-detail.
 - `POST /api/runs/manual` — manuell Workflow-start.
 - `POST /api/runs/:id/bankid/check` — fortsätter säkert det autentiserade AF-flödet.
@@ -167,7 +169,7 @@ Login- och browser-felsidor använder separat same-origin CSS på `/assets/auth.
 
 ## Runtime configuration
 
-Hemliga värden ligger i Cloudflare/runtime och får aldrig committas.
+Hemliga värden får aldrig committas. Produktionsvärden kan komma från Cloudflare/runtime eller, för de fält som dashboarden hanterar, från den krypterade D1-raden `runtime_configuration`. Deployment-värden har alltid företräde framför dashboard-värden.
 
 Credential-/security-namn:
 
@@ -192,6 +194,8 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 - `PUBLIC_BASE_URL`
 
 Notifiering kan använda Email binding och/eller HTTPS-webhook.
+
+Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, lämplighetsregler, notifieringsinställningar och Turnstile secret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord, webhook-URL och Turnstile secret returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
 
 ## Auth, request-säkerhet och privacy
 

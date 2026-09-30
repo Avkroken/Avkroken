@@ -1,18 +1,10 @@
 import { MONTHLY_APPLICATION_TARGET } from "../../../packages/core/src/types";
-import { suitabilityConfigured, type SuitabilityEnv } from "./policy";
+import type { RuntimeConfigurationView } from "./runtime-config";
 import {
   currentMonthKey,
   isApplicationAutomationWindow,
   previousMonthKey,
 } from "./time";
-
-export interface DashboardEnv extends SuitabilityEnv {
-  STUDENTCONSULTING_EMAIL?: string;
-  STUDENTCONSULTING_PASSWORD?: string;
-  STUDENTCONSULTING_AUTOSUBMIT?: string;
-  NOTIFY_EMAIL_TO?: string;
-  NOTIFY_WEBHOOK_URL?: string;
-}
 
 interface QuotaSlotRow {
   slot_no: number;
@@ -21,7 +13,10 @@ interface QuotaSlotRow {
   updated_at: string | null;
 }
 
-export async function getDashboardData(db: D1Database, env: DashboardEnv) {
+export async function getDashboardData(
+  db: D1Database,
+  configuration: RuntimeConfigurationView,
+) {
   const applicationMonth = currentMonthKey();
   const reportMonth = previousMonthKey();
 
@@ -208,17 +203,7 @@ export async function getDashboardData(db: D1Database, env: DashboardEnv) {
       ambiguousReportItems: Number(ambiguousReportItems?.count ?? 0),
       activeRun: activeRun ?? null,
     },
-    configuration: {
-      studentConsultingCredentials: Boolean(
-        env.STUDENTCONSULTING_EMAIL && env.STUDENTCONSULTING_PASSWORD,
-      ),
-      studentConsultingAutoSubmit:
-        env.STUDENTCONSULTING_AUTOSUBMIT === "true",
-      suitabilityPolicy: suitabilityConfigured(env),
-      bankIdNotification: Boolean(
-        env.NOTIFY_EMAIL_TO || env.NOTIFY_WEBHOOK_URL,
-      ),
-    },
+    configuration,
     automaticMode: {
       enabled: true,
       schedule:
