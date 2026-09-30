@@ -6,17 +6,25 @@ import {
   publicMarkdownPaths,
 } from "../src/portal-github-public-model";
 
-test("public documentation index keeps only root README and Markdown below docs", () => {
+test("public documentation index keeps repository docs plus allowlisted Skvallerbyttan app docs", () => {
   const paths = publicMarkdownPaths([
     { type: "blob", path: "README.md" },
     { type: "blob", path: "docs/index.md" },
     { type: "blob", path: "docs/architecture.md" },
+    { type: "blob", path: "apps/skvallerbyttan/README.md" },
+    { type: "blob", path: "apps/skvallerbyttan/docs/index.md" },
+    { type: "blob", path: "apps/skvallerbyttan/docs/security.md" },
+    { type: "blob", path: "apps/jobb/README.md" },
+    { type: "blob", path: "apps/jobb/docs/index.md" },
     { type: "blob", path: "src/private.md" },
     { type: "blob", path: "docs/../secret.md" },
     { type: "tree", path: "docs" },
   ]);
 
   assert.deepEqual(paths, [
+    "apps/skvallerbyttan/docs/index.md",
+    "apps/skvallerbyttan/docs/security.md",
+    "apps/skvallerbyttan/README.md",
     "docs/architecture.md",
     "docs/index.md",
     "README.md",

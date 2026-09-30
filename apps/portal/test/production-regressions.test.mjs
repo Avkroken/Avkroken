@@ -9,7 +9,7 @@ const css = await readFile(new URL("../public/styles.css", import.meta.url), "ut
 test("documentation and releases prefer Skvallerbyttans authenticated public GitHub RPCs", () => {
   assert.match(worker, /getPublicDocumentationIndex/);
   assert.match(worker, /getPublicRepositoryReleases/);
-  assert.match(worker, /github-docs-v3/);
+  assert.match(worker, /github-docs-v4/);
   assert.match(worker, /serviceTrees\.has\(repo\.name\)/);
   assert.match(worker, /serviceReleases\?\.has\(repoName\)/);
 });

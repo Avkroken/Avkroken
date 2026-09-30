@@ -16,9 +16,12 @@ const tree = [
   { type: "blob", path: "src/README.md" },
 ];
 
-test("documentation labels distinguish repository overview from docs index", () => {
+test("documentation labels distinguish overview, docs index and nested indexes", () => {
   assert.equal(pageLabel("README.md"), "Översikt");
   assert.equal(pageLabel("docs/index.md"), "Dokumentation");
+  assert.equal(pageLabel("apps/skvallerbyttan/README.md"), "Översikt");
+  assert.equal(pageLabel("apps/skvallerbyttan/docs/index.md"), "Dokumentation");
+  assert.equal(pageLabel("docs/organization/index.md"), "Organisation");
   assert.equal(pageLabel("docs/architecture.md"), "Arkitektur");
 });
 
