@@ -9,6 +9,7 @@ async function readWranglerConfig() {
 describe("Worker Preview contract", () => {
   it("stays fail-closed until isolated state resources are provisioned", async () => {
     const config = await readWranglerConfig();
+    const preview = JSON.stringify(config.previews ?? {});
 
     expect(config.previews?.d1_databases).toBeUndefined();
     expect(config.previews?.r2_buckets).toBeUndefined();
@@ -18,5 +19,9 @@ describe("Worker Preview contract", () => {
     expect(config.previews?.workflows).toBeUndefined();
     expect(config.previews?.send_email).toBeUndefined();
     expect(config.previews?.vars).toBeUndefined();
+
+    expect(preview).not.toContain('"jobb-eu"');
+    expect(preview).not.toContain('"jobb-evidence"');
+    expect(preview).not.toContain('"jobb-automation"');
   });
 });

@@ -160,6 +160,11 @@ test("repository Preview config stays fail-closed without production provider st
   assert.equal(value.previews?.secrets_store_secrets, undefined);
   assert.equal(value.previews?.vars?.CLOUDFLARE_ACCOUNT_ID, undefined);
 
+  const preview = JSON.stringify(value.previews ?? {});
+  assert.equal(preview.includes('"skvallerbyttan-stats-eu"'), false);
+  assert.equal(preview.includes('"avkroken"'), false);
+  assert.equal(preview.includes('"skvallerbyttan"'), false);
+
   const oauthSecret = value.secrets_store_secrets?.find(
     item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
   );
