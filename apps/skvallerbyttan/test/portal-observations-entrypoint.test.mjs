@@ -16,8 +16,8 @@ test("Skvallerbyttan exports a dedicated Portal observations RPC entrypoint", ()
   );
   assert.match(observations, /getPublicOperationsSummary/);
   assert.match(observations, /getPublicRepositories/);
-  assert.match(observations, /getPublicDocumentationPages/);
-  assert.match(observations, /getPublicReleases/);
+  assert.match(observations, /getPublicDocumentationIndex/);
+  assert.match(observations, /getPublicRepositoryReleases/);
   assert.match(observations, /getPublicRepositoryCi/);
   assert.match(observations, /getPublicActivity/);
 });
@@ -37,11 +37,21 @@ test("Portal public repository RPC reuses the authenticated read-only GitHub App
   assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
 });
 
+test("Portal docs and release RPCs use authenticated GitHub reads behind public repository gating", () => {
+  assert.match(observations, /getPortalDocumentationIndexSnapshot/);
+  assert.match(observations, /getPortalReleaseSnapshot/);
+  assert.match(observations, /requestedPublicRepositories/);
+  assert.match(observations, /githubOptionalJson/);
+  assert.match(observations, /publicMarkdownPaths/);
+  assert.match(observations, /normalizePortalReleaseCandidates/);
+  assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
+  assert.equal(observations.includes("Bearer "), false);
+});
+
 test("Portal repository CI RPC reuses Skvallerbyttan Actions ownership without HTTP auth", () => {
   assert.match(observations, /readSourceCache/);
   assert.match(observations, /buildPortalRepositoryCiSnapshot/);
   assert.match(observations, /publicCiRepository/);
-  assert.equal(observations.includes("githubOptionalJson"), false);
   assert.equal(observations.includes("getRepositoryActions"), false);
   assert.equal(observations.includes("/actions/runs"), false);
   assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
@@ -54,7 +64,6 @@ test("Portal activity RPC reads only the internal activity ledger behind a cache
   assert.match(observations, /getObservedActivity/);
   assert.match(observations, /buildPortalActivitySnapshot/);
   assert.match(observations, /readSourceCache/);
-  assert.equal(observations.includes("githubOptionalJson"), false);
   assert.equal(observations.includes("/events"), false);
   assert.equal(observations.includes("/actions/runs"), false);
   assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);

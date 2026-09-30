@@ -156,9 +156,9 @@ Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte
 
 ### Dokumentationskatalog
 
-Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Om projektkatalogen eller nödvändiga GitHub-katalogläsningar inte kan genomföras returneras `502` med `github_unavailable`; UI visar ett explicit unavailable-state.
+Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Repositoryns README/`docs/`-inventory hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicDocumentationIndex()`, som använder den befintliga read-only GitHub App-installationen efter samma live-public repositorygrind som projektkatalogen. Portalens credential-fria Git-tree-läsning finns kvar endast som rollout/degraded fallback. Om varken intern RPC eller fallback kan ge katalogunderlag visas explicit degraded/unavailable state.
 
-Dokumentationskatalogen läser ett rekursivt Git-tree per unikt repository/ref och deduplicerar samma source-repository mellan repositoryprojekt och opt-in-appar. Normalfallet är `SKVALLERBYTTAN_OBSERVATIONS.getPublicDocumentationPages(repoName, sourcePath)`, där Skvallerbyttans read-only GitHub App gör providerläsningen och returnerar endast allowlistade Markdown-paths. Portalens credential-fria Git-tree-read finns kvar som rollout/degraded fallback. Tree-läsningarna är concurrency-begränsade till 2. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns; RPC:n allowlistar dessutom `apps/skvallerbyttan` och kan inte enumerera skyddade `apps/jobb`.
+Skvallerbyttans docs-RPC returnerar endast sanerade Markdown-paths för root `README.md` och `docs/**/*.md|markdown`; den returnerar inte GitHub permissions, installationmetadata, providerbudget eller credentials. Portalens adapter mappar därefter root README till `Översikt`, `docs/index.md` till `Dokumentation` och övriga filer till stabila sidetiketter. Det förhindrar den tidigare dubbletten där både README och `docs/index.md` visades som `Översikt`. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen.
 
 ### Dokumentinnehåll
 
@@ -181,7 +181,7 @@ Kall indexbuild är budgeterad:
 
 - public project catalog återanvänds som första säkerhetsgrind;
 - docs-katalogen återanvänds från dess tag-invaliderbara 21 600-sekunders cache;
-- dokumentationspaths hämtas primärt genom Skvallerbyttans autentiserade read-only RPC; credential-fri Git-tree-fallback har concurrency 2 och dedupliceras per repository/ref/sourcePath;
+- GitHub Git-tree-läsningar har concurrency 2 och dedupliceras per repository/ref;
 - max 32 Markdown-dokument;
 - round-robin över docs-källor;
 - exakt allowlistad Markdown läses från GitHubs raw-content-origin först efter publiceringsgrinden;
@@ -192,7 +192,7 @@ Kall indexbuild är budgeterad:
 
 ### Changelog
 
-`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Utan egen Portal-GitHub-credential återanvänds en separat 60-sekunders repositorygate för eligibility; inventoryn bakom gaten kommer normalt live från Skvallerbyttans autentiserade read-only RPC och Portalens publika REST är fallback. Med en Portal-credential läses eligibility utan denna gate.
+`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Eligibility kommer från samma live-public repositorygate som projektkatalogen. Själva releasekandidaterna hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryReleases()`, som använder den befintliga read-only GitHub App-installationen och sanerar bort drafts/icke-canonical URLs och onödiga providerfält innan svaret lämnar observationslagret. Portalens credential-fria GitHub Releases-read är endast rollout/degraded fallback. Deployment-korrelationen sker separat genom `getPublicReleaseDeployments()` och får därför degradera oberoende av att releasen i sig visas.
 
 - projektkatalogfel: `502 changelog_unavailable`;
 - individuellt repo-releasefel: resten av snapshoten returneras med `source.coverage = partial`;
@@ -206,7 +206,7 @@ Budget:
 - concurrency 4;
 - max 40 returnerade releaser.
 
-Releasepayloaden hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicReleases(repoName, limit)`, där samma read-only GitHub App verifierar live public repository-state och sanerar releasen före RPC-svaret. Portalens credential-fria GitHub Releases-read finns endast som rollout/degraded fallback. Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller osanerad target commit, och monorepo-appar ärver inte source-repositoryts releases.
+Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller target commit, och monorepo-appar ärver inte source-repositoryts releases.
 
 ### Projektspecifika Releases
 
@@ -214,7 +214,7 @@ Releasepayloaden hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicRe
 
 - saknad/tom eller för lång project slug: `400 invalid_project`;
 - okänd slug eller monorepo-app: `404 project_releases_not_found`;
-- GitHub release-read misslyckas: `502 project_releases_unavailable`;
+- både den autentiserade release-RPC:n och credential-fria fallbacken misslyckas: `502 project_releases_unavailable`;
 - inga publicerade releases: `200`, `status = available`, tom `releases`-lista;
 - normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 10 releaser.
 
@@ -313,7 +313,7 @@ Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-fli
 
 ### Changelog
 
-Changelog lagras inte persistent i Cache API. När Portal saknar egen GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder. Både inventory och publicerade releaser läses normalt genom Skvallerbyttans autentiserade read-only RPC; credential-fri GitHub REST är rollout/degraded fallback. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
+Changelog lagras inte persistent i Cache API. När Portal saknar egen GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder; inventoryn kommer normalt från Skvallerbyttans autentiserade read-only RPC och credential-fri GitHub REST är fallback. Med Portal-credential kringgås eligibility-cachen. Releasepayloaden läses alltid från GitHub när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
 
 ### Dokumentation
 

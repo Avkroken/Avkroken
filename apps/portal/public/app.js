@@ -73,10 +73,12 @@ function metric(label, value) {
     </div>`;
 }
 
-function projectCard(project) {
-  const cardLink = project.portalUrl
-    ? `<a class="card-hit-area" data-portal-route href="${escapeHtml(project.portalUrl)}" aria-label="Öppna ${escapeHtml(project.name)}"></a>`
+function projectCard(project, { service = false } = {}) {
+  const cardTarget = project.portalUrl;
+  const cardLink = cardTarget
+    ? `<a class="card-hit-area" data-portal-route href="${escapeHtml(cardTarget)}" aria-label="${escapeHtml(service ? `Öppna projektsidan för ${project.name}` : `Öppna översikten för ${project.name}`)}"></a>`
     : "";
+
   const overviewLink = project.portalUrl
     ? `<a class="card-action primary" data-portal-route href="${escapeHtml(project.portalUrl)}">Översikt</a>`
     : "";
@@ -140,7 +142,8 @@ function renderCollection(target, projects, emptyMessage) {
     target.innerHTML = `<div class="empty"><strong>${escapeHtml(emptyMessage)}</strong></div>`;
     return;
   }
-  target.innerHTML = projects.map(projectCard).join("");
+  const service = target === serviceGrid;
+  target.innerHTML = projects.map(project => projectCard(project, { service })).join("");
 }
 
 function projectSlugFromLocation() {
@@ -174,24 +177,26 @@ function renderProjectStores(project) {
   detailStores.hidden = false;
   target.replaceChildren();
 
-  const links = Array.isArray(project.storeLinks) ? project.storeLinks : [];
-  const verified = links.filter(item =>
-    item && typeof item.label === "string" && typeof item.url === "string" &&
-    /^https:\/\//.test(item.url)
-  );
-
   if (project.url) {
-    verified.unshift({ label: "Webb", url: project.url });
+    const web = document.createElement("a");
+    web.className = "portal-button";
+    web.href = project.url;
+    web.target = "_blank";
+    web.rel = "noopener noreferrer";
+    web.textContent = "Webb";
+    target.appendChild(web);
   }
 
-  if (!verified.length) {
-    const copy = document.createElement("p");
-    copy.textContent = "Inga verifierade butikslänkar är publicerade ännu.";
-    target.appendChild(copy);
-    return;
-  }
+  const storeLinks = Array.isArray(project.storeLinks)
+    ? project.storeLinks.filter(item =>
+        item &&
+        typeof item.label === "string" &&
+        typeof item.url === "string" &&
+        /^https:\/\//.test(item.url)
+      )
+    : [];
 
-  for (const item of verified) {
+  for (const item of storeLinks) {
     const link = document.createElement("a");
     link.className = "portal-button";
     link.href = item.url;
@@ -199,6 +204,12 @@ function renderProjectStores(project) {
     link.rel = "noopener noreferrer";
     link.textContent = item.label;
     target.appendChild(link);
+  }
+
+  if (!storeLinks.length) {
+    const copy = document.createElement("p");
+    copy.textContent = "Inga verifierade App Store-, Google Play- eller Microsoft Store-länkar är publicerade ännu.";
+    target.appendChild(copy);
   }
 }
 
@@ -236,7 +247,8 @@ async function loadProjectLatestRelease(project) {
 
     const name = release.name || release.tag || "Release";
     detailReleaseStatus.textContent = name + " · " + formatDate(release.publishedAt);
-    detailReleaseLink.textContent = "Öppna " + (release.tag || "release") + " i Portalen";
+    detailReleaseLink.href = project.releasesPortalUrl;
+    detailReleaseLink.textContent = "Öppna senaste release i Portalen";
   } catch {
     if (serial !== detailReleaseSerial) return;
     detailReleaseStatus.textContent = "Releaseinformationen är tillfälligt otillgänglig.";

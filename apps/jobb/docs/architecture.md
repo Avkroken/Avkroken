@@ -17,7 +17,7 @@ Verifierade bindings och runtimeytor:
 - cron `0 9 10-13 * *`,
 - custom domain `jobb.denied.se`,
 - GitHub OAuth client ID och numerisk dashboard-allowlist som icke-hemliga Worker-vars,
-- GitHub OAuth client secret via bindingen `GITHUB_OAUTH_CLIENT_SECRET`, som i production återanvänder den befintliga Secrets Store-posten `KROSA_MAJA_CLIENT_SECRET`.
+- GitHub OAuth client secret via Secrets Store-binding.
 
 ## Översikt
 

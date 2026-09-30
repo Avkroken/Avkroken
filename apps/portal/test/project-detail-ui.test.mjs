@@ -49,7 +49,7 @@ test("project slug routes use the dedicated detail surface", () => {
 test("project cards make the full card an internal detail link while retaining explicit actions", () => {
   assert.ok(app.includes("project.portalUrl"));
   assert.ok(app.includes("card-hit-area"));
-  assert.ok(app.includes('aria-label="Öppna'));
+  assert.ok(app.includes("Öppna projektsidan för"));
   assert.ok(app.includes(">Översikt</a>"));
 });
 

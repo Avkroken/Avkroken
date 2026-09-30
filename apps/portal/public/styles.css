@@ -249,6 +249,15 @@ h1 {
   transition: transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), border-color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), background var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 
+.card::after {
+  content: "";
+  position: absolute;
+  inset: auto -25% -65% 35%;
+  height: 190px;
+  background: radial-gradient(circle, var(--glow, rgba(45,155,255,.18)), transparent 68%);
+  pointer-events: none;
+}
+
 .card-hit-area {
   position: absolute;
   inset: 0;
@@ -257,22 +266,8 @@ h1 {
 }
 
 .card-hit-area:focus-visible {
-  outline: 2px solid var(--accent, var(--cyan));
-  outline-offset: -3px;
-}
-
-.card-actions {
-  position: relative;
-  z-index: 3;
-}
-
-.card::after {
-  content: "";
-  position: absolute;
-  inset: auto -25% -65% 35%;
-  height: 190px;
-  background: radial-gradient(circle, var(--glow, rgba(45,155,255,.18)), transparent 68%);
-  pointer-events: none;
+  outline: 3px solid var(--focus, #5fb3ff);
+  outline-offset: -4px;
 }
 
 .card:hover {
@@ -331,7 +326,7 @@ h1 {
 
 .card-actions {
   position: relative;
-  z-index: 3;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

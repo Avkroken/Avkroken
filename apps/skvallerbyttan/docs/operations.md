@@ -48,7 +48,7 @@ Cloudflare Secrets Store-bindings:
 - `CLOUDFLARE_API_TOKEN_R1` — Platform / Resource Read
 - `CLOUDFLARE_API_TOKEN_R2` — Analytics / Content / Operations Read
 - `CLOUDFLARE_API_TOKEN_R3` — Security / Identity Read
-- `GITHUB_OAUTH_CLIENT_SECRET` — runtime-binding som återanvänder befintlig Secrets Store-post `KROSA_MAJA_CLIENT_SECRET`
+- `GITHUB_OAUTH_CLIENT_SECRET` — neutral runtimebinding som återanvänder den befintliga delade GitHub OAuth-hemligheten i Secrets Store; ingen ny credential skapas
 
 Varje bunden Secrets Store-secret ska ha `workers` i sin scope-lista. Bindings hämtar värden asynkront via `get()`; kodvägarna använder inte äldre generiska Cloudflare-token som fallback.
 
@@ -141,10 +141,10 @@ Skvallerbyttan exporterar `PortalObservationsService` från huvud-entrypointen. 
 RPC:n:
 
 - använder inte `SKVALLERBYTTAN_READ_API_TOKEN`, OAuth-session eller publik HTTP;
-- returnerar public-safe downstreammodeller med separata kontrakt för repositoryinventory, dokumentationspaths, publicerade releases, Drift, repository-CI, repository-Activity och release-deployment-korrelation;
+- returnerar public-safe downstreammodeller med separata kontrakt för repositoryinventory, dokumentationsinventory, releasekandidater, Drift, repository-CI, repository-Activity och release-deployment-korrelation;
 - exponerar `getPublicRepositories()` som gör en live read-only GitHub App-läsning av installationens repositoryinventory och sanerar till current-owner + `visibility = public` + icke-arkiverad metadata innan svaret lämnar observationslagret;
-- exponerar `getPublicDocumentationPages(repoName, sourcePath)` som en bounded Git-tree-läsning efter samma live public-repositorygrind och returnerar endast allowlistade Markdown-paths;
-- exponerar `getPublicReleases(repoName, limit)` som en bounded release-läsning efter samma live public-repositorygrind och returnerar högst tio sanerade publicerade releases utan body/author/assets;
+- exponerar `getPublicDocumentationIndex(repositoryNames)` som först intersectar högst 50 begärda namn med samma live-public inventory och därefter läser Git-tree via GitHub App; endast root `README.md` och Markdown-paths under `docs/` returneras, aldrig blobs, permissions eller rå tree-payload;
+- exponerar `getPublicRepositoryReleases(repositoryNames, limit)` genom samma live-public gate; endast publicerade, canonical current-owner releasekandidater returneras och body begränsas till det Changelog-sanitizern behöver för kategorisering/commitkorrelation;
 - den generella Drift-metoden exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata, scope coverage/repositoryantal eller Activity/eventvolym;
 - gör inga provider-write-operationer;
 - lämnar full/detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API;
@@ -152,7 +152,7 @@ RPC:n:
 - exponerar `getPublicActivity(repositoryNames, days)` som en separat repository-allowlistad metod. Den intersectar högst 50 repositorykortnamn med cachead publik/icke-arkiverad `overview`, queryar därefter endast D1 `observation_events` för GitHub och exakt dessa repositories, och publicerar inte resource-ID:n, actors, providerfel, permissions eller rå webhookpayload;
 - exponerar `getPublicReleaseDeployments(requests)` som en bounded read-only korrelationsmetod. Den verifierar live installation-inventory, accepterar högst åtta publika repositories och 20 commit-SHA per repository, läser högst två deployment-sidor per repository och returnerar endast exakta SHA-matchningar med sanerad miljö/tid.
 
-Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments. Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicRepositoryCi`, `getPublicActivity` och `getPublicReleaseDeployments` måste vara deployad innan Portal förlitar sig på dessa RPC-metoder. Portalens repositoryinventory har en credential-fri publik GitHub REST-fallback under rollout/degraded state; CI/Activity-data och release-deployment-korrelation har ingen sådan providerfallback. Changelog-releaser förblir däremot tillgängliga med deploymentstatus `unavailable` om korrelations-RPC:n saknas.
+Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicDocumentationIndex`, `getPublicRepositoryReleases`, `getPublicRepositoryCi`, `getPublicActivity` och `getPublicReleaseDeployments` måste vara deployad innan Portal förlitar sig på dessa RPC-metoder. Portalens repository/docs/release-läsningar har snäva credential-fria GitHub-fallbacks under rollout/degraded state; CI/Activity och release-deployment-korrelation har ingen sådan providerfallback. Releaser kan visas även när deploymentkorrelationen är `unavailable`.
 
 Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
 

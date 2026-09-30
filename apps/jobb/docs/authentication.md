@@ -11,7 +11,7 @@ Jobb skapar därefter en lokal 12-timmars signerad `__Host-jobb_session`. Login-
 Runtimekontrakt:
 
 - `GITHUB_OAUTH_CLIENT_ID` — icke-hemligt client ID.
-- `GITHUB_OAUTH_CLIENT_SECRET` — runtime-binding; production pekar bindingen på den befintliga Secrets Store-posten `KROSA_MAJA_CLIENT_SECRET`, medan lokal utveckling kan använda ignorerad dev-konfiguration.
+- `GITHUB_OAUTH_CLIENT_SECRET` — Secrets Store-binding eller ignorerad lokal dev-konfiguration.
 - `JOBB_ALLOWED_GITHUB_IDS` — numeriska GitHub-ID:n som får använda dashboarden.
 
 GitHub OAuth-klienthemligheten får inte loggas, returneras eller committas. Basic Auth och parallell OIDC-fallback ska inte införas.

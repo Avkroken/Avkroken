@@ -163,15 +163,6 @@ test("release correlation does not expose arbitrary release prose or branch targ
   assert.equal(serialized.includes('"target_commitish"'), false);
 });
 
-test("accepts sanitized pre-derived categories from the read-only observations RPC", () => {
-  const item = normalizePublicRelease(project(), release({
-    body: undefined,
-    categories: ["security", "features", "unknown", "security"]
-  }));
-
-  assert.deepEqual(item.categories, ["releases", "security", "features"]);
-});
-
 test("rejects drafts, malformed source projects and non-canonical release URLs", () => {
   assert.equal(normalizePublicRelease(project(), release({ draft: true })), null);
   assert.equal(
