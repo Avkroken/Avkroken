@@ -49,10 +49,12 @@ const GITHUB_API = githubUserRepositoriesApi();
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
+const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2");
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
 const SEARCH_FETCH_CONCURRENCY = 4;
+const GITHUB_CATALOG_CONCURRENCY = 2;
 const SEARCH_RESULT_LIMIT = 24;
 const CHANGELOG_REPOSITORY_LIMIT = 24;
 const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
@@ -80,6 +82,49 @@ function githubHeaders(env, accept = "application/vnd.github+json") {
   };
   if (env.GITHUB_TOKEN) headers.Authorization = "Bearer " + env.GITHUB_TOKEN;
   return headers;
+}
+
+async function discardResponse(response) {
+  try {
+    await response?.body?.cancel();
+  } catch {
+    // Best-effort cleanup for a response the caller will not consume.
+  }
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const values = Array.isArray(items) ? items : [];
+  const results = new Array(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, limit), values.length);
+
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex++;
+      results[index] = await mapper(values[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
+function githubRawContentUrl(repository, ref, path) {
+  try {
+    githubRepositoryApiBase(repository);
+  } catch {
+    return null;
+  }
+
+  const reference = String(ref || "").trim();
+  const segments = String(path || "").split("/").filter(Boolean);
+  if (!reference || !segments.length || segments.some(segment => segment === "." || segment === "..")) {
+    return null;
+  }
+
+  return "https://raw.githubusercontent.com/" + encodeURIComponent(GITHUB_OWNER) + "/" +
+    encodeURIComponent(repository) + "/" + encodeURIComponent(reference) + "/" +
+    segments.map(encodeURIComponent).join("/");
 }
 
 function encodedPath(path) {
@@ -150,7 +195,10 @@ function pageLabel(path) {
 
 async function fetchGitHubJson(url, env) {
   const response = await fetch(url, { headers: githubHeaders(env) });
-  if (!response.ok) return { ok: false, status: response.status, data: null };
+  if (!response.ok) {
+    await discardResponse(response);
+    return { ok: false, status: response.status, data: null };
+  }
   return { ok: true, status: response.status, data: await response.json() };
 }
 
@@ -167,8 +215,10 @@ async function scanMarkdownDocs(repo, env, path = "docs", depth = 0) {
 
   if (depth < MAX_DOC_DEPTH) {
     const directories = result.data.filter(item => item && item.type === "dir");
-    const nested = await Promise.all(
-      directories.map(item => scanMarkdownDocs(repo, env, item.path, depth + 1))
+    const nested = await mapWithConcurrency(
+      directories,
+      GITHUB_CATALOG_CONCURRENCY,
+      item => scanMarkdownDocs(repo, env, item.path, depth + 1)
     );
     nested.forEach(items => files.push(...items));
   }
@@ -234,12 +284,14 @@ async function buildDocsEntry(repo, env) {
   };
 }
 
-async function buildAppDocsEntry(project, repositories, env) {
+async function buildAppDocsEntry(project, env) {
   const source = appDocsSource(project);
   if (!source) return null;
 
-  const repo = repositories.find(candidate => candidate?.full_name === project.source.repository);
-  if (!repo) return null;
+  const repo = {
+    name: source.sourceRepository,
+    default_branch: source.defaultBranch
+  };
 
   const [docs, readme] = await Promise.all([
     scanMarkdownDocs(repo, env, source.docsRoot),
@@ -265,43 +317,81 @@ async function buildAppDocsEntry(project, repositories, env) {
   };
 }
 
-async function loadDocsCatalog(env) {
-  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
-  if (!github.ok) throw new Error("github_unavailable:" + github.status);
+function repositoryProjectAsRepo(project) {
+  if (project?.type !== "repository" || project?.source?.kind !== "repository") return null;
+  const repository = repositoryNameFromOwnedFullName(project.source.repository);
+  if (!repository || project.slug !== repository) return null;
 
-  const repositories = await github.json();
-  const publicRepositories = repositories.filter(repo =>
-    repo &&
-    repo.visibility === "public" &&
-    repo.archived === false &&
-    !isRetiredRepository(repo.name)
-  );
-
-  const [repositoryEntries, appDiscovery] = await Promise.all([
-    Promise.all(publicRepositories.map(repo => buildDocsEntry(repo, env))),
-    loadPublicAppProjects(repositories, env)
-  ]);
-
-  const appEntries = await Promise.all(
-    appDiscovery.projects.map(project => buildAppDocsEntry(project, repositories, env))
-  );
-
-  const entries = [];
-  const keys = new Set();
-  for (const entry of [...repositoryEntries, ...appEntries]) {
-    if (!entry || keys.has(entry.key)) continue;
-    keys.add(entry.key);
-    entries.push(entry);
-  }
-
-  entries.sort((a, b) => a.name.localeCompare(b.name, "sv"));
-  return entries;
+  return {
+    name: repository,
+    html_url: project.repository,
+    default_branch: project.source.ref,
+    has_pages: typeof project.pages === "string",
+    language: project.language || null,
+    pushed_at: project.updatedAt || null,
+    updated_at: project.updatedAt || null
+  };
 }
 
-async function getDocsCatalog(env) {
+async function buildProjectDocsEntry(project, env) {
+  if (project?.type === "app") return buildAppDocsEntry(project, env);
+  const repo = repositoryProjectAsRepo(project);
+  return repo ? buildDocsEntry(repo, env) : null;
+}
+
+async function loadDocsCatalog(projects, env) {
+  const entries = await mapWithConcurrency(
+    projects,
+    GITHUB_CATALOG_CONCURRENCY,
+    project => buildProjectDocsEntry(project, env)
+  );
+
+  const unique = [];
+  const keys = new Set();
+  for (const entry of entries) {
+    if (!entry || keys.has(entry.key)) continue;
+    keys.add(entry.key);
+    unique.push(entry);
+  }
+
+  unique.sort((a, b) => a.name.localeCompare(b.name, "sv"));
+  return unique;
+}
+
+async function getDocsCatalog(env, ctx, knownProjects = null) {
+  const cache = caches.default;
+  const cached = await cache.match(DOCS_CACHE_KEY);
+  if (cached) {
+    const clientResponse = new Response(cached.body, cached);
+    clientResponse.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+    clientResponse.headers.set("Cloudflare-CDN-Cache-Control", "public, max-age=" + DOCS_CACHE_SECONDS);
+    return clientResponse;
+  }
+
   try {
-    const entries = await loadDocsCatalog(env);
-    return new Response(JSON.stringify(entries), {
+    let projects = knownProjects;
+    if (!Array.isArray(projects)) {
+      const projectsResponse = await getPublicProjects(env, ctx);
+      if (!projectsResponse.ok) {
+        await discardResponse(projectsResponse);
+        throw new Error("public_projects_unavailable:" + projectsResponse.status);
+      }
+      const payload = await projectsResponse.json();
+      projects = Array.isArray(payload.projects) ? payload.projects : [];
+    }
+
+    const entries = await loadDocsCatalog(projects, env);
+    const body = JSON.stringify(entries);
+    const cachedResponse = new Response(body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=" + DOCS_CACHE_SECONDS,
+        "Cache-Tag": "docs-catalog"
+      }
+    });
+    ctx.waitUntil(cache.put(DOCS_CACHE_KEY, cachedResponse));
+
+    return new Response(body, {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "public, max-age=0, must-revalidate",
@@ -309,24 +399,6 @@ async function getDocsCatalog(env) {
         "Cache-Tag": "docs-catalog"
       }
     });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: "github_unavailable" }), {
-      status: 502,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store"
-      }
-    });
-  }
-}
-
-async function getDocContent(requestUrl, env) {
-  const sourceKey = requestUrl.searchParams.get("repo") || "";
-  const requestedPath = requestUrl.searchParams.get("path") || "";
-
-  let catalog;
-  try {
-    catalog = await loadDocsCatalog(env);
   } catch {
     return new Response(JSON.stringify({ error: "github_unavailable" }), {
       status: 502,
@@ -336,6 +408,15 @@ async function getDocContent(requestUrl, env) {
       }
     });
   }
+}
+
+async function getDocContent(requestUrl, env, ctx) {
+  const sourceKey = requestUrl.searchParams.get("repo") || "";
+  const requestedPath = requestUrl.searchParams.get("path") || "";
+
+  const catalogResponse = await getDocsCatalog(env, ctx);
+  if (!catalogResponse.ok) return catalogResponse;
+  const catalog = await catalogResponse.json();
 
   const entry = catalog.find(item => item.key === sourceKey);
   const page = entry?.pages.find(item => item.path === requestedPath);
@@ -352,13 +433,21 @@ async function getDocContent(requestUrl, env) {
     });
   }
 
-  const endpoint = githubRepositoryApiBase(location.repository) +
-    "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
-  const github = await fetch(endpoint, {
-    headers: githubHeaders(env, "application/vnd.github.raw+json")
-  });
+  const endpoint = githubRawContentUrl(location.repository, location.ref, location.path);
+  if (!endpoint) {
+    return new Response(JSON.stringify({ error: "document_not_found" }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  const github = await fetch(endpoint, { headers: { "User-Agent": "Avkroken-Portal-Worker" } });
 
   if (!github.ok) {
+    await discardResponse(github);
     return new Response(JSON.stringify({ error: "document_unavailable", status: github.status }), {
       status: github.status === 404 ? 404 : 502,
       headers: {
@@ -398,17 +487,19 @@ async function getDocContent(requestUrl, env) {
 async function readPublicAppManifest(repo, directory, env) {
   const sourcePath = directory.path;
   const manifestPath = sourcePath + "/" + PUBLIC_APP_MANIFEST;
-  const endpoint = "https://api.github.com/repos/" +
-    encodeURIComponent(repo.owner.login) + "/" + encodeURIComponent(repo.name) +
-    "/contents/" + encodedPath(manifestPath) +
-    "?ref=" + encodeURIComponent(repo.default_branch);
+  const endpoint = githubRawContentUrl(repo.name, repo.default_branch, manifestPath);
+  if (!endpoint) return { project: null, invalid: true };
 
-  const response = await fetch(endpoint, {
-    headers: githubHeaders(env, "application/vnd.github.raw+json")
-  });
+  const response = await fetch(endpoint, { headers: { "User-Agent": "Avkroken-Portal-Worker" } });
 
-  if (response.status === 404) return { project: null, invalid: false };
-  if (!response.ok) return { project: null, invalid: true };
+  if (response.status === 404) {
+    await discardResponse(response);
+    return { project: null, invalid: false };
+  }
+  if (!response.ok) {
+    await discardResponse(response);
+    return { project: null, invalid: true };
+  }
 
   const raw = await response.text();
   if (raw.length > MAX_PUBLIC_APP_MANIFEST_BYTES) {
@@ -462,8 +553,10 @@ async function loadPublicAppProjects(repositories, env) {
   let partial = listing.data.filter(item => item && item.type === "dir").length >
     MAX_PUBLIC_APP_DIRECTORIES;
 
-  const manifests = await Promise.all(
-    directories.map(directory => readPublicAppManifest(repo, directory, env))
+  const manifests = await mapWithConcurrency(
+    directories,
+    GITHUB_CATALOG_CONCURRENCY,
+    directory => readPublicAppManifest(repo, directory, env)
   );
 
   const projects = [];
@@ -479,17 +572,21 @@ async function loadPublicAppProjects(repositories, env) {
 }
 
 async function loadLivePublicRepositoryProjects(env) {
-  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
-  if (!github.ok) throw new Error("github_unavailable:" + github.status);
+  const github = await fetchGitHubJson(GITHUB_API, env);
+  if (!github.ok || !Array.isArray(github.data)) {
+    throw new Error("github_unavailable:" + github.status);
+  }
 
-  return normalizePublicRepositories(await github.json());
+  return normalizePublicRepositories(github.data);
 }
 
 async function loadPublicProjects(env) {
-  const github = await fetch(GITHUB_API, { headers: githubHeaders(env) });
-  if (!github.ok) throw new Error("github_unavailable:" + github.status);
+  const github = await fetchGitHubJson(GITHUB_API, env);
+  if (!github.ok || !Array.isArray(github.data)) {
+    throw new Error("github_unavailable:" + github.status);
+  }
 
-  const repositories = await github.json();
+  const repositories = github.data;
   const repositoryProjects = normalizePublicRepositories(repositories);
   const appDiscovery = await loadPublicAppProjects(repositories, env);
 
@@ -575,13 +672,13 @@ async function fetchSearchDocument(task, env) {
     return { searchEntry: null, failed: true, truncated: false };
   }
 
-  const endpoint = githubRepositoryApiBase(location.repository) +
-    "/contents/" + encodedPath(location.path) + "?ref=" + encodeURIComponent(location.ref);
-  const response = await fetch(endpoint, {
-    headers: githubHeaders(env, "application/vnd.github.raw+json")
-  });
+  const endpoint = githubRawContentUrl(location.repository, location.ref, location.path);
+  if (!endpoint) return { searchEntry: null, failed: true, truncated: false };
+
+  const response = await fetch(endpoint, { headers: { "User-Agent": "Avkroken-Portal-Worker" } });
 
   if (!response.ok) {
+    await discardResponse(response);
     return { searchEntry: null, failed: true, truncated: false };
   }
 
@@ -612,13 +709,21 @@ async function fetchSearchDocuments(tasks, env) {
 
 let pendingSearchIndex = null;
 
-async function loadSearchIndex(env) {
-  const [projectCatalog, docsCatalog] = await Promise.all([
-    loadPublicProjects(env),
-    loadDocsCatalog(env)
-  ]);
+async function loadSearchIndex(env, ctx) {
+  const projectsResponse = await getPublicProjects(env, ctx);
+  if (!projectsResponse.ok) {
+    await discardResponse(projectsResponse);
+    throw new Error("public_projects_unavailable:" + projectsResponse.status);
+  }
+  const projectCatalog = await projectsResponse.json();
+  const projects = Array.isArray(projectCatalog.projects) ? projectCatalog.projects : [];
 
-  const projects = projectCatalog.projects;
+  const docsResponse = await getDocsCatalog(env, ctx, projects);
+  if (!docsResponse.ok) {
+    await discardResponse(docsResponse);
+    throw new Error("public_docs_unavailable:" + docsResponse.status);
+  }
+  const docsCatalog = await docsResponse.json();
   const searchableDocs = filterSearchableDocs(projects, docsCatalog);
   const discoveredDocuments = searchableDocs.reduce(
     (sum, entry) => sum + (Array.isArray(entry.pages) ? entry.pages.length : 0),
@@ -670,9 +775,9 @@ async function loadSearchIndex(env) {
   };
 }
 
-async function getSearchIndex(env) {
+async function getSearchIndex(env, ctx) {
   if (!pendingSearchIndex) {
-    pendingSearchIndex = loadSearchIndex(env).finally(() => {
+    pendingSearchIndex = loadSearchIndex(env, ctx).finally(() => {
       pendingSearchIndex = null;
     });
   }
@@ -710,7 +815,7 @@ async function searchPortal(requestUrl, env, ctx) {
   }
 
   try {
-    const index = await getSearchIndex(env);
+    const index = await getSearchIndex(env, ctx);
     const results = searchEntries(index.entries, query, SEARCH_RESULT_LIMIT);
 
     return new Response(JSON.stringify({
@@ -1867,14 +1972,14 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Method Not Allowed", { status: 405 });
       }
-      return getDocsCatalog(env);
+      return getDocsCatalog(env, ctx);
     }
 
     if (url.pathname === "/api/docs/content") {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Method Not Allowed", { status: 405 });
       }
-      return getDocContent(url, env);
+      return getDocContent(url, env, ctx);
     }
 
     if (url.pathname === "/api/search") {
