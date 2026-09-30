@@ -47,6 +47,8 @@ Provider-readkoden använder `GAMNACKEN_GITHUB_APP_CLIENT_ID` och `GAMNACKEN_GIT
 
 GitHub App client secret används inte i installation-auth-flödet. Worker skapar App-JWT och kortlivade installation tokens från de konfigurerade GitHub App-bindings. Providerpermissions ska följa minsta möjliga read-nivå; se [Permissions]({{ '/permissions/' | relative_url }}).
 
+Portalens interna `getPublicRepositories()`-RPC återanvänder samma read-only installation-auth men returnerar inte token, installation-id, permissions, providerbudget eller rå repositorypayload. Endast current-owner repositories som providerstate markerar `visibility = public` och inte arkiverade normaliseras till den metadata som Portalens publika projektmodell använder. Private repositories failar därmed före Service Binding-svaret.
+
 ## Cloudflare provider auth
 
 Cloudflare-providerreads använder tre separata read-klasser enligt Skvallerbyttans repo-deklarerade credentialmodell:

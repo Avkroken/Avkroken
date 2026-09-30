@@ -33,7 +33,8 @@ CF Audit Logs ──────────────┘
                  ▼                            ▼
             /api/v1 contract        PortalObservationsService
              ├── dashboard          (sanitized read-only RPC)
-             └── machine clients        ├─ provider/capability snapshot
+             └── machine clients        ├─ live public repository inventory
+                 │                    ├─ provider/capability snapshot
                  │                    ├─ cached repository CI snapshot
                  │                    └─ allowlistad repository Activity
                  │                           │

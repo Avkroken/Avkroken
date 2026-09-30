@@ -4,6 +4,7 @@ import { getCapabilities } from "./capabilities";
 import { getProviderHealth } from "./provider-health";
 import { organization } from "./env";
 import { getObservedActivity } from "./activity";
+import { githubInstallationRepositories } from "./github";
 import {
   buildPortalRepositoryCiSnapshot,
   publicCiRepository,
@@ -23,6 +24,10 @@ import {
   buildPortalOperationsSnapshot,
   type PortalOperationsSnapshot,
 } from "./portal-observations-model";
+import {
+  buildPortalPublicRepositoriesSnapshot,
+  type PortalPublicRepositoriesSnapshot,
+} from "./portal-repository-model";
 
 export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOperationsSnapshot> {
   const capabilitySnapshot = await getCapabilities(env);
@@ -126,6 +131,22 @@ export async function getPortalActivitySnapshot(
   });
 }
 
+export async function getPortalPublicRepositoriesSnapshot(
+  env: Env,
+): Promise<PortalPublicRepositoriesSnapshot> {
+  const result = await githubInstallationRepositories<unknown>(env, 10);
+  if (!result.available) {
+    throw new Error("public repository inventory unavailable");
+  }
+
+  return buildPortalPublicRepositoriesSnapshot({
+    generatedAt: new Date().toISOString(),
+    owner: organization(env),
+    repositories: result.value,
+    truncated: result.truncated,
+  });
+}
+
 export async function getPortalRepositoryCiSnapshot(
   env: Env,
   repoName: string,
@@ -156,6 +177,10 @@ export async function getPortalRepositoryCiSnapshot(
 export class PortalObservationsService extends WorkerEntrypoint<Env> {
   async getPublicOperationsSummary(): Promise<PortalOperationsSnapshot> {
     return getPortalOperationsSnapshot(this.env);
+  }
+
+  async getPublicRepositories(): Promise<PortalPublicRepositoriesSnapshot> {
+    return getPortalPublicRepositoriesSnapshot(this.env);
   }
 
   async getPublicActivity(

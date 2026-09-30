@@ -49,7 +49,8 @@ Dashboarden erbjuder `legacy`, `forest` (visas som **Avkroken**) och `blackout` 
 - **GitHub webhook-ingress:** runtime verifierar signerade provider-webhooks och begränsar accepterade repositoryevents till konfigurerad owner `Avkroken` via `organization.login` eller `repository.owner.login`; faktisk hookkonfiguration är extern GitHub-state.
 - **Avkroken portal signal:** docs-relevanta GitHub-events skickas internt via Cloudflare Service Binding `AVKROKEN_PORTAL_DOCS` till deklarerat service target `avkroken`/`DocsInvalidationService`; portalen behöver därmed ingen egen provider-webhook för detta.
 - **Operativ heartbeat:** runtime skickar receiver-observerad liveness/readiness via `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`; portalens oberoende watchdog larmar vid utebliven förväntad leverans.
-- **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa en public-safe snapshot av provider health och capability status/dataState/freshness/last-success.
+- **Portal Drift & insyn:** Skvallerbyttan exporterar named RPC-entrypointen `PortalObservationsService`. Avkroken-portalen binder till just den entrypointen och kan endast läsa public-safe downstreammodeller.
+- **Portal repository-inventory:** samma named entrypoint exponerar `getPublicRepositories()`. Metoden läser GitHub App-installationens repositoryinventory med befintlig read-only auth och returnerar endast sanerad publik repositorymetadata som Portalens publiceringsadapter behöver; private/archived/annan owner, permissions, rate-limit/budget, installationmetadata och credentials lämnar inte observationslagret.
 - **Portal repository-CI:** samma named entrypoint exponerar `getPublicRepositoryCi(repoName)`, som endast läser canonical `overview` source cache, kräver en cachead publik/icke-arkiverad repositoryrad och returnerar en sanerad sampled Actions-summary med explicit freshness. Metoden gör ingen GitHub-providerrequest.
 - **Portal repository-Activity:** samma named entrypoint exponerar `getPublicActivity(repositoryNames, days)`. Metoden intersectar en bounded repositorylista med cachead publik/icke-arkiverad `overview`-state och queryar därefter endast D1 `observation_events` för `provider = github` och de godkända repositorykortnamnen. Ingen providerrequest görs; public snapshot saknar resource-ID:n, actors, permissions, providerfel och rå webhookpayload.
 
@@ -125,7 +126,7 @@ Canonical HTTP-kontrakt ligger under `/api/v1`. Det kan läsas av:
 
 Machine access är GET-only och attribueras consumer `chatgpt`.
 
-Portalens Drift & insyn, repository-CI och public-safe repository-Activity använder **inte** detta HTTP-kontrakt och får ingen bearer-token. De använder endast named `PortalObservationsService`, som är ett separat sanerat downstream-kontrakt.
+Portalens publika repositoryinventory, Drift & insyn, repository-CI och public-safe repository-Activity använder **inte** detta HTTP-kontrakt och får ingen bearer-token. De använder endast named `PortalObservationsService`, som är ett separat sanerat downstream-kontrakt.
 
 ## Epistemisk modell
 

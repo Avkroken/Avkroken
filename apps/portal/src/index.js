@@ -547,8 +547,7 @@ async function loadPublicAppProjects(repositories, env) {
 
   if (!repo) return { projects: [], status: "not_configured" };
 
-  const endpoint = "https://api.github.com/repos/" +
-    encodeURIComponent(repo.owner.login) + "/" + encodeURIComponent(repo.name) +
+  const endpoint = githubRepositoryApiBase(repo.name) +
     "/contents/" + encodedPath(PUBLIC_APP_DISCOVERY_ROOT) +
     "?ref=" + encodeURIComponent(repo.default_branch);
   const listing = await fetchGitHubJson(endpoint, env);
@@ -582,13 +581,40 @@ async function loadPublicAppProjects(repositories, env) {
   };
 }
 
-async function loadLivePublicRepositoryProjects(env) {
+async function loadServicePublicRepositories(env) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicRepositories !== "function") return null;
+
+  try {
+    const snapshot = await service.getPublicRepositories();
+    if (
+      !snapshot ||
+      typeof snapshot !== "object" ||
+      snapshot.schemaVersion !== 1 ||
+      snapshot.status !== "available" ||
+      !Array.isArray(snapshot.repositories)
+    ) {
+      return null;
+    }
+    return snapshot.repositories;
+  } catch {
+    return null;
+  }
+}
+
+async function loadPublicRepositoryRecords(env) {
+  const observed = await loadServicePublicRepositories(env);
+  if (observed !== null) return observed;
+
   const github = await fetchGitHubJson(GITHUB_API, env);
   if (!github.ok || !Array.isArray(github.data)) {
     throw new Error("github_unavailable:" + github.status);
   }
+  return github.data;
+}
 
-  return normalizePublicRepositories(github.data);
+async function loadLivePublicRepositoryProjects(env) {
+  return normalizePublicRepositories(await loadPublicRepositoryRecords(env));
 }
 
 async function loadPublicationRepositoryProjects(env) {
@@ -621,12 +647,7 @@ async function loadPublicationRepositoryProjects(env) {
 }
 
 async function loadPublicProjects(env) {
-  const github = await fetchGitHubJson(GITHUB_API, env);
-  if (!github.ok || !Array.isArray(github.data)) {
-    throw new Error("github_unavailable:" + github.status);
-  }
-
-  const repositories = github.data;
+  const repositories = await loadPublicRepositoryRecords(env);
   const repositoryProjects = normalizePublicRepositories(repositories);
   const appDiscovery = await loadPublicAppProjects(repositories, env);
 
@@ -638,7 +659,7 @@ async function loadPublicProjects(env) {
 
 async function getPublicProjects(env, ctx) {
   const cache = caches.default;
-  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v8");
+  const cacheKey = new Request("https://avkroken-cache.invalid/github-projects-v9");
   const cached = await cache.match(cacheKey);
 
   if (cached) {

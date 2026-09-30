@@ -30,7 +30,7 @@ Wrangler definierar:
 - `OBSERVABILITY` — Analytics Engine dataset `skvallerbyttan_observability`
 - `AVKROKEN_PORTAL_DOCS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `DocsInvalidationService`
 - `AVKROKEN_OPERATIONS` — Cloudflare Service Binding som deklarerar service target `avkroken`, entrypoint `OperationalHeartbeatService`
-- exported named entrypoint `PortalObservationsService` — inbound read-only RPC för Portalens sanerade Drift & insyn-, repository-CI- och repository-Activity-snapshots; ingen separat secret eller publik HTTP-route
+- exported named entrypoint `PortalObservationsService` — inbound read-only RPC för Portalens sanerade public-repository-, Drift & insyn-, repository-CI- och repository-Activity-snapshots; ingen separat secret eller publik HTTP-route
 - cron `0 */6 * * *` för reconciliation
 - cron `*/15 * * * *` för operativ heartbeat och global GitHub/Cloudflare capability-reconciliation
 - custom domain `skvallerbyttan.denied.se`
@@ -141,14 +141,15 @@ Skvallerbyttan exporterar `PortalObservationsService` från huvud-entrypointen. 
 RPC:n:
 
 - använder inte `SKVALLERBYTTAN_READ_API_TOKEN`, OAuth-session eller publik HTTP;
-- returnerar public-safe downstreammodeller med separata kontrakt för Drift, repository-CI och repository-Activity;
+- returnerar public-safe downstreammodeller med separata kontrakt för repositoryinventory, Drift, repository-CI och repository-Activity;
+- exponerar `getPublicRepositories()` som gör en live read-only GitHub App-läsning av installationens repositoryinventory och sanerar till current-owner + `visibility = public` + icke-arkiverad metadata innan svaret lämnar observationslagret;
 - den generella Drift-metoden exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata, scope coverage/repositoryantal eller Activity/eventvolym;
 - gör inga provider-write-operationer;
 - lämnar full/detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API;
 - exponerar `getPublicRepositoryCi(repoName)` som en separat summary-only metod som läser `overview` source cache, kräver cachead `visibility = public`/icke-arkiverad repositoryrad och aldrig startar en Actions-providerread;
 - exponerar `getPublicActivity(repositoryNames, days)` som en separat repository-allowlistad metod. Den intersectar högst 50 repositorykortnamn med cachead publik/icke-arkiverad `overview`, queryar därefter endast D1 `observation_events` för GitHub och exakt dessa repositories, och publicerar inte resource-ID:n, actors, providerfel, permissions eller rå webhookpayload.
 
-Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments. Skvallerbyttan-versionen med både `getPublicRepositoryCi` och `getPublicActivity` måste vara deployad innan en Portal-version som anropar dessa metoder.
+Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Det här repositoryarbetet utför ingen av dessa deployments. Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicRepositoryCi` och `getPublicActivity` måste vara deployad innan Portal förlitar sig på dessa RPC-metoder. Portalens repositoryinventory har en credential-fri publik GitHub REST-fallback under rollout/degraded state; CI/Activity-data har ingen sådan fallback.
 
 Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
 

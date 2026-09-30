@@ -43,7 +43,7 @@ npm run deploy:workers-builds
 
 Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör Portalens Node-tester och Wrangler dry-run före `npm run deploy`. Feature branches får inte använda produktionsscriptet.
 
-När Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versionen med `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Service Bindingens target/entrypoint ändras inte och ingen GitHub-secret behövs.
+När public repository inventory-, Builds/CI- och Activity-integrationen rullas ut måste Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicRepositoryCi` och `getPublicActivity` deployas och verifieras först. Service Bindingens target/entrypoint ändras inte och ingen GitHub-secret behöver läggas i Portal.
 
 Det här dokumentet beskriver repositorykontraktet. Privat Cloudflare account/DNS/Access live-state måste verifieras hos providern före en driftändring.
 
@@ -113,9 +113,9 @@ Adminlistning använder endast prefixet `logos/`; upload genererar server-side a
 
 ### Projektkatalog
 
-`GET /api/projects` läser GitHubs publika repositorylista och normaliserar den.
+`GET /api/projects` läser primärt en sanerad publik repositoryinventory via `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositories()` och normaliserar den. Skvallerbyttan gör providerläsningen med den befintliga read-only GitHub App-installationen; Portal får inte installation-/permissionmetadata, budgetstate eller credentials. Portalens credential-fria publika GitHub REST-listning finns kvar som rollout/degraded fallback.
 
-Om GitHub API inte kan läsas returnerar backend `502 github_unavailable` och UI visar att projekt-/tjänstelistan är otillgänglig.
+Om varken den interna RPC:n eller fallback-providerläsningen kan ge en giltig repositorylista returnerar backend `502 github_unavailable` och UI visar att projekt-/tjänstelistan är otillgänglig.
 
 Katalogsvaret innehåller `generatedAt` och deklarerad coverage `active_public_repositories_and_opt_in_apps`.
 
@@ -191,7 +191,7 @@ Kall indexbuild är budgeterad:
 
 ### Changelog
 
-`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Utan GitHub-credential återanvänds en separat 60-sekunders repositorygate för eligibility; med credential läses eligibility alltid live.
+`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Utan egen Portal-GitHub-credential återanvänds en separat 60-sekunders repositorygate för eligibility; inventoryn bakom gaten kommer normalt live från Skvallerbyttans autentiserade read-only RPC och Portalens publika REST är fallback. Med en Portal-credential läses eligibility utan denna gate.
 
 - projektkatalogfel: `502 changelog_unavailable`;
 - individuellt repo-releasefel: resten av snapshoten returneras med `source.coverage = partial`;
@@ -239,7 +239,7 @@ Monorepo-appar får ingen `issuesPortalUrl` och deras project-model har `issues 
 
 ### Projektspecifik Builds / CI
 
-`GET /api/builds?project=<slug>` gör först en live `type=public` repositorylistning och normaliserar den med Portalens repositorypolicy. App-manifestdiscovery används inte i Builds-gaten. Endpointen gör därefter endast ett internt RPC-anrop till `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryCi(repoName)`.
+`GET /api/builds?project=<slug>` gör först en live public-repositorykontroll från samma sanerade inventory som projektkatalogen och normaliserar den med Portalens repositorypolicy. Normalfallet är `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositories()`; Portalens credential-fria publika REST är fallback. App-manifestdiscovery används inte i Builds-gaten. Endpointen gör därefter endast ett internt RPC-anrop till `getPublicRepositoryCi(repoName)`.
 
 - saknad/tom eller för lång project slug: `400 invalid_project`;
 - okänd slug eller monorepo-app: `404 project_builds_not_found`;
@@ -261,7 +261,7 @@ Monorepo-appar har ingen `buildsPortalUrl` och `builds = null`.
 
 ### Observerad Activity
 
-`GET /api/activity?days=<1..30>&project=<slug>` gör först en live `type=public` repositorylistning och använder Portalens repositorypolicy. `project` är valfri:
+`GET /api/activity?days=<1..30>&project=<slug>` gör först en live public-repositorykontroll från samma sanerade inventory och använder Portalens repositorypolicy. Normalfallet är Skvallerbyttans autentiserade read-only `getPublicRepositories()`-RPC; Portalens publika REST är fallback. `project` är valfri:
 
 - utan `project` väljs högst 50 live-publika repositoryprojekt;
 - med `project` krävs exakt match mot ett repositoryprojekt; monorepo-appar är inte giltiga Activity-källor;
@@ -312,7 +312,7 @@ Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-fli
 
 ### Changelog
 
-Changelog lagras inte persistent i Cache API. När Portal saknar GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder; med credential kringgås eligibility-cachen och repositorylistan läses live. Releasepayloaden läses alltid från GitHub när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
+Changelog lagras inte persistent i Cache API. När Portal saknar egen GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder; inventoryn kommer normalt från Skvallerbyttans autentiserade read-only RPC och credential-fri GitHub REST är fallback. Med Portal-credential kringgås eligibility-cachen. Releasepayloaden läses alltid från GitHub när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
 
 ### Dokumentation
 
@@ -338,7 +338,7 @@ Service binding används i stället för att exponera en publik administrationse
 - Projektspecifik Builds/CI får endast läsa Skvallerbyttans public-safe cache-RPC efter live public-project-lookup; Portalen får inte göra en egen GitHub Actions-read och monorepo-appar får inte ärva source-repositoryts CI.
 - Activity får endast läsa Skvallerbyttans separata repository-allowlistade Activity-RPC efter live public-project-lookup; explicit tom repositoryscope ska fail-closed och monorepo-appar får inte ärva source-repositoryts eventström.
 - Skvallerbyttans providerintegration förblir read-only.
-- Drift & insyn får endast använda den sanerade named RPC-entrypointen; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
+- Portalens interna GitHub repositoryinventory, Drift & insyn, repository-CI och Activity får endast använda de sanerade metoderna på named `PortalObservationsService`; lägg inte `SKVALLERBYTTAN_READ_API_TOKEN`, dashboard-cookie eller rå `/api/v1`-proxy i Portalens publika Worker.
 - Publik logo-serving får endast läsa exakt `logos/<asset-id>`; ingen bucket-listning eller godtycklig key får exponeras.
 - Logotypadmin får endast nå R2 efter både provider-side Access och origin-JWT-verifiering; writes ska stanna inom `logos/`, och Preview får inte bindas till production-bucketen.
 - DNS, Cloudflare Access, R2-bucket/public-access, Worker permissions och credentialscope är provider-state och ska live-verifieras; de får inte antas från repositorydokumentation.
