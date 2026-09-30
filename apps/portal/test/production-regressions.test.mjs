@@ -14,10 +14,10 @@ test("documentation and releases prefer Skvallerbyttans authenticated public Git
   assert.match(worker, /serviceReleases\?\.has\(repoName\)/);
 });
 
-test("service cards keep explicit actions and expose a whole-card service link", () => {
+test("service cards open their Portal project page while explicit service actions stay available", () => {
   assert.match(app, /function projectCard\(project, \{ service = false \} = \{\}\)/);
-  assert.match(app, /service && project\.url \? project\.url : project\.portalUrl/);
-  assert.match(app, /class="card-hit-area"/);
+  assert.match(app, /const cardTarget = project\.portalUrl/);
+  assert.match(app, /class="card-hit-area" data-portal-route/);
   assert.match(app, /target === serviceGrid/);
   assert.match(app, />Öppna tjänst<\/a>/);
   assert.match(css, /\.card-hit-area\s*\{/);

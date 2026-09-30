@@ -22,6 +22,10 @@ const detailIds = [
   "project-detail-ref",
   "project-detail-updated",
   "project-detail-source-path",
+  "project-detail-release",
+  "project-detail-release-status",
+  "project-detail-release-link",
+  "project-detail-stores",
   "project-detail-error"
 ];
 
@@ -42,7 +46,16 @@ test("project slug routes use the dedicated detail surface", () => {
   assert.ok(shell.includes('/^\\/projekt\\/[^/]+$/'));
 });
 
-test("project cards link to their stable Portal detail route", () => {
+test("project cards make the full card an internal detail link while retaining explicit actions", () => {
   assert.ok(app.includes("project.portalUrl"));
+  assert.ok(app.includes("card-hit-area"));
+  assert.ok(app.includes("Öppna projektsidan för"));
   assert.ok(app.includes(">Översikt</a>"));
+});
+
+test("project detail shows the latest release in-portal and verified distribution links only", () => {
+  assert.ok(app.includes('"/api/releases?project="'));
+  assert.ok(app.includes("project.releasesPortalUrl"));
+  assert.ok(app.includes("Array.isArray(project.storeLinks)"));
+  assert.ok(app.includes('/^https:\\/\\//'));
 });

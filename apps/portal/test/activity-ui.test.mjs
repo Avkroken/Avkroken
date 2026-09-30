@@ -7,6 +7,7 @@ const client = await readFile(new URL("../public/activity.js", import.meta.url),
 const shell = await readFile(new URL("../public/shell.js", import.meta.url), "utf8");
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const worker = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+const portalCss = await readFile(new URL("../public/portal-v2.css", import.meta.url), "utf8");
 
 function occurrences(source, value) {
   return source.split(value).length - 1;
@@ -58,6 +59,13 @@ test("Activity DOM contract is unique and wired", () => {
   }
 
   assert.equal(occurrences(html, "data-activity-days="), 3);
+});
+
+test("global Activity keeps project breadcrumbs genuinely hidden", () => {
+  assert.ok(html.includes('id="activity-breadcrumbs" aria-label="Brödsmulor" hidden'));
+  assert.ok(portalCss.includes(".portal-v2 [hidden]"));
+  assert.ok(portalCss.includes("display: none !important;"));
+  assert.ok(client.includes("breadcrumbs.hidden = true"));
 });
 
 test("Activity client reads only the Portal API and renders untrusted values through DOM text", () => {

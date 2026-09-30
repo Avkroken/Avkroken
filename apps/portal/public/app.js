@@ -13,10 +13,15 @@ const detailRepository = document.querySelector("#project-detail-repository");
 const detailRef = document.querySelector("#project-detail-ref");
 const detailUpdated = document.querySelector("#project-detail-updated");
 const detailSourcePath = document.querySelector("#project-detail-source-path");
+const detailRelease = document.querySelector("#project-detail-release");
+const detailReleaseStatus = document.querySelector("#project-detail-release-status");
+const detailReleaseLink = document.querySelector("#project-detail-release-link");
+const detailStores = document.querySelector("#project-detail-stores");
 const detailError = document.querySelector("#project-detail-error");
 
 let allProjects = [];
 let projectsLoaded = false;
+let detailReleaseSerial = 0;
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -69,9 +74,9 @@ function metric(label, value) {
 }
 
 function projectCard(project, { service = false } = {}) {
-  const cardTarget = service && project.url ? project.url : project.portalUrl;
+  const cardTarget = project.portalUrl;
   const cardLink = cardTarget
-    ? `<a class="card-hit-area"${service && project.url ? ' target="_blank" rel="noopener noreferrer"' : " data-portal-route"} href="${escapeHtml(cardTarget)}" aria-label="${escapeHtml(service && project.url ? `Öppna tjänsten ${project.name}` : `Öppna översikten för ${project.name}`)}"></a>`
+    ? `<a class="card-hit-area" data-portal-route href="${escapeHtml(cardTarget)}" aria-label="${escapeHtml(service ? `Öppna projektsidan för ${project.name}` : `Öppna översikten för ${project.name}`)}"></a>`
     : "";
 
   const overviewLink = project.portalUrl
@@ -158,6 +163,98 @@ function detailAction(label, href, { primary = false, internal = false } = {}) {
   return `<a class="portal-button${primary ? " primary" : ""}"${routeAttribute} href="${escapeHtml(href)}"${externalAttributes}>${escapeHtml(label)}</a>`;
 }
 
+function renderProjectStores(project) {
+  if (!detailStores) return;
+  const target = detailStores.querySelector("[data-store-links]");
+  if (!target) return;
+
+  if (project?.independentProduct !== true) {
+    detailStores.hidden = true;
+    target.replaceChildren();
+    return;
+  }
+
+  detailStores.hidden = false;
+  target.replaceChildren();
+
+  if (project.url) {
+    const web = document.createElement("a");
+    web.className = "portal-button";
+    web.href = project.url;
+    web.target = "_blank";
+    web.rel = "noopener noreferrer";
+    web.textContent = "Webb";
+    target.appendChild(web);
+  }
+
+  const storeLinks = Array.isArray(project.storeLinks)
+    ? project.storeLinks.filter(item =>
+        item &&
+        typeof item.label === "string" &&
+        typeof item.url === "string" &&
+        /^https:\/\//.test(item.url)
+      )
+    : [];
+
+  for (const item of storeLinks) {
+    const link = document.createElement("a");
+    link.className = "portal-button";
+    link.href = item.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = item.label;
+    target.appendChild(link);
+  }
+
+  if (!storeLinks.length) {
+    const copy = document.createElement("p");
+    copy.textContent = "Inga verifierade App Store-, Google Play- eller Microsoft Store-länkar är publicerade ännu.";
+    target.appendChild(copy);
+  }
+}
+
+async function loadProjectLatestRelease(project) {
+  const serial = ++detailReleaseSerial;
+  if (!detailRelease || !detailReleaseStatus || !detailReleaseLink) return;
+
+  if (project?.type !== "repository" || !project.releasesPortalUrl) {
+    detailRelease.hidden = true;
+    detailReleaseLink.hidden = true;
+    return;
+  }
+
+  detailRelease.hidden = false;
+  detailReleaseStatus.textContent = "Läser senaste publicerade release…";
+  detailReleaseLink.href = project.releasesPortalUrl;
+  detailReleaseLink.textContent = "Visa releasehistorik";
+  detailReleaseLink.hidden = false;
+
+  try {
+    const response = await fetch(
+      "/api/releases?project=" + encodeURIComponent(project.slug),
+      { headers: { Accept: "application/json" } }
+    );
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    const payload = await response.json();
+    if (serial !== detailReleaseSerial) return;
+    const release = Array.isArray(payload.releases) ? payload.releases[0] : null;
+
+    if (!release) {
+      detailReleaseStatus.textContent = "Ingen publicerad GitHub Release ännu.";
+      return;
+    }
+
+    const name = release.name || release.tag || "Release";
+    detailReleaseStatus.textContent = name + " · " + formatDate(release.publishedAt);
+    detailReleaseLink.href = project.releasesPortalUrl;
+    detailReleaseLink.textContent = "Öppna senaste release i Portalen";
+  } catch {
+    if (serial !== detailReleaseSerial) return;
+    detailReleaseStatus.textContent = "Releaseinformationen är tillfälligt otillgänglig.";
+  }
+}
+
 function resetProjectDetail() {
   if (!detailTitle) return;
   detailCategory.textContent = "PROJEKT";
@@ -171,6 +268,9 @@ function resetProjectDetail() {
   detailUpdated.textContent = "—";
   detailSourcePath.hidden = true;
   detailSourcePath.textContent = "";
+  if (detailRelease) detailRelease.hidden = true;
+  if (detailReleaseLink) detailReleaseLink.hidden = true;
+  if (detailStores) detailStores.hidden = true;
   detailError.hidden = true;
 }
 
@@ -243,6 +343,8 @@ function renderProjectDetail() {
   ].filter(Boolean);
 
   detailActions.innerHTML = actions.join("");
+  renderProjectStores(project);
+  loadProjectLatestRelease(project);
   document.title = `${project.name || project.slug} · Avkroken`;
 }
 
