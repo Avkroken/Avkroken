@@ -12,7 +12,7 @@ interface Row {
   updated_by_github_id: number | null;
 }
 
-function fakeDb() {
+function fakeDb(options: { missingTable?: boolean } = {}) {
   let row: Row | null = null;
   const db = {
     prepare(sql: string) {
@@ -24,6 +24,11 @@ function fakeDb() {
         },
         async first() {
           if (!sql.includes("FROM runtime_configuration")) return null;
+          if (options.missingTable) {
+            throw new Error(
+              "D1_ERROR: no such table: runtime_configuration: SQLITE_ERROR",
+            );
+          }
           return row;
         },
         async run() {
@@ -153,6 +158,30 @@ describe("dashboard-managed runtime configuration", () => {
       "deployment",
     );
     expect(resolved.view.suitabilityPolicySource).toBe("deployment");
+  });
+
+  it("keeps the dashboard fail-closed when migration 0006 is unavailable", async () => {
+    const state = fakeDb({ missingTable: true });
+    const runtimeEnv = env(state.db);
+
+    const resolved = await resolveRuntimeConfiguration(runtimeEnv);
+    expect(resolved.view.managedConfigurationStorageReady).toBe(false);
+    expect(resolved.view.studentConsultingCredentials).toBe(false);
+    expect(resolved.env.STUDENTCONSULTING_PASSWORD).toBeUndefined();
+
+    await expect(
+      saveRuntimeConfiguration(
+        runtimeEnv,
+        {
+          studentConsulting: {
+            email: "user@example.test",
+            password: "example-password",
+          },
+          jobIncludeTerms: "support",
+        },
+        123,
+      ),
+    ).rejects.toThrow(/0006_runtime_configuration/);
   });
 
   it("fails closed when autosubmit lacks credentials or include rules", async () => {

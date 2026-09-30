@@ -8,6 +8,7 @@ const ENCRYPTION_INFO = "d1-runtime-configuration";
 const AAD = new TextEncoder().encode("Avkroken/Jobb/runtime-config/v1");
 
 class RuntimeConfigurationDecryptionError extends Error {}
+class RuntimeConfigurationStorageUnavailableError extends Error {}
 
 export interface RuntimeConfigValues {
   STUDENTCONSULTING_EMAIL?: string;
@@ -79,6 +80,7 @@ export interface RuntimeConfigurationView {
   turnstileSource: RuntimeConfigSource;
   managedConfigurationStored: boolean;
   managedConfigurationUnreadable: boolean;
+  managedConfigurationStorageReady: boolean;
   updatedAt: string | null;
 }
 
@@ -108,11 +110,17 @@ export async function resolveRuntimeConfiguration<T extends RuntimeConfigEnv>(
 ): Promise<ResolvedRuntimeConfiguration<T>> {
   let stored: (StoredRuntimeConfiguration & { updatedAt?: string }) | null = null;
   let managedConfigurationUnreadable = false;
+  let managedConfigurationStorageReady = true;
   try {
     stored = await loadManagedRuntimeConfiguration(env);
   } catch (error) {
-    if (!(error instanceof RuntimeConfigurationDecryptionError)) throw error;
-    managedConfigurationUnreadable = true;
+    if (error instanceof RuntimeConfigurationDecryptionError) {
+      managedConfigurationUnreadable = true;
+    } else if (error instanceof RuntimeConfigurationStorageUnavailableError) {
+      managedConfigurationStorageReady = false;
+    } else {
+      throw error;
+    }
   }
 
   const effective = {
@@ -174,6 +182,7 @@ export async function resolveRuntimeConfiguration<T extends RuntimeConfigEnv>(
       effective,
       stored,
       managedConfigurationUnreadable,
+      managedConfigurationStorageReady,
     ),
   };
 }
@@ -284,13 +293,23 @@ export async function saveRuntimeConfiguration(
 async function loadManagedRuntimeConfiguration(
   env: RuntimeConfigEnv,
 ): Promise<(StoredRuntimeConfiguration & { updatedAt?: string }) | null> {
-  const row = await env.DB.prepare(
-    `SELECT ciphertext, iv, updated_at, updated_by_github_id
-     FROM runtime_configuration
-     WHERE id = ?`,
-  )
-    .bind(CONFIG_ID)
-    .first<RuntimeConfigurationRow>();
+  let row: RuntimeConfigurationRow | null;
+  try {
+    row = await env.DB.prepare(
+      `SELECT ciphertext, iv, updated_at, updated_by_github_id
+       FROM runtime_configuration
+       WHERE id = ?`,
+    )
+      .bind(CONFIG_ID)
+      .first<RuntimeConfigurationRow>();
+  } catch (error) {
+    if (isMissingRuntimeConfigurationTable(error)) {
+      throw new RuntimeConfigurationStorageUnavailableError(
+        "Runtime-konfigurationslagret är inte initierat. D1-migration 0006_runtime_configuration.sql måste appliceras av en auktoriserad Cloudflare-identitet.",
+      );
+    }
+    throw error;
+  }
   if (!row) return null;
 
   const secret = await resolveGitHubClientSecret(env);
@@ -328,6 +347,7 @@ function buildConfigurationView(
   effective: RuntimeConfigEnv,
   stored: (StoredRuntimeConfiguration & { updatedAt?: string }) | null,
   managedConfigurationUnreadable: boolean,
+  managedConfigurationStorageReady: boolean,
 ): RuntimeConfigurationView {
   const credentialsSource = pairSource(
     deployment.STUDENTCONSULTING_EMAIL,
@@ -375,6 +395,7 @@ function buildConfigurationView(
     ),
     managedConfigurationStored: Boolean(stored),
     managedConfigurationUnreadable,
+    managedConfigurationStorageReady,
     updatedAt: stored?.updatedAt ?? null,
   };
 }
@@ -569,6 +590,13 @@ function base64url(input: ArrayBuffer | Uint8Array): string {
     .replace(/=/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
+}
+
+function isMissingRuntimeConfigurationTable(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /no such table:\s*runtime_configuration/i.test(error.message)
+  );
 }
 
 function decodeBase64url(value: string): ArrayBuffer {
