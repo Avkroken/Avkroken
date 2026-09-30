@@ -156,9 +156,9 @@ Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte
 
 ### Dokumentationskatalog
 
-Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Om projektkatalogen eller nödvändiga GitHub-katalogläsningar inte kan genomföras returneras `502` med `github_unavailable`; UI visar ett explicit unavailable-state.
+Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Repositoryns README/`docs/`-inventory hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicDocumentationIndex()`, som använder den befintliga read-only GitHub App-installationen efter samma live-public repositorygrind som projektkatalogen. Portalens credential-fria Git-tree-läsning finns kvar endast som rollout/degraded fallback. Om varken intern RPC eller fallback kan ge katalogunderlag visas explicit degraded/unavailable state.
 
-Dokumentationskatalogen läser ett rekursivt Git-tree per unikt repository/ref och deduplicerar samma source-repository mellan repositoryprojekt och opt-in-appar. Tree-läsningarna är concurrency-begränsade till 2 och oanvändbara felresponser cancelas explicit för att inte hålla Workers HTTP-requestslots öppna. Det ersätter rekursiva `/contents`-anrop per mapp. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
+Skvallerbyttans docs-RPC returnerar endast sanerade Markdown-paths för root `README.md` och `docs/**/*.md|markdown`; den returnerar inte GitHub permissions, installationmetadata, providerbudget eller credentials. Portalens adapter mappar därefter root README till `Översikt`, `docs/index.md` till `Dokumentation` och övriga filer till stabila sidetiketter. Det förhindrar den tidigare dubbletten där både README och `docs/index.md` visades som `Översikt`. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen.
 
 ### Dokumentinnehåll
 
@@ -192,7 +192,7 @@ Kall indexbuild är budgeterad:
 
 ### Changelog
 
-`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Utan egen Portal-GitHub-credential återanvänds en separat 60-sekunders repositorygate för eligibility; inventoryn bakom gaten kommer normalt live från Skvallerbyttans autentiserade read-only RPC och Portalens publika REST är fallback. Med en Portal-credential läses eligibility utan denna gate.
+`GET /api/changelog` bygger en bounded snapshot från publika repositoryprojekt. Eligibility kommer från samma live-public repositorygate som projektkatalogen. Själva releasekandidaterna hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositoryReleases()`, som använder den befintliga read-only GitHub App-installationen och sanerar bort drafts/icke-canonical URLs och onödiga providerfält innan svaret lämnar observationslagret. Portalens credential-fria GitHub Releases-read är endast rollout/degraded fallback. Deployment-korrelationen sker separat genom `getPublicReleaseDeployments()` och får därför degradera oberoende av att releasen i sig visas.
 
 - projektkatalogfel: `502 changelog_unavailable`;
 - individuellt repo-releasefel: resten av snapshoten returneras med `source.coverage = partial`;
@@ -214,7 +214,7 @@ Draft releases filtreras alltid bort. Changelog publicerar inte release body, au
 
 - saknad/tom eller för lång project slug: `400 invalid_project`;
 - okänd slug eller monorepo-app: `404 project_releases_not_found`;
-- GitHub release-read misslyckas: `502 project_releases_unavailable`;
+- både den autentiserade release-RPC:n och credential-fria fallbacken misslyckas: `502 project_releases_unavailable`;
 - inga publicerade releases: `200`, `status = available`, tom `releases`-lista;
 - normal respons: `200`, `status = available`, `Cache-Control: no-store`, max 10 releaser.
 

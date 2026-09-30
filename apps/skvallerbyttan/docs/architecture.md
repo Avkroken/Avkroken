@@ -68,7 +68,9 @@ Portalens operativa läsväg är separat från heartbeat och det skyddade HTTP-A
 
 Den generella Drift-snapshoten innehåller endast providerstatus/senaste observation samt capability key/name/provider/status/dataState/freshness/last-success. Provider-endpoints och permissionsträngar, accepterade permissions, HTTP-statusar/fel, installation-/budgetmetadata, scope coverage/repositoryantal och Activity/eventvolym publiceras inte genom den generella Drift-metoden.
 
-Samma named entrypoint har ett separat repository-CI-kontrakt. `getPublicRepositoryCi(repoName)` läser endast D1 source cache-keyn `overview`; den startar ingen GitHub Actions-request. Repositoryraden måste själv vara `visibility = public` och icke-arkiverad. Utåt projiceras endast sampled Actions-summary, source cache-tid och explicit `fresh|stale|unknown`. Actor, permissions/fel, event breakdown och rå runpayload lämnar inte Skvallerbyttan.
+Samma named entrypoint har dessutom två snäva GitHub App-read-kontrakt för Portalens publika contentlager. `getPublicDocumentationIndex(repositoryNames)` läser endast root `README.md` och Markdown-paths under `docs/` efter live-public repositorygrind, och `getPublicRepositoryReleases(repositoryNames, limit)` returnerar endast bounded canonical publicerade releasekandidater. Båda sanerar före RPC-svaret och exponerar inte credentials, permissions, installationmetadata eller rå providerpayload.
+
+Repository-CI-kontraktet `getPublicRepositoryCi(repoName)` läser endast D1 source cache-keyn `overview`; den startar ingen GitHub Actions-request. Repositoryraden måste själv vara `visibility = public` och icke-arkiverad. Utåt projiceras endast sampled Actions-summary, source cache-tid och explicit `fresh|stale|unknown`. Actor, permissions/fel, event breakdown och rå runpayload lämnar inte Skvallerbyttan.
 
 Ett separat repository-Activity-kontrakt exponeras som `getPublicActivity(repositoryNames, days)`. Begärda repositorykortnamn begränsas till 50 och intersectas med den cacheade `overview`-state:n; endast rader med `visibility = public` och `archived != true` går vidare. Därefter queryas D1 `observation_events` med `provider = github` och ett explicit `repository IN (...)`-filter. En explicit lista som efter validering blir tom lägger till `1 = 0` och kan inte falla tillbaka till organisationsomfattande Activity.
 
@@ -95,6 +97,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - ren public-safe repository-CI-modell: `src/portal-ci-model.ts`
 - ren public-safe repository-Activity-modell: `src/portal-activity-model.ts`
 - ren public-safe release-deployment-modell: `src/portal-release-deployment-model.ts`
+- ren public-safe Portal GitHub content-modell för docs/releasekandidater: `src/portal-github-public-model.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
@@ -102,7 +105,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 
 Externa klienter får normaliserade modeller, inte generella provider-dumpar. Relevant state bär status, freshness och provenance. Repository governance skiljer mellan `direct`, `inherited` och `effective` där providern ger tillräckligt underlag.
 
-Portalens publika Drift & insyn-, Builds- och Activity-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state och repository-Activity från den reducerade D1-eventledgern efter dubbel publiceringskontroll. Den enda Portal-initierade GitHub-providerreaden i named RPC är den separat budgeterade release-deployment-korrelationen ovan; den gör en live public-repository-grind och returnerar endast exakta SHA-matchningar.
+Portalens publika konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state och repository-Activity från den reducerade D1-eventledgern efter dubbel publiceringskontroll. Portal-initierade GitHub-providerreads i named RPC är begränsade till live-public repositoryinventory, sanerad docs-inventory, bounded releasekandidater och separat budgeterad release-deployment-korrelation; samtliga använder read-only GitHub App-auth och returnerar reducerade modeller i stället för rå providerpayload.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration: read används där GitHub kräver den nivån; provider-write ingår inte i observationslagret.
 
