@@ -59,6 +59,18 @@ test("search index is not persisted in Cache API and collapses concurrent builds
   assert.equal(worker.includes("SEARCH_INDEX_CACHE_SECONDS"), false);
 });
 
+test("public repository discovery prefers Skvallerbyttans authenticated read-only RPC", () => {
+  assert.ok(worker.includes("async function loadServicePublicRepositories(env)"));
+  assert.ok(worker.includes("service.getPublicRepositories()"));
+  assert.ok(worker.includes("snapshot.schemaVersion !== 1"));
+  assert.ok(worker.includes("snapshot.status !== \"available\""));
+  assert.ok(worker.includes("const observed = await loadServicePublicRepositories(env)"));
+  assert.ok(worker.includes("if (observed !== null) return observed"));
+  assert.ok(worker.includes("const github = await fetchGitHubJson(GITHUB_API, env)"));
+  assert.ok(worker.includes("const endpoint = githubRepositoryApiBase(repo.name) +"));
+  assert.equal(worker.includes("repo.owner.login"), false);
+});
+
 test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("const GITHUB_CATALOG_CONCURRENCY = 2;"));
   assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2")'));

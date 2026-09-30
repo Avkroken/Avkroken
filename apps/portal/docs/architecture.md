@@ -28,10 +28,13 @@ Avkroken-rendering
 
 ### Publik projektkatalog
 
-`src/project-source.mjs` normaliserar GitHubs publika repositoryobjekt till Portalens projektmodell.
+`src/project-source.mjs` normaliserar publika GitHub-repositoryobjekt till Portalens projektmodell. Repositoryinventeringen hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositories()`, där Skvallerbyttans befintliga read-only GitHub App gör den autentiserade providerläsningen och sanerar metadata innan RPC-svaret lämnar observationslagret. Portalens tidigare credential-fria GitHub REST-läsning finns kvar endast som rollout/degraded fallback och kräver ingen ny Portal-secret.
 
 ```text
-GitHub org repositories
+GitHub App /installation/repositories
+       |
+       v
+Skvallerbyttan public-safe repository RPC
        |
        v
 project-source adapter
@@ -122,7 +125,7 @@ GET /api/changelog
 /changelog
 ```
 
-Eligibility för Changelog samt projektspecifika Releases/Issues använder en separat 60-sekunders repositorygate när Portal saknar GitHub-credential. Gaten innehåller endast normaliserade publika repositoryprojekt och minskar bursttrycket mot GitHubs publika API. Om en GitHub-credential konfigureras kringgås denna cache helt och eligibility läses live, så en nyligen avpublicerad repositoryidentitet inte kan användas för en providerfetch med en credential som fortfarande har access. Själva release-/issue-payloaden lagras inte i denna gate.
+Eligibility för Changelog samt projektspecifika Releases/Issues använder samma public-safe repository-discovery och en separat 60-sekunders repositorygate när Portal saknar egen GitHub-credential. Normalfallet är Skvallerbyttans autentiserade read-only GitHub App-inventory via Service Binding; Portalens credential-fria GitHub REST är endast fallback. Gaten innehåller bara normaliserade publika repositoryprojekt. Om en Portal-credential någon gång konfigureras kringgås denna cache och eligibility läses live. Själva release-/issue-payloaden lagras inte i gaten.
 
 `release-source.mjs` accepterar endast repositoryprojekt som matchar Portalens current owner-kontrakt i `github-scope.mjs` (`GITHUB_OWNER/<repo>`). Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
 
@@ -154,7 +157,8 @@ Wiki-publicering är repository-specifik: endast projekt med `has_wiki = true` f
 Builds/CI är repositoryspecifik operativ state och går därför genom Skvallerbyttans befintliga observationsgräns i stället för en parallell Actions-klient i Portalen.
 
 ```text
-live GitHub public repository list
+authenticated public repository inventory
+via Skvallerbyttan read-only RPC
        |
        +--> project-source repository policy
        +--> repository project only
@@ -183,7 +187,7 @@ archived=false
 public-safe CI snapshot
 ```
 
-Portalen validerar först aktuell publik repository-state genom `type=public`-listningen och samma `normalizePublicRepositories()`-policy som projektkatalogen; app-manifestdiscovery körs inte för Builds-gaten. Skvallerbyttan gör därefter defense in depth mot den cacheade repositoryraden och kräver `visibility = public` och `archived != true`.
+Portalen validerar först aktuell publik repository-state från samma sanerade repositoryinventory som projektkatalogen och samma `normalizePublicRepositories()`-policy; app-manifestdiscovery körs inte för Builds-gaten. Normalfallet läser inventoryn live genom Skvallerbyttans GitHub App-RPC, medan Portalens publika REST-väg endast är fallback. Skvallerbyttan gör därefter defense in depth mot den cacheade repositoryraden och kräver `visibility = public` och `archived != true`.
 
 RPC:n gör ingen live GitHub-request. Den läser den canonical `overview` source-cachen och returnerar endast samplebaserad Actions-summary samt cache freshness. Actor, accepted/required permissions, providerfel, event breakdown och rå runpayload ingår inte.
 
@@ -196,7 +200,8 @@ Monorepo-appar får `builds = null` och `buildsPortalUrl = null` och kan inte ä
 Activity är en separat publiceringsyta ovanpå Skvallerbyttans canonical `observation_events`; Portalen skapar ingen parallell GitHub Events-klient.
 
 ```text
-live GitHub public repository list
+authenticated public repository inventory
+via Skvallerbyttan read-only RPC
        |
        +--> project-source repository policy
                  |
@@ -220,7 +225,7 @@ public/non-archived          provider=github + repo IN (...)
        /aktivitet / /projekt/:slug/aktivitet
 ```
 
-Portalen gör först en minimal live `type=public`-listning och väljer endast repositoryprojekt. Global scope är hårt begränsad till 50 repositories; projektscope till exakt ett. Skvallerbyttan kräver därefter att varje begärt repo också finns som publik och icke-arkiverad rad i den cacheade `overview`-state:n.
+Portalen gör först en minimal live public-repositorykontroll genom samma sanerade inventory och väljer endast repositoryprojekt. Normalfallet är Skvallerbyttans autentiserade read-only RPC; credential-fri GitHub REST är fallback. Global scope är hårt begränsad till 50 repositories; projektscope till exakt ett. Skvallerbyttan kräver därefter att varje begärt repo också finns som publik och icke-arkiverad rad i den cacheade `overview`-state:n.
 
 D1-queryn är fail-closed: en explicit repositorylista som efter validering blir tom ger `1 = 0`, aldrig en organisationsvid query. Queryn läser endast GitHub-event för de valda repositorykortnamnen.
 
@@ -255,7 +260,7 @@ GET /api/operations
 Drift & insyn
 ```
 
-Portalen har ingen parallell GitHub-/Cloudflare-providerklient för Drift & insyn. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal endast till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret.
+Portalen har ingen parallell GitHub-/Cloudflare-providerklient för operativ state. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret. Samma RPC äger nu även den sanerade autentiserade repositoryinventeringen genom `getPublicRepositories()`; Portal behåller endast en credential-fri publik GitHub REST-fallback för rollout/degraded state.
 
 RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort:
 

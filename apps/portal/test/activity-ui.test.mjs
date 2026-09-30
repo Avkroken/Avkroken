@@ -127,9 +127,9 @@ test("project detail exposes Activity only through repository project metadata",
 });
 
 
-test("Activity project metadata bumps the public project cache schema", () => {
-  assert.ok(worker.includes("github-projects-v8"));
-  assert.equal(worker.includes("github-projects-v7"), false);
+test("repository inventory source bumps the public project cache schema", () => {
+  assert.ok(worker.includes("github-projects-v9"));
+  assert.equal(worker.includes("github-projects-v8"), false);
 });
 
 

@@ -15,6 +15,7 @@ test("Skvallerbyttan exports a dedicated Portal observations RPC entrypoint", ()
     /class PortalObservationsService extends WorkerEntrypoint<Env>/
   );
   assert.match(observations, /getPublicOperationsSummary/);
+  assert.match(observations, /getPublicRepositories/);
   assert.match(observations, /getPublicRepositoryCi/);
   assert.match(observations, /getPublicActivity/);
 });
@@ -27,6 +28,12 @@ test("Portal observations service does not use HTTP read-token authorization", (
   assert.equal(observations.includes("scopeCoverage:"), false);
 });
 
+
+test("Portal public repository RPC reuses the authenticated read-only GitHub App inventory", () => {
+  assert.match(observations, /githubInstallationRepositories/);
+  assert.match(observations, /buildPortalPublicRepositoriesSnapshot/);
+  assert.equal(observations.includes("SKVALLERBYTTAN_READ_API_TOKEN"), false);
+});
 
 test("Portal repository CI RPC reuses Skvallerbyttan Actions ownership without HTTP auth", () => {
   assert.match(observations, /readSourceCache/);

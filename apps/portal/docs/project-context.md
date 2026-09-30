@@ -81,6 +81,8 @@ Returnerar ett objekt med:
 - `generatedAt`;
 - `projects` — normaliserade aktiva publika repositoryprojekt.
 
+Repositoryunderlaget hämtas primärt via `SKVALLERBYTTAN_OBSERVATIONS.getPublicRepositories()`. Den metoden använder Skvallerbyttans befintliga read-only GitHub App för live `/installation/repositories`, sanerar svaret till publik repositorymetadata och lämnar varken installation-/permissionmetadata, budgetstate eller credentials. Portalens credential-fria GitHub REST-listning finns kvar endast som rollout/degraded fallback.
+
 Adapterpolicyn:
 
 - kräver `visibility = public`;
@@ -135,7 +137,7 @@ Detaljvyn visar:
 - canonical länkar till repository, Wiki där tillgängligt och Discussions;
 - intern Issues-, Releases-, Builds / CI- och Activity-navigation för repositoryprojekt.
 
-Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Releases/Issues/Changelog återanvänder en separat 60-sekunders publik repositorygate endast när Portal saknar GitHub-credential; med credential görs eligibility live. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom Skvallerbyttans befintliga `PortalObservationsService` efter fortsatt live repositorygate; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata.
+Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Releases/Issues/Changelog återanvänder en separat 60-sekunders publik repositorygate när Portal saknar egen GitHub-credential; inventoryn bakom gaten kommer normalt från Skvallerbyttans autentiserade read-only RPC och Portalens publika REST är fallback. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom samma `PortalObservationsService` efter fortsatt live-public repositorygate; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata.
 
 Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggregation ska fortsatt använda rätt adapter/Skvallerbyttan där modellen passar.
 
@@ -188,7 +190,7 @@ För varje valt repository läses högst 10 GitHub Releases. Adapterpolicyn:
 
 Providerbudgeten är max 24 repositoryprojekt, 10 releaser per repository, concurrency 4 och max 40 returnerade releaser. Normal coverage är därför `bounded`, aldrig komplett. Repo-cap eller individuella release-fetchfel ger `partial`.
 
-Eligibility för Changelog, projektspecifika Releases och Issues kommer från en repository-only publiceringsgate. I nuvarande credential-fria Portal-runtime får den gaten återanvändas i högst 60 sekunder för att dämpa GitHub-bursts; om en GitHub-credential konfigureras kringgås cachen och GitHubs publika repositorylista läses live. Själva Changelog-snapshoten och release-/issue-payloads lagras inte persistent i Cache API. Samtidiga Changelog-builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
+Eligibility för Changelog, projektspecifika Releases och Issues kommer från en repository-only publiceringsgate. I nuvarande credential-fria Portal-runtime får gaten återanvändas i högst 60 sekunder; normalfallet är live-inventory från Skvallerbyttans read-only GitHub App via Service Binding och Portalens publika GitHub REST används endast som fallback. Om en Portal-credential konfigureras kringgås eligibility-cachen. Själva Changelog-snapshoten och release-/issue-payloads lagras inte persistent i Cache API. Samtidiga Changelog-builds i samma isolate delar endast ett in-flight Promise som rensas efter success/failure.
 
 Changelog-klienten filtrerar den redan sanerade snapshoten lokalt med `Alla`, `Features`, `Fixes`, `Security`, `Documentation` och `Releases`. Det skapar inga ytterligare providerreads. `Deployments` publiceras inte som filter eftersom releaseadaptern ännu saknar en verifierad canonical deploymentrelation; Portalen fabricerar inte den kopplingen från taggar eller tidsnärhet.
 
@@ -240,7 +242,7 @@ Felmodell:
 
 ### `/api/builds?project=...`
 
-Endpointen kräver först ett live-publicerat repositoryprojekt från GitHubs publika organisationslistning, normaliserad med samma repositorypolicy som Portalens projektkatalog. App-manifest läses inte för denna repository-only gate. Därefter anropas den redan konfigurerade interna bindingen `SKVALLERBYTTAN_OBSERVATIONS` och metoden `getPublicRepositoryCi(repoName)`.
+Endpointen kräver först ett live-publicerat repositoryprojekt från samma sanerade repositoryinventory som projektkatalogen. Inventoryn kommer normalt från `PortalObservationsService.getPublicRepositories()` och faller endast tillbaka till Portalens credential-fria publika GitHub REST vid rollout/degraded state. App-manifest läses inte för denna repository-only gate. Därefter anropas samma interna binding och metoden `getPublicRepositoryCi(repoName)`.
 
 Skvallerbyttans metod gör **ingen ny GitHub-request**. Den läser `overview` ur D1 source cache och kräver att den cacheade repositoryraden själv är publik och inte arkiverad innan någon CI-summary kan lämna observationslagret.
 
@@ -272,7 +274,7 @@ Felmodell i Portal:
 
 ### `/api/activity?days=...&project=...`
 
-Activity använder samma live-public repositorygate som Builds innan någon intern observationsdata läses. Om `project` anges måste slugen resolvea till exakt ett repositoryprojekt. Utan `project` väljs högst 50 live-publika repositoryprojekt.
+Activity använder samma live-public repositorygate som Builds innan någon intern observationsdata läses. Repositoryinventoryn kommer normalt från Skvallerbyttans autentiserade read-only `getPublicRepositories()`-RPC och Portalens publika REST är endast fallback. Om `project` anges måste slugen resolvea till exakt ett repositoryprojekt. Utan `project` väljs högst 50 live-publika repositoryprojekt.
 
 Portal → Skvallerbyttan sker genom `PortalObservationsService.getPublicActivity(repositoryNames, days)`. RPC:n:
 
@@ -348,7 +350,7 @@ Direktkopplingen mellan apparna består nu av tre separata least-privilege RPC-k
 
 - Skvallerbyttan → Portal: dokumentationscache-invalidering via `DocsInvalidationService`;
 - Skvallerbyttan → Portal: operativ heartbeat via `OperationalHeartbeatService`;
-- Portal → Skvallerbyttan: sanerad observationssnapshot via `PortalObservationsService`.
+- Portal → Skvallerbyttan: sanerade read-only snapshots via `PortalObservationsService`, inklusive public repository inventory, Drift, repository-CI och repository-Activity.
 
 Portalens binding `SKVALLERBYTTAN_OBSERVATIONS` pekar endast på den named entrypointen. Driftvyn använder inte Skvallerbyttans skyddade HTTP-`/api/v1`, dashboard-cookie eller `SKVALLERBYTTAN_READ_API_TOKEN`.
 
