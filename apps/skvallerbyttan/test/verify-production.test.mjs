@@ -159,4 +159,9 @@ test("repository Preview config stays fail-closed without production provider st
   assert.equal(value.previews?.services, undefined);
   assert.equal(value.previews?.secrets_store_secrets, undefined);
   assert.equal(value.previews?.vars?.CLOUDFLARE_ACCOUNT_ID, undefined);
+
+  const oauthSecret = value.secrets_store_secrets?.find(
+    item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
+  );
+  assert.equal(oauthSecret?.secret_name, "KROSA_MAJA_CLIENT_SECRET");
 });

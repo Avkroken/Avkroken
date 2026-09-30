@@ -12,6 +12,12 @@ import {
   docsContentLocation,
   repositoryDocsSource
 } from "./docs-source.mjs";
+import {
+  pageSort,
+  treeFilePage,
+  treeMarkdownPages,
+  treeReadmePage
+} from "./docs-pages.mjs";
 import { documentationPath, isPortalDocumentRoute, protectedRedirectForPath } from "./portal-routes.mjs";
 import { servePublicLogo } from "./logo-assets.mjs";
 import {
@@ -52,7 +58,7 @@ const GITHUB_API = githubUserRepositoriesApi();
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
-const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2");
+const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v3");
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
@@ -185,27 +191,6 @@ async function purgeDocumentationCache(ctx, tags) {
   return { success: false, errors: lastErrors };
 }
 
-function pageLabel(path) {
-  const name = path.split("/").pop() || path;
-  const stem = name.replace(/\.(md|markdown)$/i, "");
-  const known = {
-    "README": "Översikt",
-    "index": "Översikt",
-    "architecture": "Arkitektur",
-    "operations": "Drift",
-    "security": "Säkerhet",
-    "project-context": "Projektkontext",
-    "engineering-context": "Engineering context",
-    "deployment": "Deployment",
-    "authentication": "Autentisering",
-    "automation": "Automation",
-    "discovery": "Discovery",
-    "providers": "Providers"
-  };
-  if (known[stem]) return known[stem];
-  return stem.replace(/[-_]+/g, " ").replace(/\b\w/g, char => char.toUpperCase());
-}
-
 async function fetchGitHubJson(url, env) {
   const response = await fetch(url, { headers: githubHeaders(env) });
   if (!response.ok) {
@@ -239,55 +224,12 @@ function repositoryTreeLoader(env) {
   };
 }
 
-function treeMarkdownPages(tree, root) {
-  if (!Array.isArray(tree)) return [];
-  const prefix = String(root || "").replace(/\/+$/, "") + "/";
-  return tree
-    .filter(item => {
-      if (item?.type !== "blob" || typeof item.path !== "string") return false;
-      if (!item.path.startsWith(prefix) || !/\.(md|markdown)$/i.test(item.path)) return false;
-      const relative = item.path.slice(prefix.length);
-      return relative && relative.split("/").length - 1 <= MAX_DOC_DEPTH;
-    })
-    .map(item => ({ path: item.path, label: pageLabel(item.path) }));
-}
-
-function treeReadmePage(tree) {
-  if (!Array.isArray(tree)) return null;
-  const candidates = tree
-    .filter(item => item?.type === "blob" && typeof item.path === "string")
-    .map(item => item.path)
-    .filter(path => /(^|\/)README\.(md|markdown)$/i.test(path) && isPublicMarkdownPath(path))
-    .sort((a, b) => {
-      const rootDiff = Number(a.includes("/")) - Number(b.includes("/"));
-      return rootDiff || a.localeCompare(b, "sv");
-    });
-  return candidates.length ? { path: candidates[0], label: "Översikt" } : null;
-}
-
-function treeFilePage(tree, path, label) {
-  if (!Array.isArray(tree) || !/\.(md|markdown)$/i.test(path || "")) return null;
-  const found = tree.some(item => item?.type === "blob" && item.path === path);
-  return found ? { path, label } : null;
-}
-
-function pageSort(a, b) {
-  const rank = value => {
-    if (/(^|\/)docs\/index\.(md|markdown)$/i.test(value.path)) return 0;
-    if (/(^|\/)README\.(md|markdown)$/i.test(value.path)) return 1;
-    return 2;
-  };
-  const diff = rank(a) - rank(b);
-  if (diff !== 0) return diff;
-  return a.path.localeCompare(b.path, "sv");
-}
-
 async function buildDocsEntry(repo, loadTree) {
   const source = repositoryDocsSource(repo);
   if (!source) return null;
 
   const tree = await loadTree(repo);
-  const docs = treeMarkdownPages(tree, source.docsRoot);
+  const docs = treeMarkdownPages(tree, source.docsRoot, MAX_DOC_DEPTH);
   const readme = treeReadmePage(tree);
 
   const pages = [...docs];
@@ -311,7 +253,7 @@ async function buildAppDocsEntry(project, loadTree) {
   };
 
   const tree = await loadTree(repo);
-  const docs = treeMarkdownPages(tree, source.docsRoot);
+  const docs = treeMarkdownPages(tree, source.docsRoot, MAX_DOC_DEPTH);
   const readme = treeFilePage(tree, source.readmePath, "Översikt");
 
   const sourcePages = [...docs];
@@ -356,8 +298,67 @@ async function buildProjectDocsEntry(project, loadTree) {
   return repo ? buildDocsEntry(repo, loadTree) : null;
 }
 
+function documentationRepositoryNames(projects) {
+  const names = new Set();
+  for (const project of projects || []) {
+    if (project?.type === "repository") {
+      const name = repositoryNameFromOwnedFullName(project?.source?.repository);
+      if (name) names.add(name);
+      continue;
+    }
+    if (project?.type === "app") {
+      const source = appDocsSource(project);
+      if (source?.sourceRepository) names.add(source.sourceRepository);
+    }
+  }
+  return [...names];
+}
+
+async function loadServiceDocumentationTrees(env, projects) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicDocumentationIndex !== "function") return new Map();
+
+  try {
+    const snapshot = await service.getPublicDocumentationIndex(
+      documentationRepositoryNames(projects)
+    );
+    if (
+      !snapshot ||
+      snapshot.schemaVersion !== 1 ||
+      snapshot.status !== "available" ||
+      !Array.isArray(snapshot.repositories)
+    ) {
+      return new Map();
+    }
+
+    const trees = new Map();
+    for (const repository of snapshot.repositories) {
+      if (
+        repository?.failed === true ||
+        typeof repository?.repository !== "string" ||
+        !Array.isArray(repository?.paths)
+      ) {
+        continue;
+      }
+      trees.set(
+        repository.repository,
+        repository.paths.map(path => ({ type: "blob", path }))
+      );
+    }
+    return trees;
+  } catch {
+    return new Map();
+  }
+}
+
 async function loadDocsCatalog(projects, env) {
-  const loadTree = repositoryTreeLoader(env);
+  const serviceTrees = await loadServiceDocumentationTrees(env, projects);
+  const fallbackTree = repositoryTreeLoader(env);
+  const loadTree = repo =>
+    serviceTrees.has(repo.name)
+      ? Promise.resolve(serviceTrees.get(repo.name))
+      : fallbackTree(repo);
+
   const entries = await mapWithConcurrency(
     projects,
     GITHUB_CATALOG_CONCURRENCY,
@@ -1507,10 +1508,56 @@ async function getPublicProjectIssues(requestUrl, env) {
   }
 }
 
-async function fetchProjectReleases(project, env) {
+async function loadServiceReleaseCandidates(projects, env) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicRepositoryReleases !== "function") return new Map();
+
+  const names = projects
+    .map(project => repositoryNameFromOwnedFullName(project?.source?.repository))
+    .filter(Boolean);
+
+  try {
+    const snapshot = await service.getPublicRepositoryReleases(
+      names,
+      CHANGELOG_RELEASES_PER_REPOSITORY
+    );
+    if (
+      !snapshot ||
+      snapshot.schemaVersion !== 1 ||
+      snapshot.status !== "available" ||
+      !Array.isArray(snapshot.repositories)
+    ) {
+      return new Map();
+    }
+
+    const releases = new Map();
+    for (const repository of snapshot.repositories) {
+      if (
+        repository?.failed === true ||
+        typeof repository?.repository !== "string" ||
+        !Array.isArray(repository?.releases)
+      ) {
+        continue;
+      }
+      releases.set(repository.repository, repository.releases);
+    }
+    return releases;
+  } catch {
+    return new Map();
+  }
+}
+
+async function fetchProjectReleases(project, env, serviceReleases = null) {
   const repository = String(project?.source?.repository || "");
   const repoName = repositoryNameFromOwnedFullName(repository);
   if (!repoName) return { releases: [], failed: true };
+
+  if (serviceReleases?.has(repoName)) {
+    return {
+      releases: normalizePublicReleases(project, serviceReleases.get(repoName)),
+      failed: false
+    };
+  }
 
   const endpoint = githubRepositoryApiBase(repoName) + "/releases?per_page=" +
     CHANGELOG_RELEASES_PER_REPOSITORY;
@@ -1533,7 +1580,8 @@ async function loadPublicProjectReleases(projectSlug, env) {
 
   if (!project) return null;
 
-  const fetched = await fetchProjectReleases(project, env);
+  const serviceReleases = await loadServiceReleaseCandidates([project], env);
+  const fetched = await fetchProjectReleases(project, env, serviceReleases);
   if (fetched.failed) {
     throw new Error("project_releases_unavailable");
   }
@@ -1628,11 +1676,12 @@ async function getPublicProjectReleases(requestUrl, env) {
 
 async function fetchChangelogReleases(projects, env) {
   const results = [];
+  const serviceReleases = await loadServiceReleaseCandidates(projects, env);
 
   for (let index = 0; index < projects.length; index += CHANGELOG_FETCH_CONCURRENCY) {
     const batch = projects.slice(index, index + CHANGELOG_FETCH_CONCURRENCY);
     const batchResults = await Promise.all(
-      batch.map(project => fetchProjectReleases(project, env))
+      batch.map(project => fetchProjectReleases(project, env, serviceReleases))
     );
     results.push(...batchResults);
   }

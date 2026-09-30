@@ -258,6 +258,18 @@ h1 {
   pointer-events: none;
 }
 
+.card-hit-area {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.card-hit-area:focus-visible {
+  outline: 3px solid var(--focus, #5fb3ff);
+  outline-offset: -4px;
+}
+
 .card:hover {
   transform: translateY(-4px);
   border-color: rgba(95,179,255,.42);
@@ -314,7 +326,7 @@ h1 {
 
 .card-actions {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
