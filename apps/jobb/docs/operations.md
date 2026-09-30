@@ -36,6 +36,14 @@ Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör `pnpm typeche
 
 `pnpm deploy:cloudflare` applicerar D1-migrationer remote via `apps/jobb/wrangler.jsonc` och deployar därefter Workern med samma konfiguration.
 
+## Worker Preview state
+
+Jobbs Preview är fortsatt fail-closed för provider-/side-effect-state. Den nu beslutade stateplanen är separat D1 `jobb-preview-eu` och separat R2 `jobb-evidence-preview`, båda EU-isolerade. Production-D1 `jobb-eu`, production-R2 `jobb-evidence`, Workflow `jobb-automation`, Email och production OAuth/providercredentials får inte återanvändas i Preview.
+
+Live Cloudflare-inventory 2026-09-30 verifierade att båda planerade previewresurserna saknas. Skapande med den befintliga Wrangler-profilen stoppades av provider-authz eftersom medlemsrollen är Developer Platform Editor och inte har create/delete-rätt för Developer Platform-resurser. Ingen alternativ token skapades och inga productionbindings ändrades.
+
+När en auktoriserad create-roll finns ska `jobb-preview-eu` skapas med `jurisdiction=eu`, migrationerna `0001`–`0005` appliceras, och `jobb-evidence-preview` skapas med EU-jurisdiction. Först därefter får `previews.d1_databases`/`previews.r2_buckets` läggas till. Se `../../docs/organization/preview-state-standard.md`.
+
 ## D1 data locality
 
 Produktionsbindingen `DB` ska använda en D1-databas skapad med `jurisdiction=eu`. Cloudflare tillåter inte att jurisdiction läggs till eller ändras efter att databasen skapats, så ett framtida byte ska göras som en kontrollerad export/import till en ny EU-databas före binding-cutover.
