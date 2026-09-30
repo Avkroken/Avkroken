@@ -799,35 +799,27 @@ a.portal-product-card:hover {
   line-height: 1.65;
 }
 
-.wiki-doc-list {
-  display: grid;
-  gap: var(--ak-space-2);
+.wiki-navigation a[aria-current="page"] {
+  color: var(--ak-accent-strong);
+  border-color: color-mix(in srgb, var(--ak-accent-default) 42%, var(--ak-border-subtle));
+  background: color-mix(in srgb, var(--ak-accent-default) 7%, var(--ak-surface-raised));
 }
 
-.wiki-doc-item {
-  display: grid;
-  gap: var(--ak-space-1);
+.wiki-page-content {
+  min-width: 0;
+  padding-top: var(--ak-space-2);
+  overflow-wrap: anywhere;
+}
+
+.wiki-page-content > :first-child {
+  margin-top: 0;
+}
+
+.wiki-page-content pre {
+  overflow-x: auto;
   padding: var(--ak-space-4);
   border: 1px solid var(--ak-border-subtle);
   border-radius: var(--ak-radius-2);
-  color: inherit;
-  background: var(--ak-surface-sunken);
-  text-decoration: none;
-}
-
-.wiki-doc-item:hover {
-  border-color: color-mix(in srgb, var(--ak-accent-default) 42%, var(--ak-border-subtle));
-  background: var(--ak-surface-raised);
-}
-
-.wiki-doc-item strong {
-  color: var(--ak-text-primary);
-}
-
-.wiki-doc-item span {
-  color: var(--ak-text-tertiary);
-  overflow-wrap: anywhere;
-  font: .75rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .wiki-collaboration {

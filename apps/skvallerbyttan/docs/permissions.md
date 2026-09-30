@@ -14,6 +14,7 @@ Den här matrisen beskriver minsta provider-permissions för observationslagret.
 | --- | --- | --- | --- | --- |
 | repositories | `GET /installation/repositories` | GitHub App installation repository access | read | implementerad |
 | pull requests / issues | `GET /repos/{owner}/{repo}/pulls` + `GET /repos/{owner}/{repo}/issues` | Pull requests + Issues | read | implementerad |
+| Discussions content | GitHub GraphQL `Repository.discussions` | Discussions | read | **inte konfigurerad/implementerad**; canonical Discussion-URL exponeras av publik repositorymetadata utan Discussion-content-read |
 | repository Actions | `GET /repos/{owner}/{repo}/actions/*` | Actions | read | implementerad |
 | organization Actions permissions | `GET /orgs/{org}/actions/permissions*` | Administration (organization) | read | implementerad för Organization; `not_supported` för User owner |
 | repository effective rulesets | `GET /repos/{owner}/{repo}/rulesets?includes_parents=true` | Metadata (repository) | read | implementerad |
