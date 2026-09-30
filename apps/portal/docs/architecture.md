@@ -75,7 +75,7 @@ Discovery-flödet:
 
 Manifestet är presentation/publiceringskonfiguration, inte teknisk source of truth. Appens README/docs äger fortsatt teknisk current-state.
 
-Skvallerbyttan är första opt-in-appen. Manifestet innehåller ingen publik dashboard-URL, så projektposten gör inte den privata dashboarden publik. Jobb och Portal saknar publika appmanifests.
+Skvallerbyttan och Dumpen är explicit opt-in-publicerade appar. Skvallerbyttans manifest innehåller ingen publik dashboard-URL, så projektposten gör inte den privata dashboarden publik. Dumpens manifest återanvänder den publika tjänsteidentiteten `https://dumpen.denied.se` medan det pensionerade fristående repositoryt fortsatt filtreras bort. Jobb och Portal saknar publika appmanifests.
 
 ### Projektdetalj
 

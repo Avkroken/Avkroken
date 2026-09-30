@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   mergePublicProjectCatalog,
   normalizePublicAppManifest
@@ -49,6 +50,22 @@ test("normalizes an explicitly opted-in public app without inventing a public en
     project.sourceUrl,
     "https://github.com/Avkroken/Avkroken/tree/main/apps/skvallerbyttan"
   );
+});
+
+test("Dumpen manifest publishes the monorepo app with its canonical service identity", async () => {
+  const raw = await readFile(new URL("../../dumpen/portal.public.json", import.meta.url), "utf8");
+  const project = normalizePublicAppManifest(JSON.parse(raw), {
+    ...context,
+    sourcePath: "apps/dumpen"
+  });
+
+  assert.equal(project.slug, "dumpen");
+  assert.equal(project.name, "Dumpen");
+  assert.equal(project.category, "Tjänst");
+  assert.equal(project.accent, "violet");
+  assert.equal(project.url, "https://dumpen.denied.se/");
+  assert.equal(project.portalPublished, true);
+  assert.equal(project.source.path, "apps/dumpen");
 });
 
 test("accepts an optional public URL only when it is HTTPS", () => {

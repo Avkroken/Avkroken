@@ -118,6 +118,7 @@ Saknat manifest publicerar ingenting. Manifestdata valideras strikt och får int
 Nuvarande opt-in:
 
 - Skvallerbyttan: publicerad som projektpost utan publik dashboard-URL och med app-lokal README/docs-rendering i Portal-skalet.
+- Dumpen: publicerad som monorepo-app med `https://dumpen.denied.se` som publik tjänste-URL; det pensionerade fristående `Dumpen`-repositoryt förblir exkluderat.
 - Portal: inget separat appmanifest; `Avkroken`-repositoryprojektet representerar Portalens repositoryyta.
 - Jobb: inget publikt appmanifest; skyddad Jobb-state går fortsatt endast via Auth-gränsen.
 
