@@ -51,6 +51,13 @@ import {
   normalizePublicIssues,
   sortPublicIssues
 } from "./issue-source.mjs";
+import {
+  ensureWikiNavigation,
+  normalizeWikiPage,
+  wikiCanonicalUrl,
+  wikiNavigation,
+  wikiRawUrl
+} from "./wiki-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API = githubUserRepositoriesApi();
@@ -76,6 +83,8 @@ const CHANGELOG_RESULT_LIMIT = 40;
 const CHANGELOG_FETCH_CONCURRENCY = 4;
 const CHANGELOG_CORRELATION_REPOSITORY_LIMIT = 8;
 const PROJECT_ISSUES_LIMIT = 30;
+const WIKI_PAGE_MAX_BYTES = 150000;
+const WIKI_CDN_CACHE_SECONDS = 300;
 const ACTIVITY_REPOSITORY_LIMIT = 50;
 const ACTIVITY_DEFAULT_DAYS = 7;
 
@@ -503,6 +512,222 @@ async function getDocContent(requestUrl, env, ctx) {
     }
   });
 }
+
+async function fetchPublicWikiMarkdown(endpoint) {
+  const response = await fetch(endpoint, {
+    headers: { "User-Agent": "Avkroken-Portal-Worker" }
+  });
+
+  if (response.status === 404) {
+    await discardResponse(response);
+    return { status: "not_found", markdown: null };
+  }
+
+  if (!response.ok) {
+    await discardResponse(response);
+    return { status: "unavailable", markdown: null };
+  }
+
+  const markdown = await response.text();
+  if (markdown.length > WIKI_PAGE_MAX_BYTES) {
+    return { status: "too_large", markdown: null };
+  }
+
+  return { status: "available", markdown };
+}
+
+async function loadPublicWikiPage(projectSlug, requestedPage, env) {
+  const projects = await loadPublicationRepositoryProjects(env);
+  const project = projects.find(item =>
+    item?.type === "repository" &&
+    item?.slug === projectSlug &&
+    item?.source?.provider === "github" &&
+    item?.source?.kind === "repository" &&
+    typeof item?.source?.repository === "string" &&
+    isOwnedGitHubRepository(item.source.repository) &&
+    typeof item?.wiki === "string" &&
+    typeof item?.wikiPortalUrl === "string"
+  );
+
+  if (!project) return { status: "project_not_found" };
+
+  const page = normalizeWikiPage(requestedPage);
+  if (!page) return { status: "invalid_page" };
+
+  const repository = project.source.repository;
+  const pageEndpoint = wikiRawUrl(repository, page);
+  const sidebarEndpoint = wikiRawUrl(repository, "_Sidebar");
+
+  if (!pageEndpoint || !sidebarEndpoint) return { status: "invalid_page" };
+
+  const [pageResult, sidebarResult] = await Promise.all([
+    fetchPublicWikiMarkdown(pageEndpoint),
+    fetchPublicWikiMarkdown(sidebarEndpoint)
+  ]);
+
+  if (pageResult.status !== "available") {
+    return { status: pageResult.status };
+  }
+
+  const navigation = ensureWikiNavigation(
+    sidebarResult.status === "available"
+      ? wikiNavigation(sidebarResult.markdown)
+      : [],
+    page
+  );
+
+  const sourceUrl = wikiCanonicalUrl(repository, page);
+  if (!sourceUrl) return { status: "invalid_page" };
+
+  const label = navigation.find(item => item.page === page)?.label || page;
+
+  return {
+    status: "available",
+    payload: {
+      generatedAt: new Date().toISOString(),
+      source: {
+        provider: "github_wiki_raw",
+        scope: "public_repository_wiki_page",
+        coverage: sidebarResult.status === "available"
+          ? "page_with_sidebar"
+          : "page_only",
+        pageLimitBytes: WIKI_PAGE_MAX_BYTES,
+        navigationLimit: 24
+      },
+      project: {
+        slug: project.slug,
+        name: project.name,
+        portalUrl: project.portalUrl,
+        repository: project.repository,
+        wiki: project.wiki,
+        issues: project.issues,
+        discussions: project.discussions
+      },
+      page: {
+        name: page,
+        label,
+        markdown: pageResult.markdown,
+        sourceUrl
+      },
+      navigation
+    }
+  };
+}
+
+async function getPublicWikiPage(requestUrl, env) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+  const requestedPage = requestUrl.searchParams.get("page");
+
+  if (!projectSlug || projectSlug.length > 120) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_project"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  const normalizedPage = normalizeWikiPage(requestedPage);
+  if (!normalizedPage) {
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "invalid_wiki_page"
+    }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+
+  try {
+    const result = await loadPublicWikiPage(projectSlug, normalizedPage, env);
+
+    if (result.status === "project_not_found") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "project_wiki_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    if (result.status === "not_found") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "wiki_page_not_found"
+      }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    if (result.status === "too_large") {
+      return new Response(JSON.stringify({
+        status: "error",
+        error: "wiki_page_too_large"
+      }), {
+        status: 413,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    if (result.status !== "available") {
+      throw new Error("wiki_unavailable");
+    }
+
+    return new Response(JSON.stringify({
+      status: "available",
+      ...result.payload
+    }), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "Cloudflare-CDN-Cache-Control": "public, max-age=" + WIKI_CDN_CACHE_SECONDS,
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch (error) {
+    console.error("public Wiki unavailable", {
+      project: projectSlug,
+      page: normalizedPage,
+      error: error instanceof Error ? error.message : String(error)
+    });
+
+    return new Response(JSON.stringify({
+      status: "error",
+      error: "wiki_unavailable"
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  }
+}
+
 async function readPublicAppManifest(repo, directory, env) {
   const sourcePath = directory.path;
   const manifestPath = sourcePath + "/" + PUBLIC_APP_MANIFEST;
@@ -2183,6 +2408,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getDocContent(url, env, ctx);
+    }
+
+    if (url.pathname === "/api/wiki") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicWikiPage(url, env);
     }
 
     if (url.pathname === "/api/search") {

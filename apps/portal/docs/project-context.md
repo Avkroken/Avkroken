@@ -143,20 +143,20 @@ Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggr
 
 ## Wiki-presentation
 
-Repository-Wikis synkas redan av repo-lokala Actions från canonical `README.md` och `docs/index.md`. Workflows genererar `Home.md`, `Documentation.md` och `_Sidebar.md` och anger uttryckligen att Wikin är navigation/presentation, inte teknisk source of truth.
+Repository-Wikis synkas redan av repo-lokala Actions från canonical `README.md` och `docs/index.md`, men Wiki får också innehålla manuellt presentations-/guideinnehåll. Teknisk current-state ska fortsatt ägas av README och versionsstyrda docs.
 
-Portalen skapar därför inte en separat GitHub-Wiki-providerklient. För repositoryprojekt där GitHub rapporterar `has_wiki = true` exponeras `/projekt/:slug/wiki`.
+För repositoryprojekt där GitHub rapporterar `has_wiki = true` exponeras `/projekt/:slug/wiki` och `/projekt/:slug/wiki/:page`. Portalens server-side `/api/wiki?project=...&page=...`:
 
-Wiki-vyn:
+- verifierar projektet genom samma live-public repositorygate som övriga repositoryytor;
+- konstruerar endast current-owner Wiki-URL:er och accepterar inte godtyckliga repo-/originvärden från klienten;
+- läser vald Markdown-sida och, best-effort, `_Sidebar.md` från GitHubs publika Wiki raw-origin utan credential;
+- begränsar sidnamn, navigation till 24 poster och sidstorlek till 150 000 tecken;
+- returnerar minimal project/page/navigation-state och rå Wiki-Markdown, aldrig providercredentials eller privat metadata;
+- låter sidebarfel degradera till Home + aktuell sida i stället för att göra en i övrigt tillgänglig Wiki-sida otillgänglig.
 
-- läser endast Portalens publika `/api/projects` och `/api/docs`;
-- återger projektets Wiki-navigation och publika README/docs som interna Portal-länkar;
-- visar canonical länk till GitHub-Wikin;
-- länkar Issues/Discussions/Repository till canonical GitHub-ytor;
-- gör inga direkta browseranrop till GitHub API;
-- publicerar inte Wiki för monorepo-appar enbart därför att source-repositoryt har Wiki.
+Browserklienten hämtar endast Portalens `/api/wiki`, renderar Markdown via DOM-noder utan rå HTML-exekvering, håller relativa Wiki-länkar på Portalens interna Wiki-routes och visar canonical `Visa original-Wiki` för den faktiska sidan. Issues/Discussions/Repository länkas fortsatt till canonical GitHub-ytor.
 
-Skvallerbyttan är därför fortsatt utan separat app-Wiki-yta. Jobb påverkas inte och saknar fortsatt publik app-post.
+Monorepo-appar publicerar inte en separat Wiki enbart därför att source-repositoryt har Wiki.
 
 ## Dokumentationsdata
 
@@ -446,8 +446,7 @@ Releaseautomation verifierades live repo-för-repo 2026-09-30. `Avkroken`, `Bast
 
 Följande ligger utanför den nu verifierade Portal v2-kärnan eller saknar nödvändig interaktiv åtkomst för separat acceptance:
 
-- direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
-- Discussion-innehåll i global sök är inte aktiverat eftersom det skulle kräva en separat providerpermission/GraphQL-väg; canonical Discussions-ytor är däremot sökbara;
+- Discussion-innehåll i global sök är permission-blockerat: GitHubs Discussion-data kräver separat repositorypermission `Discussions: read`, och nuvarande Skvallerbyttan/Gamnacken-permissionkontrakt deklarerar inte den. Canonical Discussions-ytor är fortsatt sökbara/länkade utan att permissions utökas;
 - Changelog-korrelationen är implementerad för relationer som kan bevisas från canonical release metadata och exakt GitHub deployment-SHA. GitHub-miljöer som inte skapar Deployment-objekt visas som `not_observed`, inte som antaget deployade;
 - logo-admins production-CRUD kräver fortsatt en legitim interaktiv Cloudflare Access-session och kan därför inte impersoneras från den nuvarande terminalmiljön. Admin-UI:n innehåller nu ett självrensande canaryflöde som gör hela punkt 2d till ett enda autentiserat klick; edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är redan verifierade och ingen service token skapas för testet.
 

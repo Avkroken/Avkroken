@@ -1,6 +1,6 @@
 # Portal v2 — Del 1: verifierad arkitekturbas
 
-**Status:** Del 1-arkitekturkontraktet är verifierat mot current repository-/GitHub-state och dokumenterar kvarvarande externa begränsningar utan att versionsstyra flyktig provider-planstate. GitHub owner-modellen är verifierad och implementerad på arbetsgrenen. Cloudflare Workers Preview-buildfelet är löst med explicit fail-closed Preview-konfiguration och `avkroken`, `skvallerbyttan` samt `jobb` bygger verifierat grönt utan production-state. Figma är referensverktyg medan Git/runtime är source of truth. Releaseautomation ska utgå från repoägda kontrakt och ny providerverifiering när Del 3 genomförs.
+**Status:** Del 1-arkitekturkontraktet är verifierat mot current repository-/GitHub-state och dokumenterar kvarvarande externa begränsningar utan att versionsstyra flyktig provider-planstate. GitHub owner-modellen är verifierad för current privata User-owner `Avkroken`. Cloudflare Workers Preview-buildfelet är löst med explicit fail-closed Preview-konfiguration och `avkroken`, `skvallerbyttan` samt `jobb` bygger verifierat grönt utan production-state. Runtime/Git är designens source of truth; den tidigare länkade Figma-filen är uttryckligen parkerad och är inte originaldesignen. Releaseautomation är repoägd och verifierades på nytt 2026-09-30.
 
 **Verifieringsdatum:** 2026-09-26
 
@@ -204,11 +204,10 @@ Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske gen
 | --- | --- | --- | --- | --- | --- |
 | GitHub owner/login | **Löst** — Organization → privat User-owner är redan genomfört, login är fortsatt `Avkroken`, user-owner-stöd är implementerat och providerflöden använder current owner | Behåll `Avkroken` som canonical owner så länge providerstate inte ändras; någon rename-migrering är inte aktuell | Portal + Skvallerbyttan + `.github` | låg; verifiera live igen endast om owner/account type faktiskt ändras | slutfört |
 | Cloudflare Workers Previews | Grundfelet var saknade `previews`-block. Nu har alla tre appar explicit Preview-konfiguration och Workers Builds är verifierat gröna på samma branch-head. Portal använder isolerad Preview-Durable Object. Jobb och Skvallerbyttan är medvetet fail-closed utan production-D1/R2/Secrets Store/Service Bindings/Workflows; Skvallerbyttan använder separat Preview Analytics Engine-dataset | Behåll grön fail-closed Preview som säker bas. Om full stateful Preview behövs: provisionera separata D1/R2-resurser via verifierad provider-write-kanal, applicera migrationer och bind dem explicit utan att återanvända production-state | Portal + Skvallerbyttan + Jobb | låg för nuvarande fail-closed build; hög om production-state senare återanvänds som genväg | Del 1 löst för build, Del 3 för stateful Preview |
-| Figma reference | Current `main` identifierar designfilen `https://www.figma.com/design/AuxqvEggmZa2DW5OgizhCj`. Figma är referens-/designsystemverktyg; Git/runtime är source of truth | Verifiera aktuell Figma-access och läsbar designstate hos providern när Del 2 genomför designaudit. Providerplan, seat och quota versionsstyrs inte här | Portal design | låg för runtime; medel för design-reference drift | Del 2 |
+| Figma | **Parkerad** — den tidigare länkade filen är inte originaldesignen och får inte användas som designreferens | Återuppta endast efter ett nytt uttryckligt beslut och en verifierad originalkälla; runtime/Git gäller tills dess | Portal design | låg | deferred |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
-| Releaseautomation | Conventional Commit-/SemVer-kontrakt finns, men full release-PR-automation är avsiktligt ej aktiverad | CI-kompatibel least-privilege releaseidentitet eller annan verifierad modell | monorepo + valda repos | write-permission/CI-bypass-risk | Del 3 |
-| Releasekontrakt skiljer mellan repos | Bastion/Politiker/Pastebinit/Docker-idempotent-update har verifierade release-/PR-title-kontrakt; Produkter/Klarspråk har release notes config/Wiki men saknar motsvarande verifierat release-standard/pr-title-kontrakt | Endast faktiskt versionsbara repos får ett konsekvent, repoägt releasekontrakt | fristående repos | inkonsekventa releases | Del 3 |
-| Faktisk tag/releasehistorik | Providerverifierad 2026-09-26 via tillfällig read-only GitHub Actions-inventering mot exakta `Avkroken/*`-repos. Ingen publik repo träffade 100-resultatsgränsen. Avkroken 0 releases/0 tags; Bastion 54/54, latest `v0.24.1`; Politiker 72/73, latest `v0.10.5`, extra tag `deployed`; Pastebinit 41/47, latest `v2.4.6`, sex äldre taggar utan Release; Docker-idempotent-update 24/24, latest `v3.3.5`; Produkter 45/46, latest `v1.4.5`, extra tag `deployed`; Klarsprak 7/7, latest `v1.0.6`; `.github` 0/0. Inga draft/prerelease Releases observerades i inventeringen | Använd denna live-bas när Del 3 klassificerar faktisk releaseautomation. Taggar utan Release får inte automatiskt presenteras som officiella Releases | versionsbara repos + publik stöd/governance | låg för historikbasen; kvarvarande risk är att framtida state ändras före Del 3 | Del 3 |
+| Releaseautomation | **Löst** — repoägd releaseautomation och releasekontrakt verifierades live 2026-09-30 för `Avkroken`, `Bastion`, `Docker-idempotent-update`, `Klarsprak`, `Pastebinit`, `Politiker` och `Produkter`; respektive verifierad release-workflow var grön | Behåll releasekontrakt i respektive repository och verifiera providerstate vid incident/ändring i stället för att kopiera flyktiga versionsnummer hit | monorepo + versionsbara repos | låg så länge repoägda kontrakt respekteras | slutfört |
+| Faktisk tag/releasehistorik | Flyktig providerstate och därför inte längre duplicerad som versionsnummer/counts i detta arkitekturdokument | Läs GitHub Releases/tags live när historiken behövs; Portalens Changelog använder endast publicerade Releases och antar inte att en lös tagg är en officiell Release | versionsbara repos | låg; stale dokumentation undviks | löpande live-state |
 | Gamnacken som fristående komponent | Namnet används i Skvallerbyttans GitHub App-bindings, men något fristående current repo/app syns inte i den installerade repositorylistan | Dokumentera endast den faktiska kvarvarande rollen efter live-verifiering av GitHub App/providerstate | Skvallerbyttan | stale arkitekturbild | Del 1/3 |
 
 ## 4. C — Beslutad informationsarkitektur
@@ -266,7 +265,7 @@ Runtimeimplementationen i Git är source of truth.
 
 - tokens: `apps/portal/public/tokens.css`;
 - Portal-shell/komponentstyling: primärt `portal-v2.css`, med befintliga legacy primitives där de fortfarande används;
-- Figma är referens-/designsystemverktyg och får inte övertrumfa runtime när de divergerar.
+- Figma är parkerat; den tidigare länkade filen är inte originaldesignen och ska inte användas som referens.
 
 ### 5.2 Visuell modell
 
@@ -322,7 +321,7 @@ Designreferensen ska täcka:
 - Auth/Denied;
 - mobil.
 
-Figma-filen är identifierad från current `main` som `https://www.figma.com/design/AuxqvEggmZa2DW5OgizhCj`. Runtimeimplementationen och `public/tokens.css` i Git är source of truth. Figma-access, providerplan och aktuell tool quota är extern live-state och ska verifieras hos providern när en designaudit faktiskt genomförs; de versionsstyrs inte som canonical fakta i repositoryt.
+Figma-arbete är parkerat. Den tidigare länkade Figma-filen är uttryckligen **inte** originaldesignen och ska inte styra implementationen. Runtimeimplementationen, Git-historiken och `public/tokens.css` är source of truth tills en verifierad originalkälla uttryckligen återinförs.
 
 ## 6. E — Säkerhets- och authkontrakt
 
@@ -402,10 +401,10 @@ Del 1 verifierade att releasehistorik och releasekontrakt skiljer sig mellan rep
 - GitHub Releases i respektive repository är canonical publicerad releasehistorik där projektet använder Releases;
 - taggar utan GitHub Release får inte automatiskt presenteras som officiella Releases;
 - stöd-/infrastrukturrepositories ska inte få versionsrelease enbart för att de finns i GitHub;
-- Produkter och Klarspråk ska endast få releaseautomation efter att deras egna repositories uttryckligen definierat ett repoägt releasekontrakt;
-- providerstate för tags/Releases ska läsas på nytt i Del 3 och inte kopieras som permanent current-state till Portalens arkitekturdokument.
+- Produkter och Klarspråk har nu repoägda releasekontrakt och releaseautomation; framtida ändringar ska fortsatt ägas i respektive repository;
+- providerstate för tags/Releases ska läsas live vid behov och inte kopieras som permanent versions-/count-state till Portalens arkitekturdokument.
 
-Innan releaseautomation införs ska varje repository klassificeras i sin egen källa som:
+Vid framtida införande av releaseautomation i ytterligare repositories ska varje repository först klassificeras i sin egen källa som:
 
 - versionsbar produkt/bibliotek;
 - deploybar app där GitHub Release är meningsfull;
@@ -420,8 +419,8 @@ Eftersom bred Portal v2-implementation redan ligger på `main` ska fortsatt arbe
 
 1. GitHub owner/topologi: **löst** — övergången från Organization till privat User-owner är redan genomförd, kontonamnet är fortsatt `Avkroken`, och user-owner-modellen är implementerad/verifierad i CI.
 2. Cloudflare Workers Preview-buildarna är lösta: `avkroken`, `skvallerbyttan` och `jobb` bygger grönt med fail-closed Preview-konfiguration. Portal har isolerad Durable Object-binding; Jobb exponerar endast Browser API-binding; Skvallerbyttan har current owner-var och separat Analytics Engine-dataset. Production-D1/R2/Secrets Store/Service Bindings/Workflows/Email är inte bundna i Preview. Full stateful Preview flyttas till Del 3 och kräver separat provider-resource-provisionering/migrering.
-3. Figma-referensen är identifierad. Del 2 ska verifiera aktuell provideraccess och designstate vid audit-tillfället; runtime-arkitekturen blockeras inte eftersom Git är uttrycklig source of truth.
-4. Releaseklassificering och full publik tag/GitHub Release-inventering är providerverifierad 2026-09-26. Del 3 ska utgå från denna bas men göra en ny live-read före automation, eftersom providerstate kan ändras.
+3. Figma är parkerat och den tidigare länkade filen är inte originaldesignen. Ingen Figma-audit ingår förrän ett nytt uttryckligt beslut anger en verifierad originalkälla.
+4. Releaseautomation och repoägda kontrakt verifierades live 2026-09-30. Flyktig tag/Release-state läses på nytt vid behov i stället för att versionsstyras här.
 
 ### 1. Del 2 — Shell/design/docs som audit
 
@@ -458,10 +457,10 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | URL-modell | beslutad | behåll current path-baserade kontrakt |
 | adapter/cachemodell | beslutad | adapters för repo/docs, Skvallerbyttan för operations, separat Jobb backend |
 | public/protected-kontrakt | beslutad | fail-closed före index/cache/datafetch |
-| designsystemplan | verifierad i repo; Figma-referens identifierad | runtime Git är source of truth; provideraccess verifieras live vid Del 2-audit |
+| designsystemplan | verifierad i repo; Figma parkerad och tidigare fil ej originaldesign | runtime Git/Git-historik är source of truth tills verifierad originalkälla uttryckligen återinförs |
 | releaseinventering | verifierad | komplett publik providerinventering genomförd för Avkroken, Bastion, Politiker, Pastebinit, Docker-idempotent-update, Produkter, Klarsprak och `.github`; repoägda kontrakt separat verifierade |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
-| blockers dokumenterade | verifierad | Cloudflare Preview-build är löst; full stateful Preview är Del 3. Figma-provideraccess verifieras live vid Del 2-audit och är inte canonical repo-state. GitHub owner/scope är löst |
+| blockers dokumenterade | verifierad | Cloudflare Preview-build är löst; full stateful Preview kräver separata previewresurser. Discussion-innehåll kräver en providerpermission som nuvarande GitHub App-kontrakt inte deklarerar. Figma är parkerat. GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
 
 Del 1 får **inte** markeras klar förrän de blockerande live-state-punkterna ovan är verifierade eller uttryckligen lösta genom ett förankrat arkitekturbeslut.

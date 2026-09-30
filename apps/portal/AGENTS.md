@@ -38,7 +38,7 @@ Gäller `apps/portal/**`.
 
 - Runtimeimplementationen i Git är source of truth.
 - `public/tokens.css` är Portal-shellens aktuella runtime-tokenlager.
-- Figma är designsystem-/referensverktyg.
+- Figma är parkerat tills vidare och är varken originaldesign eller source of truth. Använd inte den nu länkade Figma-filen som designreferens utan ett nytt uttryckligt beslut.
 - Avkroken-shell får inte homogenisera Politiker, Klarspråk eller Produkter visuellt.
 - Använd inte avatarer, ansikten eller maskotporträtt som genomgående identitet.
 - Keyboard navigation, tydliga focus states, kontrast, reduced motion och responsiv layout är krav.
