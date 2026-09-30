@@ -74,6 +74,8 @@ Ett separat repository-Activity-kontrakt exponeras som `getPublicActivity(reposi
 
 Activity-sanitizern returnerar aggregate counts/coverage och recent event-rader med repository, capability, source, coverage, event/action och timestamps. `resourceId`, resource type, actor, providerfel, permissions och rå webhookpayload lämnar inte Skvallerbyttan. Capability-allowlisten innehåller endast `github.avkroken.repositories`, `github.avkroken.pull_requests` och `github.avkroken.actions`; security, Custom Properties och effective-ruleset-events publiceras inte. Cloudflare account-/org-Activity publiceras inte genom detta kontrakt.
 
+Release-deployment-kontraktet `getPublicReleaseDeployments(requests)` är den snäva operativa providerread som Portal får begära för Changelog-korrelation. Det gör först en live installation-inventory-read, släpper endast igenom current-owner repositories som fortfarande är public och icke-arkiverade, läser därefter högst två GitHub deployment-sidor per högst åtta repositories med concurrency 2 och matchar endast högst 20 exakta commit-SHA per repository. Sanitizern returnerar enbart repository, SHA, environment och created/updated-tid.
+
 ## Runtime
 
 Runtime är en TypeScript-baserad Cloudflare Worker.
@@ -92,6 +94,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 - ren public-safe Drift-sanitizationmodell: `src/portal-observations-model.ts`
 - ren public-safe repository-CI-modell: `src/portal-ci-model.ts`
 - ren public-safe repository-Activity-modell: `src/portal-activity-model.ts`
+- ren public-safe release-deployment-modell: `src/portal-release-deployment-model.ts`
 - push heartbeat/readiness: `src/runtime-heartbeat.ts`
 - source cache: `src/source-cache.ts`
 
@@ -99,7 +102,7 @@ Runtime är en TypeScript-baserad Cloudflare Worker.
 
 Externa klienter får normaliserade modeller, inte generella provider-dumpar. Relevant state bär status, freshness och provenance. Repository governance skiljer mellan `direct`, `inherited` och `effective` där providern ger tillräckligt underlag.
 
-Portalens publika Drift & insyn-, Builds- och Activity-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state, och repository-Activity från den reducerade D1-eventledgern efter dubbel publiceringskontroll; inget av kontrakten får göra en ny providerread på Portalens begäran.
+Portalens publika Drift & insyn-, Builds- och Activity-konsumenter är ännu snävare än machine-API:t: de kan endast nå den sanerade named RPC-entrypointen och får inte återanvända dashboard-session eller machine bearer-token som genväg. Repository-CI läses från redan observerad/cachead state och repository-Activity från den reducerade D1-eventledgern efter dubbel publiceringskontroll. Den enda Portal-initierade GitHub-providerreaden i named RPC är den separat budgeterade release-deployment-korrelationen ovan; den gör en live public-repository-grind och returnerar endast exakta SHA-matchningar.
 
 GitHub-providerobservationer använder endast read-behörigheter. Administration: read används där GitHub kräver den nivån; provider-write ingår inte i observationslagret.
 

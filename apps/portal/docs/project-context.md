@@ -341,7 +341,7 @@ Aktuella värden i koden:
 - dokumentationskatalog: 21 600 sekunder i Workers Cache API med `docs-catalog`-tag samt motsvarande CDN-cachekontrakt;
 - dokumentinnehåll: 21 600 sekunder via Cloudflare CDN cache;
 - server-side sökindex: ingen persistent Cache API-lagring; samtidiga kalla builds i samma isolate delar ett in-flight Promise;
-- Changelog snapshot: ingen persistent Cache API-lagring; samtidiga builds i samma isolate delar ett in-flight Promise.
+- Changelog snapshot: ingen persistent Cache API-lagring; samtidiga builds i samma isolate delar ett in-flight Promise. Release→PR/commit härleds endast från canonical release metadata och deploymentrelationer hämtas separat från Skvallerbyttans public-safe RPC med exakt SHA-matchning.
 
 Skvallerbyttan kan invalidera dokumentationscache internt med cache tags genom Portalens service binding.
 
@@ -353,7 +353,7 @@ Direktkopplingen mellan apparna består nu av tre separata least-privilege RPC-k
 
 - Skvallerbyttan → Portal: dokumentationscache-invalidering via `DocsInvalidationService`;
 - Skvallerbyttan → Portal: operativ heartbeat via `OperationalHeartbeatService`;
-- Portal → Skvallerbyttan: sanerade read-only snapshots via `PortalObservationsService`, inklusive public repository inventory, Drift, repository-CI och repository-Activity.
+- Portal → Skvallerbyttan: sanerade read-only snapshots via `PortalObservationsService`, inklusive public repository inventory, Drift, repository-CI, repository-Activity och bounded release→deployment-korrelation på exakt commit-SHA.
 
 Portalens binding `SKVALLERBYTTAN_OBSERVATIONS` pekar endast på den named entrypointen. Driftvyn använder inte Skvallerbyttans skyddade HTTP-`/api/v1`, dashboard-cookie eller `SKVALLERBYTTAN_READ_API_TOKEN`.
 
@@ -448,7 +448,7 @@ Följande ligger utanför den nu verifierade Portal v2-kärnan eller saknar nöd
 
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Discussion-innehåll i global sök är inte aktiverat eftersom det skulle kräva en separat providerpermission/GraphQL-väg; canonical Discussions-ytor är däremot sökbara;
-- Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
+- Changelog-korrelationen är implementerad för relationer som kan bevisas från canonical release metadata och exakt GitHub deployment-SHA. GitHub-miljöer som inte skapar Deployment-objekt visas som `not_observed`, inte som antaget deployade;
 - logo-admins production-CRUD kräver fortsatt en legitim interaktiv Cloudflare Access-session och kan därför inte impersoneras från den nuvarande terminalmiljön. Admin-UI:n innehåller nu ett självrensande canaryflöde som gör hela punkt 2d till ett enda autentiserat klick; edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är redan verifierade och ingen service token skapas för testet.
 
 Varje nytt arbete ska göras i separat branch/PR enligt repositoryts arbetsregler.

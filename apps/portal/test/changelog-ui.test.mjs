@@ -69,6 +69,19 @@ test("Changelog client reads only the Portal API and renders untrusted strings a
   assert.ok(client.includes('rel = "noopener noreferrer"'));
 });
 
+test("Changelog renders bounded release, PR, commit and deployment correlation", () => {
+  assert.ok(client.includes("release?.correlation"));
+  assert.ok(client.includes("correlation.previousTag"));
+  assert.ok(client.includes("correlation.commits"));
+  assert.ok(client.includes("correlation.pullRequests"));
+  assert.ok(client.includes("correlation.deployments"));
+  assert.ok(client.includes('"Ingen exakt deployment observerad"'));
+  assert.ok(client.includes('"Deploymenttäckning ofullständig"'));
+  assert.ok(client.includes('"Deploymentdata otillgänglig"'));
+  assert.equal(client.includes("deployment.payload"), false);
+  assert.equal(client.includes("deployment.creator"), false);
+});
+
 test("public repository gate caches only credential-free publication checks", () => {
   const gate = section(
     worker,
@@ -93,6 +106,8 @@ test("Changelog backend derives release eligibility from the bounded public repo
   assert.ok(load.includes("loadPublicationRepositoryProjects(env)"));
   assert.ok(load.includes("eligibleReleaseProjects(projects"));
   assert.ok(load.includes("sortPublicReleases"));
+  assert.ok(load.includes("loadReleaseDeploymentSnapshot"));
+  assert.ok(load.includes("attachReleaseDeployments"));
   assert.ok(load.includes('"bounded"'));
   assert.ok(load.includes('"partial"'));
 });

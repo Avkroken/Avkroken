@@ -4,7 +4,11 @@ import { getCapabilities } from "./capabilities";
 import { getProviderHealth } from "./provider-health";
 import { organization } from "./env";
 import { getObservedActivity } from "./activity";
-import { githubInstallationRepositories } from "./github";
+import {
+  githubInstallationRepositories,
+  githubListAll,
+  mapLimit,
+} from "./github";
 import {
   buildPortalRepositoryCiSnapshot,
   publicCiRepository,
@@ -28,6 +32,12 @@ import {
   buildPortalPublicRepositoriesSnapshot,
   type PortalPublicRepositoriesSnapshot,
 } from "./portal-repository-model";
+import {
+  normalizeReleaseDeploymentRequests,
+  sanitizeReleaseDeployments,
+  type PortalReleaseDeploymentRequest,
+  type PortalReleaseDeploymentsSnapshot,
+} from "./portal-release-deployment-model";
 
 export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOperationsSnapshot> {
   const capabilitySnapshot = await getCapabilities(env);
@@ -43,6 +53,22 @@ export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOpera
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
 
 const PORTAL_CI_FRESH_MS = 6 * 60 * 60 * 1000;
+const PORTAL_RELEASE_DEPLOYMENT_PAGE_LIMIT = 2;
+
+type PortalInventoryRepository = {
+  name?: unknown;
+  full_name?: unknown;
+  visibility?: unknown;
+  private?: unknown;
+  archived?: unknown;
+};
+
+type PortalRawDeployment = {
+  sha?: unknown;
+  environment?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
+};
 
 type OverviewCache = {
   repositories?: PortalCiRepositoryObservation[];
@@ -147,6 +173,123 @@ export async function getPortalPublicRepositoriesSnapshot(
   });
 }
 
+export async function getPortalReleaseDeploymentsSnapshot(
+  env: Env,
+  values: readonly unknown[],
+): Promise<PortalReleaseDeploymentsSnapshot> {
+  const requests = normalizeReleaseDeploymentRequests(values);
+  const generatedAt = new Date().toISOString();
+  const coverage = {
+    repositoryLimit: 8 as const,
+    shaLimitPerRepository: 20 as const,
+    deploymentPageLimit: 2 as const,
+  };
+
+  if (!requests.length) {
+    return {
+      schemaVersion: 1,
+      generatedAt,
+      status: "available",
+      coverage,
+      repositories: [],
+    };
+  }
+
+  const owner = organization(env);
+  const inventory = await githubInstallationRepositories<PortalInventoryRepository>(env, 10);
+  if (!inventory.available) {
+    return {
+      schemaVersion: 1,
+      generatedAt,
+      status: "unavailable",
+      coverage,
+      repositories: requests.map((request) => ({
+        repository: `${owner}/${request.repository}`,
+        status: "unavailable" as const,
+        truncated: false,
+        matches: [],
+      })),
+    };
+  }
+
+  const observedRepositories = new Set(
+    inventory.value.flatMap((repository) =>
+      typeof repository.name === "string"
+        ? [repository.name.toLowerCase()]
+        : []
+    ),
+  );
+  const publicRepositories = new Set(
+    inventory.value.flatMap((repository) => {
+      if (
+        typeof repository.name !== "string" ||
+        typeof repository.full_name !== "string" ||
+        repository.visibility !== "public" ||
+        repository.private === true ||
+        repository.archived === true ||
+        repository.full_name.toLowerCase() !== `${owner}/${repository.name}`.toLowerCase()
+      ) {
+        return [];
+      }
+      return [repository.name.toLowerCase()];
+    }),
+  );
+
+  const repositories = await mapLimit(
+    requests,
+    2,
+    async (request: PortalReleaseDeploymentRequest) => {
+      const fullName = `${owner}/${request.repository}`;
+      if (!publicRepositories.has(request.repository.toLowerCase())) {
+        const observed = observedRepositories.has(request.repository.toLowerCase());
+        return {
+          repository: fullName,
+          status: observed || !inventory.truncated
+            ? "not_observed" as const
+            : "unavailable" as const,
+          truncated: inventory.truncated,
+          matches: [],
+        };
+      }
+
+      const encoded = `${encodeURIComponent(owner)}/${encodeURIComponent(request.repository)}`;
+      const deployments = await githubListAll<PortalRawDeployment>(
+        env,
+        `/repos/${encoded}/deployments?per_page=100`,
+        PORTAL_RELEASE_DEPLOYMENT_PAGE_LIMIT,
+      );
+
+      if (!deployments.available) {
+        return {
+          repository: fullName,
+          status: "unavailable" as const,
+          truncated: false,
+          matches: [],
+        };
+      }
+
+      return {
+        repository: fullName,
+        status: "available" as const,
+        truncated: deployments.truncated,
+        matches: sanitizeReleaseDeployments(
+          fullName,
+          request.commitShas,
+          deployments.value,
+        ),
+      };
+    },
+  );
+
+  return {
+    schemaVersion: 1,
+    generatedAt,
+    status: "available",
+    coverage,
+    repositories,
+  };
+}
+
 export async function getPortalRepositoryCiSnapshot(
   env: Env,
   repoName: string,
@@ -181,6 +324,15 @@ export class PortalObservationsService extends WorkerEntrypoint<Env> {
 
   async getPublicRepositories(): Promise<PortalPublicRepositoriesSnapshot> {
     return getPortalPublicRepositoriesSnapshot(this.env);
+  }
+
+  async getPublicReleaseDeployments(
+    requests: unknown[],
+  ): Promise<PortalReleaseDeploymentsSnapshot> {
+    if (!Array.isArray(requests)) {
+      throw new Error("invalid release deployment requests");
+    }
+    return getPortalReleaseDeploymentsSnapshot(this.env, requests);
   }
 
   async getPublicActivity(

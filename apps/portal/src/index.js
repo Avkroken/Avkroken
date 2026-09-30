@@ -34,8 +34,10 @@ import {
   selectSearchDocumentTasks
 } from "./search-index.mjs";
 import {
+  attachReleaseDeployments,
   eligibleReleaseProjects,
   normalizePublicReleases,
+  releaseDeploymentRequests,
   sortPublicReleases
 } from "./release-source.mjs";
 import {
@@ -66,6 +68,7 @@ const CHANGELOG_REPOSITORY_LIMIT = 24;
 const CHANGELOG_RELEASES_PER_REPOSITORY = 10;
 const CHANGELOG_RESULT_LIMIT = 40;
 const CHANGELOG_FETCH_CONCURRENCY = 4;
+const CHANGELOG_CORRELATION_REPOSITORY_LIMIT = 8;
 const PROJECT_ISSUES_LIMIT = 30;
 const ACTIVITY_REPOSITORY_LIMIT = 50;
 const ACTIVITY_DEFAULT_DAYS = 7;
@@ -1637,6 +1640,32 @@ async function fetchChangelogReleases(projects, env) {
   return results;
 }
 
+async function loadReleaseDeploymentSnapshot(releases, env) {
+  const requests = releaseDeploymentRequests(
+    releases,
+    CHANGELOG_CORRELATION_REPOSITORY_LIMIT
+  );
+  if (!requests.length) return null;
+
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicReleaseDeployments !== "function") return null;
+
+  try {
+    const snapshot = await service.getPublicReleaseDeployments(requests);
+    if (
+      !snapshot ||
+      typeof snapshot !== "object" ||
+      snapshot.schemaVersion !== 1 ||
+      !Array.isArray(snapshot.repositories)
+    ) {
+      return null;
+    }
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
 async function loadPublicChangelog(env) {
   const projects = await loadPublicationRepositoryProjects(env);
   const eligible = eligibleReleaseProjects(projects, 100);
@@ -1644,9 +1673,17 @@ async function loadPublicChangelog(env) {
   const fetched = await fetchChangelogReleases(selected, env);
 
   const failedRepositories = fetched.filter(result => result.failed).length;
-  const releases = sortPublicReleases(
+  const normalizedReleases = sortPublicReleases(
     fetched.flatMap(result => result.releases),
     CHANGELOG_RESULT_LIMIT
+  );
+  const deploymentSnapshot = await loadReleaseDeploymentSnapshot(
+    normalizedReleases,
+    env
+  );
+  const releases = attachReleaseDeployments(
+    normalizedReleases,
+    deploymentSnapshot
   );
 
   return {
@@ -1667,6 +1704,15 @@ async function loadPublicChangelog(env) {
       releases: {
         perRepositoryLimit: CHANGELOG_RELEASES_PER_REPOSITORY,
         resultLimit: CHANGELOG_RESULT_LIMIT
+      },
+      correlation: {
+        releaseMetadata: "derived",
+        deployments: deploymentSnapshot?.status === "available"
+          ? "available"
+          : "unavailable",
+        repositoryLimit: CHANGELOG_CORRELATION_REPOSITORY_LIMIT,
+        shaLimitPerRepository: 20,
+        exactShaOnly: true
       }
     },
     releases

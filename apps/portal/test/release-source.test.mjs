@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  attachReleaseDeployments,
   eligibleReleaseProjects,
   normalizePublicRelease,
+  releaseCorrelation,
+  releaseDeploymentRequests,
   normalizePublicReleases,
   sortPublicReleases
 } from "../src/release-source.mjs";
@@ -98,6 +101,68 @@ test("does not infer categories from arbitrary release prose", () => {
   assert.deepEqual(item.categories, ["releases"]);
 });
 
+test("derives bounded commit and PR correlation only from canonical release metadata", () => {
+  const sha = "6d9fdaf46c61304cf68614f85ebb0c0ae4061928";
+  const target = "401752ce5c3920cdc7cb39a8e4ad51362ea20f7d";
+  const correlation = releaseCorrelation(
+    "Avkroken/Bastion",
+    [
+      "Changes since v0.24.2.",
+      "",
+      "## Fixes",
+      "- fix(ci): harden gate (#535) ([6d9fdaf](https://github.com/Avkroken/Bastion/commit/" + sha + "))",
+      "- ignore external (#999) ([other](https://github.com/Other/Bastion/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa))"
+    ].join("\n"),
+    target
+  );
+
+  assert.equal(correlation.source, "release_metadata");
+  assert.equal(correlation.derived, true);
+  assert.equal(correlation.previousTag, "v0.24.2");
+  assert.deepEqual(correlation.pullRequests, [{
+    number: 535,
+    url: "https://github.com/Avkroken/Bastion/pull/535",
+    source: "release_note_reference",
+    derived: true
+  }]);
+  assert.deepEqual(correlation.commits, [
+    {
+      sha,
+      shortSha: "6d9fdaf",
+      url: "https://github.com/Avkroken/Bastion/commit/" + sha,
+      releaseTarget: false,
+      source: "release_note_commit_url",
+      derived: true
+    },
+    {
+      sha: target,
+      shortSha: "401752c",
+      url: "https://github.com/Avkroken/Bastion/commit/" + target,
+      releaseTarget: true,
+      source: "target_commitish",
+      derived: true
+    }
+  ]);
+});
+
+test("release correlation does not expose arbitrary release prose or branch target names", () => {
+  const item = normalizePublicRelease(project(), release({
+    body: [
+      "Changes since v0.24.0.",
+      "- fix: public change (#42) ([abc](https://github.com/Avkroken/Bastion/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa))",
+      "SECRET_RELEASE_PROSE"
+    ].join("\n"),
+    target_commitish: "main"
+  }));
+
+  assert.equal(item.correlation.previousTag, "v0.24.0");
+  assert.equal(item.correlation.commits.length, 1);
+  assert.equal(item.correlation.pullRequests[0].number, 42);
+  const serialized = JSON.stringify(item);
+  assert.equal(serialized.includes("SECRET_RELEASE_PROSE"), false);
+  assert.equal(serialized.includes('"target_commitish"'), false);
+});
+
 test("rejects drafts, malformed source projects and non-canonical release URLs", () => {
   assert.equal(normalizePublicRelease(project(), release({ draft: true })), null);
   assert.equal(
@@ -184,4 +249,114 @@ test("sorts releases newest first with a hard result cap", () => {
   ]);
 
   assert.deepEqual(sortPublicReleases(items, 2).map(item => item.tag), ["v2", "v3"]);
+});
+
+test("builds bounded deployment requests from release commit correlation", () => {
+  const shaA = "a".repeat(40);
+  const shaB = "b".repeat(40);
+  const releases = [
+    {
+      repository: "Avkroken/Bastion",
+      correlation: { commits: [{ sha: shaA }, { sha: shaB }] }
+    },
+    {
+      repository: "Avkroken/Bastion",
+      correlation: { commits: [{ sha: shaA }] }
+    },
+    {
+      repository: "Other/Private",
+      correlation: { commits: [{ sha: shaA }] }
+    }
+  ];
+
+  assert.deepEqual(releaseDeploymentRequests(releases), [{
+    repository: "Bastion",
+    commitShas: [shaA, shaB]
+  }]);
+
+  const many = Array.from({ length: 25 }, (_, index) => ({
+    repository: "Avkroken/Bastion",
+    correlation: {
+      commits: [{
+        sha: index.toString(16).padStart(40, "0")
+      }]
+    }
+  }));
+  assert.equal(releaseDeploymentRequests(many)[0].commitShas.length, 20);
+});
+
+test("attaches deployments only to exact release commit SHAs", () => {
+  const sha = "a".repeat(40);
+  const other = "b".repeat(40);
+  const releases = [{
+    repository: "Avkroken/Bastion",
+    correlation: {
+      source: "release_metadata",
+      previousTag: "v1.0.0",
+      commits: [{ sha, shortSha: "aaaaaaa", url: "https://github.com/Avkroken/Bastion/commit/" + sha }],
+      pullRequests: []
+    }
+  }];
+
+  const [item] = attachReleaseDeployments(releases, {
+    schemaVersion: 1,
+    repositories: [{
+      repository: "Avkroken/Bastion",
+      status: "available",
+      truncated: false,
+      matches: [
+        {
+          sha,
+          environment: "produktion",
+          createdAt: "2026-09-30T10:00:00Z",
+          updatedAt: null,
+          secret: "MUST_NOT_LEAK"
+        },
+        { sha: other, environment: "produktion", createdAt: "2026-09-30T11:00:00Z", updatedAt: null }
+      ]
+    }]
+  });
+
+  assert.equal(item.correlation.deployments.status, "available");
+  assert.equal(item.correlation.deployments.matches.length, 1);
+  assert.deepEqual(item.correlation.deployments.matches[0], {
+    sha,
+    environment: "produktion",
+    createdAt: "2026-09-30T10:00:00Z",
+    updatedAt: null
+  });
+  assert.equal(JSON.stringify(item).includes("MUST_NOT_LEAK"), false);
+});
+
+test("deployment correlation distinguishes complete absence from truncated uncertainty", () => {
+  const sha = "c".repeat(40);
+  const releaseItem = {
+    repository: "Avkroken/Bastion",
+    correlation: { commits: [{ sha }] }
+  };
+
+  const [complete] = attachReleaseDeployments([releaseItem], {
+    schemaVersion: 1,
+    repositories: [{
+      repository: "Avkroken/Bastion",
+      status: "available",
+      truncated: false,
+      matches: []
+    }]
+  });
+  assert.equal(complete.correlation.deployments.status, "not_observed");
+
+  const [truncated] = attachReleaseDeployments([releaseItem], {
+    schemaVersion: 1,
+    repositories: [{
+      repository: "Avkroken/Bastion",
+      status: "available",
+      truncated: true,
+      matches: []
+    }]
+  });
+  assert.equal(truncated.correlation.deployments.status, "unknown");
+
+  const [unavailable] = attachReleaseDeployments([releaseItem], null);
+  assert.equal(unavailable.correlation.deployments.status, "unavailable");
 });

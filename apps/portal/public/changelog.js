@@ -97,6 +97,81 @@
 
     header.append(identity, meta);
 
+    const correlation = release?.correlation;
+    if (correlation && typeof correlation === "object") {
+      const correlationBox = document.createElement("div");
+      correlationBox.className = "changelog-correlation";
+
+      const summary = document.createElement("div");
+      summary.className = "changelog-correlation-summary";
+
+      const parts = [];
+      if (correlation.previousTag) parts.push("Sedan " + correlation.previousTag);
+      const commits = Array.isArray(correlation.commits) ? correlation.commits : [];
+      const pullRequests = Array.isArray(correlation.pullRequests) ? correlation.pullRequests : [];
+      if (commits.length) parts.push(commits.length + (commits.length === 1 ? " commit" : " commits"));
+      if (pullRequests.length) parts.push(pullRequests.length + " PR-ref");
+      summary.textContent = parts.join(" · ") || "Releasekorrelation";
+
+      const links = document.createElement("div");
+      links.className = "changelog-correlation-links";
+
+      for (const pullRequest of pullRequests.slice(0, 3)) {
+        if (!pullRequest?.url || !Number.isInteger(pullRequest.number)) continue;
+        const link = document.createElement("a");
+        link.href = pullRequest.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "PR-ref #" + pullRequest.number;
+        links.appendChild(link);
+      }
+
+      for (const commit of commits.slice(0, 3)) {
+        if (!commit?.url || typeof commit.shortSha !== "string") continue;
+        const link = document.createElement("a");
+        link.href = commit.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = commit.shortSha;
+        links.appendChild(link);
+      }
+
+      const deployments = correlation.deployments;
+      if (deployments && typeof deployments === "object") {
+        const deploymentState = document.createElement("span");
+        deploymentState.className = "changelog-deployment-state";
+
+        const matches = Array.isArray(deployments.matches) ? deployments.matches : [];
+        if (deployments.status === "available") {
+          deploymentState.textContent = matches.length === 1
+            ? "1 exakt deployment"
+            : matches.length + " exakta deployments";
+        } else if (deployments.status === "not_observed") {
+          deploymentState.textContent = "Ingen exakt deployment observerad";
+        } else if (deployments.status === "unknown") {
+          deploymentState.textContent = "Deploymenttäckning ofullständig";
+        } else {
+          deploymentState.textContent = "Deploymentdata otillgänglig";
+        }
+        links.appendChild(deploymentState);
+
+        for (const deployment of matches.slice(0, 2)) {
+          const item = document.createElement("span");
+          item.className = "changelog-deployment-match";
+          const shortSha = typeof deployment.sha === "string"
+            ? deployment.sha.slice(0, 7)
+            : "okänd";
+          item.textContent = (deployment.environment || "deployment") + " @ " + shortSha;
+          links.appendChild(item);
+        }
+      }
+
+      correlationBox.append(summary, links);
+      article.append(header, correlationBox);
+    } else {
+      article.appendChild(header);
+    }
+
     const footer = document.createElement("div");
     footer.className = "changelog-release-footer";
 
@@ -111,7 +186,7 @@
     original.textContent = "Visa release";
     footer.appendChild(original);
 
-    article.append(header, footer);
+    article.appendChild(footer);
     list.appendChild(article);
   }
 
