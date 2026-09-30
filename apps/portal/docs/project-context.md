@@ -57,7 +57,7 @@ Worker-koden innehåller idag:
 - statiska `/access-denied/`, `/access-denied/identity/`, `/access-denied/non-identity/` och `/access-denied/gateway/` med separata Access-/Gateway-semantiker och `noindex,nofollow`;
 - gemensam `data-theme`-arkitektur med `legacy`, `forest` och `blackout` ovanpå samma primitive → semantic tokenkedja, där Legacy är fallback och preferensen kan delas som ren presentationsstate;
 - public logo-read boundary i `src/logo-assets.mjs`: exakt `/media/logos/<asset-id>`, GET/HEAD, fast `logos/`-keyprefix, MIME-allowlist, `nosniff`, bounded publik cache och ingen listning;
-- logo-storage med separerad public/admin-gräns: production binder `PORTAL_LOGOS` till den dedikerade logobucketen, public route är read-only och admin-write kräver Cloudflare Access + origin-JWT; branch-previews saknar medvetet R2/admin-Access-bindings och failar därmed stängt.
+- logo-storage med separerad public/admin-gräns: production binder `PORTAL_LOGOS` till den dedikerade logobucketen, public route är read-only och admin-write kräver Cloudflare Access + origin-JWT; branch-previews saknar medvetet R2/admin-Access-bindings och failar därmed stängt. Den Access-skyddade admin-UI:n har dessutom en explicit `Kör verifiering`-canary som via de ordinarie API-routes skapar en syntetisk SVG, verifierar listning/metadata/public URL, ersätter den med bibehållet asset-id, laddar ned den, raderar den och verifierar 404 efter delete. Vid avbrott försöker klienten radera testasseten i `finally`; ingen service token eller separat verifieringscredential används.
 
 
 ## Startsida / kontrollpanel
@@ -446,6 +446,6 @@ Följande ligger utanför den nu verifierade Portal v2-kärnan eller saknar nöd
 - direkt rendering av eventuellt manuellt Wiki-innehåll utanför den repo-lokalt genererade Wiki-modellen;
 - Issues/Discussions i global sök;
 - Changelog-korrelation release → PR → commits → deployment utöver de verifierbara release-sektionerna;
-- logo-admins interaktiva upload/replace/download/delete-flöde har inte muterats i production eftersom verifieringsmiljön saknar en legitim interaktiv Cloudflare Access-session. Edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är verifierade; ingen service token skapades enbart för test.
+- logo-admins production-CRUD kräver fortsatt en legitim interaktiv Cloudflare Access-session och kan därför inte impersoneras från den nuvarande terminalmiljön. Admin-UI:n innehåller nu ett självrensande canaryflöde som gör hela punkt 2d till ett enda autentiserat klick; edge-intercept, origin-gräns, R2 read-binding och fail-closed paths är redan verifierade och ingen service token skapas för testet.
 
 Varje nytt arbete ska göras i separat branch/PR enligt repositoryts arbetsregler.
