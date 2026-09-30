@@ -12,10 +12,15 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const script = await readFile(new URL("../scripts/workers-build-production.mjs", import.meta.url), "utf8");
   assert.match(script, /WORKERS_CI !== "1"/);
   assert.match(script, /WORKERS_CI_BRANCH !== "main"/);
+  assert.match(script, /process\.exit\(0\)/);
+  assert.match(script, /Skipping Dumpen production deployment for non-main branch/);
   assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
+  const branchGuard = script.indexOf('WORKERS_CI_BRANCH !== "main"');
+  const branchExit = script.indexOf("process.exit(0)");
   const check = script.indexOf('run("npm", ["run", "check"])');
   const deploy = script.indexOf('run("npm", ["run", "deploy"])');
   const verify = script.indexOf('run("npm", ["run", "verify:production"])');
-  assert.ok(check >= 0 && deploy > check && verify > deploy);
+  assert.ok(branchGuard >= 0 && branchExit > branchGuard && check > branchExit);
+  assert.ok(deploy > check && verify > deploy);
 });

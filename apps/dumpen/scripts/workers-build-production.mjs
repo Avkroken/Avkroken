@@ -15,9 +15,10 @@ if (process.env.WORKERS_CI !== "1") {
   throw new Error("deploy:workers-builds may only run inside Cloudflare Workers Builds");
 }
 if (process.env.WORKERS_CI_BRANCH !== "main") {
-  throw new Error(
-    `Production deploy requires WORKERS_CI_BRANCH=main, got ${process.env.WORKERS_CI_BRANCH || "<unset>"}`,
+  console.log(
+    `Skipping Dumpen production deployment for non-main branch ${process.env.WORKERS_CI_BRANCH || "<unset>"}.`,
   );
+  process.exit(0);
 }
 
 run("npm", ["run", "check"]);

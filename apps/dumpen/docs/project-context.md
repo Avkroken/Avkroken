@@ -73,7 +73,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. Scriptet accepterar endast `main`, kör `npm run check`, deployar och avslutar med `npm run verify:production`. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
+Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. På `main` kör scriptet `npm run check`, deployar och avslutar med `npm run verify:production`. Om Cloudflare anropar samma entrypoint för en annan branch avslutas körningen framgångsrikt utan deployment; feature-/PR-branches får alltså aldrig producera en Dumpen-produktionsdeploy. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
 
 ## Dokumentationsgräns
 
