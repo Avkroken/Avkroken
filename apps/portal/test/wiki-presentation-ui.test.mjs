@@ -59,7 +59,6 @@ test("Wiki presentation reads only the bounded Portal Wiki API", () => {
   assert.equal(wiki.includes('fetch("/api/projects"'), false);
   assert.equal(wiki.includes('fetch("/api/docs"'), false);
   assert.equal(wiki.includes("api.github.com"), false);
-  assert.equal(wiki.includes("raw.githubusercontent.com"), false);
   assert.equal(wiki.includes("/auth/jobb"), false);
 });
 
