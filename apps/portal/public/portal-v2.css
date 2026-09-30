@@ -240,7 +240,7 @@ body.portal-v2::before {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.portal-route-panel[hidden] {
+.portal-v2 [hidden] {
   display: none !important;
 }
 
@@ -661,6 +661,42 @@ a.portal-product-card:hover {
   flex-wrap: wrap;
   gap: var(--ak-space-2);
   padding: var(--ak-space-5) 0;
+}
+
+.project-detail-extras {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ak-space-5);
+  margin-top: var(--ak-space-5);
+}
+
+.project-detail-extras .portal-info-card {
+  display: grid;
+  align-content: start;
+  gap: var(--ak-space-3);
+}
+
+.project-detail-extras h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.project-detail-extras p {
+  margin: 0;
+}
+
+.project-detail-release .portal-button {
+  justify-self: start;
+}
+
+.project-detail-store-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ak-space-2);
+}
+
+.project-detail-store-links p {
+  color: var(--ak-text-secondary);
 }
 
 .project-detail-facts {
@@ -1785,6 +1821,7 @@ a.portal-product-card:hover {
 
   .portal-boundary,
   .project-detail-layout,
+  .project-detail-extras,
   .wiki-layout {
     grid-template-columns: 1fr;
   }

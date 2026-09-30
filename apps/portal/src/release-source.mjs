@@ -157,6 +157,16 @@ export function eligibleReleaseProjects(projects, limit = 24) {
     .slice(0, maximum);
 }
 
+function normalizedReleaseCategories(value, body) {
+  const allowed = new Set(["releases", "features", "fixes", "security", "documentation"]);
+  if (Array.isArray(value)) {
+    const categories = [...new Set(value.filter(item => typeof item === "string" && allowed.has(item)))];
+    if (!categories.includes("releases")) categories.unshift("releases");
+    return categories;
+  }
+  return releaseCategories(body);
+}
+
 export function normalizePublicRelease(project, release) {
   if (
     project?.type !== "repository" ||
@@ -199,7 +209,7 @@ export function normalizePublicRelease(project, release) {
     name: safeText(release.name, 180) || tag,
     publishedAt,
     url,
-    categories: releaseCategories(release.body),
+    categories: normalizedReleaseCategories(release.categories, release.body),
     prerelease: release.prerelease === true,
     ...(correlation ? { correlation } : {})
   };

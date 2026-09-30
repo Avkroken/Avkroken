@@ -102,7 +102,8 @@ När användaren navigerar till en projektdetalj återanvänds den redan laddade
 Changelog är en separat publik GitHub-adapter ovanpå samma projektpubliceringspolicy som Projekt-vyn.
 
 ```text
-GitHub public org repositories
+authenticated public repository inventory
+via Skvallerbyttan read-only RPC
        |
        v
 loadPublicProjects()
@@ -110,7 +111,9 @@ loadPublicProjects()
        +--> repository projects only
        |
        v
-GitHub Releases (max 10/repo)
+PortalObservationsService.getPublicReleases()
+       |
+       +--> credential-free GitHub REST fallback
        |
        v
 release-source.mjs
@@ -129,7 +132,7 @@ Eligibility för Changelog samt projektspecifika Releases/Issues använder samma
 
 `release-source.mjs` accepterar endast repositoryprojekt som matchar Portalens current owner-kontrakt i `github-scope.mjs` (`GITHUB_OWNER/<repo>`). Monorepo-appar är egna Portal-projekt och får inte ärva source-repositoryts releaser. Draft releases avvisas explicit. Publik modell innehåller inte release body, author, assets eller target SHA.
 
-Providerarbetet är bounded: högst 24 repos, 10 releaser/repo, concurrency 4 och 40 returnerade poster. `bounded` betyder den definierade budgeten; `partial` används vid repo-cap eller release-fetchfel. Ingen persistent Changelog-cache används.
+Providerarbetet är bounded: högst 24 repos, 10 releaser/repo, concurrency 4 och 40 returnerade poster. Releasepayloaden kommer primärt från Skvallerbyttans read-only GitHub App-RPC och är redan sanerad innan den når Portal; credential-fri GitHub REST används bara som rollout/degraded fallback. `bounded` betyder den definierade budgeten; `partial` används vid repo-cap eller release-fetchfel. Ingen persistent Changelog-cache används.
 
 ### Wiki-presentation
 
@@ -260,7 +263,7 @@ GET /api/operations
 Drift & insyn
 ```
 
-Portalen har ingen parallell GitHub-/Cloudflare-providerklient för operativ state. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret. Samma RPC äger nu även den sanerade autentiserade repositoryinventeringen genom `getPublicRepositories()`; Portal behåller endast en credential-fri publik GitHub REST-fallback för rollout/degraded state.
+Portalen har ingen parallell GitHub-/Cloudflare-providerklient för operativ state. `SKVALLERBYTTAN_OBSERVATIONS` binder Portal till Skvallerbyttans named `PortalObservationsService` och kräver ingen ny bearer-secret. Samma RPC äger repositoryinventering genom `getPublicRepositories()`, dokumentationspaths genom `getPublicDocumentationPages()` och sanerade publicerade releases genom `getPublicReleases()`. Portal behåller credential-fria publika GitHub REST-fallbacks endast för rollout/degraded state.
 
 RPC-entrypointen är en publiceringsgräns, inte ett proxy-API. Den sanerar bort:
 

@@ -73,7 +73,7 @@ test("public repository discovery prefers Skvallerbyttans authenticated read-onl
 
 test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("const GITHUB_CATALOG_CONCURRENCY = 2;"));
-  assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2")'));
+  assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v3")'));
   assert.ok(worker.includes("await cache.match(DOCS_CACHE_KEY)"));
   assert.ok(worker.includes("ctx.waitUntil(cache.put(DOCS_CACHE_KEY, cachedResponse))"));
   assert.ok(worker.includes("getDocsCatalog(env, ctx, projects)"));
@@ -81,6 +81,7 @@ test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("githubRawContentUrl(location.repository, location.ref, location.path)"));
   assert.ok(worker.includes("githubRawContentUrl(repo.name, repo.default_branch, manifestPath)"));
   assert.ok(worker.includes('"/git/trees/" + encodeURIComponent(repo.default_branch) + "?recursive=1"'));
+  assert.ok(worker.includes("service.getPublicDocumentationPages("));
   assert.ok(worker.includes("repositoryTreeLoader(env)"));
   assert.ok(worker.includes("const SEARCH_ISSUE_REPOSITORY_LIMIT = 8;"));
   assert.ok(worker.includes("const SEARCH_ISSUES_PER_REPOSITORY = 8;"));

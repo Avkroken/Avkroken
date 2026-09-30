@@ -48,7 +48,7 @@ Cloudflare Secrets Store-bindings:
 - `CLOUDFLARE_API_TOKEN_R1` — Platform / Resource Read
 - `CLOUDFLARE_API_TOKEN_R2` — Analytics / Content / Operations Read
 - `CLOUDFLARE_API_TOKEN_R3` — Security / Identity Read
-- `GITHUB_OAUTH_CLIENT_SECRET`
+- `GITHUB_OAUTH_CLIENT_SECRET` — runtime-binding som återanvänder befintlig Secrets Store-post `KROSA_MAJA_CLIENT_SECRET`
 
 Varje bunden Secrets Store-secret ska ha `workers` i sin scope-lista. Bindings hämtar värden asynkront via `get()`; kodvägarna använder inte äldre generiska Cloudflare-token som fallback.
 
@@ -141,8 +141,10 @@ Skvallerbyttan exporterar `PortalObservationsService` från huvud-entrypointen. 
 RPC:n:
 
 - använder inte `SKVALLERBYTTAN_READ_API_TOKEN`, OAuth-session eller publik HTTP;
-- returnerar public-safe downstreammodeller med separata kontrakt för repositoryinventory, Drift, repository-CI, repository-Activity och release-deployment-korrelation;
+- returnerar public-safe downstreammodeller med separata kontrakt för repositoryinventory, dokumentationspaths, publicerade releases, Drift, repository-CI, repository-Activity och release-deployment-korrelation;
 - exponerar `getPublicRepositories()` som gör en live read-only GitHub App-läsning av installationens repositoryinventory och sanerar till current-owner + `visibility = public` + icke-arkiverad metadata innan svaret lämnar observationslagret;
+- exponerar `getPublicDocumentationPages(repoName, sourcePath)` som en bounded Git-tree-läsning efter samma live public-repositorygrind och returnerar endast allowlistade Markdown-paths;
+- exponerar `getPublicReleases(repoName, limit)` som en bounded release-läsning efter samma live public-repositorygrind och returnerar högst tio sanerade publicerade releases utan body/author/assets;
 - den generella Drift-metoden exponerar inte required/accepted provider permissions, HTTP-status/fel, installation-/budgetmetadata, scope coverage/repositoryantal eller Activity/eventvolym;
 - gör inga provider-write-operationer;
 - lämnar full/detailed Activity och repository-scopead Insyn bakom Skvallerbyttans autentiserade dashboard/API;

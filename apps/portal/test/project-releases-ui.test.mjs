@@ -71,6 +71,8 @@ test("project Releases backend derives eligibility from the bounded public repos
   assert.ok(load.includes("loadPublicationRepositoryProjects(env)"));
   assert.ok(load.includes("eligibleReleaseProjects(projects"));
   assert.ok(load.includes("fetchProjectReleases(project, env)"));
+  assert.ok(worker.includes("service.getPublicReleases("));
+  assert.ok(worker.includes("const observed = await loadServiceProjectReleases(repoName, env)"));
   assert.ok(load.includes("sortPublicReleases"));
   assert.equal(load.includes("getPublicChangelog"), false);
 });

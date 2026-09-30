@@ -145,6 +145,17 @@ test("repository wrangler config satisfies the deployment contract", async () =>
 });
 
 
+test("repository production config reuses the existing Krösa-Maja OAuth secret", async () => {
+  const raw = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
+  );
+  const value = JSON.parse(raw);
+  assert.ok(value.secrets_store_secrets.some((item) =>
+    item.binding === "GITHUB_OAUTH_CLIENT_SECRET" &&
+    item.secret_name === "KROSA_MAJA_CLIENT_SECRET"
+  ));
+});
+
 test("repository Preview config stays fail-closed without production provider state", async () => {
   const raw = await import("node:fs/promises").then(({ readFile }) =>
     readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")

@@ -171,7 +171,7 @@ Hemliga värden ligger i Cloudflare/runtime och får aldrig committas.
 
 Credential-/security-namn:
 
-- `GITHUB_OAUTH_CLIENT_SECRET` — GitHub OAuth-klienthemligheten; produktion läser värdet via Cloudflare Secrets Store-binding medan lokal utveckling kan använda en vanlig runtime-sträng
+- `GITHUB_OAUTH_CLIENT_SECRET` — GitHub OAuth-klienthemlighetens runtime-binding; production återanvänder befintlig Secrets Store-post `KROSA_MAJA_CLIENT_SECRET`, medan lokal utveckling kan använda en vanlig ignorerad runtime-sträng
 - `TURNSTILE_SECRET`
 - `STUDENTCONSULTING_EMAIL`
 - `STUDENTCONSULTING_PASSWORD`

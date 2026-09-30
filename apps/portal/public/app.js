@@ -13,10 +13,15 @@ const detailRepository = document.querySelector("#project-detail-repository");
 const detailRef = document.querySelector("#project-detail-ref");
 const detailUpdated = document.querySelector("#project-detail-updated");
 const detailSourcePath = document.querySelector("#project-detail-source-path");
+const detailRelease = document.querySelector("#project-detail-release");
+const detailReleaseStatus = document.querySelector("#project-detail-release-status");
+const detailReleaseLink = document.querySelector("#project-detail-release-link");
+const detailStores = document.querySelector("#project-detail-stores");
 const detailError = document.querySelector("#project-detail-error");
 
 let allProjects = [];
 let projectsLoaded = false;
+let detailReleaseSerial = 0;
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -69,6 +74,9 @@ function metric(label, value) {
 }
 
 function projectCard(project) {
+  const cardLink = project.portalUrl
+    ? `<a class="card-hit-area" data-portal-route href="${escapeHtml(project.portalUrl)}" aria-label="Öppna ${escapeHtml(project.name)}"></a>`
+    : "";
   const overviewLink = project.portalUrl
     ? `<a class="card-action primary" data-portal-route href="${escapeHtml(project.portalUrl)}">Översikt</a>`
     : "";
@@ -101,6 +109,7 @@ function projectCard(project) {
   return `
     <article class="card"
        style="--glow:${accentColor(project.accent)};--accent:${accentSolid(project.accent)}">
+      ${cardLink}
       <div class="card-top">
         <span class="badge">${escapeHtml(project.category || "Projekt")}</span>
         <span class="arrow" aria-hidden="true">↗</span>
@@ -151,6 +160,89 @@ function detailAction(label, href, { primary = false, internal = false } = {}) {
   return `<a class="portal-button${primary ? " primary" : ""}"${routeAttribute} href="${escapeHtml(href)}"${externalAttributes}>${escapeHtml(label)}</a>`;
 }
 
+function renderProjectStores(project) {
+  if (!detailStores) return;
+  const target = detailStores.querySelector("[data-store-links]");
+  if (!target) return;
+
+  if (project?.independentProduct !== true) {
+    detailStores.hidden = true;
+    target.replaceChildren();
+    return;
+  }
+
+  detailStores.hidden = false;
+  target.replaceChildren();
+
+  const links = Array.isArray(project.storeLinks) ? project.storeLinks : [];
+  const verified = links.filter(item =>
+    item && typeof item.label === "string" && typeof item.url === "string" &&
+    /^https:\/\//.test(item.url)
+  );
+
+  if (project.url) {
+    verified.unshift({ label: "Webb", url: project.url });
+  }
+
+  if (!verified.length) {
+    const copy = document.createElement("p");
+    copy.textContent = "Inga verifierade butikslänkar är publicerade ännu.";
+    target.appendChild(copy);
+    return;
+  }
+
+  for (const item of verified) {
+    const link = document.createElement("a");
+    link.className = "portal-button";
+    link.href = item.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = item.label;
+    target.appendChild(link);
+  }
+}
+
+async function loadProjectLatestRelease(project) {
+  const serial = ++detailReleaseSerial;
+  if (!detailRelease || !detailReleaseStatus || !detailReleaseLink) return;
+
+  if (project?.type !== "repository" || !project.releasesPortalUrl) {
+    detailRelease.hidden = true;
+    detailReleaseLink.hidden = true;
+    return;
+  }
+
+  detailRelease.hidden = false;
+  detailReleaseStatus.textContent = "Läser senaste publicerade release…";
+  detailReleaseLink.href = project.releasesPortalUrl;
+  detailReleaseLink.textContent = "Visa releasehistorik";
+  detailReleaseLink.hidden = false;
+
+  try {
+    const response = await fetch(
+      "/api/releases?project=" + encodeURIComponent(project.slug),
+      { headers: { Accept: "application/json" } }
+    );
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    const payload = await response.json();
+    if (serial !== detailReleaseSerial) return;
+    const release = Array.isArray(payload.releases) ? payload.releases[0] : null;
+
+    if (!release) {
+      detailReleaseStatus.textContent = "Ingen publicerad GitHub Release ännu.";
+      return;
+    }
+
+    const name = release.name || release.tag || "Release";
+    detailReleaseStatus.textContent = name + " · " + formatDate(release.publishedAt);
+    detailReleaseLink.textContent = "Öppna " + (release.tag || "release") + " i Portalen";
+  } catch {
+    if (serial !== detailReleaseSerial) return;
+    detailReleaseStatus.textContent = "Releaseinformationen är tillfälligt otillgänglig.";
+  }
+}
+
 function resetProjectDetail() {
   if (!detailTitle) return;
   detailCategory.textContent = "PROJEKT";
@@ -164,6 +256,9 @@ function resetProjectDetail() {
   detailUpdated.textContent = "—";
   detailSourcePath.hidden = true;
   detailSourcePath.textContent = "";
+  if (detailRelease) detailRelease.hidden = true;
+  if (detailReleaseLink) detailReleaseLink.hidden = true;
+  if (detailStores) detailStores.hidden = true;
   detailError.hidden = true;
 }
 
@@ -236,6 +331,8 @@ function renderProjectDetail() {
   ].filter(Boolean);
 
   detailActions.innerHTML = actions.join("");
+  renderProjectStores(project);
+  loadProjectLatestRelease(project);
   document.title = `${project.name || project.slug} · Avkroken`;
 }
 

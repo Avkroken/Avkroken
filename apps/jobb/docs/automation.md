@@ -26,7 +26,7 @@ Authvägen är fail-closed:
 - GitHub access-token används endast för `GET /user`, persisteras inte och revokeras best-effort;
 - numeriskt GitHub-ID måste finnas i aktuell allowlist innan lokal signerad session skapas.
 
-I produktion läses client secret via Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`. Client ID och allowlist är icke-hemliga Worker-vars. Real credential values får aldrig committas.
+I produktion läses client secret via Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`. Bindingen återanvänder den redan etablerade Secrets Store-posten `KROSA_MAJA_CLIENT_SECRET`, eftersom Jobb och Skvallerbyttan använder samma Krösa-Maja OAuth-klient. Client ID och allowlist är icke-hemliga Worker-vars. Real credential values får aldrig committas.
 
 ## Manual mode
 

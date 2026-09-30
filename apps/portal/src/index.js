@@ -52,7 +52,7 @@ const GITHUB_API = githubUserRepositoriesApi();
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
-const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v2");
+const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v3");
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
@@ -215,7 +215,35 @@ async function fetchGitHubJson(url, env) {
   return { ok: true, status: response.status, data: await response.json() };
 }
 
-async function fetchRepositoryTree(repo, env) {
+async function loadServiceDocumentationTree(repo, sourcePath, env) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicDocumentationPages !== "function") return null;
+
+  try {
+    const snapshot = await service.getPublicDocumentationPages(
+      repo.name,
+      sourcePath || null
+    );
+    if (
+      !snapshot ||
+      typeof snapshot !== "object" ||
+      snapshot.schemaVersion !== 1 ||
+      snapshot.status !== "available" ||
+      snapshot.repository !== repo.name ||
+      !Array.isArray(snapshot.paths)
+    ) {
+      return null;
+    }
+    return snapshot.paths.map(path => ({ type: "blob", path }));
+  } catch {
+    return null;
+  }
+}
+
+async function fetchRepositoryTree(repo, env, sourcePath = null) {
+  const observed = await loadServiceDocumentationTree(repo, sourcePath, env);
+  if (observed !== null) return observed;
+
   const endpoint = githubRepositoryApiBase(repo.name) +
     "/git/trees/" + encodeURIComponent(repo.default_branch) + "?recursive=1";
   const result = await fetchGitHubJson(endpoint, env);
@@ -232,9 +260,9 @@ async function fetchRepositoryTree(repo, env) {
 
 function repositoryTreeLoader(env) {
   const pending = new Map();
-  return repo => {
-    const key = repo.name + "@" + repo.default_branch;
-    if (!pending.has(key)) pending.set(key, fetchRepositoryTree(repo, env));
+  return (repo, sourcePath = null) => {
+    const key = repo.name + "@" + repo.default_branch + ":" + (sourcePath || "");
+    if (!pending.has(key)) pending.set(key, fetchRepositoryTree(repo, env, sourcePath));
     return pending.get(key);
   };
 }
@@ -291,7 +319,14 @@ async function buildDocsEntry(repo, loadTree) {
   const readme = treeReadmePage(tree);
 
   const pages = [...docs];
-  if (readme && !pages.some(page => page.path === readme.path)) pages.push(readme);
+  if (readme && !pages.some(page => page.path === readme.path)) {
+    pages.push({
+      ...readme,
+      label: docs.some(page => /(^|\/)docs\/index\.(md|markdown)$/i.test(page.path))
+        ? "README"
+        : "Översikt"
+    });
+  }
   pages.sort(pageSort);
 
   return {
@@ -310,12 +345,19 @@ async function buildAppDocsEntry(project, loadTree) {
     default_branch: source.defaultBranch
   };
 
-  const tree = await loadTree(repo);
+  const tree = await loadTree(repo, source.sourcePath);
   const docs = treeMarkdownPages(tree, source.docsRoot);
   const readme = treeFilePage(tree, source.readmePath, "Översikt");
 
   const sourcePages = [...docs];
-  if (readme && !sourcePages.some(page => page.path === readme.path)) sourcePages.push(readme);
+  if (readme && !sourcePages.some(page => page.path === readme.path)) {
+    sourcePages.push({
+      ...readme,
+      label: docs.some(page => /(^|\/)docs\/index\.(md|markdown)$/i.test(page.path))
+        ? "README"
+        : "Översikt"
+    });
+  }
 
   const prefix = source.sourcePath + "/";
   const pages = sourcePages
@@ -1507,10 +1549,43 @@ async function getPublicProjectIssues(requestUrl, env) {
   }
 }
 
+async function loadServiceProjectReleases(repoName, env) {
+  const service = env.SKVALLERBYTTAN_OBSERVATIONS;
+  if (!service || typeof service.getPublicReleases !== "function") return null;
+
+  try {
+    const snapshot = await service.getPublicReleases(
+      repoName,
+      CHANGELOG_RELEASES_PER_REPOSITORY
+    );
+    if (
+      !snapshot ||
+      typeof snapshot !== "object" ||
+      snapshot.schemaVersion !== 1 ||
+      snapshot.status !== "available" ||
+      snapshot.repository !== repoName ||
+      !Array.isArray(snapshot.releases)
+    ) {
+      return null;
+    }
+    return snapshot.releases;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchProjectReleases(project, env) {
   const repository = String(project?.source?.repository || "");
   const repoName = repositoryNameFromOwnedFullName(repository);
   if (!repoName) return { releases: [], failed: true };
+
+  const observed = await loadServiceProjectReleases(repoName, env);
+  if (observed !== null) {
+    return {
+      releases: normalizePublicReleases(project, observed),
+      failed: false
+    };
+  }
 
   const endpoint = githubRepositoryApiBase(repoName) + "/releases?per_page=" +
     CHANGELOG_RELEASES_PER_REPOSITORY;

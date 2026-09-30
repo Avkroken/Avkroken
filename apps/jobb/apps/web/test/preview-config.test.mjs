@@ -7,6 +7,15 @@ async function readWranglerConfig() {
 }
 
 describe("Worker Preview contract", () => {
+  it("production reuses the existing Krösa-Maja OAuth secret from Secrets Store", async () => {
+    const config = await readWranglerConfig();
+    expect(config.secrets_store_secrets).toContainEqual({
+      binding: "GITHUB_OAUTH_CLIENT_SECRET",
+      store_id: "293e79006fa649b8b182ef105a6b46d1",
+      secret_name: "KROSA_MAJA_CLIENT_SECRET"
+    });
+  });
+
   it("stays fail-closed until isolated state resources are provisioned", async () => {
     const config = await readWranglerConfig();
 

@@ -249,6 +249,23 @@ h1 {
   transition: transform var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), border-color var(--ak-motion-duration-standard) var(--ak-motion-ease-standard), background var(--ak-motion-duration-standard) var(--ak-motion-ease-standard);
 }
 
+.card-hit-area {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.card-hit-area:focus-visible {
+  outline: 2px solid var(--accent, var(--cyan));
+  outline-offset: -3px;
+}
+
+.card-actions {
+  position: relative;
+  z-index: 3;
+}
+
 .card::after {
   content: "";
   position: absolute;
@@ -314,7 +331,7 @@ h1 {
 
 .card-actions {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;

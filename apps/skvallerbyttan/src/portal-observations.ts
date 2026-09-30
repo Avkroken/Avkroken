@@ -6,6 +6,7 @@ import { organization } from "./env";
 import { getObservedActivity } from "./activity";
 import {
   githubInstallationRepositories,
+  githubJson,
   githubListAll,
   mapLimit,
 } from "./github";
@@ -38,6 +39,14 @@ import {
   type PortalReleaseDeploymentRequest,
   type PortalReleaseDeploymentsSnapshot,
 } from "./portal-release-deployment-model";
+import {
+  buildPortalPublicDocumentationSnapshot,
+  type PortalPublicDocumentationSnapshot,
+} from "./portal-docs-model";
+import {
+  normalizePortalPublicRelease,
+  type PortalPublicRelease,
+} from "./portal-release-model";
 
 export async function getPortalOperationsSnapshot(env: Env): Promise<PortalOperationsSnapshot> {
   const capabilitySnapshot = await getCapabilities(env);
@@ -171,6 +180,75 @@ export async function getPortalPublicRepositoriesSnapshot(
     repositories: result.value,
     truncated: result.truncated,
   });
+}
+
+export async function getPortalPublicDocumentationSnapshot(
+  env: Env,
+  repoName: string,
+  sourcePath: string | null = null,
+): Promise<PortalPublicDocumentationSnapshot> {
+  const repositories = await getPortalPublicRepositoriesSnapshot(env);
+  const repository = repositories.repositories.find(
+    (candidate) => candidate.name.toLowerCase() === repoName.toLowerCase(),
+  );
+  if (!repository) throw new Error("public repository not found");
+
+  const tree = await githubJson<{
+    truncated?: boolean;
+    tree?: Array<{ path?: string; type?: string }>;
+  }>(
+    env,
+    `/repos/${organization(env)}/${encodeURIComponent(repository.name)}/git/trees/${encodeURIComponent(repository.default_branch)}?recursive=1`,
+  );
+  if (tree?.truncated === true || !Array.isArray(tree?.tree)) {
+    throw new Error("public repository tree unavailable");
+  }
+
+  return buildPortalPublicDocumentationSnapshot({
+    generatedAt: new Date().toISOString(),
+    repository: repository.name,
+    defaultBranch: repository.default_branch,
+    sourcePath,
+    tree: tree.tree,
+  });
+}
+
+export async function getPortalPublicReleasesSnapshot(
+  env: Env,
+  repoName: string,
+  limit = 10,
+): Promise<{
+  schemaVersion: 1;
+  generatedAt: string;
+  status: "available";
+  repository: string;
+  releases: PortalPublicRelease[];
+}> {
+  const repositories = await getPortalPublicRepositoriesSnapshot(env);
+  const repository = repositories.repositories.find(
+    (candidate) => candidate.name.toLowerCase() === repoName.toLowerCase(),
+  );
+  if (!repository) throw new Error("public repository not found");
+
+  const boundedLimit = Math.min(10, Math.max(1, Math.trunc(Number(limit) || 10)));
+  const raw = await githubJson<unknown[]>(
+    env,
+    `/repos/${organization(env)}/${encodeURIComponent(repository.name)}/releases?per_page=${boundedLimit}`,
+  );
+  if (!Array.isArray(raw)) throw new Error("public releases unavailable");
+
+  const releases = raw
+    .map((item) => normalizePortalPublicRelease(item, repository.full_name))
+    .filter((item): item is PortalPublicRelease => item !== null)
+    .slice(0, boundedLimit);
+
+  return {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    status: "available",
+    repository: repository.name,
+    releases,
+  };
 }
 
 export async function getPortalReleaseDeploymentsSnapshot(
@@ -324,6 +402,38 @@ export class PortalObservationsService extends WorkerEntrypoint<Env> {
 
   async getPublicRepositories(): Promise<PortalPublicRepositoriesSnapshot> {
     return getPortalPublicRepositoriesSnapshot(this.env);
+  }
+
+  async getPublicDocumentationPages(
+    repoName: string,
+    sourcePath: string | null = null,
+  ): Promise<PortalPublicDocumentationSnapshot> {
+    const normalized = typeof repoName === "string" ? repoName.trim() : "";
+    if (
+      !normalized ||
+      !REPOSITORY_NAME.test(normalized) ||
+      normalized === "." ||
+      normalized === ".."
+    ) {
+      throw new Error("invalid repository name");
+    }
+    return getPortalPublicDocumentationSnapshot(this.env, normalized, sourcePath);
+  }
+
+  async getPublicReleases(
+    repoName: string,
+    limit = 10,
+  ) {
+    const normalized = typeof repoName === "string" ? repoName.trim() : "";
+    if (
+      !normalized ||
+      !REPOSITORY_NAME.test(normalized) ||
+      normalized === "." ||
+      normalized === ".."
+    ) {
+      throw new Error("invalid repository name");
+    }
+    return getPortalPublicReleasesSnapshot(this.env, normalized, limit);
   }
 
   async getPublicReleaseDeployments(

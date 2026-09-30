@@ -158,7 +158,7 @@ Projektcache-nyckeln bumpas när Wiki-fälten införs så gammal v4-payload inte
 
 Dokumentationskatalogen byggs från Portalens redan public-safe projektkatalog och lagras i Workers Cache API i 21 600 sekunder med `docs-catalog`-tag. Om projektkatalogen eller nödvändiga GitHub-katalogläsningar inte kan genomföras returneras `502` med `github_unavailable`; UI visar ett explicit unavailable-state.
 
-Dokumentationskatalogen läser ett rekursivt Git-tree per unikt repository/ref och deduplicerar samma source-repository mellan repositoryprojekt och opt-in-appar. Tree-läsningarna är concurrency-begränsade till 2 och oanvändbara felresponser cancelas explicit för att inte hålla Workers HTTP-requestslots öppna. Det ersätter rekursiva `/contents`-anrop per mapp. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns som projektkatalogen. Appens publika route-path hålls separat från provider-path.
+Dokumentationskatalogen läser ett rekursivt Git-tree per unikt repository/ref och deduplicerar samma source-repository mellan repositoryprojekt och opt-in-appar. Normalfallet är `SKVALLERBYTTAN_OBSERVATIONS.getPublicDocumentationPages(repoName, sourcePath)`, där Skvallerbyttans read-only GitHub App gör providerläsningen och returnerar endast allowlistade Markdown-paths. Portalens credential-fria Git-tree-read finns kvar som rollout/degraded fallback. Tree-läsningarna är concurrency-begränsade till 2. Opt-in-appdokument tas endast med när appen först har passerat samma giltiga `portal.public.json`-gräns; RPC:n allowlistar dessutom `apps/skvallerbyttan` och kan inte enumerera skyddade `apps/jobb`.
 
 ### Dokumentinnehåll
 
@@ -181,7 +181,7 @@ Kall indexbuild är budgeterad:
 
 - public project catalog återanvänds som första säkerhetsgrind;
 - docs-katalogen återanvänds från dess tag-invaliderbara 21 600-sekunders cache;
-- GitHub Git-tree-läsningar har concurrency 2 och dedupliceras per repository/ref;
+- dokumentationspaths hämtas primärt genom Skvallerbyttans autentiserade read-only RPC; credential-fri Git-tree-fallback har concurrency 2 och dedupliceras per repository/ref/sourcePath;
 - max 32 Markdown-dokument;
 - round-robin över docs-källor;
 - exakt allowlistad Markdown läses från GitHubs raw-content-origin först efter publiceringsgrinden;
@@ -206,7 +206,7 @@ Budget:
 - concurrency 4;
 - max 40 returnerade releaser.
 
-Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller target commit, och monorepo-appar ärver inte source-repositoryts releases.
+Releasepayloaden hämtas primärt genom `SKVALLERBYTTAN_OBSERVATIONS.getPublicReleases(repoName, limit)`, där samma read-only GitHub App verifierar live public repository-state och sanerar releasen före RPC-svaret. Portalens credential-fria GitHub Releases-read finns endast som rollout/degraded fallback. Draft releases filtreras alltid bort. Changelog publicerar inte release body, author, assets eller osanerad target commit, och monorepo-appar ärver inte source-repositoryts releases.
 
 ### Projektspecifika Releases
 
@@ -313,7 +313,7 @@ Samtidiga indexbyggen i samma Worker-isolate kollapsas till ett gemensamt in-fli
 
 ### Changelog
 
-Changelog lagras inte persistent i Cache API. När Portal saknar egen GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder; inventoryn kommer normalt från Skvallerbyttans autentiserade read-only RPC och credential-fri GitHub REST är fallback. Med Portal-credential kringgås eligibility-cachen. Releasepayloaden läses alltid från GitHub när snapshoten byggs. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
+Changelog lagras inte persistent i Cache API. När Portal saknar egen GitHub-credential får repository-eligibility återanvändas i högst 60 sekunder. Både inventory och publicerade releaser läses normalt genom Skvallerbyttans autentiserade read-only RPC; credential-fri GitHub REST är rollout/degraded fallback. Samtidiga builds i samma Worker-isolate delar ett in-flight Promise som rensas efter success/failure.
 
 ### Dokumentation
 

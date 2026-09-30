@@ -16,6 +16,8 @@ test("Skvallerbyttan exports a dedicated Portal observations RPC entrypoint", ()
   );
   assert.match(observations, /getPublicOperationsSummary/);
   assert.match(observations, /getPublicRepositories/);
+  assert.match(observations, /getPublicDocumentationPages/);
+  assert.match(observations, /getPublicReleases/);
   assert.match(observations, /getPublicRepositoryCi/);
   assert.match(observations, /getPublicActivity/);
 });
