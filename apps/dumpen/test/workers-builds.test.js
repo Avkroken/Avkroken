@@ -9,6 +9,9 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(pkg.scripts["deploy:workers-builds"], "node scripts/workers-build-production.mjs");
 
+  const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
+  assert.deepEqual(wrangler.previews, {});
+
   const script = await readFile(new URL("../scripts/workers-build-production.mjs", import.meta.url), "utf8");
   assert.match(script, /WORKERS_CI !== "1"/);
   assert.match(script, /WORKERS_CI_BRANCH !== "main"/);

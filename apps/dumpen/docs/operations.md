@@ -86,11 +86,13 @@ Wrangler-konfigurationen har persistent logs/traces med sampling och query-strin
 
 Repositoryts produktionsmodell är Cloudflare Workers Builds, inte en GitHub Actions-deployworkflow. Workern ska skapas/importeras från repository `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med deploy command `npm run deploy:workers-builds`. Scriptet deployar endast från `main`; när Cloudflare startar samma build command för en PR-/feature-branch avslutas den explicit utan deployment. Scriptet skapar inga tokens eller runtime-secrets.
 
+Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkonfigurationen är tom och ärver därför inte production-R2, Secrets Store eller authvars. Previewbuilden får inte använda production-data som genväg.
+
 ### Nuvarande providerläge
 
-Live-verifiering 2026-09-29 visar ingen `dumpen` Worker i de två konton som den autentiserade Wrangler-profilen kan läsa. `dumpen.denied.se` saknade observerbara A/AAAA-poster. R2 kan inte verifieras i det repository-deklarerade kontot eftersom bucket-listning ger authentication error; i det andra kontot är R2 inte aktiverat.
+Live-verifiering 2026-09-30 visar att `dumpen` är provisionerad i det repository-deklarerade Cloudflare-kontot. Wrangler visar aktiva deployments/versioner och `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200. Den lokala Wrangler-identiteten får däremot `403` mot Workers Builds logg-API och kan inte separat inventera R2-bucketen; dessa delar ska därför fortsatt markeras `permission_denied`/`unknown` i stället för att antas.
 
-Det explicit beslutade nästa providersteget är att återskapa Workern genom GitHub-import/Workers Builds. `wrangler.jsonc` binder den befintliga Krösa-Maja OAuth-klientens publika client ID och Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindingen förblir `DUMPEN -> dumpen`; bucketens live-state måste verifieras när Workers Builds-provisioneringen körs eftersom lokal R2-listning är permission-denied.
+`wrangler.jsonc` binder den befintliga Krösa-Maja OAuth-klientens publika client ID och Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindingen förblir `DUMPEN -> dumpen`; den separata bucket-inventeringen är fortfarande permission-denied för den lokala identiteten.
 
 ## GitHub Auth
 

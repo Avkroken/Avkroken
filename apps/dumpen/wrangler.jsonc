@@ -36,6 +36,7 @@
   "r2_buckets": [
     { "binding": "DUMPEN", "bucket_name": "dumpen" }
   ],
+  "previews": {},
   "routes": [
     { "pattern": "dumpen.denied.se", "custom_domain": true }
   ]
