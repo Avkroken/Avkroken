@@ -31,15 +31,16 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 
 ## Live provider-state
 
-Verifierat 2026-09-29 med den autentiserade Wrangler-profilens läsbara konton samt DNS-resolution:
+Verifierat 2026-09-30 med den autentiserade Wrangler-profilen och faktisk runtime:
 
-- Worker `dumpen`: **not_configured** — Cloudflare API returnerar uttryckligen att Workern inte finns i båda tillgängliga kontona;
-- runtime-secrets: **not_observed** — det finns ingen Worker att läsa secretnamn från;
-- R2 i kontot som `wrangler.jsonc` pekar på: **permission_denied / unknown** — bucket-listning returnerar Cloudflare authentication error, så bucketens existens får inte antas åt något håll;
-- R2 i det andra tillgängliga kontot: **not_configured** — Cloudflare anger att R2 inte är aktiverat;
-- `dumpen.denied.se`: **unavailable / not_configured observed** — varken systemresolvern eller 1.1.1.1 returnerade A/AAAA-post vid verifieringen.
+- Worker `dumpen`: **available** — `wrangler deployments list` och `wrangler versions list` visar aktiva versioner/deployments i det deklarerade kontot;
+- senaste observerade deployment: **2026-09-30T02:42:42Z**;
+- `https://dumpen.denied.se/`: **available** — HTTP 200;
+- `https://dumpen.denied.se/robots.txt`: **available** — HTTP 200;
+- Workers Builds logg-API: **permission_denied** för den lokala Wrangler-identiteten (`403`), så enskilda provider-buildloggar får inte beskrivas som lästa när de endast syns som GitHub-checkstatus;
+- R2-bucketens separata inventory-state är fortsatt **permission_denied / unknown** från den lokala identiteten; runtime/deploymentens funktion bevisar inte separat bucket-listbehörighet.
 
-Detta var providerläget efter repositorymigreringen. Ett explicit beslut togs därefter att återskapa Dumpen som en GitHub-kopplad Cloudflare Worker. Provisioneringen ska ske genom Cloudflare Workers Builds från `Avkroken/Avkroken`, branch `main`, root `apps/dumpen`; lokal `wrangler deploy` är inte skapandemekanismen. R2-state ska fortfarande verifieras separat eftersom bucket-listning saknar läsrätt i den lokala Wrangler-identiteten.
+Dumpen är alltså nu provisionerad och körs som GitHub-kopplad Cloudflare Worker. Produktionsdeployment ägs fortsatt av Cloudflare Workers Builds från `Avkroken/Avkroken`, branch `main`, root `apps/dumpen`; lokal `wrangler deploy` är inte normal skapande-/releaseväg.
 
 ## Routinggräns
 
@@ -54,6 +55,12 @@ Detta var providerläget efter repositorymigreringen. Ett explicit beslut togs d
 
 Detta är server-side guarantees. Frontendkod får inte vara enda platsen som upprätthåller dem.
 
+## Tema
+
+Dumpens svart/gröna terminalidentitet behålls som produktaccent, men ytorna använder monorepots gemensamma teman `legacy`, `forest` (visas som **Avkroken**) och `blackout`. `legacy` är fallback.
+
+Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, presentationscookien `avkroken_theme`. Cookien är inte autentiserings- eller auktorisationsstate och får aldrig påverka Dumpens GitHub-session, upload-tickets eller access-routing.
+
 ## Storage
 
 R2-bucketen `dumpen` är durable object storage för applikationen. Dokumentation, debugoutput och loggning får inte dumpa objektinnehåll som en generell felsökningsmekanism.
@@ -67,7 +74,9 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. Scriptet accepterar endast `main`, kör `npm run check`, deployar och avslutar med `npm run verify:production`. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
+Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. På `main` kör scriptet `npm run check`, deployar och avslutar med `npm run verify:production`. Om Cloudflare anropar samma entrypoint för en annan branch avslutas körningen framgångsrikt utan deployment; feature-/PR-branches får alltså aldrig producera en Dumpen-produktionsdeploy. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
+
+`wrangler.jsonc` har dessutom ett explicit tomt `previews`-block. Det gör branch-previews fail-closed: production-R2, Secrets Store och authvars är inte bundna i previewmiljön. En preview får därför verifiera build/runtime-skal men får inte läsa eller skriva Dumpens production-data.
 
 ## Dokumentationsgräns
 

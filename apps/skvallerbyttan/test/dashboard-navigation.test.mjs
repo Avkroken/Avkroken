@@ -58,3 +58,16 @@ test("mobile styles keep navigation and capability cards usable", () => {
   assert.match(css, /\.capability-grid/);
   assert.match(css, /@media \(max-width: 680px\)/);
 });
+
+test("dashboard exposes the shared Avkroken theme contract without losing its own shell", () => {
+  const theme = readFileSync(new URL("../public/theme.js", import.meta.url), "utf8");
+  assert.match(html, /<html lang="sv" data-theme="legacy">/);
+  assert.match(html, /<option value="legacy">Legacy<\/option>[\s\S]*<option value="forest">Avkroken<\/option>/);
+  assert.match(css, /:root\[data-theme="forest"\]/);
+  assert.match(css, /:root\[data-theme="blackout"\]/);
+  assert.match(css, /--accent:\s*#7dd3fc/);
+  assert.match(theme, /avkroken\.theme/);
+  assert.match(theme, /avkroken_theme/);
+  assert.match(theme, /Domain=\.denied\.se/);
+  assert.match(shell, /initTheme\(\)/);
+});

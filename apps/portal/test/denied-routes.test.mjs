@@ -14,7 +14,7 @@ const routes = [
 test("denied routes are static noindex documents with shared token styling", async () => {
   for (const [path, kind, title] of routes) {
     const html = await readFile(publicFile(path), "utf8");
-    assert.match(html, /<html lang="sv" data-theme="forest">/);
+    assert.match(html, /<html lang="sv" data-theme="legacy">/);
     assert.match(html, /<meta name="robots" content="noindex,nofollow">/);
     assert.match(html, /href="\/tokens\.css"/);
     assert.match(html, /href="\/styles\.css"/);

@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="sv">
+<html lang="sv" data-theme="legacy">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#04070e" />
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>Skvallerbyttan · Avkrokens observationslager</title>
     <link rel="stylesheet" href="/styles.css" />
@@ -17,6 +18,14 @@
           <p class="subtitle">Read-only observationslager för GitHub, Cloudflare och operativ aktivitet.</p>
         </div>
         <div class="topbar-actions">
+          <label class="theme-control" for="theme-select">
+            <span>Tema</span>
+            <select id="theme-select" aria-label="Tema">
+              <option value="legacy">Legacy</option>
+              <option value="forest">Avkroken</option>
+              <option value="blackout">Blackout</option>
+            </select>
+          </label>
           <span id="freshness" class="muted">Laddar…</span>
           <a class="button-link secondary" href="/auth/logout">Logga ut</a>
           <button id="refresh" type="button">Uppdatera</button>

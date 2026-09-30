@@ -16,6 +16,8 @@ describe("dashboard rendering", () => {
     }
     expect(html).toContain("/assets/dashboard.css");
     expect(html).toContain("/assets/dashboard.js");
+    expect(html).toContain('<html lang="sv" data-theme="legacy">');
+    expect(html).toMatch(/<option value="legacy">Legacy<\/option>.*<option value="forest">Avkroken<\/option>/s);
     expect(html).not.toContain("DASHBOARD_PASSWORD");
     expect(html).not.toContain("STUDENTCONSULTING_PASSWORD");
   });
@@ -32,7 +34,15 @@ describe("dashboard rendering", () => {
     const js = renderDashboardScript();
     expect(css.headers.get("content-type")).toContain("text/css");
     expect(js.headers.get("content-type")).toContain("text/javascript");
-    expect(await css.text()).toContain(".slots");
-    expect(await js.text()).toContain("/api/dashboard");
+    const cssText = await css.text();
+    const jsText = await js.text();
+    expect(cssText).toContain(".slots");
+    expect(cssText).toContain(':root[data-theme="forest"]');
+    expect(cssText).toContain(':root[data-theme="blackout"]');
+    expect(cssText).toContain("--accent:#7dd3fc");
+    expect(jsText).toContain("/api/dashboard");
+    expect(jsText).toContain("avkroken.theme");
+    expect(jsText).toContain("avkroken_theme");
+    expect(jsText).toContain("Domain=.denied.se");
   });
 });

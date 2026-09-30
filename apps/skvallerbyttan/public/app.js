@@ -3,6 +3,7 @@ import {
   refreshAllObservationData,
   setOverviewForObservations,
 } from "./observations.js";
+import { initTheme } from "./theme.js";
 
 const state = { overview: null, repoRequestId: null };
 const $ = (selector) => document.querySelector(selector);
@@ -555,5 +556,6 @@ $("#close-detail").addEventListener("click", () => {
   history.replaceState(null, "", location.pathname);
 });
 
+initTheme();
 initObservationsNavigation();
 loadOverview();

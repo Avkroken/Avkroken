@@ -36,13 +36,13 @@ Stämning får inte försämra läsbarhet eller navigering.
 
 Portal-shellen använder ett och samma komponent-/tokenlager med `data-theme` på dokumentroten:
 
-- `forest` — Avkroken / Wrong Turn / Forest och runtime-default;
-- `legacy` — blåare legacy-ton inom samma semantiska system;
+- `legacy` — blåare legacy-ton inom samma semantiska system och runtime-default;
+- `forest` — Avkroken / Wrong Turn / Forest;
 - `blackout` — neutral, mycket mörk variant.
 
 `tokens.css` override:ar endast primitive färgtokens per tema. Semantic tokens som `--ak-surface-*`, `--ak-text-*`, `--ak-status-*` och interaktions-/fokustokens förblir gemensamma. Teman ska därför inte få egna duplicerade komponentstylesheets.
 
-Tema kan väljas i Portalens huvudnavigation. Valet lagras lokalt när storage är tillgänglig; `forest` är säker server-renderad fallback. Fokus, keyboardnavigation, kontrastkrav och reduced motion gäller identiskt i alla teman.
+Tema kan väljas i Portalens huvudnavigation. `legacy` är server-renderad fallback. Valet persisteras med det gemensamma presentationskontraktet `localStorage["avkroken.theme"]` och, på `denied.se`, den icke-känsliga cookien `avkroken_theme`; Portal läser även den äldre `avkroken.portal.theme` som migrationskälla. Temapreferensen får aldrig påverka autentisering eller auktorisation. Fokus, keyboardnavigation, kontrastkrav och reduced motion gäller identiskt i alla teman.
 
 ## Två designnivåer
 
