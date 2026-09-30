@@ -178,6 +178,11 @@ live GitHub public repository list
   -> repository projects only
   -> GitHub Releases
   -> release-source normalization
+     -> canonical release-note commit/PR relations
+     -> exact target SHA when GitHub exposes one
+  -> Skvallerbyttan public-safe deployment RPC
+     -> live public repository verification
+     -> exact commit SHA -> GitHub deployment match
   -> GET /api/changelog
   -> /changelog
 ```
@@ -186,7 +191,7 @@ Changelog använder endast repositoryprojekt som fortfarande passerar den live p
 
 Repositoryprojekt får både canonical GitHub Releases-länk och intern `releasesPortalUrl`. Monorepo-appar är separata projektidentiteter: deras `releases` och `releasesPortalUrl` är `null`, så source-repositoryts releasehistorik kan inte presenteras som appens egen.
 
-Den publika releasemodellen innehåller endast projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Draft releases och rå body/author/assets/target SHA publiceras inte. Changelog-snapshoten och projektspecifika release-responser lagras inte persistent i Cache API.
+Den publika releasemodellen innehåller projekt, tagg/namn, publiceringstid, canonical release-URL och prerelease-flagga. Där release metadata bevisar relationen härleds även föregående tagg, högst 20 canonical commit-SHA/länkar, högst 20 PR-länkar och exakt release-target SHA när `target_commitish` faktiskt är en 40-teckens SHA. Rå body, author, assets eller branchnamn publiceras inte. Changelog ber dessutom Skvallerbyttans named read-only RPC att matcha högst åtta repositories och 20 SHA per repository mot GitHubs deploymentinventory; endast exakt SHA-matchade miljö/tidsobservationer returneras. Ingen tidsbaserad deploymentgissning görs. Changelog-snapshoten och projektspecifika release-responser lagras inte persistent i Cache API.
 
 ### Repository Issues
 
