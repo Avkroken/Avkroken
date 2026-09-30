@@ -8,9 +8,13 @@ async function readWranglerConfig() {
   return JSON.parse(raw);
 }
 
-test("portal deploy targets the canonical avkroken Worker", async () => {
+test("portal tracked production config cannot be sanitized into a preview-only config", async () => {
   const config = await readWranglerConfig();
   assert.equal(config.name, "avkroken");
+  assert.equal(config.observability?.enabled, true);
+  assert.ok(config.services?.some(binding => binding.binding === "SKVALLERBYTTAN_OBSERVATIONS"));
+  assert.ok(config.r2_buckets?.some(binding => binding.binding === "PORTAL_LOGOS"));
+  assert.ok(config.triggers?.crons?.length > 0);
 });
 
 

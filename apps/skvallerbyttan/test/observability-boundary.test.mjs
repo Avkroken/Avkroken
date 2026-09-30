@@ -6,6 +6,17 @@ async function read(path) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
 }
 
+test("tracked production config cannot be sanitized into a preview-only config", async () => {
+  const wrangler = JSON.parse(await read("wrangler.jsonc"));
+  assert.equal(wrangler.name, "skvallerbyttan");
+  assert.equal(wrangler.observability?.enabled, true);
+  assert.ok(wrangler.d1_databases?.some(binding => binding.binding === "STATS_DB"));
+  assert.ok(wrangler.services?.some(binding => binding.binding === "AVKROKEN_PORTAL_DOCS"));
+  assert.ok(wrangler.services?.some(binding => binding.binding === "AVKROKEN_OPERATIONS"));
+  assert.ok(wrangler.routes?.some(route => route.pattern === "skvallerbyttan.denied.se"));
+  assert.ok(wrangler.triggers?.crons?.length > 0);
+});
+
 test("observability stays Cloudflare-only", async () => {
   const wranglerText = await read("wrangler.jsonc");
   const wrangler = JSON.parse(wranglerText);
