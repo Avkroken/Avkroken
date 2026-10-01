@@ -121,6 +121,7 @@ describe("automation run claims", () => {
 
     expect(statement).toContain("status = 'needs_user_auth'");
     expect(statement).toContain("auth_expires_at IS NULL");
+    expect(statement).toContain("datetime(auth_expires_at) IS NULL");
     expect(statement).toContain("datetime(auth_expires_at) <= datetime('now')");
     expect(statement).toContain("status = 'failed'");
     expect(statement).toContain("auth_session_id = NULL");

@@ -98,6 +98,7 @@ export async function failExpiredBankIdRuns(
        WHERE status = 'needs_user_auth'
          AND (
            auth_expires_at IS NULL
+           OR datetime(auth_expires_at) IS NULL
            OR datetime(auth_expires_at) <= datetime('now')
          )`,
     )
