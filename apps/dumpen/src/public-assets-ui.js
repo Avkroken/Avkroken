@@ -53,8 +53,31 @@ export function publicAssetsMarkup() {
       </div>
   `;
 }
+export function filterAssetCards(cards, { app = "", size = "", theme = "" } = {}) {
+  let visible = 0;
+  for (const card of cards) {
+    const show = (!app || card.dataset.app === app)
+      && (!size || card.dataset.size === size)
+      && (!theme || card.dataset.theme === theme);
+    card.hidden = !show;
+    if (show) visible += 1;
+  }
+  const filtered = Boolean(app || size || theme);
+  return {
+    visible,
+    filtered,
+    message: filtered ? visible + " bild" + (visible === 1 ? "" : "er") + " matchar filtret." : "",
+  };
+}
+
+export function bindAssetFilterChanges(selects, apply) {
+  for (const select of selects) select?.addEventListener("change", apply);
+}
+
 export function publicAssetsScript() {
   return `
+const filterAssetCards=${filterAssetCards.toString()};
+const bindAssetFilterChanges=${bindAssetFilterChanges.toString()};
 const formatLabel=(type,name)=>{
   const ext=(name.split('.').pop()||'').toUpperCase();
   const map={'image/jpeg':'JPEG','image/png':'PNG','image/webp':'WEBP','image/gif':'GIF','image/avif':'AVIF','image/svg+xml':'SVG','image/x-icon':'ICO','image/vnd.microsoft.icon':'ICO'};
@@ -97,14 +120,12 @@ function rebuildAssetFilters(assets){
   fillAssetFilter('#asset-filter-theme',themes,'Alla teman');
 }
 function applyAssetFilters(){
-  const app=$('#asset-filter-app').value,size=$('#asset-filter-size').value,theme=$('#asset-filter-theme').value;
-  let visible=0;
-  for(const card of document.querySelectorAll('#asset-gallery .asset-card')){
-    const show=(!app||card.dataset.app===app)&&(!size||card.dataset.size===size)&&(!theme||card.dataset.theme===theme);
-    card.hidden=!show;if(show)visible+=1;
-  }
-  const filtered=Boolean(app||size||theme);
-  $('#asset-status').textContent=filtered?visible+' bild'+(visible===1?'':'er')+' matchar filtret.':'';
+  const result=filterAssetCards(document.querySelectorAll('#asset-gallery .asset-card'),{
+    app:$('#asset-filter-app').value,
+    size:$('#asset-filter-size').value,
+    theme:$('#asset-filter-theme').value
+  });
+  $('#asset-status').textContent=result.message;
 }
 function assetTags(asset){
   const wrap=document.createElement('div');wrap.className='asset-tags';
@@ -113,9 +134,10 @@ function assetTags(asset){
   }
   return wrap;
 }
-for(const id of ['#asset-filter-app','#asset-filter-size','#asset-filter-theme']){
-  $(id)?.addEventListener('change',applyAssetFilters);
-}
+bindAssetFilterChanges(
+  ['#asset-filter-app','#asset-filter-size','#asset-filter-theme'].map((id)=>$(id)),
+  applyAssetFilters
+);
 function renderAssets(assets,state='available'){
   const gallery=$('#asset-gallery'),files=$('#asset-file-list'),empty=$('#asset-empty'),badge=$('#asset-badge'),status=$('#asset-status');
   gallery.replaceChildren();files.replaceChildren();
