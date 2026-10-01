@@ -28,6 +28,14 @@ test("documentation client bypasses the previous edge-cached catalog generation"
   assert.match(docsClient, /fetch\(docsCatalogUrl/);
 });
 
+test("documentation client surfaces safe HTTP diagnostics without injecting provider errors", () => {
+  assert.match(docsClient, /detail = await response\.json\(\)/);
+  assert.match(docsClient, /Källan svarade med HTTP/);
+  assert.match(docsClient, /Dokumenttjänsten svarade med HTTP/);
+  assert.match(docsClient, /detail\.textContent = error\?\.userMessage/);
+  assert.match(docsClient, /Documentation load failed/);
+});
+
 test("service cards open their Portal project page while explicit service actions stay available", () => {
   assert.match(app, /function projectCard\(project, \{ service = false \} = \{\}\)/);
   assert.match(app, /const cardTarget = project\.portalUrl/);
