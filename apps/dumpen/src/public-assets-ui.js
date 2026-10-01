@@ -54,10 +54,16 @@ function assetActions(asset){
   const open=document.createElement('a');open.href=asset.directUrl;open.target='_blank';open.rel='noopener';open.textContent='Öppna';wrap.append(open);
   return wrap;
 }
-function renderAssets(assets){
-  const gallery=$('#asset-gallery'),files=$('#asset-file-list'),empty=$('#asset-empty');
-  gallery.replaceChildren();files.replaceChildren();empty.hidden=assets.length!==0;
-  $('#asset-badge').textContent=assets.length+' objekt';
+function renderAssets(assets,state='available'){
+  const gallery=$('#asset-gallery'),files=$('#asset-file-list'),empty=$('#asset-empty'),badge=$('#asset-badge'),status=$('#asset-status');
+  gallery.replaceChildren();files.replaceChildren();
+  if(state!=='available'){
+    const message=state==='not_configured'?'Assetlagret är inte konfigurerat.':'Assetlagret är tillfälligt otillgängligt.';
+    empty.textContent=message;empty.hidden=false;badge.textContent=state==='not_configured'?'ej konfigurerat':'otillgängligt';status.textContent=message;
+    return;
+  }
+  empty.textContent='Inga publika filer uppladdade ännu.';empty.hidden=assets.length!==0;
+  badge.textContent=assets.length+' objekt';
   for(const asset of assets){
     if(asset.image){
       const card=document.createElement('article');card.className='asset-card';
