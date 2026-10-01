@@ -15,8 +15,8 @@ function sizeOf(body) {
 }
 
 function fakeR2(seed = []) {
-  const objects = new Map(seed.map(({ key, uploaded, body = "", size }) => [key, {
-    key, uploaded, body, size: size ?? sizeOf(body),
+  const objects = new Map(seed.map(({ key, uploaded, body = "", size, httpMetadata, customMetadata }) => [key, {
+    key, uploaded, body, size: size ?? sizeOf(body), httpMetadata, customMetadata, etag: `etag-${key}`,
   }]));
   return {
     puts: [],
@@ -26,18 +26,28 @@ function fakeR2(seed = []) {
       if (ifNoneMatch === "*" && objects.has(key)) return null;
       this.puts.push({ key, body, options });
       const timestamp = Number(key.match(/\/(\d+)\.zip$/)?.[1] || Date.now());
-      const entry = { key, uploaded: new Date(timestamp), body, size: sizeOf(body) };
+      const entry = {
+        key,
+        uploaded: new Date(timestamp),
+        body,
+        size: sizeOf(body),
+        httpMetadata: options.httpMetadata,
+        customMetadata: options.customMetadata,
+        etag: `etag-${this.puts.length}`,
+      };
       objects.set(key, entry);
-      return { key, etag: `etag-${this.puts.length}` };
+      return { key, etag: entry.etag };
     },
     async delete(key) {
-      objects.delete(key);
+      for (const item of Array.isArray(key) ? key : [key]) objects.delete(item);
     },
     async list({ prefix = "" } = {}) {
       return {
         objects: [...objects.values()]
           .filter((o) => o.key.startsWith(prefix))
-          .map(({ key, uploaded, size }) => ({ key, uploaded, size })),
+          .map(({ key, uploaded, size, httpMetadata, customMetadata, etag }) => ({
+            key, uploaded, size, httpMetadata, customMetadata, etag,
+          })),
         truncated: false,
       };
     },
@@ -46,11 +56,33 @@ function fakeR2(seed = []) {
       if (!obj) return null;
       return {
         body: obj.body,
+        size: obj.size,
+        httpMetadata: obj.httpMetadata,
+        customMetadata: obj.customMetadata,
+        etag: obj.etag,
+        writeHttpMetadata(headers) {
+          if (obj.httpMetadata?.contentType) headers.set("content-type", obj.httpMetadata.contentType);
+        },
         async text() {
           if (typeof obj.body === "string") return obj.body;
           if (obj.body instanceof ArrayBuffer) return new TextDecoder().decode(obj.body);
           if (ArrayBuffer.isView(obj.body)) return new TextDecoder().decode(obj.body);
           return String(obj.body ?? "");
+        },
+      };
+    },
+    async head(key) {
+      const obj = objects.get(key);
+      if (!obj) return null;
+      return {
+        key: obj.key,
+        size: obj.size,
+        uploaded: obj.uploaded,
+        httpMetadata: obj.httpMetadata,
+        customMetadata: obj.customMetadata,
+        etag: obj.etag,
+        writeHttpMetadata(headers) {
+          if (obj.httpMetadata?.contentType) headers.set("content-type", obj.httpMetadata.contentType);
         },
       };
     },
@@ -65,13 +97,14 @@ function request(path, { method = "GET", token, body, headers = {} } = {}) {
   return new Request(`https://dumpen.denied.se${path}`, { method, headers: h, body });
 }
 
-function env(r2 = fakeR2()) {
+function env(r2 = fakeR2(), assets = fakeR2()) {
   return {
     DUMPEN_TOKEN: TOKEN,
     GITHUB_OAUTH_CLIENT_ID: GITHUB_CLIENT_ID,
     GITHUB_OAUTH_CLIENT_SECRET: GITHUB_CLIENT_SECRET,
     DUMPEN_ALLOWED_GITHUB_IDS: String(GITHUB_USER_ID),
     DUMPEN: r2,
+    ASSETS: assets,
   };
 }
 
@@ -135,11 +168,11 @@ test("root visar privat dashboard och engångsticket-flöde", async () => {
   assert.match(html, /dumpen\.denied\.se/);
   assert.match(html, /Privat kontrollpanel/);
   assert.match(html, /engångsticket/i);
-  assert.match(html, /Vanlig GET är privat/);
+  assert.match(html, /publika direktlänkade assets/);
   assert.match(html, /--bg:#04070e/);
   assert.match(html, /value="legacy">Legacy/);
   assert.match(html, /20 MB per fil/);
-  assert.match(html, /500 MB totalt/);
+  assert.match(html, /500 MB appgräns/);
 });
 
 test("fel token på legacy PUT ger 401", async () => {
@@ -309,6 +342,54 @@ test("capability-upload är privat efter uppladdning", async () => {
   assert.equal(await privateRead.text(), "private-data");
 });
 
+test("publik asset-upload kräver admininloggning", async () => {
+  const response = await worker.fetch(request("/api/assets/upload/app-icon.png", {
+    method: "PUT",
+    body: new Uint8Array([1, 2, 3]),
+    headers: { "content-type": "image/png" },
+  }), env());
+  assert.equal(response.status, 401);
+});
+
+test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bindingen", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2([{
+    key: "apps/plex/plex-256.png",
+    uploaded: new Date("2026-09-27T11:32:58Z"),
+    body: new Uint8Array([1, 2, 3]),
+    httpMetadata: { contentType: "image/png" },
+  }]);
+  const e = env(transfers, assets);
+  const body = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+  const upload = await worker.fetch(request("/api/assets/upload/app-icon.png", {
+    method: "PUT",
+    body,
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), e);
+  assert.equal(upload.status, 201);
+  const { asset } = await upload.json();
+  assert.match(asset.managedId, /^[0-9a-f]{32}$/);
+  assert.equal(asset.name, "app-icon.png");
+  assert.equal(asset.contentType, "image/png");
+  assert.equal(asset.image, true);
+  assert.match(asset.key, /^uploads\/[0-9a-f]{32}\/app-icon\.png$/);
+  assert.match(asset.directUrl, /^https:\/\/logos\.denied\.se\/uploads\/[0-9a-f]{32}\/app-icon\.png$/);
+  assert.equal(assets.keys().includes(asset.key), true);
+  assert.equal(transfers.keys().length, 0);
+
+  const listing = await worker.fetch(request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }), e);
+  assert.equal(listing.status, 200);
+  const listed = await listing.json();
+  assert.equal(listed.assetState, "available");
+  assert.equal(listed.objects.length, 0);
+  assert.equal(listed.assets.length, 2);
+  const plex = listed.assets.find((item) => item.key === "apps/plex/plex-256.png");
+  assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-256.png");
+  assert.equal(plex.image, true);
+  assert.equal(plex.contentType, "image/png");
+});
+
 test("objektlista kräver admininloggning", async () => {
   const response = await worker.fetch(request("/api/objects"), env(fakeR2(versions)));
   assert.equal(response.status, 401);
@@ -379,4 +460,9 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
+  assert.match(adminHtml, /Publika filer och bilder/);
+  assert.match(adminHtml, /Cloudflare App Launcher/);
+  assert.match(adminHtml, /Kopiera länk/);
+  assert.match(adminHtml, /naturalWidth/);
+  assert.match(adminHtml, / px · /);
 });

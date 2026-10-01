@@ -29,6 +29,8 @@ Efter ändringar i `src/access.js`, verifiera minst:
 - legacy privilegierade `/api/*` canonicaliseras;
 - `/admin` kräver GitHub-session och oautentiserade browserrequests går via `/login` → Krösa-Maja;
 - `/admin/api/*` kräver samma signerade GitHub-session och når rätt intern applikationsroute;
+- `/admin/api/assets/*` kan lista indirekt via objekt-API:t och skapa nya assets men är aldrig publik;
+- asset-direktlänkar går mot den separat verifierade custom domainen `logos.denied.se`; Dumpen exponerar ingen publik asset-listning;
 - icke-publika ytor får avsedda `X-Robots-Tag`-headers;
 - känsliga redirects/svar inte får publik cachepolicy.
 
@@ -36,12 +38,14 @@ Efter ändringar i `src/access.js`, verifiera minst:
 
 När en ändring rör objektoperationer:
 
-1. verifiera att rätt binding används (`DUMPEN`);
+1. verifiera att rätt binding används (`DUMPEN` för privata transferer, `ASSETS` för assetlagret);
 2. verifiera key/path-hantering i kod och test;
 3. undvik generella list-/dumpoperationer som felsökningsgenväg;
 4. testa felutfall separat från happy path.
 
-R2-innehåll ska behandlas som applikationsdata, inte dokumentationsdata.
+R2-innehåll ska behandlas som applikationsdata, inte dokumentationsdata. `DUMPEN -> dumpen` är privat transferstorage. `ASSETS -> avkroken-assets` är den befintliga asset-bucketen; dess exakta objekt-URL:er är publika via `logos.denied.se`, men inventory och upload är fortsatt adminskyddade.
+
+Live 2026-10-01: `dumpen` skapades 2026-09-29T20:05:35.526Z och hade 0 objekt / 0 B. `avkroken-assets` hade 39 objekt / 48,4 MB och aktiv custom domain `logos.denied.se`; `r2.dev` var avstängt. Båda buckets hade endast standardregeln för abort av ofullständiga multipart-uploads efter 7 dagar och ingen automatisk objektradering.
 
 ## Deployment
 
@@ -90,9 +94,9 @@ Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkon
 
 ### Nuvarande providerläge
 
-Live-verifiering 2026-09-30 visar att `dumpen` är provisionerad i det repository-deklarerade Cloudflare-kontot. Wrangler visar aktiva deployments/versioner och `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200. Den lokala Wrangler-identiteten får däremot `403` mot Workers Builds logg-API och kan inte separat inventera R2-bucketen; dessa delar ska därför fortsatt markeras `permission_denied`/`unknown` i stället för att antas.
+Live-verifiering 2026-10-01 visar att `dumpen` och `avkroken-assets` finns i det repository-deklarerade Cloudflare-kontot. Wrangler kan läsa bucket-inventory, public-access-state och lifecycle direkt. `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200, och `https://logos.denied.se/apps/plex/plex-256.png` svarar HTTP 200 med `image/png`. Workers Builds logg-API har tidigare varit permission-denied för den lokala identiteten och ska inte beskrivas som läst utan en ny lyckad direktkontroll.
 
-`wrangler.jsonc` binder den befintliga delade GitHub OAuth-klientens publika client ID och den neutralt namngivna Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; bindingen återanvänder den redan existerande OAuth-hemligheten i samma store i stället för att skapa en ny credential. Adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindingen förblir `DUMPEN -> dumpen`; den separata bucket-inventeringen är fortfarande permission-denied för den lokala identiteten.
+`wrangler.jsonc` binder den befintliga delade GitHub OAuth-klientens publika client ID och den neutralt namngivna Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; bindingen återanvänder den redan existerande OAuth-hemligheten i samma store i stället för att skapa en ny credential. Adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindings är `DUMPEN -> dumpen` och `ASSETS -> avkroken-assets`; previewblocket förblir tomt så production-buckets inte binds i branch previews.
 
 ## GitHub Auth
 

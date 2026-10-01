@@ -1,6 +1,6 @@
 # Projektkontext
 
-**Senast verifierad:** 2026-09-29
+**Senast verifierad:** 2026-10-01
 
 ## Ansvar
 
@@ -8,8 +8,10 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 
 - `src/access.js` är extern entrypoint.
 - `src/index.js` innehåller applikationslogik.
-- R2-bindingen `DUMPEN` är tjänstens persistenta objektlager.
-- den publika rooten hålls separat från privilegierad applikationsyta.
+- R2-bindings är `DUMPEN -> dumpen` för privata transferer och `ASSETS -> avkroken-assets` för publika assets.
+- privata transferer och publika assets använder separata R2-buckets och separata accesskontrakt.
+- `avkroken-assets` har den verifierade custom domainen `logos.denied.se`; Dumpen listar och laddar upp via bindingen `ASSETS`, medan direktlänkar går direkt mot custom domainen utan publik bucket-listning.
+- den publika Dumpen-rooten hålls separat från den privilegierade applikationsytan.
 
 ## Repository-deklarerad runtime target
 
@@ -20,7 +22,7 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 - custom domain: `dumpen.denied.se`
 - `workers_dev=false`
 - preview URLs avstängda
-- R2-binding: `DUMPEN -> dumpen`
+- R2-bindings: `DUMPEN -> dumpen` för privata transferer och `ASSETS -> avkroken-assets` för App Launcher-/assetfiler
 - persistent Cloudflare observability
 - query-string-redaction
 - log sampling 0.1 (10 %)
@@ -31,14 +33,17 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 
 ## Live provider-state
 
-Verifierat 2026-09-30 med den autentiserade Wrangler-profilen och faktisk runtime:
+Verifierat 2026-10-01 med den autentiserade Wrangler-profilen och faktisk runtime:
 
 - Worker `dumpen`: **available** — `wrangler deployments list` och `wrangler versions list` visar aktiva versioner/deployments i det deklarerade kontot;
 - senaste observerade deployment: **2026-09-30T02:42:42Z**;
 - `https://dumpen.denied.se/`: **available** — HTTP 200;
 - `https://dumpen.denied.se/robots.txt`: **available** — HTTP 200;
 - Workers Builds logg-API: **permission_denied** för den lokala Wrangler-identiteten (`403`), så enskilda provider-buildloggar får inte beskrivas som lästa när de endast syns som GitHub-checkstatus;
-- R2-bucketens separata inventory-state är fortsatt **permission_denied / unknown** från den lokala identiteten; runtime/deploymentens funktion bevisar inte separat bucket-listbehörighet.
+- R2-bucket `dumpen`: **available** — skapad 2026-09-29T20:05:35.526Z och 0 objekt / 0 B vid kontrollen; den behålls för privata transferer;
+- R2-bucket `avkroken-assets`: **available** — 39 objekt / 48,4 MB vid kontrollen, med App Launcher-bilder under exempelvis `apps/plex/`, `apps/sonarr/` och `apps/radarr/`;
+- `avkroken-assets` public access: **available** — `r2.dev` är avstängt och custom domain `logos.denied.se` är aktiv med TLS; `https://logos.denied.se/apps/plex/plex-256.png` svarade HTTP 200 som `image/png`;
+- R2 lifecycle för båda berörda buckets: **available** — enda live-regeln är Cloudflares standardregel som avbryter ofullständiga multipart-uploads efter 7 dagar; ingen automatisk objektradering är konfigurerad.
 
 Dumpen är alltså nu provisionerad och körs som GitHub-kopplad Cloudflare Worker. Produktionsdeployment ägs fortsatt av Cloudflare Workers Builds från `Avkroken/Avkroken`, branch `main`, root `apps/dumpen`; lokal `wrangler deploy` är inte normal skapande-/releaseväg.
 
@@ -63,7 +68,11 @@ Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, present
 
 ## Storage
 
-R2-bucketen `dumpen` är durable object storage för applikationen. Dokumentation, debugoutput och loggning får inte dumpa objektinnehåll som en generell felsökningsmekanism.
+R2-bucketen `dumpen` är durable storage för privata transferer. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`; dess 39 befintliga App Launcher-bilder blir därmed synliga i Dumpens privata galleri utan kopiering eller migrering.
+
+Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`, exempelvis `https://logos.denied.se/apps/plex/plex-256.png`. Nya admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL. Dumpen exponerar ingen publik inventory-route; endast R2-custom-domainens exakta object-URL:er är publika.
+
+Dokumentation, debugoutput och loggning får inte dumpa objektinnehåll som en generell felsökningsmekanism.
 
 ## Verifieringsmodell
 

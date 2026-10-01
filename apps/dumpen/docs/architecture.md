@@ -24,7 +24,8 @@ src/index.js
       |     +-- numeric GitHub ID allowlist
       |     +-- signed __Host session cookie
       |
-      +--> R2 bucket via DUMPEN
+      +--> R2 private transfers via DUMPEN -> dumpen
+      +--> R2 assets via ASSETS -> avkroken-assets -> logos.denied.se
 ```
 
 ## Komponentansvar
@@ -47,13 +48,21 @@ Applikationslagret hanterar den egentliga funktionaliteten efter accesslagret oc
 
 ### R2
 
-`DUMPEN` binder Workern till bucket `dumpen`. R2 är den persistenta lagringsgränsen; Worker-processens minne ska betraktas som tillfälligt.
+`DUMPEN` binder Workern till bucket `dumpen` för privata transferer. `ASSETS` binder samma Worker till den befintliga bucket `avkroken-assets`, som innehåller App Launcher-bilder och andra publika assets. Worker-processens minne ska betraktas som tillfälligt.
+
+De två lagren blandas inte. Privata transferer behåller sin äldre versionsstruktur i `dumpen`. Asset-inventory läses via `ASSETS`, medan klientens direktlänk härleds till R2-custom-domainen `https://logos.denied.se/<object-key>`.
 
 ## Requestflöden
 
 ### Publik root
 
 `/` hanteras av accesslagret och kan presenteras publikt utan att exponera den privilegierade applikationsytan.
+
+### Publika assets
+
+Admin kan lista den befintliga `avkroken-assets`-inventoryn och ladda upp nya filer via den sessionsskyddade asset-API:n. Nya filer lagras under `uploads/<random-128-bit-id>/<filename>` för att undvika konflikter med befintliga `apps/.../`-nycklar. Ingen publik list-endpoint införs.
+
+Bildformat renderas i admin-galleriet; klienten läser bildens naturliga pixelmått och visar storlek, dimensioner och format under kortet. Direktlänken är R2-custom-domainens canonical URL, exempelvis `https://logos.denied.se/apps/plex/plex-256.png`. `r2.dev` är avstängt och bucketens custom domain är den enda avsedda publika objektvägen.
 
 ### Privilegierad API-yta
 
@@ -85,5 +94,8 @@ Det minskar risken att ett lagrings- eller applikationsfel felaktigt behandlas s
 - accesspolicy ska ligga server-side;
 - GitHub OAuth/sessionvalidering ska faila stängt om klient, Secrets Store-secret eller allowlist saknas;
 - Basic Auth ska inte återintroduceras som parallell interaktiv adminväg;
-- R2-innehåll ska inte exponeras genom generell debugfunktion;
+- R2-innehåll ska inte exponeras genom generell debugfunktion eller publik bucket-listning;
+- asset-inventory och asset-upload får endast nås genom GitHub-session-skyddad admin-API;
+- den befintliga custom domainen `logos.denied.se` får endast användas för exakt kända object-URL:er; Dumpen får inte införa publik bucket-listning;
+- nya upload-nycklar ska använda servergenererade oförutsägbara id:n för att undvika kollisioner;
 - query strings ska fortsatt redigeras i persistent observability.

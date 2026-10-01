@@ -19,10 +19,10 @@ export function publicPage() {
 <body><main>
   <div class="theme-row">${themeControl()}</div>
   <h1>dumpen.<span>denied</span>.se</h1>
-  <p>Privat och tillfällig filöverföring. Uppladdning sker med kortlivade engångstickets och nedladdning kräver inloggning.</p>
+  <p>Privat kontrollpanel för R2-baserad filhantering. Tillfälliga transferer ligger i <code>dumpen</code>; App Launcher-bilder och andra publika assets ligger i <code>avkroken-assets</code> och direktlänkas via <code>logos.denied.se</code>.</p>
   <section class="panel">
-    <strong>Ingen driftmetadata visas publikt.</strong>
-    <p>Objektlista, lagringsstatus, nedladdning och skapande av upload-tickets finns i den privata kontrollpanelen.</p>
+    <strong>Ingen bucket-lista eller driftmetadata visas publikt.</strong>
+    <p>Objektlista, uppladdning och galleri finns i den privata kontrollpanelen. Publika asset-filer kan däremot läsas via sin exakta <code>https://logos.denied.se/&lt;object-key&gt;</code>-länk.</p>
     <a href="/admin">Öppna privat kontrollpanel</a>
   </section>
 </main>${themeScript()}</body>
