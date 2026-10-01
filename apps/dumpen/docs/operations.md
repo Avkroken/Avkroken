@@ -51,6 +51,8 @@ Live 2026-10-01: `dumpen` skapades 2026-09-29T20:05:35.526Z och hade 0 objekt / 
 
 `scripts/sync-app-assets.mjs` äger den reproducerbara one-way-syncen för de versionsstyrda app-/temakombinationerna. Den läser numrerade original från `apps/<app>/<app>-<tema>.png`, genererar exakt 256×256 och 512×512 med Sharp och kan skriva både canonical-objektet och motsvarande `hotlink-ok/`-spegel. Syncen raderar inte objekt och använder inte äldre `<app>-256.png` som källa eller tema.
 
+Kör kommandona från `apps/dumpen` med installerade beroenden. App-/temalistan finns i `APP_ASSET_APPS` i `scripts/app-assets-sync.mjs` och omfattar 31 original över 8 appar. `DUMPEN_ASSET_WORK` anger arbetskatalogen; standardvärdet är `.asset-work`, relativt aktuell katalog och ignorerat av Git. Original lagras som `source/<app>-<tema>.png` och genererade varianter som `generated/apps/<app>/<app>-<tema>-<storlek>.png` under arbetskatalogen. Utan `--fetch` måste samtliga original redan finnas där.
+
 Lokal generering från befintlig arbetskopia:
 
 ```bash
@@ -68,6 +70,8 @@ Efter explicit R2-skrivbehörighet kan samma verifierade pipeline även synka ob
 ```bash
 npm run assets:sync -- --fetch --upload
 ```
+
+`--upload` kräver `--fetch`; lokala original får inte vara källa för en live-upload. Hela batchens original måste vara exakt 1254×1254 och samtliga genererade dimensioner valideras före första PUT. Upload skriver sedan varje canonical-variant följd av dess hotlink-spegel, seriellt, med `image/png`. En full körning skriver 62 canonical-varianter och 62 speglar. Körningen avbryts vid första fel; om felet inträffar under upload kan tidigare PUT redan ha lyckats och ingen rollback görs.
 
 Live-verifiering 2026-10-01: den lokala Wrangler-profilen kan läsa `avkroken-assets` men object PUT returnerar 403 eftersom OAuth-identiteten saknar `k2.write`. Därför är 62 lokala storleksvarianter verifierade, medan live-bucketen fortsatt ligger på 78 objekt tills samma identitet har refreshats med R2 write-scope. Ingen partiell upload observerades.
 

@@ -68,7 +68,7 @@ Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, present
 
 ## Storage
 
-R2-bucketen `dumpen` är durable storage för privata transferer. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`. Dumpens logiska App Launcher-inventory använder canonical `apps/...`-objekt, döljer `hotlink-ok/...`-speglar och behandlar äldre `<app>-256.png` som legacy så de inte skapar falska teman.
+R2-bucketen `dumpen` är durable storage för privata transferer. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`. Dumpens logiska App Launcher-inventory använder canonical `apps/...`-objekt och döljer både `hotlink-ok/apps/...`-speglar och äldre `<app>-256.png`-filer som klassas som legacy. Andra objekt under `hotlink-ok/` döljs inte av spegelfiltret.
 
 Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`. Temabilder använder `<app>-<tema>.png` som original och `<app>-<tema>-256.png` respektive `<app>-<tema>-512.png` som normaliserade storleksvarianter; UI:t härleder appkategori, tema och pixelstorlek från detta kontrakt och kan filtrera på alla tre. Nya generiska admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL. Dumpen exponerar ingen publik inventory-route; endast R2-custom-domainens exakta object-URL:er är publika.
 
