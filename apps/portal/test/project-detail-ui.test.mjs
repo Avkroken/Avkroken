@@ -26,6 +26,7 @@ const detailIds = [
   "project-detail-release-status",
   "project-detail-release-link",
   "project-detail-stores",
+  "project-detail-distribution-status",
   "project-detail-error"
 ];
 
@@ -53,9 +54,13 @@ test("project cards make the full card an internal detail link while retaining e
   assert.ok(app.includes(">Översikt</a>"));
 });
 
-test("project detail shows the latest release in-portal and verified distribution links only", () => {
+test("project detail shows latest release, live PWA status and verified store links", () => {
   assert.ok(app.includes('"/api/releases?project="'));
+  assert.ok(app.includes('"/api/distribution?project="'));
   assert.ok(app.includes("project.releasesPortalUrl"));
-  assert.ok(app.includes("Array.isArray(project.storeLinks)"));
+  assert.ok(app.includes("payload?.webApp?.storeLinks"));
+  assert.ok(app.includes("renderVerifiedStoreLinks"));
   assert.ok(app.includes('/^https:\\/\\//'));
+  assert.ok(app.includes("Installerbar webbapp (PWA)"));
+  assert.ok(app.includes("manifest och service worker verifierade live"));
 });

@@ -58,6 +58,7 @@ import {
   wikiNavigation,
   wikiRawUrl
 } from "./wiki-source.mjs";
+import { distributionEndpoints, normalizeInstallableManifest } from "./distribution-source.mjs";
 import { DurableObject, WorkerEntrypoint } from "cloudflare:workers";
 
 const GITHUB_API = githubUserRepositoriesApi();
@@ -87,6 +88,10 @@ const WIKI_PAGE_MAX_BYTES = 150000;
 const WIKI_CDN_CACHE_SECONDS = 300;
 const ACTIVITY_REPOSITORY_LIMIT = 50;
 const ACTIVITY_DEFAULT_DAYS = 7;
+const DISTRIBUTION_MANIFEST_MAX_BYTES = 32768;
+const DISTRIBUTION_SERVICE_WORKER_MAX_BYTES = 65536;
+const DISTRIBUTION_MANIFEST_TYPES = new Set(["application/manifest+json", "application/json"]);
+const DISTRIBUTION_SERVICE_WORKER_TYPES = new Set(["application/javascript", "text/javascript", "application/x-javascript"]);
 
 const PUBLIC_APP_DISCOVERY_REPOSITORY = "Avkroken";
 const PUBLIC_APP_DISCOVERY_ROOT = "apps";
@@ -937,6 +942,163 @@ async function getPublicProjects(env, ctx) {
       }
     });
   }
+}
+
+async function readBoundedDistributionAsset(url, maxBytes, accept) {
+  let response;
+  try {
+    response = await fetch(url, {
+      redirect: "manual",
+      headers: {
+        "Accept": accept,
+        "User-Agent": "Avkroken-Portal-Worker"
+      }
+    });
+  } catch {
+    return { status: "unavailable", text: null };
+  }
+
+  if (response.status !== 200) {
+    const status = response.status === 404 ? "not_found" : "unavailable";
+    await discardResponse(response);
+    return { status, text: null };
+  }
+
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await discardResponse(response);
+    return { status: "too_large", text: null };
+  }
+
+  const text = await response.text();
+  if (new TextEncoder().encode(text).byteLength > maxBytes) {
+    return { status: "too_large", text: null, mediaType: null };
+  }
+
+  const mediaType = String(response.headers.get("content-type") || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+
+  return { status: "available", text, mediaType };
+}
+
+async function getPublicDistribution(requestUrl, env, ctx) {
+  const projectSlug = String(requestUrl.searchParams.get("project") || "").trim();
+  if (!projectSlug || projectSlug.length > 120) {
+    return new Response(JSON.stringify({ status: "error", error: "invalid_project" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  const projectsResponse = await getPublicProjects(env, ctx);
+  if (!projectsResponse.ok) {
+    await discardResponse(projectsResponse);
+    return new Response(JSON.stringify({ status: "unavailable", error: "project_catalog_unavailable" }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  const catalog = await projectsResponse.json();
+  const projects = Array.isArray(catalog?.projects) ? catalog.projects : [];
+  const project = projects.find(item =>
+    item?.slug === projectSlug &&
+    item?.independentProduct === true
+  );
+  const endpoints = distributionEndpoints(project);
+
+  if (!project || !endpoints) {
+    return new Response(JSON.stringify({ status: "not_found", error: "project_not_found" }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store"
+      }
+    });
+  }
+
+  const [manifestResult, serviceWorkerResult] = await Promise.all([
+    readBoundedDistributionAsset(
+      endpoints.manifestUrl,
+      DISTRIBUTION_MANIFEST_MAX_BYTES,
+      "application/manifest+json, application/json;q=0.9"
+    ),
+    readBoundedDistributionAsset(
+      endpoints.serviceWorkerUrl,
+      DISTRIBUTION_SERVICE_WORKER_MAX_BYTES,
+      "application/javascript, text/javascript;q=0.9"
+    )
+  ]);
+
+  const manifestTypeValid =
+    manifestResult.status === "available" &&
+    DISTRIBUTION_MANIFEST_TYPES.has(manifestResult.mediaType);
+  const serviceWorkerTypeValid =
+    serviceWorkerResult.status === "available" &&
+    DISTRIBUTION_SERVICE_WORKER_TYPES.has(serviceWorkerResult.mediaType);
+
+  let manifest = null;
+  if (manifestTypeValid) {
+    try {
+      manifest = JSON.parse(manifestResult.text);
+    } catch {
+      manifest = null;
+    }
+  }
+
+  const normalizedManifest = normalizeInstallableManifest(manifest, endpoints.origin);
+  const available =
+    normalizedManifest !== null &&
+    serviceWorkerTypeValid &&
+    Boolean(serviceWorkerResult.text?.trim());
+
+  const status = available
+    ? "available"
+    : (manifestResult.status === "not_found" || serviceWorkerResult.status === "not_found")
+      ? "not_configured"
+      : "unavailable";
+
+  const body = JSON.stringify({
+    status,
+    generatedAt: new Date().toISOString(),
+    source: {
+      provider: "public_service_origin",
+      coverage: "live_manifest_and_service_worker"
+    },
+    project: {
+      slug: project.slug,
+      name: project.name,
+      url: project.url
+    },
+    webApp: {
+      available,
+      status,
+      kind: available ? "pwa" : null,
+      manifestUrl: endpoints.manifestUrl,
+      serviceWorkerUrl: endpoints.serviceWorkerUrl,
+      display: normalizedManifest?.display || null,
+      startUrl: normalizedManifest?.startUrl || null,
+      scope: normalizedManifest?.scope || null,
+      iconSizes: normalizedManifest?.iconSizes || [],
+      storeLinks: normalizedManifest?.storeLinks || []
+    }
+  });
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Cloudflare-CDN-Cache-Control": "public, max-age=60"
+    }
+  });
 }
 
 async function getPortalSites(env, ctx) {
@@ -2387,6 +2549,13 @@ export default {
         return new Response("Method Not Allowed", { status: 405 });
       }
       return getPublicProjects(env, ctx);
+    }
+
+    if (url.pathname === "/api/distribution") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405 });
+      }
+      return getPublicDistribution(url, env, ctx);
     }
 
     if (url.pathname === "/api/sites") {
