@@ -6,6 +6,7 @@ const worker = await readFile(new URL("../src/index.js", import.meta.url), "utf8
 const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const docsClient = await readFile(new URL("../public/docs.js", import.meta.url), "utf8");
 
 test("documentation and releases prefer Skvallerbyttans authenticated public GitHub RPCs", () => {
   assert.match(worker, /getPublicDocumentationIndex/);
@@ -19,6 +20,11 @@ test("documentation and releases prefer Skvallerbyttans authenticated public Git
 
 test("portal HTML does not render escaped newlines between script tags", () => {
   assert.doesNotMatch(html, /<\/script>\\n\s*<script/);
+});
+
+test("documentation client bypasses the previous edge-cached catalog generation", () => {
+  assert.match(docsClient, /const docsCatalogUrl = "\/api\/docs\?catalog=v5"/);
+  assert.match(docsClient, /fetch\(docsCatalogUrl/);
 });
 
 test("service cards open their Portal project page while explicit service actions stay available", () => {

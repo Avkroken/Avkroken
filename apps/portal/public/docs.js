@@ -6,6 +6,7 @@
   const docsPageTabs = document.querySelector("#docs-page-tabs");
   const docsLinks = document.querySelector("#docs-links");
   const docsContent = document.querySelector("#docs-content");
+  const docsCatalogUrl = "/api/docs?catalog=v5";
 
   let catalog = null;
   let activeRepo = null;
@@ -534,7 +535,7 @@
     docsContent.innerHTML = '<div class="empty">Läser in dokumentationskatalog…</div>';
 
     try {
-      const response = await fetch("/api/docs", { headers: { Accept: "application/json" } });
+      const response = await fetch(docsCatalogUrl, { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error("HTTP " + response.status);
       catalog = await response.json();
 
