@@ -34,7 +34,7 @@ The protected dashboard exposes **Kör nu** only during the active application w
 
 Manual start is protected by dashboard authentication, an exact same-origin mutation check and Cloudflare Turnstile server-side validation for action `manual_run`. The same-origin guard is also applied to the authenticated BankID continuation POST endpoint.
 
-The button starts a Cloudflare Workflow and immediately returns control to the browser. Progress, failures, completed applications, quota state, notification state and BankID handoff state are persisted in D1 and displayed by the dashboard.
+The button pre-creates the D1 run, starts a Cloudflare Workflow, immediately links the Workflow instance ID, and returns control to the browser. Workflow exceptions are persisted back to the run as `failed` before being rethrown to Cloudflare. Legacy running rows without a Workflow link or application activity are treated as orphaned after five minutes and are reconciled before a new run starts. Progress, failures, completed applications, quota state, notification state and BankID handoff state are displayed by the dashboard.
 
 ## Automatic safety mode
 
@@ -102,7 +102,7 @@ JOB_ALLOWED_LOCATIONS=Stockholm,Uppsala
 JOB_ALLOWED_COUNTRIES=SE
 ```
 
-The application engine discovers StudentConsulting candidates only from the authenticated **Matcha jobb** profile route and fails closed if that route is missing or redirects elsewhere. A candidate must also have a resolvable supported country code before autosubmit; unknown country remains fail-closed. `JOB_INCLUDE_TERMS` is optional and acts only as an additional narrowing filter.
+The application engine discovers StudentConsulting candidates only from the authenticated canonical **Matcha jobb** profile route (`/sv/min-profil/matcha-jobb/`) and does not depend on that route being exposed as a visible navigation link on the landing page. It fails closed if the canonical route redirects elsewhere. A candidate must also have a resolvable supported country code before autosubmit; unknown country remains fail-closed. `JOB_INCLUDE_TERMS` is optional and acts only as an additional narrowing filter.
 
 The protected System view can manage StudentConsulting credentials, autosubmit, optional extra suitability filters and BankID notification settings. Production Turnstile is managed centrally: Jobb uses the Cloudflare widget `denied.se`; its public site key is versioned client configuration, while `TURNSTILE_SECRET` is a Worker deployment secret and is not entered in the dashboard. The StudentConsulting password and webhook URL are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
 

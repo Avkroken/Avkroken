@@ -24,7 +24,7 @@ Systemets hårda mål är **10 verifierade lämpliga ansökningar per kalenderm�
 
 Viktiga säkerhetsgränser:
 
-- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade profilrouten **Matcha jobb**; saknas routen, omdirigeras den utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
+- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade kanoniska profilrouten **Matcha jobb** (`/sv/min-profil/matcha-jobb/`) utan att vara beroende av en synlig navigationslänk; omdirigeras routen utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
 - En ansökan räknas inte som verifierad förrän exakt StudentConsulting Jobb-ID återfinns i `Ansökningar`.
 - D1 har exakt tio quota-slots per månad. Ett osäkert submit-resultat behåller sin slot som `uncertain`; systemet kompenserar inte med en potentiell elfte ansökan.
 - BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i Cloudflare Browser Run Live View.

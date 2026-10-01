@@ -32,20 +32,43 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       triggeredAt: event.payload?.triggeredAt ?? event.timestamp.toISOString(),
     }));
 
-    const result = await step.do(
-      "execute application automation",
-      {
-        retries: { limit: 0, delay: "1 second" },
-        timeout: "30 minutes",
-      },
-      async () => {
-        const runtime = await resolveRuntimeConfiguration(this.env);
-        return executeAutomation(runtime.env, {
-          mode: trigger.mode,
-          runId: trigger.runId,
-        });
-      },
-    );
+    let result: Awaited<ReturnType<typeof executeAutomation>>;
+    try {
+      result = await step.do(
+        "execute application automation",
+        {
+          retries: { limit: 0, delay: "1 second" },
+          timeout: "30 minutes",
+        },
+        async () => {
+          const runtime = await resolveRuntimeConfiguration(this.env);
+          return executeAutomation(runtime.env, {
+            mode: trigger.mode,
+            runId: trigger.runId,
+          });
+        },
+      );
+    } catch (error) {
+      if (trigger.runId) {
+        try {
+          await step.do("record workflow failure", async () => {
+            await updateRun(this.env.DB, trigger.runId!, {
+              status: "failed",
+              workflowInstanceId: event.instanceId,
+              lastError: workflowErrorMessage(error),
+              completedAt: new Date().toISOString(),
+            });
+          });
+        } catch (recordError) {
+          console.error("Failed to persist workflow failure", {
+            runId: trigger.runId,
+            workflowInstanceId: event.instanceId,
+            error: workflowErrorMessage(recordError),
+          });
+        }
+      }
+      throw error;
+    }
 
     if (result.status !== "skipped") {
       await step.do("link workflow instance", async () => {
@@ -57,4 +80,8 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
 
     return result;
   }
+}
+
+function workflowErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

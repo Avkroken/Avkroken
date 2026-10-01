@@ -12,6 +12,7 @@ const DEFAULT_BASE_URL = "https://www.studentconsulting.com";
 const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
+const MATCHED_JOBS_URL = `${DEFAULT_BASE_URL}/sv/min-profil/matcha-jobb/`;
 
 export interface StudentConsultingProviderOptions {
   page: BrowserPage;
@@ -123,15 +124,22 @@ export class StudentConsultingProvider implements JobProvider {
   }
 
   async discover(): Promise<JobCandidate[]> {
-    await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+    const matchedJobsUrl = normalizeStudentConsultingMatchedJobsUrl(
+      MATCHED_JOBS_URL,
+    );
+    if (!matchedJobsUrl) {
+      throw new Error(
+        "STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: Matcha jobb-routen kunde inte valideras.",
+      );
+    }
+
+    await this.page.goto(matchedJobsUrl, {
       waitUntil: "domcontentloaded",
       timeout: 30_000,
     });
-
-    const matchedJobsUrl = await findMatchedJobsUrl(this.page);
-    if (!matchedJobsUrl) {
+    if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
       throw new Error(
-        "STUDENTCONSULTING_MATCHED_PROFILE_NOT_FOUND: den autentiserade profilen saknar en synlig Matcha jobb-länk.",
+        "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
       );
     }
 
@@ -398,24 +406,6 @@ export function normalizeStudentConsultingMatchedJobsUrl(
     return null;
   }
   return safe;
-}
-
-async function findMatchedJobsUrl(page: BrowserPage): Promise<string | null> {
-  const anchors = page.locator("a");
-  const count = Math.min(await anchors.count(), 300);
-
-  for (let index = 0; index < count; index += 1) {
-    const anchor = anchors.nth(index);
-    if (!(await anchor.isVisible())) continue;
-    const label = await safeInnerText(anchor);
-    if (!isStudentConsultingMatchedJobsLabel(label)) continue;
-
-    const href = await anchor.getAttribute("href");
-    if (!href) continue;
-    const safeUrl = normalizeStudentConsultingMatchedJobsUrl(href);
-    if (safeUrl) return safeUrl;
-  }
-  return null;
 }
 
 function isSameMatchedJobsRoute(current: string, expected: string): boolean {

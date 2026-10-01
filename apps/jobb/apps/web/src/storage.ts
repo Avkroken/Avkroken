@@ -79,6 +79,34 @@ export async function getRun(
     .first<AutomationRunRow>();
 }
 
+export async function failOrphanedRunningRuns(
+  db: D1Database,
+  applicationMonth: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE automation_runs
+       SET status = 'failed',
+           last_error = COALESCE(
+             last_error,
+             'WORKFLOW_ORPHANED: körningen saknar kopplad workflow-instans och har ingen ansökningsaktivitet.'
+           ),
+           completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE application_month = ?
+         AND status = 'running'
+         AND workflow_instance_id IS NULL
+         AND updated_at <= datetime('now', '-5 minutes')
+         AND NOT EXISTS (
+           SELECT 1
+           FROM applications a
+           WHERE a.automation_run_id = automation_runs.id
+         )`,
+    )
+    .bind(applicationMonth)
+    .run();
+}
+
 export async function updateRun(
   db: D1Database,
   id: string,

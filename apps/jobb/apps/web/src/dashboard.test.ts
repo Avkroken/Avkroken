@@ -4,6 +4,61 @@ import {
   renderDashboardScript,
   renderDashboardStyles,
 } from "./dashboard";
+import { isOrphanedDashboardRun } from "./dashboard-data";
+
+describe("dashboard run state", () => {
+  const now = Date.parse("2026-10-01T15:45:00Z");
+
+  it("treats old running rows without workflow linkage or applications as orphaned", () => {
+    expect(
+      isOrphanedDashboardRun(
+        {
+          status: "running",
+          workflow_instance_id: null,
+          application_count: 0,
+          updated_at: "2026-10-01 15:34:43",
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps linked, recent or application-bearing runs active", () => {
+    expect(
+      isOrphanedDashboardRun(
+        {
+          status: "running",
+          workflow_instance_id: "manual-instance",
+          application_count: 0,
+          updated_at: "2026-10-01 15:30:00",
+        },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isOrphanedDashboardRun(
+        {
+          status: "running",
+          workflow_instance_id: null,
+          application_count: 0,
+          updated_at: "2026-10-01 15:44:00",
+        },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isOrphanedDashboardRun(
+        {
+          status: "running",
+          workflow_instance_id: null,
+          application_count: 1,
+          updated_at: "2026-10-01 15:30:00",
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("dashboard rendering", () => {
   it("renders operational navigation without embedding credential names", async () => {
@@ -58,6 +113,7 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain(
       "En körning pågår. Turnstile behövs först inför nästa manuella start.",
     );
+    expect(jsText).toContain("Övergivna körningar");
     expect(jsText).toContain(
       "Turnstile hanteras centralt i deployment och behöver inte fyllas i här.",
     );
