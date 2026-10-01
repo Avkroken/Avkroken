@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import sharp from "sharp";
 
@@ -11,11 +12,10 @@ const shouldFetch = args.has("--fetch");
 const shouldUpload = args.has("--upload");
 const workRoot = path.resolve(process.env.DUMPEN_ASSET_WORK || ".asset-work");
 
+const wranglerCli = fileURLToPath(import.meta.resolve("wrangler"));
+
 async function wrangler(wranglerArgs) {
-  const bin = process.platform === "win32"
-    ? path.resolve("node_modules/.bin/wrangler.cmd")
-    : path.resolve("node_modules/.bin/wrangler");
-  return execFileAsync(bin, wranglerArgs, {
+  return execFileAsync(process.execPath, [wranglerCli, ...wranglerArgs], {
     maxBuffer: 8 * 1024 * 1024,
     env: process.env,
   });

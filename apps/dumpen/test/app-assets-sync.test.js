@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -35,6 +36,13 @@ function fakeImageAdapter(sourceSize = 1254) {
 
   return image;
 }
+
+test("app asset sync launches Wrangler through Node instead of platform cmd shims", async () => {
+  const wrapper = await readFile(new URL("../scripts/sync-app-assets.mjs", import.meta.url), "utf8");
+  assert.match(wrapper, /process\.execPath/);
+  assert.match(wrapper, /import\.meta\.resolve\("wrangler"\)/);
+  assert.doesNotMatch(wrapper, /wrangler\.cmd/);
+});
 
 test("app asset sync requires fresh live sources before upload", async () => {
   let wranglerCalls = 0;
