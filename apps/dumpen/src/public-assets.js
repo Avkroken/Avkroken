@@ -109,9 +109,12 @@ function appAssetMetadata(key) {
 
   const app = parts[1];
   const file = parts[2];
-  const escapedApp = app.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const sized = file.match(new RegExp("^" + escapedApp + "-(\\d+)-(256|512)\\.png$", "i"));
-  const original = file.match(new RegExp("^" + escapedApp + "-(\\d+)\\.png$", "i"));
+  const prefix = app + "-";
+  const suffix = file.toLowerCase().startsWith(prefix.toLowerCase())
+    ? file.slice(prefix.length)
+    : "";
+  const sized = suffix.match(/^(\d+)-(256|512)\.png$/i);
+  const original = suffix.match(/^(\d+)\.png$/i);
 
   if (sized) {
     const pixelSize = Number(sized[2]);
