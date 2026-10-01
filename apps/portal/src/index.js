@@ -66,7 +66,7 @@ const GITHUB_API = githubUserRepositoriesApi();
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
-const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v5");
+const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v6");
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
@@ -224,6 +224,11 @@ async function fetchRepositoryTree(repo, env) {
     result.data.truncated === true ||
     !Array.isArray(result.data.tree)
   ) {
+    console.warn("Portal GitHub tree fallback unavailable", {
+      repository: repo.name,
+      status: result.status,
+      truncated: result.data?.truncated === true
+    });
     return null;
   }
   return result.data.tree;

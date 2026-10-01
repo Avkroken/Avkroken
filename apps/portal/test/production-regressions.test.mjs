@@ -11,10 +11,11 @@ const docsClient = await readFile(new URL("../public/docs.js", import.meta.url),
 test("documentation and releases prefer Skvallerbyttans authenticated public GitHub RPCs", () => {
   assert.match(worker, /getPublicDocumentationIndex/);
   assert.match(worker, /getPublicRepositoryReleases/);
-  assert.match(worker, /github-docs-v5/);
+  assert.match(worker, /github-docs-v6/);
   assert.match(worker, /serviceTrees\.get\(repo\.name\)/);
   assert.match(worker, /serviceTreeCoversAppSource\(serviceTree, appSource\)/);
   assert.match(worker, /return fallbackTree\(repo\)/);
+  assert.match(worker, /Portal GitHub tree fallback unavailable/);
   assert.match(worker, /serviceReleases\?\.has\(repoName\)/);
 });
 
@@ -23,7 +24,7 @@ test("portal HTML does not render escaped newlines between script tags", () => {
 });
 
 test("documentation client bypasses the previous edge-cached catalog generation", () => {
-  assert.match(docsClient, /const docsCatalogUrl = "\/api\/docs\?catalog=v5"/);
+  assert.match(docsClient, /const docsCatalogUrl = "\/api\/docs\?catalog=v6"/);
   assert.match(docsClient, /fetch\(docsCatalogUrl/);
 });
 
