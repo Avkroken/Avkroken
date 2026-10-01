@@ -430,10 +430,23 @@ export function normalizeStudentConsultingJobUrl(
 
 function extractStudentConsultingJobUrlCandidates(value: string): string[] {
   const candidates = new Set<string>([value.trim()]);
-  const matches = value.match(
-    /(?:https:\/\/(?:[a-z0-9-]+\.)?studentconsulting\.com)?\/sv\/lediga-jobb\/[^\s"'<>]+\/[^\s"'<>]+\/\d+\/?/gi,
+  const absoluteUrlPattern = /https:\/\/[^\s"'<>]+/gi;
+  const absoluteMatches = [...value.matchAll(absoluteUrlPattern)];
+  let relativeSource = value;
+
+  for (const match of absoluteMatches) {
+    candidates.add(match[0]);
+    const start = match.index ?? 0;
+    relativeSource =
+      relativeSource.slice(0, start) +
+      " ".repeat(match[0].length) +
+      relativeSource.slice(start + match[0].length);
+  }
+
+  const relativeMatches = relativeSource.match(
+    /\/sv\/lediga-jobb\/[^\s"'<>]+\/[^\s"'<>]+\/\d+\/?/gi,
   );
-  for (const match of matches ?? []) candidates.add(match);
+  for (const match of relativeMatches ?? []) candidates.add(match);
   return [...candidates].filter(Boolean);
 }
 
@@ -554,7 +567,7 @@ async function collectJobLinks(
 
     for (const source of sources) {
       const elements = page.locator(source.selector);
-      const count = Math.min(await elements.count(), 250);
+      const count = await elements.count();
       for (let index = 0; index < count; index += 1) {
         const value = await elements.nth(index).getAttribute(source.attribute);
         if (!value) continue;

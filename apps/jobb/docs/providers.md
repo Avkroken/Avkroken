@@ -10,7 +10,7 @@ Implemented flow:
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
 4. Navigate only to the canonical authenticated `/sv/min-profil/matcha-jobb/` route and discover candidates from that matched list.
-5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href` or `data-url`; fail closed on redirects or untrusted URL shapes.
+5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority, and redirects or untrusted URL shapes fail closed.
 6. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
 7. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
 8. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.

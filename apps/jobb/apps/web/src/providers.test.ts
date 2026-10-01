@@ -128,6 +128,9 @@ function matchedProfilePage(
   options: {
     redirectMatched?: boolean;
     jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
+    jobLinkValue?: string;
+    leadingHrefCount?: number;
+    matchedBodyText?: string;
     explicitEmpty?: boolean;
   } = {},
 ): BrowserPage {
@@ -155,25 +158,33 @@ function matchedProfilePage(
           attribute === "href" ? "a[href]" : `[${attribute}]`;
         if (selector !== expectedSelector) return fakeLocator();
 
-        return fakeLocator([
+        const jobLinkValue =
+          options.jobLinkValue ??
+          "/sv/lediga-jobb/stockholm/supporttekniker/87178/";
+        const jobItem =
           attribute === "href"
-            ? { href: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
+            ? { href: jobLinkValue }
             : attribute === "data-href"
-              ? { dataHref: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
+              ? { dataHref: jobLinkValue }
               : attribute === "data-url"
-                ? { dataUrl: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
-                : {
-                    onclick:
-                      "window.location='/sv/lediga-jobb/stockholm/supporttekniker/87178/'",
-                  },
-        ]);
+                ? { dataUrl: jobLinkValue }
+                : { onclick: `window.location='${jobLinkValue}'` };
+        const leading =
+          attribute === "href"
+            ? Array.from({ length: options.leadingHrefCount ?? 0 }, (_, index) => ({
+                href: `/sv/om-oss/${index}`,
+              }))
+            : [];
+        return fakeLocator([...leading, jobItem]);
       }
       if (
         current.pathname === "/sv/min-profil/matcha-jobb/" &&
         selector === "body" &&
-        options.explicitEmpty
+        (options.explicitEmpty || options.matchedBodyText)
       ) {
-        return fakeLocator([{ text: "0 matchande jobb" }]);
+        return fakeLocator([
+          { text: options.matchedBodyText ?? "0 matchande jobb" },
+        ]);
       }
       if (
         current.pathname ===
@@ -254,6 +265,51 @@ describe("StudentConsulting authenticated discovery", () => {
       ]);
     },
   );
+
+  it("rejects foreign absolute URLs embedded in inline navigation", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        jobLinkAttribute: "onclick",
+        jobLinkValue:
+          "https://evil.test/sv/lediga-jobb/stockholm/supporttekniker/87178/",
+        matchedBodyText: "0 matchande jobb",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /STUDENTCONSULTING_NO_MATCHED_JOBS/,
+    );
+  });
+
+  it("finds a trusted job link after more than 250 ordinary anchors", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        leadingHrefCount: 300,
+        matchedBodyText: "0 matchande jobb",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
 
   it("distinguishes an explicit empty Matcha jobb profile", async () => {
     const provider = new StudentConsultingProvider({
