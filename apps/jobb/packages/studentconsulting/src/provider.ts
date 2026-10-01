@@ -13,26 +13,21 @@ const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
 
-export interface StudentConsultingDiscoverySource {
-  url: string;
-  country: string;
-  countryCode: string;
-  isInternational: boolean;
-}
-
 export interface StudentConsultingProviderOptions {
   page: BrowserPage;
   credentials: CredentialsProvider;
   maxJobs?: number;
   maxPagesPerSource?: number;
   autoSubmit?: boolean;
-  discoverySources?: StudentConsultingDiscoverySource[];
 }
 
 export interface ParsedStudentConsultingJob {
   externalId?: string;
   location?: string;
   occupation?: string;
+  country?: string;
+  countryCode?: string;
+  isInternational: boolean;
 }
 
 export class StudentConsultingProvider implements JobProvider {
@@ -43,7 +38,6 @@ export class StudentConsultingProvider implements JobProvider {
   private readonly maxJobs: number;
   private readonly maxPagesPerSource: number;
   private readonly autoSubmit: boolean;
-  private readonly discoverySources: StudentConsultingDiscoverySource[];
 
   constructor(options: StudentConsultingProviderOptions) {
     this.page = options.page;
@@ -51,26 +45,6 @@ export class StudentConsultingProvider implements JobProvider {
     this.maxJobs = options.maxJobs ?? 30;
     this.maxPagesPerSource = options.maxPagesPerSource ?? 3;
     this.autoSubmit = options.autoSubmit ?? false;
-    this.discoverySources = options.discoverySources ?? [
-      {
-        url: `${DEFAULT_BASE_URL}/sv/lediga-jobb/norge?country=2`,
-        country: "Norge",
-        countryCode: "NO",
-        isInternational: true,
-      },
-      {
-        url: `${DEFAULT_BASE_URL}/sv/lediga-jobb/danmark?country=3`,
-        country: "Danmark",
-        countryCode: "DK",
-        isInternational: true,
-      },
-      {
-        url: `${DEFAULT_BASE_URL}/sv/lediga-jobb/`,
-        country: "Sverige",
-        countryCode: "SE",
-        isInternational: false,
-      },
-    ];
   }
 
   async authenticate(): Promise<AuthenticationState> {
@@ -149,37 +123,48 @@ export class StudentConsultingProvider implements JobProvider {
   }
 
   async discover(): Promise<JobCandidate[]> {
+    await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
+
+    const matchedJobsUrl = await findMatchedJobsUrl(this.page);
+    if (!matchedJobsUrl) {
+      throw new Error(
+        "STUDENTCONSULTING_MATCHED_PROFILE_NOT_FOUND: den autentiserade profilen saknar en synlig Matcha jobb-länk.",
+      );
+    }
+
     const candidates = new Map<string, JobCandidate>();
+    for (let pageNumber = 1; pageNumber <= this.maxPagesPerSource; pageNumber += 1) {
+      if (candidates.size >= this.maxJobs) break;
 
-    for (const source of this.discoverySources) {
-      const safeSourceUrl = normalizeStudentConsultingUrl(source.url);
-      if (!safeSourceUrl) continue;
-
-      for (let pageNumber = 1; pageNumber <= this.maxPagesPerSource; pageNumber += 1) {
-        if (candidates.size >= this.maxJobs) break;
-
-        const listingUrl = withPage(safeSourceUrl, pageNumber);
-        await this.page.goto(listingUrl, {
-          waitUntil: "domcontentloaded",
-          timeout: 30_000,
-        });
-
-        const links = await collectJobLinks(this.page);
-        if (links.length === 0) break;
-
-        let addedOnPage = 0;
-        for (const sourceUrl of links) {
-          if (candidates.size >= this.maxJobs) break;
-          if (candidates.has(sourceUrl)) continue;
-
-          const candidate = await this.readJob(sourceUrl, source);
-          if (!candidate) continue;
-          candidates.set(sourceUrl, candidate);
-          addedOnPage += 1;
-        }
-
-        if (addedOnPage === 0) break;
+      const listingUrl = withPage(matchedJobsUrl, pageNumber);
+      await this.page.goto(listingUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+      if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+        throw new Error(
+          "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+        );
       }
+
+      const links = await collectJobLinks(this.page);
+      if (links.length === 0) break;
+
+      let addedOnPage = 0;
+      for (const sourceUrl of links) {
+        if (candidates.size >= this.maxJobs) break;
+        if (candidates.has(sourceUrl)) continue;
+
+        const candidate = await this.readJob(sourceUrl);
+        if (!candidate) continue;
+        candidates.set(sourceUrl, candidate);
+        addedOnPage += 1;
+      }
+
+      if (addedOnPage === 0) break;
     }
 
     return [...candidates.values()].slice(0, this.maxJobs);
@@ -313,10 +298,7 @@ export class StudentConsultingProvider implements JobProvider {
     }
   }
 
-  private async readJob(
-    sourceUrl: string,
-    source: StudentConsultingDiscoverySource,
-  ): Promise<JobCandidate | null> {
+  private async readJob(sourceUrl: string): Promise<JobCandidate | null> {
     const safeJobUrl = normalizeStudentConsultingJobUrl(sourceUrl);
     if (!safeJobUrl) return null;
 
@@ -336,11 +318,12 @@ export class StudentConsultingProvider implements JobProvider {
       title,
       employer: "StudentConsulting",
       location: parsed.location,
-      country: source.country,
-      countryCode: source.countryCode,
-      isInternational: source.isInternational,
+      country: parsed.country,
+      countryCode: parsed.countryCode,
+      isInternational: parsed.isInternational,
       occupation: parsed.occupation,
       applicationUrl: safeJobUrl,
+      discoverySource: "studentconsulting_matcha_jobb",
       sourceUrl: safeJobUrl,
     };
   }
@@ -353,10 +336,13 @@ export function parseStudentConsultingJobText(
   const facts = factsStart >= 0 ? bodyText.slice(factsStart) : bodyText;
   const externalId = facts.match(/Jobb-ID\s*([0-9]+)/i)?.[1];
 
+  const country = classifyCountry(readFact(facts, "Land"));
+
   return {
     externalId,
     location: readFact(facts, "Ort"),
     occupation: readFact(facts, "Yrkeskategori"),
+    ...country,
   };
 }
 
@@ -392,6 +378,52 @@ export function normalizeStudentConsultingJobUrl(
     return null;
   }
   return safe;
+}
+
+export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
+  const normalized = normalize(label);
+  return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
+}
+
+export function normalizeStudentConsultingMatchedJobsUrl(
+  value: string,
+): string | null {
+  const safe = normalizeStudentConsultingUrl(value);
+  if (!safe) return null;
+
+  const pathname = new URL(safe).pathname;
+  if (
+    !/^\/sv\/min-profil\/matcha-jobb\/?$/i.test(pathname)
+  ) {
+    return null;
+  }
+  return safe;
+}
+
+async function findMatchedJobsUrl(page: BrowserPage): Promise<string | null> {
+  const anchors = page.locator("a");
+  const count = Math.min(await anchors.count(), 300);
+
+  for (let index = 0; index < count; index += 1) {
+    const anchor = anchors.nth(index);
+    if (!(await anchor.isVisible())) continue;
+    const label = await safeInnerText(anchor);
+    if (!isStudentConsultingMatchedJobsLabel(label)) continue;
+
+    const href = await anchor.getAttribute("href");
+    if (!href) continue;
+    const safeUrl = normalizeStudentConsultingMatchedJobsUrl(href);
+    if (safeUrl) return safeUrl;
+  }
+  return null;
+}
+
+function isSameMatchedJobsRoute(current: string, expected: string): boolean {
+  const currentSafe = normalizeStudentConsultingMatchedJobsUrl(current);
+  const expectedSafe = normalizeStudentConsultingMatchedJobsUrl(expected);
+  if (!currentSafe || !expectedSafe) return false;
+
+  return new URL(currentSafe).pathname === new URL(expectedSafe).pathname;
 }
 
 async function collectJobLinks(page: BrowserPage): Promise<string[]> {
@@ -593,16 +625,42 @@ function readFact(text: string, label: string): string | undefined {
     .filter(Boolean);
   const normalizedLabel = normalize(label);
 
+  const inlinePattern = new RegExp(
+    `^${escapeRegExp(label)}(?:\\s*[:–-]\\s*|\\s+)(.+)$`,
+    "i",
+  );
+
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const normalizedLine = normalize(line);
     if (normalizedLine === normalizedLabel) return lines[index + 1];
-    if (normalizedLine.startsWith(normalizedLabel)) {
-      const value = line.slice(label.length).trim();
-      if (value) return value;
-    }
+
+    const inlineMatch = line.match(inlinePattern);
+    const value = inlineMatch?.[1]?.trim();
+    if (value) return value;
   }
   return undefined;
+}
+
+function classifyCountry(value?: string): {
+  country?: string;
+  countryCode?: string;
+  isInternational: boolean;
+} {
+  const normalized = normalize(value ?? "");
+  if (!normalized) {
+    return { isInternational: false };
+  }
+  if (/^(sverige|sweden)$/.test(normalized)) {
+    return { country: value, countryCode: "SE", isInternational: false };
+  }
+  if (/^(norge|norway)$/.test(normalized)) {
+    return { country: value, countryCode: "NO", isInternational: true };
+  }
+  if (/^(danmark|denmark)$/.test(normalized)) {
+    return { country: value, countryCode: "DK", isInternational: true };
+  }
+  return { country: value, isInternational: true };
 }
 
 function withPage(url: string, page: number): string {

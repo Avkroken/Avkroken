@@ -19,11 +19,12 @@ STUDENTCONSULTING_EMAIL="user@example.com"
 STUDENTCONSULTING_PASSWORD="replace-me"
 STUDENTCONSULTING_AUTOSUBMIT="false"
 
-# Suitability policy. Autonomous applications fail closed until include terms exist.
-JOB_INCLUDE_TERMS="supporttekniker,it-support,helpdesk"
-JOB_EXCLUDE_TERMS="chef,senior"
-JOB_ALLOWED_LOCATIONS="Stockholm,Uppsala"
-JOB_ALLOWED_COUNTRIES="SE"
+# Optional extra suitability filters. Primary discovery comes from the authenticated StudentConsulting "Matcha jobb" profile.
+# Example values: supporttekniker,it-support,helpdesk | chef,senior | Stockholm,Uppsala | SE,NO,DK
+JOB_INCLUDE_TERMS=""
+JOB_EXCLUDE_TERMS=""
+JOB_ALLOWED_LOCATIONS=""
+JOB_ALLOWED_COUNTRIES=""
 
 # BankID notification. Cloudflare Email Service binding must be configured for email.
 NOTIFY_EMAIL_TO="user@example.com"

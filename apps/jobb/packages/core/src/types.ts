@@ -15,6 +15,7 @@ export interface JobCandidate {
   occupationConceptId?: string;
   applicationUrl?: string;
   applicationReference?: string;
+  discoverySource?: "studentconsulting_matcha_jobb";
   sourceUrl: string;
 }
 
