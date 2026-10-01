@@ -120,11 +120,13 @@ jobs:
           python3 - <<'PYCODE'
           import json, os
           from pathlib import Path
-          notes=os.environ.get("RELEASE_NOTES","").strip()
+          raw_notes=os.environ.get("RELEASE_NOTES","")
+          notes=raw_notes.strip()
           uncertain=json.loads(os.environ.get("UNCERTAIN_ENTRIES") or "[]")
           skipped=json.loads(os.environ.get("SKIPPED_PRS") or "[]")
           if not notes:
-              print("::notice::Copilot advisory returned no substantive notes; canonical GitHub Release is unaffected.")
+              if raw_notes:
+                  print("::notice::Copilot advisory returned no substantive notes; canonical GitHub Release is unaffected.")
               raise SystemExit(0)
           with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a",encoding="utf-8") as h:
               h.write("# Advisory Copilot release notes\n\n")
