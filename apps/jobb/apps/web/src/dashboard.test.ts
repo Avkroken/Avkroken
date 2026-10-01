@@ -54,6 +54,10 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("0x4AAAAAAFFcNlOYVIZhQ4Qd");
     expect(jsText).not.toContain("0x4AAAAAADtfk0hF05HrDLLJ");
     expect(jsText).not.toContain("cfgTurnstile");
+    expect(jsText).toContain("signature===overviewSignature");
+    expect(jsText).toContain(
+      "En körning pågår. Turnstile behövs först inför nästa manuella start.",
+    );
     expect(jsText).toContain(
       "Turnstile hanteras centralt i deployment och behöver inte fyllas i här.",
     );
