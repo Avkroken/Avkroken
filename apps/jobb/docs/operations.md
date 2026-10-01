@@ -1,6 +1,6 @@
 # Drift och verifiering
 
-**Senast verifierad mot repositoryt:** 2026-09-24
+**Senast verifierad mot repositoryt:** 2026-10-01
 
 ## Lokal verifiering
 
@@ -54,7 +54,7 @@ Read replication ska vara avstängd tills Jobbs D1-requestväg använder D1 Sess
 
 `GET /api/health` är minimal liveness.
 
-`GET /api/ready` verifierar D1 och att dashboard-authkonfigurationen är användbar enligt implementationen. Readiness får inte exponera credential-värden.
+`GET /api/ready` verifierar D1, att dashboard-authkonfigurationen är användbar och att `0006_runtime_configuration.sql` både finns i schemat och är registrerad i D1:s migrationshistorik. Readiness får inte exponera credential-värden.
 
 ## Månadskörning
 
