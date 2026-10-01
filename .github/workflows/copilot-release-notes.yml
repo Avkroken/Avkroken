@@ -109,7 +109,7 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
       - name: Publish advisory Copilot summary
-        if: ${{ steps.copilot_notes.outcome == 'success' }}
+        if: ${{ steps.copilot_notes.outcome == 'success' && steps.copilot_notes.outputs.release-notes != '' }}
         shell: bash
         env:
           RELEASE_NOTES: ${{ steps.copilot_notes.outputs.release-notes }}
@@ -132,6 +132,6 @@ jobs:
           PYCODE
 
       - name: Report Copilot fallback
-        if: ${{ always() && steps.metadata.outputs.available == 'true' && (steps.install.outcome == 'failure' || steps.copilot_notes.outcome == 'failure') }}
+        if: ${{ always() && steps.metadata.outputs.available == 'true' && (steps.install.outcome == 'failure' || steps.copilot_notes.outcome == 'failure' || (steps.copilot_notes.outcome == 'success' && steps.copilot_notes.outputs.release-notes == '')) }}
         shell: bash
-        run: echo "::notice::Copilot advisory generation failed; canonical GitHub Release is unaffected."
+        run: echo "::notice::Copilot advisory generation failed or returned no notes; canonical GitHub Release is unaffected."
