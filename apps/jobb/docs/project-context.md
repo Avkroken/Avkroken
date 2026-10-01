@@ -2,7 +2,7 @@
 
 Det här dokumentet är den app-specifika, versionsstyrda tekniska kontexten för `Avkroken/Avkroken` / `apps/jobb`.
 
-**Senast verifierad mot repositoryt:** 2026-10-01
+**Senast verifierad mot repositoryt:** 2026-10-02
 
 ## Auktoritet och läsordning
 
@@ -104,7 +104,7 @@ Dashboarden visar evidence-metadata men är inte en generell R2 object-browser.
 
 ## StudentConsulting
 
-StudentConsulting-integrationen använder Browser Run för autentisering, discovery, formulärkontroll, submission och verifiering.
+StudentConsulting-integrationen använder Browser Run för autentisering, discovery, formulärkontroll, submission och verifiering. Discovery läser navigationsvärden från `href`, `data-href`, `data-url` och inline `onclick` på den verifierade Matcha-jobb-vyn. Absoluta URL:er behåller sin ursprungliga authority vid validering; endast betrodda StudentConsulting-rutter av formen `/sv/lediga-jobb/.../<Jobb-ID>` får bli kandidater.
 
 Autonom submission kräver:
 

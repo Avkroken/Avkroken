@@ -10,7 +10,7 @@ Implemented flow:
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
 4. Navigate only to the canonical authenticated `/sv/min-profil/matcha-jobb/` route and discover candidates from that matched list.
-5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href` or `data-url`; fail closed on redirects or untrusted URL shapes.
+5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority, and redirects or untrusted URL shapes fail closed.
 6. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
 7. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
 8. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
@@ -68,6 +68,6 @@ Since June 2026, Arbetsförmedlingen can require answers to activities transferr
 
 ## Evidence and diagnostics
 
-Application attempts persist status, machine-readable error codes and provider messages in D1. Verified StudentConsulting evidence is stored in the private `jobb-evidence` R2 bucket with metadata in D1.
+Application attempts persist status, machine-readable error codes and provider messages in D1. StudentConsulting Matcha-jobb discovery scans navigational `href`, `data-href`, `data-url` and inline navigation attributes, but every extracted candidate must still normalize to the trusted StudentConsulting `/sv/lediga-jobb/.../<Jobb-ID>` route before it can become a job candidate. Verified StudentConsulting evidence is stored in the private `jobb-evidence` R2 bucket with metadata in D1.
 
 The `evidence.sha256` schema field currently exists but is not populated by the evidence write path. It must not be treated as an active integrity guarantee until hashing is implemented and verified.

@@ -428,6 +428,28 @@ export function normalizeStudentConsultingJobUrl(
   return safe;
 }
 
+function extractStudentConsultingJobUrlCandidates(value: string): string[] {
+  const candidates = new Set<string>([value.trim()]);
+  const absoluteUrlPattern = /https:\/\/[^\s"'<>]+/gi;
+  const absoluteMatches = [...value.matchAll(absoluteUrlPattern)];
+  let relativeSource = value;
+
+  for (const match of absoluteMatches) {
+    candidates.add(match[0]);
+    const start = match.index ?? 0;
+    relativeSource =
+      relativeSource.slice(0, start) +
+      " ".repeat(match[0].length) +
+      relativeSource.slice(start + match[0].length);
+  }
+
+  const relativeMatches = relativeSource.match(
+    /\/sv\/lediga-jobb\/[^\s"'<>]+\/[^\s"'<>]+\/\d+\/?/gi,
+  );
+  for (const match of relativeMatches ?? []) candidates.add(match);
+  return [...candidates].filter(Boolean);
+}
+
 export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   const normalized = normalize(label);
   return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
@@ -537,28 +559,22 @@ async function collectJobLinks(
   while (Date.now() - started < MATCHED_LISTING_WAIT_MS) {
     const links = new Set<string>();
     const sources = [
-      {
-        selector: 'a[href*="/sv/lediga-jobb/"]',
-        attribute: "href",
-      },
-      {
-        selector: '[data-href*="/sv/lediga-jobb/"]',
-        attribute: "data-href",
-      },
-      {
-        selector: '[data-url*="/sv/lediga-jobb/"]',
-        attribute: "data-url",
-      },
+      { selector: "a[href]", attribute: "href" },
+      { selector: "[data-href]", attribute: "data-href" },
+      { selector: "[data-url]", attribute: "data-url" },
+      { selector: "[onclick]", attribute: "onclick" },
     ] as const;
 
     for (const source of sources) {
       const elements = page.locator(source.selector);
-      const count = Math.min(await elements.count(), 250);
+      const count = await elements.count();
       for (let index = 0; index < count; index += 1) {
         const value = await elements.nth(index).getAttribute(source.attribute);
         if (!value) continue;
-        const safeJobUrl = normalizeStudentConsultingJobUrl(value);
-        if (safeJobUrl) links.add(safeJobUrl);
+        for (const candidate of extractStudentConsultingJobUrlCandidates(value)) {
+          const safeJobUrl = normalizeStudentConsultingJobUrl(candidate);
+          if (safeJobUrl) links.add(safeJobUrl);
+        }
       }
     }
 
