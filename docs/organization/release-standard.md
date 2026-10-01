@@ -145,7 +145,7 @@ Vid förändring av releasekontraktet ska minst följande verifieras:
 
 ## Copilot-sammanfattning
 
-Efter en lyckad canonical `Release`-körning kan ett separat follow-up-workflow köra den SHA-pinnade `github/copilot-release-notes`-actionen. `Release` lämnar endast över den exakta release-rangen (`base_ref` och `target_sha`) i ett kortlivat, icke-hemligt Actions-artifact med en dags retention. Follow-up-workflowet har endast `actions: read`, `contents: read` och `pull-requests: read` och deltar därför inte i `release.yml`-körningens serialiseringslås.
+Efter en lyckad canonical `Release`-körning kan ett separat follow-up-workflow köra den SHA-pinnade `github/copilot-release-notes`-actionen. `Release` lämnar endast över den exakta release-rangen (`base_ref` och `target_sha`) i ett kortlivat, icke-hemligt Actions-artifact med en dags retention. Follow-up-workflowet har endast `actions: read`, `contents: read` och `pull-requests: read` och deltar därför inte i `release.yml`-körningens serialiseringslås. Det inbyggda `GITHUB_TOKEN` används med dessa read-only-rättigheter för Actions-artifact, repository- och PR-metadata; det separata `COPILOT_GITHUB_TOKEN` används endast för Copilot-anrop.
 
 Copilot CLI förinstalleras i exakt version `1.0.90` innan `COPILOT_GITHUB_TOKEN` exponeras, så actionen använder den redan installerade binären i stället för att hämta en flytande CLI-version. `COPILOT_GITHUB_TOKEN` ska vara en least-privilege fine-grained PAT med `Copilot Requests: Read` och en tokenägare med aktiv Copilot-licens. Workflown skapar eller roterar ingen credential. Om artifactet eller secreten saknas, installationen misslyckas eller Copilot-genereringen fallerar påverkas inte den redan färdigställda canonical releasen.
 

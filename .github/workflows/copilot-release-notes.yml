@@ -84,10 +84,10 @@ jobs:
         if: ${{ steps.install.outcome == 'success' }}
         shell: bash
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_ENABLED: ${{ secrets.COPILOT_GITHUB_TOKEN != '' }}
         run: |
           set -euo pipefail
-          if [[ -n "${COPILOT_GITHUB_TOKEN}" ]]; then
+          if [[ "${COPILOT_ENABLED}" == "true" ]]; then
             echo "enabled=true" >> "${GITHUB_OUTPUT}"
           else
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
