@@ -50,7 +50,7 @@ Applikationslagret hanterar den egentliga funktionaliteten efter accesslagret oc
 
 `DUMPEN` binder Workern till bucket `dumpen` för privata transferer. `ASSETS` binder samma Worker till den befintliga bucket `avkroken-assets`, som innehåller App Launcher-bilder och andra publika assets. Worker-processens minne ska betraktas som tillfälligt.
 
-De två lagren blandas inte. Privata transferer behåller sin äldre versionsstruktur i `dumpen`. Asset-inventory läses via `ASSETS`, medan klientens direktlänk härleds till R2-custom-domainen `https://logos.denied.se/<object-key>`.
+De två lagren blandas inte. Privata transferer behåller sin äldre versionsstruktur i `dumpen`. Asset-inventory läses via `ASSETS`, medan klientens direktlänk härleds till R2-custom-domainen `https://logos.denied.se/<object-key>`. Om asset-inventoryn faller visas assets som otillgängliga utan att den privata transferlistan slutar fungera.
 
 ## Requestflöden
 
