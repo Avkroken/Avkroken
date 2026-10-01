@@ -111,7 +111,7 @@ Normal release använder repositoryts GitHub Actions `GITHUB_TOKEN` med minsta p
 
 Övriga jobb behåller read-only eller tomma permissions efter behov.
 
-Ingen PAT, bypass eller utökad provider-writeidentitet ska införas för releaseflödet utan separat arkitekturbeslut.
+Canonical SemVer-/GitHub Release-publication använder ingen PAT, bypass eller utökad provider-writeidentitet. Det valfria rådgivande Copilot-jobbet är separat och använder endast den read-only `COPILOT_GITHUB_TOKEN` som beskrivs nedan.
 
 ## Deployment
 
@@ -142,3 +142,11 @@ Vid förändring av releasekontraktet ska minst följande verifieras:
 - att promotion pekar på aktiv RC-commit;
 - att gammal misslyckad releasekörning inte blockerar en senare lyckad recovery;
 - att GitHub Release fortsatt är repositoryts kanoniska versionshistorik.
+
+## Copilot-sammanfattning
+
+Efter en lyckad canonical `Release`-körning kan ett separat follow-up-workflow köra den SHA-pinnade `github/copilot-release-notes`-actionen. `Release` lämnar endast över den exakta release-rangen (`base_ref` och `target_sha`) i ett kortlivat, icke-hemligt Actions-artifact med en dags retention. Follow-up-workflowet har endast `actions: read`, `contents: read` och `pull-requests: read` och deltar därför inte i `release.yml`-körningens serialiseringslås. Det inbyggda `GITHUB_TOKEN` används med dessa read-only-rättigheter för Actions-artifact, repository- och PR-metadata; det separata `COPILOT_GITHUB_TOKEN` används endast för Copilot-anrop. Follow-up-körningen checkar endast ut den konstanta, betrodda `main`-grenen med full historik; dynamiska refs från `workflow_run` eller artifactet används aldrig som checkout-target. Den exakta release-rangen från artifactet skickas enbart som base/head-data till den pinnade actionen.
+
+Copilot CLI förinstalleras i exakt version `1.0.90` innan `COPILOT_GITHUB_TOKEN` exponeras, så actionen använder den redan installerade binären i stället för att hämta en flytande CLI-version. `COPILOT_GITHUB_TOKEN` ska vara en least-privilege fine-grained PAT med `Copilot Requests: Read` och en tokenägare med aktiv Copilot-licens. Workflown skapar eller roterar ingen credential. Om artifactet eller secreten saknas, installationen misslyckas eller Copilot-genereringen fallerar påverkas inte den redan färdigställda canonical releasen.
+
+Copilot-resultatet publiceras endast i follow-up-körningens GitHub Actions run summary som rådgivande text. Det skrivs inte in i den kanoniska GitHub Release-body:n. SemVer, release-target, required checks och release notes i GitHub Release fortsätter därför att komma enbart från `semantic_release.py`; osäkra eller ofullständiga AI-resultat kan aldrig ändra canonical changelog. Upstream v1.0.3 kan dessutom missa rebase-mergade PR:er; Copilot-resultatet får därför inte användas som bevis på full release-täckning.
