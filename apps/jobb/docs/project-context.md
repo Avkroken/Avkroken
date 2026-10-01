@@ -24,7 +24,7 @@ Systemets hårda mål är **10 verifierade lämpliga ansökningar per kalenderm�
 
 Viktiga säkerhetsgränser:
 
-- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade profilrouten **Matcha jobb**; saknas routen, omdirigeras den utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
+- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade kanoniska profilrouten **Matcha jobb** (`/sv/min-profil/matcha-jobb/`) utan att vara beroende av en synlig navigationslänk; omdirigeras routen utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
 - En ansökan räknas inte som verifierad förrän exakt StudentConsulting Jobb-ID återfinns i `Ansökningar`.
 - D1 har exakt tio quota-slots per månad. Ett osäkert submit-resultat behåller sin slot som `uncertain`; systemet kompenserar inte med en potentiell elfte ansökan.
 - BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i Cloudflare Browser Run Live View.
@@ -61,6 +61,8 @@ Manuell start kräver:
 3. giltig Cloudflare Turnstile-token för action `manual_run`,
 4. öppet applikationsfönster.
 
+Starten gör därefter en atomisk D1-claim: högst en `running`/`needs_user_auth` automation får finnas åt gången över manuella och schemalagda starter. Run-raden skapas eller, för en failed schemalagd retry, återställs till ett rent `running`-state innan Workflow startas. Workflow-ID länkas både direkt efter create och som första Workflow-step. Startfel och Workflow-undantag skrivs tillbaka som `failed`; gamla `running`-rader utan Workflow-länk eller ansökningsaktivitet klassas/reconcileras som orphaned efter fem minuter. Utgångna eller ogiltiga `needs_user_auth`-handoffs reconcileras till `failed` före ny claim och räknas inte som aktiva i dashboarden efter `auth_expires_at`.
+
 ### Automatisk säkerhetskörning
 
 Cron kör en gång per dag den **10:e–13:e** vid `09:00 UTC`.
@@ -90,7 +92,7 @@ Centrala stateflöden:
 - quota slot: `free → reserved → submitted|verified|uncertain`.
 - report activity: `pending → save_attempted → saved`.
 - report: `collecting → ready → needs_user_auth|submitting → submitted`, med `failed` som felstate.
-- automation run: `running → needs_user_auth|completed|failed`.
+- automation run: atomisk claim till `running → needs_user_auth|completed|failed`; en failed schemalagd retry nollställer tidigare completion/error/auth/workflow-fält innan nytt Workflow startas. Dashboarden visar äldre oanslutna `running`-rader som `orphaned` i stället för som verkligt aktiva.
 
 ## Evidens
 
@@ -203,7 +205,7 @@ GitHub är Jobbs externa identity provider. Jobb använder Authorization Code + 
 
 GitHub OAuth är fail-closed och enda dashboard-authvägen: komplett klient-, secret- och allowlistkonfiguration krävs, och saknad eller halvkonfigurerad konfiguration ger fel i auth/readiness. Produktionshemligheten binds från Cloudflare Secrets Store som `GITHUB_OAUTH_CLIENT_SECRET`; client ID och allowlist ligger som icke-hemliga Worker-vars. Legacy Basic Auth och OIDC-proxy accepteras inte av koden.
 
-Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname.
+Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname. Dashboardens 10-sekunders polling behåller en redan monterad widget när relevant manuellt startläge är oförändrat, kan initiera widgeten senare om Turnstile-scriptet blir redo efter första renderingen, och tar bort/suppressar widgeten medan en verklig aktiv körning pågår.
 
 Dashboardens mutationsendpoints har same-origin-kontroll. UI-responsen sätter CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` och `Cache-Control: no-store`.
 

@@ -66,6 +66,21 @@ Kontrollera före manuell omkörning:
 4. senaste providerfel/evidence,
 5. att en ny körning inte kan överskrida månadsgränsen.
 
+## Workflow/orphan-incident
+
+En automation räknas som **orphaned** när D1 fortfarande visar `running`, `workflow_instance_id` saknas, ingen application är kopplad till runnen och `updated_at` är äldre än fem minuter. Dashboarden visar sådana rader som **Övergivna körningar** i stället för som aktiva.
+
+Före varje manuell eller schemalagd start reconcilerar Workern utgångna/ogiltiga `needs_user_auth`-BankID-handoffs och orphaned rader till `failed`. En BankID-handoff räknas som utgången när `auth_expires_at` saknas/är ogiltig eller har passerats; dashboarden ska då inte längre blockera nästa manuella start. Den atomiska run-claimen tillåter därefter högst en `running` eller `needs_user_auth` automation åt gången. En failed `scheduled:YYYY-MM`-retry återställs till rent `running`-state innan nytt Workflow startas.
+
+Vid incident, kontrollera i denna ordning:
+
+1. Cloudflare Workflow-instansens status och fel,
+2. D1 `automation_runs.status`, `workflow_instance_id`, `last_error`, `updated_at`,
+3. om runnen har applications/attempts eller provider-side effects,
+4. quota slots och eventuell `uncertain` state innan retry.
+
+Korrigera inte en run med observerade provider-side effects som orphaned enbart för att Workflow-länken saknas. Om direkt D1-write saknar behörighet ska state återställas genom den versionerade reconciliation/startvägen efter deployment, inte genom att byta Cloudflare-identitet eller kringgå behörighetsmodellen.
+
 ## Browser/providerincident
 
 Vid browser/providerfel:

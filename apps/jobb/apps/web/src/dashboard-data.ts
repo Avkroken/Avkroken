@@ -13,6 +13,41 @@ interface QuotaSlotRow {
   updated_at: string | null;
 }
 
+interface DashboardRunState {
+  status: string;
+  workflow_instance_id?: string | null;
+  application_count?: number | null;
+  auth_expires_at?: string | null;
+  updated_at?: string | null;
+}
+
+const ORPHANED_RUN_AGE_MS = 5 * 60 * 1_000;
+
+export function isExpiredBankIdDashboardRun(
+  run: DashboardRunState,
+  nowMs = Date.now(),
+): boolean {
+  if (run.status !== "needs_user_auth") return false;
+  if (!run.auth_expires_at) return true;
+  const expiresAtMs = Date.parse(run.auth_expires_at);
+  return !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
+}
+
+export function isOrphanedDashboardRun(
+  run: DashboardRunState,
+  nowMs = Date.now(),
+): boolean {
+  if (run.status !== "running" || run.workflow_instance_id) return false;
+  if (Number(run.application_count ?? 0) > 0) return false;
+  if (!run.updated_at) return false;
+
+  const timestamp = run.updated_at.includes("T")
+    ? run.updated_at
+    : `${run.updated_at.replace(" ", "T")}Z`;
+  const updatedAtMs = Date.parse(timestamp);
+  return Number.isFinite(updatedAtMs) && updatedAtMs <= nowMs - ORPHANED_RUN_AGE_MS;
+}
+
 export async function getDashboardData(
   db: D1Database,
   configuration: RuntimeConfigurationView,
@@ -79,9 +114,11 @@ export async function getDashboardData(
     db
       .prepare(
         `SELECT r.id, r.mode, r.application_month, r.report_month, r.status,
-                r.target_count, r.verified_count, r.auth_live_view_url,
-                r.auth_expires_at, r.last_error, r.started_at, r.completed_at,
-                r.updated_at,
+                r.target_count, r.verified_count, r.workflow_instance_id,
+                r.auth_live_view_url, r.auth_expires_at, r.last_error,
+                r.started_at, r.completed_at, r.updated_at,
+                (SELECT COUNT(*) FROM applications a
+                 WHERE a.automation_run_id = r.id) AS application_count,
                 (SELECT p.status FROM integration_probes p
                  WHERE p.automation_run_id = r.id
                  LIMIT 1) AS probe_status,
@@ -172,12 +209,39 @@ export async function getDashboardData(
   });
 
   const uncertainSlots = quotaSlots.filter((slot) => slot.state === "uncertain").length;
-  const activeRun = runs.results.find(
+  const dashboardRuns = runs.results.map((run) => {
+    if (!run || typeof run !== "object" || !("status" in run)) return run;
+    return {
+      ...run,
+      orphaned: isOrphanedDashboardRun(run as unknown as DashboardRunState),
+      expiredAuth: isExpiredBankIdDashboardRun(
+        run as unknown as DashboardRunState,
+      ),
+    };
+  });
+  const orphanedRuns = dashboardRuns.filter(
+    (run) =>
+      run &&
+      typeof run === "object" &&
+      "orphaned" in run &&
+      run.orphaned === true,
+  ).length;
+  const expiredAuthRuns = dashboardRuns.filter(
+    (run) =>
+      run &&
+      typeof run === "object" &&
+      "expiredAuth" in run &&
+      run.expiredAuth === true,
+  ).length;
+  const activeRun = dashboardRuns.find(
     (run) =>
       run &&
       typeof run === "object" &&
       "status" in run &&
-      (run.status === "running" || run.status === "needs_user_auth"),
+      ((run.status === "needs_user_auth" &&
+        (!("expiredAuth" in run) || run.expiredAuth !== true)) ||
+        (run.status === "running" &&
+          (!("orphaned" in run) || run.orphaned !== true))),
   );
 
   return {
@@ -193,7 +257,7 @@ export async function getDashboardData(
     reportSaved: Number(reportItems?.saved ?? 0),
     reportItems: Number(reportItems?.total ?? 0),
     reportActivities: reportActivities.results,
-    runs: runs.results,
+    runs: dashboardRuns,
     applications: applications.results,
     notifications: notifications.results,
     attention: {
@@ -201,6 +265,8 @@ export async function getDashboardData(
       failedRuns: Number(failedRuns?.count ?? 0),
       failedNotifications: Number(failedNotifications?.count ?? 0),
       ambiguousReportItems: Number(ambiguousReportItems?.count ?? 0),
+      orphanedRuns,
+      expiredAuthRuns,
       activeRun: activeRun ?? null,
     },
     configuration,

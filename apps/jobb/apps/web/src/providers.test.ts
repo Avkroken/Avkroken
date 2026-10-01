@@ -115,11 +115,6 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
     },
     locator(selector: string) {
       const current = new URL(currentUrl);
-      if (current.pathname === "/sv/" && selector === "a") {
-        return fakeLocator([
-          { text: "Matcha jobb", href: "/sv/min-profil/matcha-jobb/" },
-        ]);
-      }
       if (
         current.pathname === "/sv/min-profil/matcha-jobb/" &&
         selector === 'a[href*="/sv/lediga-jobb/"]'
@@ -165,7 +160,7 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
 }
 
 describe("StudentConsulting authenticated discovery", () => {
-  it("discovers only from the visible Matcha jobb profile view", async () => {
+  it("discovers from the canonical authenticated Matcha jobb route without depending on a visible navigation link", async () => {
     const provider = new StudentConsultingProvider({
       page: matchedProfilePage(),
       credentials: {
