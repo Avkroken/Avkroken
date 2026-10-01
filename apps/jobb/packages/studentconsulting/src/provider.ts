@@ -428,6 +428,15 @@ export function normalizeStudentConsultingJobUrl(
   return safe;
 }
 
+function extractStudentConsultingJobUrlCandidates(value: string): string[] {
+  const candidates = new Set<string>([value.trim()]);
+  const matches = value.match(
+    /(?:https:\/\/(?:[a-z0-9-]+\.)?studentconsulting\.com)?\/sv\/lediga-jobb\/[^\s"'<>]+\/[^\s"'<>]+\/\d+\/?/gi,
+  );
+  for (const match of matches ?? []) candidates.add(match);
+  return [...candidates].filter(Boolean);
+}
+
 export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   const normalized = normalize(label);
   return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
@@ -537,18 +546,10 @@ async function collectJobLinks(
   while (Date.now() - started < MATCHED_LISTING_WAIT_MS) {
     const links = new Set<string>();
     const sources = [
-      {
-        selector: 'a[href*="/sv/lediga-jobb/"]',
-        attribute: "href",
-      },
-      {
-        selector: '[data-href*="/sv/lediga-jobb/"]',
-        attribute: "data-href",
-      },
-      {
-        selector: '[data-url*="/sv/lediga-jobb/"]',
-        attribute: "data-url",
-      },
+      { selector: "a[href]", attribute: "href" },
+      { selector: "[data-href]", attribute: "data-href" },
+      { selector: "[data-url]", attribute: "data-url" },
+      { selector: "[onclick]", attribute: "onclick" },
     ] as const;
 
     for (const source of sources) {
@@ -557,8 +558,10 @@ async function collectJobLinks(
       for (let index = 0; index < count; index += 1) {
         const value = await elements.nth(index).getAttribute(source.attribute);
         if (!value) continue;
-        const safeJobUrl = normalizeStudentConsultingJobUrl(value);
-        if (safeJobUrl) links.add(safeJobUrl);
+        for (const candidate of extractStudentConsultingJobUrlCandidates(value)) {
+          const safeJobUrl = normalizeStudentConsultingJobUrl(candidate);
+          if (safeJobUrl) links.add(safeJobUrl);
+        }
       }
     }
 

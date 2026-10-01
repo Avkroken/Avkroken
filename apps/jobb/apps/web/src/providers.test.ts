@@ -71,6 +71,7 @@ function fakeLocator(
     href?: string;
     dataHref?: string;
     dataUrl?: string;
+    onclick?: string;
   }> = [],
   index = 0,
 ): BrowserLocator {
@@ -94,6 +95,7 @@ function fakeLocator(
       if (name === "href") return items[index]?.href ?? null;
       if (name === "data-href") return items[index]?.dataHref ?? null;
       if (name === "data-url") return items[index]?.dataUrl ?? null;
+      if (name === "onclick") return items[index]?.onclick ?? null;
       return null;
     },
     async innerText() {
@@ -125,7 +127,7 @@ const countryIndexFetcher: typeof fetch = async (_input, init) => {
 function matchedProfilePage(
   options: {
     redirectMatched?: boolean;
-    jobLinkAttribute?: "href" | "data-href" | "data-url";
+    jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
     explicitEmpty?: boolean;
   } = {},
 ): BrowserPage {
@@ -145,14 +147,12 @@ function matchedProfilePage(
       const current = new URL(currentUrl);
       if (
         current.pathname === "/sv/min-profil/matcha-jobb/" &&
-        selector.includes("/sv/lediga-jobb/")
+        ["a[href]", "[data-href]", "[data-url]", "[onclick]"].includes(selector)
       ) {
         if (options.explicitEmpty) return fakeLocator();
         const attribute = options.jobLinkAttribute ?? "href";
         const expectedSelector =
-          attribute === "href"
-            ? 'a[href*="/sv/lediga-jobb/"]'
-            : `[${attribute}*="/sv/lediga-jobb/"]`;
+          attribute === "href" ? "a[href]" : `[${attribute}]`;
         if (selector !== expectedSelector) return fakeLocator();
 
         return fakeLocator([
@@ -160,7 +160,12 @@ function matchedProfilePage(
             ? { href: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
             : attribute === "data-href"
               ? { dataHref: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
-              : { dataUrl: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" },
+              : attribute === "data-url"
+                ? { dataUrl: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
+                : {
+                    onclick:
+                      "window.location='/sv/lediga-jobb/stockholm/supporttekniker/87178/'",
+                  },
         ]);
       }
       if (
@@ -226,7 +231,7 @@ describe("StudentConsulting authenticated discovery", () => {
     ]);
   });
 
-  it.each(["data-href", "data-url"] as const)(
+  it.each(["data-href", "data-url", "onclick"] as const)(
     "discovers trusted job URLs from %s cards on Matcha jobb",
     async (jobLinkAttribute) => {
       const provider = new StudentConsultingProvider({

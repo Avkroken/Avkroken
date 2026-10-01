@@ -68,6 +68,6 @@ Since June 2026, Arbetsförmedlingen can require answers to activities transferr
 
 ## Evidence and diagnostics
 
-Application attempts persist status, machine-readable error codes and provider messages in D1. Verified StudentConsulting evidence is stored in the private `jobb-evidence` R2 bucket with metadata in D1.
+Application attempts persist status, machine-readable error codes and provider messages in D1. StudentConsulting Matcha-jobb discovery scans navigational `href`, `data-href`, `data-url` and inline navigation attributes, but every extracted candidate must still normalize to the trusted StudentConsulting `/sv/lediga-jobb/.../<Jobb-ID>` route before it can become a job candidate. Verified StudentConsulting evidence is stored in the private `jobb-evidence` R2 bucket with metadata in D1.
 
 The `evidence.sha256` schema field currently exists but is not populated by the evidence write path. It must not be treated as an active integrity guarantee until hashing is implemented and verified.
