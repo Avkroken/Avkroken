@@ -195,7 +195,7 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 
 Notifiering kan använda Email binding och/eller HTTPS-webhook.
 
-Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, valfria extra lämplighetsfilter, notifieringsinställningar och Turnstile secret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord, webhook-URL och Turnstile secret returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
+Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, valfria extra lämplighetsfilter och notifieringsinställningar. Produktions-Turnstile hanteras centralt med den enda Cloudflare-widgeten `denied.se`: dess site key är publik klientkonfiguration och `TURNSTILE_SECRET` binds som Worker deployment secret, inte via System-formuläret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord och webhook-URL returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
 
 ## Auth, request-säkerhet och privacy
 

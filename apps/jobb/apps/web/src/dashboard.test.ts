@@ -51,5 +51,11 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");
     expect(jsText).toContain("Domain=.denied.se");
+    expect(jsText).toContain("0x4AAAAAAFFcNlOYVIZhQ4Qd");
+    expect(jsText).not.toContain("0x4AAAAAADtfk0hF05HrDLLJ");
+    expect(jsText).not.toContain("cfgTurnstile");
+    expect(jsText).toContain(
+      "Turnstile hanteras centralt i deployment och behöver inte fyllas i här.",
+    );
   });
 });
