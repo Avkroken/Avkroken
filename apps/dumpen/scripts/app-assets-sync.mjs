@@ -1,0 +1,115 @@
+import { mkdir, readFile, stat } from "node:fs/promises";
+import path from "node:path";
+
+export const APP_ASSET_APPS = {
+  dozzle: [1, 2, 3, 4, 5, 6],
+  maintainerr: [1, 2, 3],
+  plex: [1, 2, 3],
+  prowlarr: [1, 2, 3],
+  qbittorrent: [1, 2, 3],
+  radarr: [1, 2, 3, 4, 5, 6, 7],
+  sonarr: [1, 2, 3],
+  tautulli: [1, 2, 3],
+};
+
+export const APP_ASSET_SOURCE_SIZE = 1254;
+export const APP_ASSET_SIZES = [256, 512];
+export const APP_ASSET_BUCKET = "avkroken-assets";
+
+export async function syncAppAssets({
+  workRoot,
+  shouldFetch = false,
+  shouldUpload = false,
+  apps = APP_ASSET_APPS,
+  sizes = APP_ASSET_SIZES,
+  sourceSize = APP_ASSET_SOURCE_SIZE,
+  bucket = APP_ASSET_BUCKET,
+  wrangler,
+  image,
+  mkdirFn = mkdir,
+  statFn = stat,
+  readFileFn = readFile,
+}) {
+  if (shouldUpload && !shouldFetch) {
+    throw new Error("--upload requires --fetch so live R2 originals are authoritative.");
+  }
+  if (typeof wrangler !== "function" || typeof image !== "function") {
+    throw new Error("syncAppAssets requires wrangler and image adapters.");
+  }
+
+  const sourceRoot = path.join(workRoot, "source");
+  const outputRoot = path.join(workRoot, "generated");
+
+  async function fetchSource(app, theme, destination) {
+    await wrangler([
+      "r2", "object", "get",
+      bucket + "/apps/" + app + "/" + app + "-" + theme + ".png",
+      "--remote", "--file", destination,
+    ]);
+  }
+
+  async function uploadVariant(key, file) {
+    await wrangler([
+      "r2", "object", "put", bucket + "/" + key,
+      "--remote", "--file", file, "--content-type", "image/png",
+    ]);
+    await wrangler([
+      "r2", "object", "put", bucket + "/hotlink-ok/" + key,
+      "--remote", "--file", file, "--content-type", "image/png",
+    ]);
+  }
+
+  async function ensureSource(app, theme) {
+    const source = path.join(sourceRoot, app + "-" + theme + ".png");
+    if (shouldFetch) {
+      await mkdirFn(path.dirname(source), { recursive: true });
+      await fetchSource(app, theme, source);
+      return source;
+    }
+    try {
+      await statFn(source);
+    } catch {
+      throw new Error("Source image is missing; rerun with the fetch flag.");
+    }
+    return source;
+  }
+
+  const generated = [];
+  for (const [app, themes] of Object.entries(apps)) {
+    for (const theme of themes) {
+      const source = await ensureSource(app, theme);
+      const sourceMeta = await image(source).metadata();
+      if (sourceMeta.width !== sourceSize || sourceMeta.height !== sourceSize) {
+        throw new Error("Source image must be " + sourceSize + "×" + sourceSize + ".");
+      }
+
+      for (const size of sizes) {
+        const key = "apps/" + app + "/" + app + "-" + theme + "-" + size + ".png";
+        const destination = path.join(outputRoot, key);
+        await mkdirFn(path.dirname(destination), { recursive: true });
+        await image(source)
+          .resize(size, size, { fit: "contain", withoutEnlargement: true })
+          .png()
+          .toFile(destination);
+
+        const meta = await image(destination).metadata();
+        if (meta.width !== size || meta.height !== size) {
+          throw new Error("Generated image has unexpected dimensions.");
+        }
+
+        const bytes = (await readFileFn(destination)).byteLength;
+        generated.push({ app, theme, size, key, bytes });
+        if (shouldUpload) await uploadVariant(key, destination);
+      }
+    }
+  }
+
+  return {
+    sources: Object.values(apps).reduce((sum, themes) => sum + themes.length, 0),
+    generated: generated.length,
+    uploadedObjects: shouldUpload ? generated.length * 2 : 0,
+    sizes,
+    outputRoot,
+    variants: generated,
+  };
+}

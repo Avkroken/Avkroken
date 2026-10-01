@@ -377,6 +377,7 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1.png" },
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-256.png" },
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-512.png" },
+    { ...png, key: "hotlink-ok/manual.png" },
   ]);
 
   const listed = await listPublicAssets(assets);
@@ -384,8 +385,9 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
     "apps/dozzle/dozzle-1.png",
     "apps/dozzle/dozzle-1-256.png",
     "apps/dozzle/dozzle-1-512.png",
+    "hotlink-ok/manual.png",
   ]);
-  assert.deepEqual(listed.map((asset) => ({
+  assert.deepEqual(listed.slice(0, 3).map((asset) => ({
     appCategory: asset.appCategory,
     theme: asset.theme,
     pixelSize: asset.pixelSize,
@@ -395,8 +397,9 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
     { appCategory: "dozzle", theme: "1", pixelSize: 256, variant: "resized" },
     { appCategory: "dozzle", theme: "1", pixelSize: 512, variant: "resized" },
   ]);
-  assert.equal(listed.every((asset) => asset.appLabel === "Dozzle"), true);
-  assert.equal(listed.every((asset) => asset.themeLabel === "Tema 1"), true);
+  assert.equal(listed.slice(0, 3).every((asset) => asset.appLabel === "Dozzle"), true);
+  assert.equal(listed.slice(0, 3).every((asset) => asset.themeLabel === "Tema 1"), true);
+  assert.equal(listed[3].mirror, false);
 });
 
 test("assetfel degraderar separat utan att blockera privata transferer", async () => {

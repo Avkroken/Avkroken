@@ -1,0 +1,89 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import test from "node:test";
+
+import { syncAppAssets } from "../scripts/app-assets-sync.mjs";
+
+function fakeImageAdapter(sourceSize = 1254) {
+  const dimensions = new Map();
+
+  function image(file) {
+    let requestedSize = null;
+    return {
+      async metadata() {
+        if (dimensions.has(file)) return dimensions.get(file);
+        if (file.includes(path.sep + "source" + path.sep)) {
+          return { width: sourceSize, height: sourceSize };
+        }
+        return {};
+      },
+      resize(width, height, options) {
+        assert.equal(width, height);
+        assert.deepEqual(options, { fit: "contain", withoutEnlargement: true });
+        requestedSize = width;
+        return this;
+      },
+      png() {
+        return this;
+      },
+      async toFile(destination) {
+        assert.ok(requestedSize);
+        dimensions.set(destination, { width: requestedSize, height: requestedSize });
+      },
+    };
+  }
+
+  return image;
+}
+
+test("app asset sync requires fresh live sources before upload", async () => {
+  let wranglerCalls = 0;
+  await assert.rejects(
+    syncAppAssets({
+      workRoot: "/tmp/dumpen-assets-test",
+      shouldFetch: false,
+      shouldUpload: true,
+      apps: { demo: [1] },
+      wrangler: async () => { wranglerCalls += 1; },
+      image: fakeImageAdapter(),
+    }),
+    /--upload requires --fetch/,
+  );
+  assert.equal(wranglerCalls, 0);
+});
+
+test("app asset sync writes exactly canonical and hotlink mirror variants", async () => {
+  const calls = [];
+  const workRoot = path.resolve("/tmp/dumpen-assets-test");
+  const result = await syncAppAssets({
+    workRoot,
+    shouldFetch: true,
+    shouldUpload: true,
+    apps: { demo: [1] },
+    sizes: [256, 512],
+    sourceSize: 1254,
+    bucket: "test-assets",
+    wrangler: async (args) => { calls.push(args); },
+    image: fakeImageAdapter(),
+    mkdirFn: async () => {},
+    readFileFn: async () => new Uint8Array([1, 2, 3]),
+  });
+
+  assert.equal(result.sources, 1);
+  assert.equal(result.generated, 2);
+  assert.equal(result.uploadedObjects, 4);
+  assert.deepEqual(result.variants.map(({ key, size, bytes }) => ({ key, size, bytes })), [
+    { key: "apps/demo/demo-1-256.png", size: 256, bytes: 3 },
+    { key: "apps/demo/demo-1-512.png", size: 512, bytes: 3 },
+  ]);
+
+  const source = path.join(workRoot, "source", "demo-1.png");
+  const generated = path.join(workRoot, "generated", "apps", "demo");
+  assert.deepEqual(calls, [
+    ["r2", "object", "get", "test-assets/apps/demo/demo-1.png", "--remote", "--file", source],
+    ["r2", "object", "put", "test-assets/apps/demo/demo-1-256.png", "--remote", "--file", path.join(generated, "demo-1-256.png"), "--content-type", "image/png"],
+    ["r2", "object", "put", "test-assets/hotlink-ok/apps/demo/demo-1-256.png", "--remote", "--file", path.join(generated, "demo-1-256.png"), "--content-type", "image/png"],
+    ["r2", "object", "put", "test-assets/apps/demo/demo-1-512.png", "--remote", "--file", path.join(generated, "demo-1-512.png"), "--content-type", "image/png"],
+    ["r2", "object", "put", "test-assets/hotlink-ok/apps/demo/demo-1-512.png", "--remote", "--file", path.join(generated, "demo-1-512.png"), "--content-type", "image/png"],
+  ]);
+});

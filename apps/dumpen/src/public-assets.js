@@ -102,7 +102,7 @@ const APP_LABELS = {
 };
 
 function appAssetMetadata(key) {
-  const mirror = key.startsWith("hotlink-ok/");
+  const mirror = key.startsWith("hotlink-ok/apps/");
   const logicalKey = mirror ? key.slice("hotlink-ok/".length) : key;
   const parts = logicalKey.split("/");
   if (parts.length !== 3 || parts[0] !== "apps") return { mirror, logicalKey };
