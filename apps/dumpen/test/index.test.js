@@ -366,6 +366,39 @@ test("assetdirektlänkar bevarar tomma segment i giltiga R2-nycklar", async () =
   assert.equal(listed[0].directUrl, "https://logos.denied.se/apps//icon.png");
 });
 
+test("appbilder får kategori, tema och storleksvariant utan mirror- eller legacy-dubbletter", async () => {
+  const uploaded = new Date("2026-10-01T10:00:00Z");
+  const png = { uploaded, body: new Uint8Array([1]), httpMetadata: { contentType: "image/png" } };
+  const assets = fakeR2([
+    { ...png, key: "apps/dozzle/dozzle-1.png" },
+    { ...png, key: "apps/dozzle/dozzle-1-256.png" },
+    { ...png, key: "apps/dozzle/dozzle-1-512.png" },
+    { ...png, key: "apps/dozzle/dozzle-256.png" },
+    { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1.png" },
+    { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-256.png" },
+    { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-512.png" },
+  ]);
+
+  const listed = await listPublicAssets(assets);
+  assert.deepEqual(listed.map((asset) => asset.key), [
+    "apps/dozzle/dozzle-1.png",
+    "apps/dozzle/dozzle-1-256.png",
+    "apps/dozzle/dozzle-1-512.png",
+  ]);
+  assert.deepEqual(listed.map((asset) => ({
+    appCategory: asset.appCategory,
+    theme: asset.theme,
+    pixelSize: asset.pixelSize,
+    variant: asset.variant,
+  })), [
+    { appCategory: "dozzle", theme: "1", pixelSize: 1254, variant: "original" },
+    { appCategory: "dozzle", theme: "1", pixelSize: 256, variant: "resized" },
+    { appCategory: "dozzle", theme: "1", pixelSize: 512, variant: "resized" },
+  ]);
+  assert.equal(listed.every((asset) => asset.appLabel === "Dozzle"), true);
+  assert.equal(listed.every((asset) => asset.themeLabel === "Tema 1"), true);
+});
+
 test("assetfel degraderar separat utan att blockera privata transferer", async () => {
   const transfers = fakeR2([{
     key: "backup/1000.zip",
@@ -401,7 +434,7 @@ test("publik asset-upload kräver admininloggning", async () => {
 test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bindingen", async () => {
   const transfers = fakeR2();
   const assets = fakeR2([{
-    key: "apps/plex/plex-256.png",
+    key: "apps/plex/plex-1-256.png",
     uploaded: new Date("2026-09-27T11:32:58Z"),
     body: new Uint8Array([1, 2, 3]),
     httpMetadata: { contentType: "image/png" },
@@ -431,10 +464,16 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(listed.assetState, "available");
   assert.equal(listed.objects.length, 0);
   assert.equal(listed.assets.length, 2);
-  const plex = listed.assets.find((item) => item.key === "apps/plex/plex-256.png");
-  assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-256.png");
+  const plex = listed.assets.find((item) => item.key === "apps/plex/plex-1-256.png");
+  assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-1-256.png");
   assert.equal(plex.image, true);
   assert.equal(plex.contentType, "image/png");
+  assert.equal(plex.appCategory, "plex");
+  assert.equal(plex.appLabel, "Plex");
+  assert.equal(plex.theme, "1");
+  assert.equal(plex.themeLabel, "Tema 1");
+  assert.equal(plex.pixelSize, 256);
+  assert.equal(plex.pixelLabel, "256×256");
 });
 
 test("objektlista kräver admininloggning", async () => {
@@ -510,6 +549,15 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /Publika filer och bilder/);
   assert.match(adminHtml, /Cloudflare App Launcher/);
   assert.match(adminHtml, /Kopiera länk/);
+  assert.match(adminHtml, /id="asset-filter-app"/);
+  assert.match(adminHtml, /id="asset-filter-size"/);
+  assert.match(adminHtml, /id="asset-filter-theme"/);
+  assert.match(adminHtml, /Appkategori/);
+  assert.match(adminHtml, /Pixelstorlek/);
+  assert.match(adminHtml, /Alla teman/);
+  assert.match(adminHtml, /asset\.appCategory/);
+  assert.match(adminHtml, /asset\.theme/);
+  assert.match(adminHtml, /asset\.pixelSize/);
   assert.match(adminHtml, /naturalWidth/);
   assert.match(adminHtml, / px · /);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);

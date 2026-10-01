@@ -88,6 +88,62 @@ function managedAssetId(key) {
   return ASSET_ID.test(id) ? id : null;
 }
 
+const APP_SOURCE_PIXEL_SIZE = 1254;
+
+const APP_LABELS = {
+  dozzle: "Dozzle",
+  maintainerr: "Maintainerr",
+  plex: "Plex",
+  prowlarr: "Prowlarr",
+  qbittorrent: "qBittorrent",
+  radarr: "Radarr",
+  sonarr: "Sonarr",
+  tautulli: "Tautulli",
+};
+
+function appAssetMetadata(key) {
+  const mirror = key.startsWith("hotlink-ok/");
+  const logicalKey = mirror ? key.slice("hotlink-ok/".length) : key;
+  const parts = logicalKey.split("/");
+  if (parts.length !== 3 || parts[0] !== "apps") return { mirror, logicalKey };
+
+  const app = parts[1];
+  const file = parts[2];
+  const escapedApp = app.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sized = file.match(new RegExp("^" + escapedApp + "-(\\d+)-(256|512)\\.png$", "i"));
+  const original = file.match(new RegExp("^" + escapedApp + "-(\\d+)\\.png$", "i"));
+
+  if (sized) {
+    const pixelSize = Number(sized[2]);
+    return {
+      mirror, logicalKey, app, appCategory: app,
+      appLabel: APP_LABELS[app] || app,
+      theme: sized[1], themeLabel: "Tema " + sized[1],
+      pixelSize, pixelLabel: pixelSize + "×" + pixelSize,
+      variant: "resized", legacy: false,
+    };
+  }
+  if (original && original[1] !== "256") {
+    return {
+      mirror, logicalKey, app, appCategory: app,
+      appLabel: APP_LABELS[app] || app,
+      theme: original[1], themeLabel: "Tema " + original[1],
+      pixelSize: APP_SOURCE_PIXEL_SIZE,
+      pixelLabel: APP_SOURCE_PIXEL_SIZE + "×" + APP_SOURCE_PIXEL_SIZE,
+      variant: "original", legacy: false,
+    };
+  }
+  const legacy = original?.[1] === "256";
+  return {
+    mirror, logicalKey, app: app || null, appCategory: app || null,
+    appLabel: app ? (APP_LABELS[app] || app) : null,
+    theme: null, themeLabel: null,
+    pixelSize: legacy ? 256 : null,
+    pixelLabel: legacy ? "256×256" : null,
+    variant: legacy ? "legacy" : "unclassified", legacy,
+  };
+}
+
 function assetRecord(object) {
   const key = String(object.key || "");
   if (!key) return null;
@@ -98,8 +154,10 @@ function assetRecord(object) {
     name,
   );
   const managedId = managedAssetId(key);
+  const appMetadata = appAssetMetadata(key);
   return {
     key,
+    ...appMetadata,
     managedId,
     managed: Boolean(managedId),
     name,
@@ -130,8 +188,20 @@ export async function listPublicAssets(bucket) {
   const objects = await listAll(bucket);
   return objects
     .map(assetRecord)
-    .filter(Boolean)
-    .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+    .filter((asset) => asset && !asset.mirror && !asset.legacy)
+    .sort((a, b) => {
+      if (a.app && b.app) {
+        const appOrder = a.appLabel.localeCompare(b.appLabel, "sv");
+        if (appOrder) return appOrder;
+        const themeOrder = Number(a.theme || 0) - Number(b.theme || 0);
+        if (themeOrder) return themeOrder;
+        const sizeRank = (asset) => asset.variant === "original" ? 0 : Number(asset.pixelSize || 9999);
+        return sizeRank(a) - sizeRank(b);
+      }
+      if (a.app) return -1;
+      if (b.app) return 1;
+      return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+    });
 }
 export async function uploadPublicAsset(request, bucket, rawName, limits) {
   const name = safeAssetName(safeDecode(rawName));

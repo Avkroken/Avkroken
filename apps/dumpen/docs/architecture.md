@@ -62,7 +62,7 @@ De två lagren blandas inte. Privata transferer behåller sin äldre versionsstr
 
 Admin kan lista den befintliga `avkroken-assets`-inventoryn och ladda upp nya filer via den sessionsskyddade asset-API:n. Nya filer lagras under `uploads/<random-128-bit-id>/<filename>` för att undvika konflikter med befintliga `apps/.../`-nycklar. Ingen publik list-endpoint införs.
 
-Bildformat renderas i admin-galleriet; klienten läser bildens naturliga pixelmått och visar storlek, dimensioner och format under kortet. Direktlänken är R2-custom-domainens canonical URL, exempelvis `https://logos.denied.se/apps/plex/plex-256.png`. `r2.dev` är avstängt och bucketens custom domain är den enda avsedda publika objektvägen.
+Bildformat renderas i admin-galleriet; klienten läser bildens naturliga pixelmått och visar storlek, dimensioner och format under kortet. App Launcher-filer under `apps/<app>/` normaliseras dessutom till appkategori, numeriskt tema och variant: `<app>-<tema>.png` är den verifierade 1254×1254-källan, följd av `<app>-<tema>-256.png` och `<app>-<tema>-512.png`. Galleriet erbjuder separata filter för appkategori, pixelstorlek och tema. `hotlink-ok/apps/...` är en lagringsspegel och döljs ur den logiska inventoryn; äldre `<app>-256.png` klassas som legacy och blir inte ett extra tema. Direktlänken för en logisk asset är R2-custom-domainens canonical `apps/...`-URL. `r2.dev` är avstängt och bucketens custom domain är den enda avsedda publika objektvägen.
 
 ### Privilegierad API-yta
 

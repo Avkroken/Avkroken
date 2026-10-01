@@ -45,7 +45,31 @@ När en ändring rör objektoperationer:
 
 R2-innehåll ska behandlas som applikationsdata, inte dokumentationsdata. `DUMPEN -> dumpen` är privat transferstorage. `ASSETS -> avkroken-assets` är den befintliga asset-bucketen; dess exakta objekt-URL:er är publika via `logos.denied.se`, men inventory och upload är fortsatt adminskyddade.
 
-Live 2026-10-01: `dumpen` skapades 2026-09-29T20:05:35.526Z och hade 0 objekt / 0 B. `avkroken-assets` hade 39 objekt / 48,4 MB och aktiv custom domain `logos.denied.se`; `r2.dev` var avstängt. Båda buckets hade endast standardregeln för abort av ofullständiga multipart-uploads efter 7 dagar och ingen automatisk objektradering.
+Live 2026-10-01: `dumpen` skapades 2026-09-29T20:05:35.526Z och hade 0 objekt / 0 B. `avkroken-assets` hade 78 objekt / 96,7 MB: 39 canonical `apps/...`-objekt och 39 motsvarande `hotlink-ok/apps/...`-speglar. Custom domain `logos.denied.se` var aktiv och `r2.dev` avstängt. Båda buckets hade endast standardregeln för abort av ofullständiga multipart-uploads efter 7 dagar och ingen automatisk objektradering.
+
+### App Launcher-varianter
+
+`scripts/sync-app-assets.mjs` äger den reproducerbara one-way-syncen för de versionsstyrda app-/temakombinationerna. Den läser numrerade original från `apps/<app>/<app>-<tema>.png`, genererar exakt 256×256 och 512×512 med Sharp och kan skriva både canonical-objektet och motsvarande `hotlink-ok/`-spegel. Syncen raderar inte objekt och använder inte äldre `<app>-256.png` som källa eller tema.
+
+Lokal generering från befintlig arbetskopia:
+
+```bash
+DUMPEN_ASSET_WORK=.asset-work npm run assets:sync
+```
+
+Hämta canonical-original från live-R2 och generera varianterna:
+
+```bash
+npm run assets:sync -- --fetch
+```
+
+Efter explicit R2-skrivbehörighet kan samma verifierade pipeline även synka objekten:
+
+```bash
+npm run assets:sync -- --fetch --upload
+```
+
+Live-verifiering 2026-10-01: den lokala Wrangler-profilen kan läsa `avkroken-assets` men object PUT returnerar 403 eftersom OAuth-identiteten saknar `k2.write`. Därför är 62 lokala storleksvarianter verifierade, medan live-bucketen fortsatt ligger på 78 objekt tills samma identitet har refreshats med R2 write-scope. Ingen partiell upload observerades.
 
 ## Deployment
 

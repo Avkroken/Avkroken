@@ -9,9 +9,11 @@
     "validate:worker": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy --strict",
     "verify:production": "node scripts/verify-production.mjs",
-    "deploy:workers-builds": "node scripts/workers-build-production.mjs"
+    "deploy:workers-builds": "node scripts/workers-build-production.mjs",
+    "assets:sync": "node scripts/sync-app-assets.mjs"
   },
   "devDependencies": {
+    "sharp": "^0.35.4",
     "wrangler": "^4.146.0"
   },
   "allowScripts": {
