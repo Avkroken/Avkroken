@@ -79,6 +79,31 @@ export async function getRun(
     .first<AutomationRunRow>();
 }
 
+export async function failExpiredBankIdRuns(
+  db: D1Database,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE automation_runs
+       SET status = 'failed',
+           last_error = COALESCE(
+             last_error,
+             'BANKID_HANDOFF_EXPIRED: den användarstyrda BankID-sessionen har gått ut.'
+           ),
+           auth_session_id = NULL,
+           auth_live_view_url = NULL,
+           auth_expires_at = NULL,
+           completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE status = 'needs_user_auth'
+         AND (
+           auth_expires_at IS NULL
+           OR datetime(auth_expires_at) <= datetime('now')
+         )`,
+    )
+    .run();
+}
+
 export async function failOrphanedRunningRuns(
   db: D1Database,
 ): Promise<void> {

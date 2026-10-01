@@ -70,7 +70,7 @@ Kontrollera före manuell omkörning:
 
 En automation räknas som **orphaned** när D1 fortfarande visar `running`, `workflow_instance_id` saknas, ingen application är kopplad till runnen och `updated_at` är äldre än fem minuter. Dashboarden visar sådana rader som **Övergivna körningar** i stället för som aktiva.
 
-Före varje manuell eller schemalagd start reconcilerar Workern orphaned rader till `failed`. Den atomiska run-claimen tillåter därefter högst en `running` eller `needs_user_auth` automation åt gången. En failed `scheduled:YYYY-MM`-retry återställs till rent `running`-state innan nytt Workflow startas.
+Före varje manuell eller schemalagd start reconcilerar Workern utgångna/ogiltiga `needs_user_auth`-BankID-handoffs och orphaned rader till `failed`. En BankID-handoff räknas som utgången när `auth_expires_at` saknas/är ogiltig eller har passerats; dashboarden ska då inte längre blockera nästa manuella start. Den atomiska run-claimen tillåter därefter högst en `running` eller `needs_user_auth` automation åt gången. En failed `scheduled:YYYY-MM`-retry återställs till rent `running`-state innan nytt Workflow startas.
 
 Vid incident, kontrollera i denna ordning:
 

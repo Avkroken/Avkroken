@@ -41,6 +41,7 @@ import {
 import { verifyTurnstile, type TurnstileEnv } from "./turnstile";
 import {
   claimRunStart,
+  failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   getRun,
   scheduledRunId,
@@ -239,6 +240,7 @@ export default {
 
       const applicationMonth = currentMonthKey(now);
       const reportMonth = previousMonthKey(now);
+      await failExpiredBankIdRuns(env.DB);
       await failOrphanedRunningRuns(env.DB);
 
       const runId = `manual:${applicationMonth}:${crypto.randomUUID()}`;
@@ -429,6 +431,7 @@ export default {
 
     const applicationMonth = currentMonthKey(triggeredAt);
     const reportMonth = previousMonthKey(triggeredAt);
+    await failExpiredBankIdRuns(env.DB);
     await failOrphanedRunningRuns(env.DB);
 
     const runId = scheduledRunId(applicationMonth);

@@ -4,7 +4,10 @@ import {
   renderDashboardScript,
   renderDashboardStyles,
 } from "./dashboard";
-import { isOrphanedDashboardRun } from "./dashboard-data";
+import {
+  isExpiredBankIdDashboardRun,
+  isOrphanedDashboardRun,
+} from "./dashboard-data";
 
 describe("dashboard run state", () => {
   const now = Date.parse("2026-10-01T15:45:00Z");
@@ -21,6 +24,27 @@ describe("dashboard run state", () => {
         now,
       ),
     ).toBe(true);
+  });
+
+  it("does not treat expired BankID handoffs as active", () => {
+    expect(
+      isExpiredBankIdDashboardRun(
+        {
+          status: "needs_user_auth",
+          auth_expires_at: "2026-10-01T15:44:59.000Z",
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isExpiredBankIdDashboardRun(
+        {
+          status: "needs_user_auth",
+          auth_expires_at: "2026-10-01T15:46:00.000Z",
+        },
+        now,
+      ),
+    ).toBe(false);
   });
 
   it("keeps linked, recent or application-bearing runs active", () => {

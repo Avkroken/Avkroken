@@ -17,10 +17,21 @@ interface DashboardRunState {
   status: string;
   workflow_instance_id?: string | null;
   application_count?: number | null;
+  auth_expires_at?: string | null;
   updated_at?: string | null;
 }
 
 const ORPHANED_RUN_AGE_MS = 5 * 60 * 1_000;
+
+export function isExpiredBankIdDashboardRun(
+  run: DashboardRunState,
+  nowMs = Date.now(),
+): boolean {
+  if (run.status !== "needs_user_auth") return false;
+  if (!run.auth_expires_at) return true;
+  const expiresAtMs = Date.parse(run.auth_expires_at);
+  return !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
+}
 
 export function isOrphanedDashboardRun(
   run: DashboardRunState,
@@ -203,6 +214,9 @@ export async function getDashboardData(
     return {
       ...run,
       orphaned: isOrphanedDashboardRun(run as unknown as DashboardRunState),
+      expiredAuth: isExpiredBankIdDashboardRun(
+        run as unknown as DashboardRunState,
+      ),
     };
   });
   const orphanedRuns = dashboardRuns.filter(
@@ -212,12 +226,20 @@ export async function getDashboardData(
       "orphaned" in run &&
       run.orphaned === true,
   ).length;
+  const expiredAuthRuns = dashboardRuns.filter(
+    (run) =>
+      run &&
+      typeof run === "object" &&
+      "expiredAuth" in run &&
+      run.expiredAuth === true,
+  ).length;
   const activeRun = dashboardRuns.find(
     (run) =>
       run &&
       typeof run === "object" &&
       "status" in run &&
-      (run.status === "needs_user_auth" ||
+      ((run.status === "needs_user_auth" &&
+        (!("expiredAuth" in run) || run.expiredAuth !== true)) ||
         (run.status === "running" &&
           (!("orphaned" in run) || run.orphaned !== true))),
   );
@@ -244,6 +266,7 @@ export async function getDashboardData(
       failedNotifications: Number(failedNotifications?.count ?? 0),
       ambiguousReportItems: Number(ambiguousReportItems?.count ?? 0),
       orphanedRuns,
+      expiredAuthRuns,
       activeRun: activeRun ?? null,
     },
     configuration,

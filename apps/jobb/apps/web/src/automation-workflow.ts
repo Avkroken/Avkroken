@@ -32,16 +32,16 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       triggeredAt: event.payload?.triggeredAt ?? event.timestamp.toISOString(),
     }));
 
-    if (trigger.runId) {
-      await step.do("link workflow instance at start", async () => {
-        await updateRun(this.env.DB, trigger.runId!, {
-          workflowInstanceId: event.instanceId,
-        });
-      });
-    }
-
     let result: Awaited<ReturnType<typeof executeAutomation>>;
     try {
+      if (trigger.runId) {
+        await step.do("link workflow instance at start", async () => {
+          await updateRun(this.env.DB, trigger.runId!, {
+            workflowInstanceId: event.instanceId,
+          });
+        });
+      }
+
       result = await step.do(
         "execute application automation",
         {

@@ -61,7 +61,7 @@ Manuell start kräver:
 3. giltig Cloudflare Turnstile-token för action `manual_run`,
 4. öppet applikationsfönster.
 
-Starten gör därefter en atomisk D1-claim: högst en `running`/`needs_user_auth` automation får finnas åt gången över manuella och schemalagda starter. Run-raden skapas eller, för en failed schemalagd retry, återställs till ett rent `running`-state innan Workflow startas. Workflow-ID länkas både direkt efter create och som första Workflow-step. Startfel och Workflow-undantag skrivs tillbaka som `failed`; gamla `running`-rader utan Workflow-länk eller ansökningsaktivitet klassas/reconcileras som orphaned efter fem minuter.
+Starten gör därefter en atomisk D1-claim: högst en `running`/`needs_user_auth` automation får finnas åt gången över manuella och schemalagda starter. Run-raden skapas eller, för en failed schemalagd retry, återställs till ett rent `running`-state innan Workflow startas. Workflow-ID länkas både direkt efter create och som första Workflow-step. Startfel och Workflow-undantag skrivs tillbaka som `failed`; gamla `running`-rader utan Workflow-länk eller ansökningsaktivitet klassas/reconcileras som orphaned efter fem minuter. Utgångna eller ogiltiga `needs_user_auth`-handoffs reconcileras till `failed` före ny claim och räknas inte som aktiva i dashboarden efter `auth_expires_at`.
 
 ### Automatisk säkerhetskörning
 

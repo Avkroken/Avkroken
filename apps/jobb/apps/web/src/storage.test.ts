@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   claimRunStart,
+  failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   type AutomationRunRow,
 } from "./storage";
@@ -101,6 +102,29 @@ describe("automation run claims", () => {
     expect(fake.sql[0]).toContain("completed_at = NULL");
     expect(fake.sql[0]).toContain("WHERE automation_runs.status = 'failed'");
     expect(fake.sql[1]).toBe("SELECT * FROM automation_runs WHERE id = ?");
+  });
+
+  it("expires stale BankID handoffs before a new claim", async () => {
+    let statement = "";
+    const db = {
+      prepare(sql: string) {
+        statement = sql;
+        return {
+          async run() {
+            return { meta: { changes: 1 } };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await failExpiredBankIdRuns(db);
+
+    expect(statement).toContain("status = 'needs_user_auth'");
+    expect(statement).toContain("auth_expires_at IS NULL");
+    expect(statement).toContain("datetime(auth_expires_at) <= datetime('now')");
+    expect(statement).toContain("status = 'failed'");
+    expect(statement).toContain("auth_session_id = NULL");
+    expect(statement).toContain("auth_live_view_url = NULL");
   });
 
   it("reconciles orphaned unlinked runs globally before a new claim", async () => {
