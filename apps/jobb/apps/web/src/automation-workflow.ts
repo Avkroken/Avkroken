@@ -78,6 +78,18 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       throw error;
     }
 
+    if (result.status === "skipped" && trigger.runId) {
+      await step.do("finalize skipped workflow", async () => {
+        await updateRun(this.env.DB, trigger.runId!, {
+          status: "failed",
+          workflowInstanceId: event.instanceId,
+          verifiedCount: result.verifiedCount,
+          lastError: `WORKFLOW_SKIPPED: ${result.message ?? "run window closed before execution"}`,
+          completedAt: new Date().toISOString(),
+        });
+      });
+    }
+
     return result;
   }
 }

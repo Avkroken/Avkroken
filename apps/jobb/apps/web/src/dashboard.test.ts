@@ -64,6 +64,7 @@ interface ClientHarness {
   window: { turnstile?: FakeTurnstile; onhashchange?: (() => void) | null };
   dashboard: Record<string, unknown>;
   poll(): Promise<void>;
+  failNextPoll(): void;
   turnstile: FakeTurnstile;
   overviewRenderCount(): number;
   manualResult(): { textContent: string; disabled: boolean };
@@ -143,6 +144,7 @@ async function createClientHarness(
   let overviewRenders = 0;
   let intervalCallback: (() => Promise<void>) | null = null;
   let dashboard = dashboardFixture();
+  let failNextFetch = false;
 
   const makeElement = (id = ""): any => ({
     id,
@@ -244,15 +246,29 @@ async function createClientHarness(
     onhashchange: null,
     ...(turnstileInitiallyAvailable ? { turnstile } : {}),
   };
-  const fetch = async () => ({
-    ok: true,
-    async json() {
-      return dashboard;
-    },
-    async text() {
-      return "";
-    },
-  });
+  const fetch = async () => {
+    if (failNextFetch) {
+      failNextFetch = false;
+      return {
+        ok: false,
+        async json() {
+          return {};
+        },
+        async text() {
+          return "temporary dashboard failure";
+        },
+      };
+    }
+    return {
+      ok: true,
+      async json() {
+        return dashboard;
+      },
+      async text() {
+        return "";
+      },
+    };
+  };
   const setIntervalStub = (callback: () => Promise<void>) => {
     intervalCallback = callback;
     return 1;
@@ -288,6 +304,9 @@ async function createClientHarness(
       if (!intervalCallback) throw new Error("dashboard polling was not registered");
       await intervalCallback();
       await flushClient();
+    },
+    failNextPoll() {
+      failNextFetch = true;
     },
     turnstile,
     overviewRenderCount() {
@@ -342,6 +361,24 @@ describe("dashboard polling behavior", () => {
 
     expect(harness.turnstile.renders).toBe(1);
     expect(harness.overviewRenderCount()).toBe(1);
+  });
+
+  it("recovers the overview and Turnstile after a transient dashboard poll error", async () => {
+    const harness = await createClientHarness(true);
+
+    expect(harness.turnstile.renders).toBe(1);
+    expect(harness.overviewRenderCount()).toBe(1);
+
+    harness.failNextPoll();
+    await harness.poll();
+
+    expect(harness.turnstile.removes).toBe(1);
+    expect(harness.overviewRenderCount()).toBe(2);
+
+    await harness.poll();
+
+    expect(harness.turnstile.renders).toBe(2);
+    expect(harness.overviewRenderCount()).toBe(3);
   });
 
   it("rerenders when manual-run configuration or the application window changes", async () => {
