@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   claimRunStart,
+  deleteRunRecords,
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   type AutomationRunRow,
@@ -126,6 +127,37 @@ describe("automation run claims", () => {
     expect(statement).toContain("status = 'failed'");
     expect(statement).toContain("auth_session_id = NULL");
     expect(statement).toContain("auth_live_view_url = NULL");
+  });
+
+  it("deletes only run-scoped auxiliary records and the run row", async () => {
+    const statements: string[] = [];
+    const binds: unknown[][] = [];
+    let batchSize = 0;
+    const db = {
+      prepare(sql: string) {
+        statements.push(sql);
+        return {
+          bind(...values: unknown[]) {
+            binds.push(values);
+            return this;
+          },
+        };
+      },
+      async batch(items: unknown[]) {
+        batchSize = items.length;
+        return [];
+      },
+    } as unknown as D1Database;
+
+    await deleteRunRecords(db, "manual:test");
+
+    expect(batchSize).toBe(3);
+    expect(statements).toEqual([
+      "DELETE FROM notifications WHERE automation_run_id = ?",
+      "DELETE FROM integration_probes WHERE automation_run_id = ?",
+      "DELETE FROM automation_runs WHERE id = ?",
+    ]);
+    expect(binds).toEqual([["manual:test"], ["manual:test"], ["manual:test"]]);
   });
 
   it("reconciles orphaned unlinked runs globally before a new claim", async () => {

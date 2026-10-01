@@ -22,7 +22,6 @@ export interface RuntimeConfigValues {
   NOTIFY_EMAIL_FROM?: string;
   NOTIFY_WEBHOOK_URL?: string;
   PUBLIC_BASE_URL?: string;
-  TURNSTILE_SECRET?: string;
 }
 
 export interface RuntimeConfigEnv extends RuntimeConfigValues {
@@ -47,7 +46,6 @@ interface ManagedRuntimeConfiguration {
   notifyEmailTo?: string;
   notifyEmailFrom?: string;
   notifyWebhookUrl?: string;
-  turnstileSecret?: string;
 }
 
 interface StoredRuntimeConfiguration extends ManagedRuntimeConfiguration {
@@ -76,8 +74,6 @@ export interface RuntimeConfigurationView {
   notifyEmailTo: string;
   notifyEmailFrom: string;
   notifyWebhookConfigured: boolean;
-  turnstileConfigured: boolean;
-  turnstileSource: RuntimeConfigSource;
   managedConfigurationStored: boolean;
   managedConfigurationUnreadable: boolean;
   managedConfigurationStorageReady: boolean;
@@ -97,7 +93,6 @@ export interface RuntimeConfigurationUpdate {
   notifyEmailTo?: string;
   notifyEmailFrom?: string;
   notifyWebhookUrl?: string;
-  turnstileSecret?: string;
 }
 
 export interface ResolvedRuntimeConfiguration<T extends RuntimeConfigEnv> {
@@ -169,10 +164,6 @@ export async function resolveRuntimeConfiguration<T extends RuntimeConfigEnv>(
       env.NOTIFY_WEBHOOK_URL,
       stored?.notifyWebhookUrl,
     ),
-    TURNSTILE_SECRET: preferDeployment(
-      env.TURNSTILE_SECRET,
-      stored?.turnstileSecret,
-    ),
   } as T;
 
   return {
@@ -202,6 +193,9 @@ export async function saveRuntimeConfiguration(
     ...(existing ?? {}),
     v: 1,
   };
+  delete (
+    next as StoredRuntimeConfiguration & { turnstileSecret?: unknown }
+  ).turnstileSecret;
 
   if (update.studentConsulting !== undefined) {
     const email = normalizeEmail(
@@ -247,16 +241,6 @@ export async function saveRuntimeConfiguration(
   if (update.notifyWebhookUrl !== undefined) {
     next.notifyWebhookUrl = normalizeWebhook(update.notifyWebhookUrl);
   }
-  if (update.turnstileSecret !== undefined) {
-    const secret = update.turnstileSecret.trim();
-    if (!secret || secret.length > 512) {
-      throw new Error(
-        "Turnstile-hemligheten måste anges och vara högst 512 tecken.",
-      );
-    }
-    next.turnstileSecret = update.turnstileSecret;
-  }
-
   validateEffectiveConfiguration(env, next);
 
   const secret = await resolveGitHubClientSecret(env);
@@ -390,11 +374,6 @@ function buildConfigurationView(
     notifyEmailTo: effective.NOTIFY_EMAIL_TO ?? "",
     notifyEmailFrom: effective.NOTIFY_EMAIL_FROM ?? "",
     notifyWebhookConfigured: webhookConfigured,
-    turnstileConfigured: Boolean(effective.TURNSTILE_SECRET),
-    turnstileSource: sourceOf(
-      deployment.TURNSTILE_SECRET,
-      stored?.turnstileSecret,
-    ),
     managedConfigurationStored: Boolean(stored),
     managedConfigurationUnreadable,
     managedConfigurationStorageReady,

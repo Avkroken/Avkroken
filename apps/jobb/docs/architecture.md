@@ -79,7 +79,7 @@ Authorization Code + PKCE S256 används direkt mot GitHub. Provider-tokenen anv�
 
 ## Request security
 
-Skyddade mutationer använder same-origin-kontroll och `Sec-Fetch-Site` när headern finns. Manuell körning kräver dessutom Turnstile.
+Skyddade mutationer använder GitHub-dashboardens autentiserade session, same-origin-kontroll och `Sec-Fetch-Site` när headern finns. Manuell körning har ingen separat Turnstile-utmaning i Jobb.
 
 ## Deployment boundary
 

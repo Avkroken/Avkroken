@@ -13,6 +13,21 @@ const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
 const MATCHED_JOBS_URL = `${DEFAULT_BASE_URL}/sv/min-profil/matcha-jobb/`;
+const MATCHED_LISTING_WAIT_MS = 8_000;
+const JOB_OPENINGS_API = `${DEFAULT_BASE_URL}/api/v1/jobopenings`;
+const COUNTRY_PAGE_SIZE = 200;
+
+const STUDENTCONSULTING_COUNTRIES = [
+  { id: 1, country: "Sverige", countryCode: "SE", isInternational: false },
+  { id: 2, country: "Norge", countryCode: "NO", isInternational: true },
+  { id: 3, country: "Danmark", countryCode: "DK", isInternational: true },
+] as const;
+
+export interface StudentConsultingCountry {
+  country: string;
+  countryCode: string;
+  isInternational: boolean;
+}
 
 export interface StudentConsultingProviderOptions {
   page: BrowserPage;
@@ -20,6 +35,7 @@ export interface StudentConsultingProviderOptions {
   maxJobs?: number;
   maxPagesPerSource?: number;
   autoSubmit?: boolean;
+  fetcher?: typeof fetch;
 }
 
 export interface ParsedStudentConsultingJob {
@@ -39,6 +55,7 @@ export class StudentConsultingProvider implements JobProvider {
   private readonly maxJobs: number;
   private readonly maxPagesPerSource: number;
   private readonly autoSubmit: boolean;
+  private readonly fetcher: typeof fetch;
 
   constructor(options: StudentConsultingProviderOptions) {
     this.page = options.page;
@@ -46,6 +63,7 @@ export class StudentConsultingProvider implements JobProvider {
     this.maxJobs = options.maxJobs ?? 30;
     this.maxPagesPerSource = options.maxPagesPerSource ?? 3;
     this.autoSubmit = options.autoSubmit ?? false;
+    this.fetcher = options.fetcher ?? fetch;
   }
 
   async authenticate(): Promise<AuthenticationState> {
@@ -143,6 +161,14 @@ export class StudentConsultingProvider implements JobProvider {
       );
     }
 
+    const countryByExternalId = await loadStudentConsultingCountryIndex(
+      this.fetcher,
+    ).catch((error) => {
+      console.warn("StudentConsulting country index unavailable", {
+        error: errorMessage(error),
+      });
+      return new Map<string, StudentConsultingCountry>();
+    });
     const candidates = new Map<string, JobCandidate>();
     for (let pageNumber = 1; pageNumber <= this.maxPagesPerSource; pageNumber += 1) {
       if (candidates.size >= this.maxJobs) break;
@@ -166,7 +192,7 @@ export class StudentConsultingProvider implements JobProvider {
         if (candidates.size >= this.maxJobs) break;
         if (candidates.has(sourceUrl)) continue;
 
-        const candidate = await this.readJob(sourceUrl);
+        const candidate = await this.readJob(sourceUrl, countryByExternalId);
         if (!candidate) continue;
         candidates.set(sourceUrl, candidate);
         addedOnPage += 1;
@@ -306,7 +332,10 @@ export class StudentConsultingProvider implements JobProvider {
     }
   }
 
-  private async readJob(sourceUrl: string): Promise<JobCandidate | null> {
+  private async readJob(
+    sourceUrl: string,
+    countryByExternalId: Map<string, StudentConsultingCountry>,
+  ): Promise<JobCandidate | null> {
     const safeJobUrl = normalizeStudentConsultingJobUrl(sourceUrl);
     if (!safeJobUrl) return null;
 
@@ -319,6 +348,7 @@ export class StudentConsultingProvider implements JobProvider {
     const bodyText = await safeInnerText(this.page.locator("body").first());
     const parsed = parseStudentConsultingJobText(bodyText);
     if (!title || !parsed.externalId) return null;
+    const indexedCountry = countryByExternalId.get(parsed.externalId);
 
     return {
       provider: this.id,
@@ -326,9 +356,12 @@ export class StudentConsultingProvider implements JobProvider {
       title,
       employer: "StudentConsulting",
       location: parsed.location,
-      country: parsed.country,
-      countryCode: parsed.countryCode,
-      isInternational: parsed.isInternational,
+      country: parsed.country ?? indexedCountry?.country,
+      countryCode: parsed.countryCode ?? indexedCountry?.countryCode,
+      isInternational:
+        parsed.countryCode !== undefined
+          ? parsed.isInternational
+          : (indexedCountry?.isInternational ?? parsed.isInternational),
       occupation: parsed.occupation,
       applicationUrl: safeJobUrl,
       discoverySource: "studentconsulting_matcha_jobb",
@@ -400,12 +433,80 @@ export function normalizeStudentConsultingMatchedJobsUrl(
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
-  if (
-    !/^\/sv\/min-profil\/matcha-jobb\/?$/i.test(pathname)
-  ) {
+  if (!/^\/sv\/min-profil\/matcha-jobb\/?$/i.test(pathname)) {
     return null;
   }
   return safe;
+}
+
+export async function loadStudentConsultingCountryIndex(
+  fetcher: typeof fetch = fetch,
+): Promise<Map<string, StudentConsultingCountry>> {
+  const result = new Map<string, StudentConsultingCountry>();
+  const ambiguous = new Set<string>();
+
+  for (const country of STUDENTCONSULTING_COUNTRIES) {
+    let page = 1;
+    let totalHits = Number.POSITIVE_INFINITY;
+
+    while ((page - 1) * COUNTRY_PAGE_SIZE < totalHits && page <= 10) {
+      const response = await fetcher(JOB_OPENINGS_API, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "accept-language": "sv-SE",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          locations: [{ type: "country", id: country.id, name: country.country }],
+          professions: [],
+          schemas: [],
+          types: [],
+          keywords: [],
+          onlySummer: false,
+          onlyInternal: false,
+          sortOrder: 0,
+          page,
+          pageSize: COUNTRY_PAGE_SIZE,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `STUDENTCONSULTING_COUNTRY_INDEX_FAILED: HTTP ${response.status}`,
+        );
+      }
+
+      const payload = (await response.json()) as {
+        data?: Array<{ url?: string }>;
+        meta?: { totalHits?: number };
+      };
+      const rows = Array.isArray(payload.data) ? payload.data : [];
+      totalHits = Number(payload.meta?.totalHits ?? rows.length);
+
+      for (const row of rows) {
+        const externalId = row.url?.match(/\/([0-9]+)\/?(?:\?.*)?$/)?.[1];
+        if (!externalId || ambiguous.has(externalId)) continue;
+
+        const value: StudentConsultingCountry = {
+          country: country.country,
+          countryCode: country.countryCode,
+          isInternational: country.isInternational,
+        };
+        const existing = result.get(externalId);
+        if (existing && existing.countryCode !== value.countryCode) {
+          result.delete(externalId);
+          ambiguous.add(externalId);
+          continue;
+        }
+        result.set(externalId, value);
+      }
+
+      if (rows.length === 0) break;
+      page += 1;
+    }
+  }
+
+  return result;
 }
 
 function isSameMatchedJobsRoute(current: string, expected: string): boolean {
@@ -417,17 +518,22 @@ function isSameMatchedJobsRoute(current: string, expected: string): boolean {
 }
 
 async function collectJobLinks(page: BrowserPage): Promise<string[]> {
-  const anchors = page.locator('a[href*="/sv/lediga-jobb/"]');
-  const count = Math.min(await anchors.count(), 250);
-  const links = new Set<string>();
+  const started = Date.now();
+  while (Date.now() - started < MATCHED_LISTING_WAIT_MS) {
+    const anchors = page.locator('a[href*="/sv/lediga-jobb/"]');
+    const count = Math.min(await anchors.count(), 250);
+    const links = new Set<string>();
 
-  for (let index = 0; index < count; index += 1) {
-    const href = await anchors.nth(index).getAttribute("href");
-    if (!href) continue;
-    const safeJobUrl = normalizeStudentConsultingJobUrl(href);
-    if (safeJobUrl) links.add(safeJobUrl);
+    for (let index = 0; index < count; index += 1) {
+      const href = await anchors.nth(index).getAttribute("href");
+      if (!href) continue;
+      const safeJobUrl = normalizeStudentConsultingJobUrl(href);
+      if (safeJobUrl) links.add(safeJobUrl);
+    }
+    if (links.size > 0) return [...links];
+    await page.waitForTimeout(400);
   }
-  return [...links];
+  return [];
 }
 
 async function firstVisible(

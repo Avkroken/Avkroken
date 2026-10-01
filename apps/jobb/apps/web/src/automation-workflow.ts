@@ -90,6 +90,10 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       });
     }
 
+    if (result.status === "failed") {
+      throw new Error(result.message ?? "Job automation failed.");
+    }
+
     return result;
   }
 }

@@ -343,9 +343,21 @@ async function fillMonthlyApplicationTarget(
     }
 
     const discovered = await provider.discover();
-    const suitable = discovered.filter(
-      (job) => evaluateSuitability(env, job).suitable,
-    );
+    const rejectionCounts = new Map<string, number>();
+    const suitable = discovered.filter((job) => {
+      const assessment = evaluateSuitability(env, job);
+      if (assessment.suitable) return true;
+      for (const reason of assessment.reasons) {
+        rejectionCounts.set(reason, (rejectionCounts.get(reason) ?? 0) + 1);
+      }
+      return false;
+    });
+    console.info("StudentConsulting discovery evaluated", {
+      runId,
+      discoveredCount: discovered.length,
+      suitableCount: suitable.length,
+      rejectionCounts: Object.fromEntries(rejectionCounts),
+    });
 
     for (const job of suitable) {
       verifiedCount = await countVerifiedApplications(env.DB, applicationMonth);
@@ -594,10 +606,22 @@ async function fillMonthlyApplicationTarget(
         verifiedCount < MONTHLY_APPLICATION_TARGET
           ? occupied >= MONTHLY_APPLICATION_TARGET
             ? `${occupied}/${MONTHLY_APPLICATION_TARGET} monthly slots are occupied, but only ${verifiedCount} are verified. Existing uncertain submissions will be rechecked; no additional applications will be sent meanwhile.`
-            : `Only ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} suitable verified applications could be completed from the current StudentConsulting listings.`
+            : discovered.length === 0
+              ? "STUDENTCONSULTING_MATCHED_PROFILE_EMPTY: Matcha jobb innehöll inga upptäckbara jobblänkar."
+              : suitable.length === 0
+                ? `STUDENTCONSULTING_NO_SUITABLE_MATCHES: ${discovered.length} Matcha-jobb hittades men alla stoppades av fail-closed policy. ${summarizeRejections(rejectionCounts)}`
+                : `Only ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} suitable verified applications could be completed. ${discovered.length} Matcha-jobb hittades och ${suitable.length} passerade policy.`
           : undefined,
     };
   });
+}
+
+function summarizeRejections(rejectionCounts: Map<string, number>): string {
+  if (rejectionCounts.size === 0) return "Ingen specifik policyorsak registrerades.";
+  return [...rejectionCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([reason, count]) => `${count}× ${reason}`)
+    .join("; ");
 }
 
 async function reconcilePendingApplications(

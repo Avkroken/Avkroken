@@ -66,6 +66,11 @@ Kontrollera före manuell omkörning:
 4. senaste providerfel/evidence,
 5. att en ny körning inte kan överskrida månadsgränsen.
 
+
+## Stoppa och radera körningar
+
+I den autentiserade dashboardens körningsdetaljer kan en aktiv `running`/ `needs_user_auth`-körning stoppas. Om en Cloudflare Workflow-instance finns termineras den först och D1-raden finaliseras som `failed` med `RUN_STOPPED_BY_USER`. En terminal körning kan raderas endast när den saknar ansökningshistorik; då raderas eventuell Workflow-instance samt run-bundna notifications/probes och därefter run-raden. Körningar som har applications bevaras för spårbarhet och får inte raderas från dashboarden.
+
 ## Workflow/orphan-incident
 
 En automation räknas som **orphaned** när D1 fortfarande visar `running`, `workflow_instance_id` saknas, ingen application är kopplad till runnen och `updated_at` är äldre än fem minuter. Dashboarden visar sådana rader som **Övergivna körningar** i stället för som aktiva.

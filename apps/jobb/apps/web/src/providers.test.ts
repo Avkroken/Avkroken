@@ -8,6 +8,7 @@ import type {
 import {
   containsExactJobId,
   isStudentConsultingMatchedJobsLabel,
+  loadStudentConsultingCountryIndex,
   normalizeStudentConsultingJobUrl,
   normalizeStudentConsultingMatchedJobsUrl,
   normalizeStudentConsultingUrl,
@@ -100,6 +101,20 @@ function fakeLocator(
   };
 }
 
+const countryIndexFetcher: typeof fetch = async (_input, init) => {
+  const request = JSON.parse(String(init?.body ?? "{}")) as {
+    locations?: Array<{ id?: number }>;
+  };
+  const data =
+    request.locations?.[0]?.id === 1
+      ? [{ url: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }]
+      : [];
+  return new Response(
+    JSON.stringify({ data, meta: { totalHits: data.length } }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+};
+
 function matchedProfilePage(options: { redirectMatched?: boolean } = {}): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/";
 
@@ -117,7 +132,7 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
       const current = new URL(currentUrl);
       if (
         current.pathname === "/sv/min-profil/matcha-jobb/" &&
-        selector === 'a[href*="/sv/lediga-jobb/"]'
+        selector.includes("/sv/lediga-jobb/")
       ) {
         return fakeLocator([
           {
@@ -144,8 +159,6 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
               "Jobb-ID 87178",
               "Ort",
               "Stockholm",
-              "Land",
-              "Sverige",
               "Yrkeskategori",
               "IT / Support",
             ].join("\n"),
@@ -160,7 +173,7 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
 }
 
 describe("StudentConsulting authenticated discovery", () => {
-  it("discovers from the canonical authenticated Matcha jobb route without depending on a visible navigation link", async () => {
+  it("discovers from the canonical authenticated Matcha jobb route", async () => {
     const provider = new StudentConsultingProvider({
       page: matchedProfilePage(),
       credentials: {
@@ -169,6 +182,7 @@ describe("StudentConsulting authenticated discovery", () => {
         },
       },
       maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
     });
 
     await expect(provider.discover()).resolves.toEqual([
@@ -191,11 +205,38 @@ describe("StudentConsulting authenticated discovery", () => {
         },
       },
       maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
     });
 
     await expect(provider.discover()).rejects.toThrow(
       /MATCHED_PROFILE_REDIRECTED/,
     );
+  });
+});
+
+describe("StudentConsulting country resolution", () => {
+  it("maps public job IDs through StudentConsulting country filters", async () => {
+    const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as {
+        locations: Array<{ id: number }>;
+      };
+      const countryId = body.locations[0]?.id;
+      const url =
+        countryId === 1
+          ? "/sv/lediga-jobb/borlange/test/87542"
+          : countryId === 2
+            ? "/sv/lediga-jobb/oslo/test/87398"
+            : "/sv/lediga-jobb/kopenhamn/test/87000";
+      return new Response(
+        JSON.stringify({ data: [{ url }], meta: { totalHits: 1 } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    const index = await loadStudentConsultingCountryIndex(fetcher);
+    expect(index.get("87542")?.countryCode).toBe("SE");
+    expect(index.get("87398")?.countryCode).toBe("NO");
+    expect(index.get("87000")?.countryCode).toBe("DK");
   });
 });
 
@@ -249,6 +290,11 @@ describe("StudentConsulting parsing", () => {
     expect(
       normalizeStudentConsultingMatchedJobsUrl(
         "https://www.studentconsulting.com/sv/min-profil/matchade-jobb/",
+      ),
+    ).toBeNull();
+    expect(
+      normalizeStudentConsultingMatchedJobsUrl(
+        "https://www.studentconsulting.com/sv/min-profil/",
       ),
     ).toBeNull();
     expect(

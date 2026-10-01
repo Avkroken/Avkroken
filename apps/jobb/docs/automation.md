@@ -32,7 +32,7 @@ I produktion läses client secret via Cloudflare Secrets Store-bindingen `GITHUB
 
 The protected dashboard exposes **Kör nu** only during the active application window, the **1st–14th** of each calendar month in `Europe/Stockholm`. Outside that window the UI disables the action and the API rejects manual runs.
 
-Manual start is protected by dashboard authentication, an exact same-origin mutation check and Cloudflare Turnstile server-side validation for action `manual_run`. The same-origin guard is also applied to the authenticated BankID continuation POST endpoint. Dashboard polling preserves an already mounted Turnstile widget while the manual-start state is unchanged; if the Turnstile client library becomes available after initial render, a later poll initializes it without rebuilding the overview. A real active run suppresses/removes the widget because a new manual start is not allowed, and the widget is mounted again when the run leaves the active state.
+Manual start is protected by GitHub dashboard authentication and an exact same-origin mutation check; no second Turnstile challenge is embedded in Jobb. The same-origin guard is also applied to authenticated run stop/delete controls and the BankID continuation POST endpoint. A real active run disables a new manual start until the run leaves the active state.
 
 The button atomically claims the D1 run only when no `running` or `needs_user_auth` run exists, so concurrent tabs and the scheduler cannot launch overlapping Workflows. It then starts a Cloudflare Workflow, immediately links the Workflow instance ID, and returns control to the browser; the Workflow also records its instance ID as its first persistent step. Workflow exceptions are persisted back to the run as `failed` before being rethrown to Cloudflare. Legacy running rows without a Workflow link or application activity are treated as orphaned after five minutes and are reconciled before a new run starts. Expired or malformed `needs_user_auth` BankID handoffs are reconciled to `failed` before the next claim and are excluded from the dashboard active-run model immediately after expiry. A failed stable scheduled run is reset to clean `running` state, including clearing stale error/completion/auth/workflow fields, as part of the same atomic claim before a retry is launched. Progress, failures, completed applications, quota state, notification state and BankID handoff state are displayed by the dashboard.
 
@@ -79,7 +79,6 @@ Secrets must never be committed to the public repository. Deployment/runtime val
 
 ```text
 GITHUB_OAUTH_CLIENT_SECRET      # Cloudflare Secrets Store in production; local string only for development
-TURNSTILE_SECRET
 STUDENTCONSULTING_EMAIL
 STUDENTCONSULTING_PASSWORD
 ```
@@ -102,11 +101,9 @@ JOB_ALLOWED_LOCATIONS=Stockholm,Uppsala
 JOB_ALLOWED_COUNTRIES=SE
 ```
 
-The application engine discovers StudentConsulting candidates only from the authenticated canonical **Matcha jobb** profile route (`/sv/min-profil/matcha-jobb/`) and does not depend on that route being exposed as a visible navigation link on the landing page. It fails closed if the canonical route redirects elsewhere. A candidate must also have a resolvable supported country code before autosubmit; unknown country remains fail-closed. `JOB_INCLUDE_TERMS` is optional and acts only as an additional narrowing filter.
+After StudentConsulting login, the engine opens the authenticated profile root and resolves the visible **Matcha jobb** navigation dynamically within `/sv/min-profil/...`; it does not guess a private route slug. Redirects outside the selected profile route fail closed. Current job-detail pages do not consistently expose `Land`, so country is enriched from StudentConsulting's public job-search API using its explicit Sverige/Norge/Danmark country filters; unresolved or ambiguous country remains fail-closed. `JOB_INCLUDE_TERMS` is optional and acts only as an additional narrowing filter.
 
-The protected System view can manage StudentConsulting credentials, autosubmit, optional extra suitability filters and BankID notification settings. Production Turnstile is managed centrally: Jobb uses the Cloudflare widget `denied.se`; its public site key is versioned client configuration, while `TURNSTILE_SECRET` is a Worker deployment secret and is not entered in the dashboard. The StudentConsulting password and webhook URL are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
-
-`TURNSTILE_HOSTNAMES` is non-secret hostname configuration. Production uses `jobb.denied.se`; local development values belong in an ignored `.dev.vars` file.
+The protected System view can manage StudentConsulting credentials, autosubmit, optional extra suitability filters and BankID notification settings. Manual run start is already behind the authenticated GitHub dashboard session and exact same-origin mutation guard, so Jobb does not embed or require Turnstile. The StudentConsulting password and webhook URL are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
 
 ## BankID notifications
 
@@ -179,5 +176,5 @@ Detta dokument beskriver inte vilket externt CI/CD-system som eventuellt triggar
 
 Worker-konfigurationen binder Browser Run, D1, R2, Email, Workflow och Cron och publicerar custom domain `jobb.denied.se`.
 
-Dashboardens response-policy ska fortsatt hålla script/style-hosting och Turnstile-gränsen enligt implementationen. Worker observability använder `redact_query_string=true` så authorization `code`/`state` i callback-queryn inte persisteras i logs/traces.
+Dashboardens response-policy ska fortsatt hålla scripts/styles/connect till `self` enligt implementationen. Worker observability använder `redact_query_string=true` så authorization `code`/`state` i callback-queryn inte persisteras i logs/traces.
 
