@@ -32,6 +32,14 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       triggeredAt: event.payload?.triggeredAt ?? event.timestamp.toISOString(),
     }));
 
+    if (trigger.runId) {
+      await step.do("link workflow instance at start", async () => {
+        await updateRun(this.env.DB, trigger.runId!, {
+          workflowInstanceId: event.instanceId,
+        });
+      });
+    }
+
     let result: Awaited<ReturnType<typeof executeAutomation>>;
     try {
       result = await step.do(
@@ -68,14 +76,6 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
         }
       }
       throw error;
-    }
-
-    if (result.status !== "skipped") {
-      await step.do("link workflow instance", async () => {
-        await updateRun(this.env.DB, result.runId, {
-          workflowInstanceId: event.instanceId,
-        });
-      });
     }
 
     return result;

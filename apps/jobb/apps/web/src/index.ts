@@ -40,7 +40,7 @@ import {
 } from "./runtime-config";
 import { verifyTurnstile, type TurnstileEnv } from "./turnstile";
 import {
-  createRun,
+  claimRunStart,
   failOrphanedRunningRuns,
   getRun,
   scheduledRunId,
@@ -239,19 +239,26 @@ export default {
 
       const applicationMonth = currentMonthKey(now);
       const reportMonth = previousMonthKey(now);
-      await failOrphanedRunningRuns(env.DB, applicationMonth);
+      await failOrphanedRunningRuns(env.DB);
 
       const runId = `manual:${applicationMonth}:${crypto.randomUUID()}`;
-      await createRun(env.DB, {
+      const claimed = await claimRunStart(env.DB, {
         id: runId,
         mode: "manual",
         applicationMonth,
         reportMonth,
         targetCount: MONTHLY_APPLICATION_TARGET,
       });
+      if (!claimed) {
+        return Response.json(
+          { error: "En automation körs redan. Vänta tills den är klar innan en ny startas." },
+          { status: 409 },
+        );
+      }
 
+      let instance: Awaited<ReturnType<Env["JOB_AUTOMATION"]["create"]>>;
       try {
-        const instance = await env.JOB_AUTOMATION.create({
+        instance = await env.JOB_AUTOMATION.create({
           id: `manual-${crypto.randomUUID()}`,
           params: {
             mode: "manual",
@@ -259,14 +266,6 @@ export default {
             triggeredAt: now.toISOString(),
           },
         });
-        await updateRun(env.DB, runId, {
-          workflowInstanceId: instance.id,
-        });
-
-        return Response.json(
-          { runId, workflowInstanceId: instance.id, status: "queued" },
-          { status: 202 },
-        );
       } catch (error) {
         await updateRun(env.DB, runId, {
           status: "failed",
@@ -275,6 +274,23 @@ export default {
         });
         return jsonError(error, 502);
       }
+
+      try {
+        await updateRun(env.DB, runId, {
+          workflowInstanceId: instance.id,
+        });
+      } catch (error) {
+        console.error("Workflow started before D1 link could be persisted", {
+          runId,
+          workflowInstanceId: instance.id,
+          error: errorMessage(error),
+        });
+      }
+
+      return Response.json(
+        { runId, workflowInstanceId: instance.id, status: "queued" },
+        { status: 202 },
+      );
     }
 
     const bankIdMatch = url.pathname.match(
@@ -413,32 +429,28 @@ export default {
 
     const applicationMonth = currentMonthKey(triggeredAt);
     const reportMonth = previousMonthKey(triggeredAt);
-    await failOrphanedRunningRuns(env.DB, applicationMonth);
+    await failOrphanedRunningRuns(env.DB);
 
     const runId = scheduledRunId(applicationMonth);
-    const existing = await getRun(env.DB, runId);
-    if (existing && existing.status !== "failed") return;
-
-    await createRun(env.DB, {
+    const claimed = await claimRunStart(env.DB, {
       id: runId,
       mode: "scheduled",
       applicationMonth,
       reportMonth,
       targetCount: MONTHLY_APPLICATION_TARGET,
     });
+    if (!claimed) return;
 
     const suffix = triggeredAt.toISOString().replace(/[^0-9]/g, "").slice(0, 12);
+    let instance: Awaited<ReturnType<Env["JOB_AUTOMATION"]["create"]>>;
     try {
-      const instance = await env.JOB_AUTOMATION.create({
+      instance = await env.JOB_AUTOMATION.create({
         id: `scheduled-${applicationMonth}-${suffix}`,
         params: {
           mode: "scheduled",
           runId,
           triggeredAt: triggeredAt.toISOString(),
         },
-      });
-      await updateRun(env.DB, runId, {
-        workflowInstanceId: instance.id,
       });
     } catch (error) {
       await updateRun(env.DB, runId, {
@@ -447,6 +459,18 @@ export default {
         completedAt: new Date().toISOString(),
       });
       throw error;
+    }
+
+    try {
+      await updateRun(env.DB, runId, {
+        workflowInstanceId: instance.id,
+      });
+    } catch (error) {
+      console.error("Scheduled Workflow started before D1 link could be persisted", {
+        runId,
+        workflowInstanceId: instance.id,
+        error: errorMessage(error),
+      });
     }
   },
 } satisfies ExportedHandler<Env>;

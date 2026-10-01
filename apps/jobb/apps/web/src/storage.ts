@@ -81,7 +81,6 @@ export async function getRun(
 
 export async function failOrphanedRunningRuns(
   db: D1Database,
-  applicationMonth: string,
 ): Promise<void> {
   await db
     .prepare(
@@ -93,8 +92,7 @@ export async function failOrphanedRunningRuns(
            ),
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            updated_at = CURRENT_TIMESTAMP
-       WHERE application_month = ?
-         AND status = 'running'
+       WHERE status = 'running'
          AND workflow_instance_id IS NULL
          AND updated_at <= datetime('now', '-5 minutes')
          AND NOT EXISTS (
@@ -103,8 +101,62 @@ export async function failOrphanedRunningRuns(
            WHERE a.automation_run_id = automation_runs.id
          )`,
     )
-    .bind(applicationMonth)
     .run();
+}
+
+export async function claimRunStart(
+  db: D1Database,
+  input: {
+    id: string;
+    mode: RunMode;
+    applicationMonth: string;
+    reportMonth: string;
+    targetCount: number;
+  },
+): Promise<AutomationRunRow | null> {
+  const claimed = await db
+    .prepare(
+      `INSERT INTO automation_runs
+       (id, mode, application_month, report_month, status, target_count,
+        verified_count, workflow_instance_id, auth_session_id,
+        auth_live_view_url, auth_expires_at, last_notified_at, last_error,
+        started_at, completed_at, updated_at)
+       SELECT ?, ?, ?, ?, 'running', ?, 0, NULL, NULL, NULL, NULL, NULL, NULL,
+              CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM automation_runs active
+         WHERE active.status IN ('running', 'needs_user_auth')
+       )
+       ON CONFLICT(id) DO UPDATE SET
+         mode = excluded.mode,
+         application_month = excluded.application_month,
+         report_month = excluded.report_month,
+         status = 'running',
+         target_count = excluded.target_count,
+         verified_count = 0,
+         workflow_instance_id = NULL,
+         auth_session_id = NULL,
+         auth_live_view_url = NULL,
+         auth_expires_at = NULL,
+         last_notified_at = NULL,
+         last_error = NULL,
+         started_at = CURRENT_TIMESTAMP,
+         completed_at = NULL,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE automation_runs.status = 'failed'`,
+    )
+    .bind(
+      input.id,
+      input.mode,
+      input.applicationMonth,
+      input.reportMonth,
+      input.targetCount,
+    )
+    .run();
+
+  if ((claimed.meta.changes ?? 0) === 0) return null;
+  return getRun(db, input.id);
 }
 
 export async function updateRun(

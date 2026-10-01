@@ -61,6 +61,8 @@ Manuell start kräver:
 3. giltig Cloudflare Turnstile-token för action `manual_run`,
 4. öppet applikationsfönster.
 
+Starten gör därefter en atomisk D1-claim: högst en `running`/`needs_user_auth` automation får finnas åt gången över manuella och schemalagda starter. Run-raden skapas eller, för en failed schemalagd retry, återställs till ett rent `running`-state innan Workflow startas. Workflow-ID länkas både direkt efter create och som första Workflow-step. Startfel och Workflow-undantag skrivs tillbaka som `failed`; gamla `running`-rader utan Workflow-länk eller ansökningsaktivitet klassas/reconcileras som orphaned efter fem minuter.
+
 ### Automatisk säkerhetskörning
 
 Cron kör en gång per dag den **10:e–13:e** vid `09:00 UTC`.
@@ -90,7 +92,7 @@ Centrala stateflöden:
 - quota slot: `free → reserved → submitted|verified|uncertain`.
 - report activity: `pending → save_attempted → saved`.
 - report: `collecting → ready → needs_user_auth|submitting → submitted`, med `failed` som felstate.
-- automation run: `running → needs_user_auth|completed|failed`.
+- automation run: atomisk claim till `running → needs_user_auth|completed|failed`; en failed schemalagd retry nollställer tidigare completion/error/auth/workflow-fält innan nytt Workflow startas. Dashboarden visar äldre oanslutna `running`-rader som `orphaned` i stället för som verkligt aktiva.
 
 ## Evidens
 
