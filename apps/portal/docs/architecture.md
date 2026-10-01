@@ -94,7 +94,24 @@ client project catalog
        +--> /projekt/:slug
 ```
 
-När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues-, Releases- och Builds/CI-routes. Själva detaljsidan gör ingen separat providerrequest för dessa vyer.
+När användaren navigerar till en projektdetalj återanvänds den redan laddade katalogen. Vyn visar canonical source/ref/path och länkar vidare till dokumentation, repository, Wiki där repositorymetadata stödjer det och Discussions. Repositoryprojekt får interna Issues-, Releases- och Builds/CI-routes. Själva detaljsidan gör ingen separat GitHub-providerrequest för dessa vyer.
+
+För `independentProduct` används en separat public-origin-adapter:
+
+```text
+GET /api/distribution?project=<slug>
+       |
+       +--> project lookup i normaliserad publik katalog
+       +--> endast HTTPS denied.se-origin från katalogen
+       +--> bounded GET /site.webmanifest
+       +--> bounded GET /service-worker.js
+       +--> validate PWA + related_applications
+       |
+       v
+projektdetalj: installerbar webbapp + verifierade store listings
+```
+
+Klienten kan inte ange extern URL. `related_applications` sanitiseras till högst tre officiella butikslänkar och endast hosts `apps.apple.com`, `play.google.com` och `apps.microsoft.com` accepteras. Därmed förblir produktrepositoryts manifest source of truth för faktisk distribution, medan Portalen endast presenterar live-verifierad state.
 
 
 ### Changelog / Releases

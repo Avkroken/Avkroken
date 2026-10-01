@@ -138,6 +138,16 @@ Okänd slug visar ett explicit not-found-state i Portal-skalet. Om projektkatalo
 
 Detaljvyn får endast exponera fält som redan finns i den publika normaliserade projektmodellen och canonical länkar som härleds där. Den ska inte börja läsa skyddad appstate eller operativ providerstate direkt.
 
+`GET /api/distribution?project=<slug>` är det avgränsade undantaget för independent products och läser endast publika distributionsassets från projektets redan normaliserade HTTPS-origin. Endpointen accepterar ingen caller-supplied URL. Manifest-read är begränsad till 32 KiB och service-worker-read till 64 KiB, redirects följs inte, manifest kräver manifest/JSON-MIME, service worker kräver JavaScript-MIME och CDN-cache är högst 60 sekunder.
+
+Statusmodellen är:
+
+- `available` — manifest + service worker verifierade och manifestet uppfyller PWA-kontraktet;
+- `not_configured` — manifest eller service worker saknas på origin;
+- `unavailable` — origin/read/parse/validation kunde inte verifieras just nu.
+
+Store listings publiceras endast från manifestets `related_applications` och endast för HTTPS-hostarna `apps.apple.com`, `play.google.com` och `apps.microsoft.com`. Tom lista betyder att ingen verifierad listing är publicerad; Portalen får inte gissa en butikslänk.
+
 ### Publicerade sites
 
 `GET /api/sites` härleds från projektkatalogen och behåller den tidigare endpointpolicyn genom `portalPublished`.

@@ -17,11 +17,13 @@ const detailRelease = document.querySelector("#project-detail-release");
 const detailReleaseStatus = document.querySelector("#project-detail-release-status");
 const detailReleaseLink = document.querySelector("#project-detail-release-link");
 const detailStores = document.querySelector("#project-detail-stores");
+const detailDistributionStatus = document.querySelector("#project-detail-distribution-status");
 const detailError = document.querySelector("#project-detail-error");
 
 let allProjects = [];
 let projectsLoaded = false;
 let detailReleaseSerial = 0;
+let detailDistributionSerial = 0;
 
 const escapeHtml = (value = "") =>
   String(value).replace(/[&<>"']/g, c => ({
@@ -163,6 +165,98 @@ function detailAction(label, href, { primary = false, internal = false } = {}) {
   return `<a class="portal-button${primary ? " primary" : ""}"${routeAttribute} href="${escapeHtml(href)}"${externalAttributes}>${escapeHtml(label)}</a>`;
 }
 
+function clearStoreListingState(target) {
+  for (const node of target.querySelectorAll("[data-store-listing], [data-store-listing-status]")) {
+    node.remove();
+  }
+}
+
+function renderVerifiedStoreLinks(target, storeLinks, emptyCopy) {
+  if (!target) return;
+  clearStoreListingState(target);
+
+  const verified = Array.isArray(storeLinks)
+    ? storeLinks.filter(item =>
+        item &&
+        typeof item.label === "string" &&
+        typeof item.url === "string" &&
+        /^https:\/\//.test(item.url)
+      )
+    : [];
+
+  for (const item of verified) {
+    const link = document.createElement("a");
+    link.className = "portal-button";
+    link.href = item.url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = item.label;
+    link.dataset.storeListing = "true";
+    target.appendChild(link);
+  }
+
+  if (!verified.length) {
+    const copy = document.createElement("p");
+    copy.dataset.storeListingStatus = "true";
+    copy.textContent = emptyCopy;
+    target.appendChild(copy);
+  }
+}
+
+async function loadProjectDistribution(project, target) {
+  const serial = ++detailDistributionSerial;
+  if (!detailDistributionStatus) return;
+
+  if (project?.independentProduct !== true) {
+    detailDistributionStatus.textContent = "";
+    return;
+  }
+
+  detailDistributionStatus.textContent = "Verifierar installerbar webbapp…";
+  renderVerifiedStoreLinks(target, [], "Verifierar butikslänkar…");
+
+  try {
+    const response = await fetch(
+      "/api/distribution?project=" + encodeURIComponent(project.slug),
+      { headers: { Accept: "application/json" } }
+    );
+    if (!response.ok) throw new Error("HTTP " + response.status);
+
+    const payload = await response.json();
+    if (serial !== detailDistributionSerial) return;
+
+    renderVerifiedStoreLinks(
+      target,
+      payload?.webApp?.storeLinks,
+      "Inga verifierade App Store-, Google Play- eller Microsoft Store-länkar är publicerade ännu."
+    );
+
+    if (payload?.webApp?.available === true && payload?.webApp?.kind === "pwa") {
+      detailDistributionStatus.textContent =
+        "Installerbar webbapp (PWA) · manifest och service worker verifierade live.";
+      return;
+    }
+
+    if (payload?.status === "not_configured") {
+      detailDistributionStatus.textContent =
+        "Ingen verifierad installerbar webbapp är publicerad på tjänstens origin ännu.";
+      return;
+    }
+
+    detailDistributionStatus.textContent =
+      "Webbapp-status kunde inte verifieras just nu.";
+  } catch {
+    if (serial !== detailDistributionSerial) return;
+    renderVerifiedStoreLinks(
+      target,
+      [],
+      "Butikslänkar kunde inte verifieras just nu."
+    );
+    detailDistributionStatus.textContent =
+      "Webbapp-status kunde inte verifieras just nu.";
+  }
+}
+
 function renderProjectStores(project) {
   if (!detailStores) return;
   const target = detailStores.querySelector("[data-store-links]");
@@ -171,6 +265,7 @@ function renderProjectStores(project) {
   if (project?.independentProduct !== true) {
     detailStores.hidden = true;
     target.replaceChildren();
+    if (detailDistributionStatus) detailDistributionStatus.textContent = "";
     return;
   }
 
@@ -187,30 +282,7 @@ function renderProjectStores(project) {
     target.appendChild(web);
   }
 
-  const storeLinks = Array.isArray(project.storeLinks)
-    ? project.storeLinks.filter(item =>
-        item &&
-        typeof item.label === "string" &&
-        typeof item.url === "string" &&
-        /^https:\/\//.test(item.url)
-      )
-    : [];
-
-  for (const item of storeLinks) {
-    const link = document.createElement("a");
-    link.className = "portal-button";
-    link.href = item.url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.textContent = item.label;
-    target.appendChild(link);
-  }
-
-  if (!storeLinks.length) {
-    const copy = document.createElement("p");
-    copy.textContent = "Inga verifierade App Store-, Google Play- eller Microsoft Store-länkar är publicerade ännu.";
-    target.appendChild(copy);
-  }
+  loadProjectDistribution(project, target);
 }
 
 async function loadProjectLatestRelease(project) {
@@ -271,6 +343,8 @@ function resetProjectDetail() {
   if (detailRelease) detailRelease.hidden = true;
   if (detailReleaseLink) detailReleaseLink.hidden = true;
   if (detailStores) detailStores.hidden = true;
+  if (detailDistributionStatus) detailDistributionStatus.textContent = "";
+  detailDistributionSerial += 1;
   detailError.hidden = true;
 }
 

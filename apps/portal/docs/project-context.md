@@ -1,6 +1,6 @@
 # Projektkontext — Avkroken Portal
 
-Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening, public-safe observerad integration, search/provider-budget och production acceptance: 2026-09-30.
+Senast verifierad mot Portal v2 design-tokenkontrakt, Del 3-hardening, public-safe observerad integration, search/provider-budget, distributionsstatus och production acceptance: 2026-10-01.
 
 Det här dokumentet beskriver källkodens aktuella Portal-arkitektur. Produktionens privata Cloudflare-kontostate är inte derivat av detta dokument och måste verifieras hos providern före driftändringar.
 
@@ -42,7 +42,8 @@ Worker-koden innehåller idag:
 - stabila dokumentations-URL:er;
 - Portal v2 design tokens för semantic/interactive colors, typography, spacing, form, elevation, focus, motion och responsive reference values samt shell-CSS;
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
-- projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra providerfetch per sidvisning;
+- projektdetalj som återanvänder den normaliserade projektkatalogen och visar canonical länkar utan extra GitHub-providerfetch per sidvisning;
+- live distributionsstatus för independent products via en bounded Portal-adapter som verifierar tjänstens publika PWA-manifest och service worker samt endast publicerar butikslänkar från allowlistade officiella store-hostar;
 - Portal-native Wiki-presentation som återanvänder publik project/docs-katalog och länkar tillbaka till original-Wikin;
 - server-side global sök som indexerar endast intersektionen av publicerade projekt och publicerade docs-källor;
 - Drift & insyn som läser en sanerad read-only observationssnapshot från Skvallerbyttans dedikerade RPC-entrypoint via Cloudflare Service Binding;
@@ -139,6 +140,10 @@ Detaljvyn visar:
 - intern Issues-, Releases-, Builds / CI- och Activity-navigation för repositoryprojekt.
 
 Repositoryprojekt kan öppna `/projekt/:slug/releases`, som hämtar endast det aktuella projektets publicerade GitHub Releases via Portalens backend. De kan också öppna `/projekt/:slug/issues`, som läser högst 30 senast uppdaterade GitHub Issues efter public project-lookup och filtrerar bort pull requests. Releases/Issues/Changelog återanvänder en separat 60-sekunders publik repositorygate när Portal saknar egen GitHub-credential; inventoryn bakom gaten kommer normalt från Skvallerbyttans autentiserade read-only RPC och Portalens publika REST är fallback. `/projekt/:slug/builds` läser en cachead, sampled Actions-summary genom samma `PortalObservationsService` efter fortsatt live-public repositorygate; Portalen gör ingen separat Actions-providerread. Monorepo-appar får inte ärva source-repositoryts Issues, Releases, CI eller Activity som appdata.
+
+För `independentProduct`-projekt läser detaljvyn dessutom `/api/distribution?project=<slug>`. Backend väljer alltid origin från den redan normaliserade publika projektkatalogen; klienten kan inte skicka en egen URL. Endast HTTPS-origins på `denied.se`/`*.denied.se` accepteras. Manifestet och `/service-worker.js` hämtas med redirect avstängt och storleksgränser, och PWA-status blir `available` först när manifestet har same-origin `start_url`/`scope`, standalone-liknande display, 192/512-ikoner och en tillgänglig service worker.
+
+Eventuella App Store-/Google Play-/Microsoft Store-länkar ägs av produktens eget PWA-manifest genom `related_applications`. Portalens sanitizer accepterar där endast HTTPS-URL:er på `apps.apple.com`, `play.google.com` och `apps.microsoft.com`; andra hosts ignoreras. Saknad listing får aldrig ersättas med en antagen eller fabricerad butikslänk.
 
 Detaljvyn hämtar fortfarande inte annan rå operativ providerstate. Sådan aggregation ska fortsatt använda rätt adapter/Skvallerbyttan där modellen passar.
 
