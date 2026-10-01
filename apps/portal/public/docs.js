@@ -487,7 +487,21 @@
       const response = await fetch("/api/docs/content?" + params.toString(), {
         headers: { Accept: "application/json" }
       });
-      if (!response.ok) throw new Error("HTTP " + response.status);
+      if (!response.ok) {
+        let detail = null;
+        try {
+          detail = await response.json();
+        } catch {
+          // Keep the HTTP status as the diagnostic when the error body is not JSON.
+        }
+
+        const upstreamStatus = Number.isInteger(detail?.status) ? detail.status : null;
+        const error = new Error("Documentation request failed with HTTP " + response.status);
+        error.userMessage = upstreamStatus
+          ? "Källan svarade med HTTP " + upstreamStatus + ". Försök igen senare."
+          : "Dokumenttjänsten svarade med HTTP " + response.status + ". Försök igen senare.";
+        throw error;
+      }
 
       const data = await response.json();
       if (serial !== requestSerial) return;
@@ -496,9 +510,15 @@
       renderLinks(data.sourceUrl || null);
     } catch (error) {
       if (serial !== requestSerial) return;
-      docsContent.innerHTML =
-        '<div class="empty"><strong>Dokumentet kunde inte hämtas.</strong><span>Försök igen senare.</span></div>';
-      console.error(error);
+      const box = document.createElement("div");
+      box.className = "empty";
+      const heading = document.createElement("strong");
+      heading.textContent = "Dokumentet kunde inte hämtas.";
+      const detail = document.createElement("span");
+      detail.textContent = error?.userMessage || "Försök igen senare.";
+      box.append(heading, detail);
+      docsContent.replaceChildren(box);
+      console.error("Documentation load failed", { repo: repo.key || repo.name, path, error });
     }
   }
 
