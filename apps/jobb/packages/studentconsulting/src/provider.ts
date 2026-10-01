@@ -13,7 +13,7 @@ const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
 const MATCHED_JOBS_URL = `${DEFAULT_BASE_URL}/sv/min-profil/matcha-jobb/`;
-const MATCHED_LISTING_WAIT_MS = 8_000;
+const MATCHED_LISTING_WAIT_MS = 15_000;
 const JOB_OPENINGS_API = `${DEFAULT_BASE_URL}/api/v1/jobopenings`;
 const COUNTRY_PAGE_SIZE = 200;
 
@@ -184,11 +184,18 @@ export class StudentConsultingProvider implements JobProvider {
         );
       }
 
-      const links = await collectJobLinks(this.page);
-      if (links.length === 0) break;
+      const listing = await collectJobLinks(this.page);
+      if (listing.links.length === 0) {
+        if (pageNumber === 1 && listing.explicitEmpty) {
+          throw new Error(
+            "STUDENTCONSULTING_NO_MATCHED_JOBS: Matcha jobb rapporterade inga matchande jobb.",
+          );
+        }
+        break;
+      }
 
       let addedOnPage = 0;
-      for (const sourceUrl of links) {
+      for (const sourceUrl of listing.links) {
         if (candidates.size >= this.maxJobs) break;
         if (candidates.has(sourceUrl)) continue;
 
@@ -517,23 +524,67 @@ function isSameMatchedJobsRoute(current: string, expected: string): boolean {
   return new URL(currentSafe).pathname === new URL(expectedSafe).pathname;
 }
 
-async function collectJobLinks(page: BrowserPage): Promise<string[]> {
-  const started = Date.now();
-  while (Date.now() - started < MATCHED_LISTING_WAIT_MS) {
-    const anchors = page.locator('a[href*="/sv/lediga-jobb/"]');
-    const count = Math.min(await anchors.count(), 250);
-    const links = new Set<string>();
+interface MatchedListingObservation {
+  links: string[];
+  explicitEmpty: boolean;
+}
 
-    for (let index = 0; index < count; index += 1) {
-      const href = await anchors.nth(index).getAttribute("href");
-      if (!href) continue;
-      const safeJobUrl = normalizeStudentConsultingJobUrl(href);
-      if (safeJobUrl) links.add(safeJobUrl);
+async function collectJobLinks(
+  page: BrowserPage,
+): Promise<MatchedListingObservation> {
+  const started = Date.now();
+
+  while (Date.now() - started < MATCHED_LISTING_WAIT_MS) {
+    const links = new Set<string>();
+    const sources = [
+      {
+        selector: 'a[href*="/sv/lediga-jobb/"]',
+        attribute: "href",
+      },
+      {
+        selector: '[data-href*="/sv/lediga-jobb/"]',
+        attribute: "data-href",
+      },
+      {
+        selector: '[data-url*="/sv/lediga-jobb/"]',
+        attribute: "data-url",
+      },
+    ] as const;
+
+    for (const source of sources) {
+      const elements = page.locator(source.selector);
+      const count = Math.min(await elements.count(), 250);
+      for (let index = 0; index < count; index += 1) {
+        const value = await elements.nth(index).getAttribute(source.attribute);
+        if (!value) continue;
+        const safeJobUrl = normalizeStudentConsultingJobUrl(value);
+        if (safeJobUrl) links.add(safeJobUrl);
+      }
     }
-    if (links.size > 0) return [...links];
+
+    if (links.size > 0) {
+      return { links: [...links], explicitEmpty: false };
+    }
+
+    const bodyText = await safeInnerText(page.locator("body").first());
+    if (matchedListingExplicitlyEmpty(bodyText)) {
+      return { links: [], explicitEmpty: true };
+    }
+
     await page.waitForTimeout(400);
   }
-  return [];
+
+  const bodyText = await safeInnerText(page.locator("body").first());
+  return {
+    links: [],
+    explicitEmpty: matchedListingExplicitlyEmpty(bodyText),
+  };
+}
+
+function matchedListingExplicitlyEmpty(text: string): boolean {
+  return /(?:^|\n)\s*(?:0\s+(?:matchande|matchade)?\s*jobb|inga\s+(?:matchande|matchade)?\s*jobb|inget\s+jobb\s+matchar)[^\n]*(?:$|\n)/im.test(
+    text,
+  );
 }
 
 async function firstVisible(
