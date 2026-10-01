@@ -37,6 +37,7 @@ import {
   saveRuntimeConfiguration,
   type RuntimeConfigurationUpdate,
 } from "./runtime-config";
+import { applyRuntimeConfigurationMigration } from "./runtime-migration";
 import { verifyTurnstile, type TurnstileEnv } from "./turnstile";
 import {
   getRun,
@@ -53,6 +54,8 @@ import {
 } from "./time";
 
 export { JobAutomationWorkflow };
+
+const TEMP_RUNTIME_MIGRATION_CRON = "*/2 * * * *";
 
 export interface Env extends AutomationEnv, DashboardAuthEnv, TurnstileEnv {
   DB: D1Database;
@@ -381,6 +384,11 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === TEMP_RUNTIME_MIGRATION_CRON) {
+      await applyRuntimeConfigurationMigration(env.DB);
+      return;
+    }
+
     const triggeredAt = new Date(controller.scheduledTime);
     if (!isScheduledSafetyWindow(triggeredAt)) return;
 

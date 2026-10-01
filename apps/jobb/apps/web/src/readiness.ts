@@ -1,11 +1,13 @@
 import { dashboardAuthMode, type DashboardAuthEnv } from "./auth";
 import { resolveGitHubClientSecret } from "./github-auth";
+import { runtimeConfigurationMigrationReady } from "./runtime-migration";
 
 export interface ReadinessResult {
   status: "ready" | "degraded";
   checks: {
     database: boolean;
     dashboardAuth: boolean;
+    runtimeConfiguration: boolean;
   };
 }
 
@@ -21,6 +23,10 @@ export async function getReadiness(
     database = false;
   }
 
+  const runtimeConfiguration = database
+    ? await runtimeConfigurationMigrationReady(db)
+    : false;
+
   const authMode = dashboardAuthMode(env);
   let dashboardAuth = false;
   if (authMode === "github") {
@@ -33,10 +39,14 @@ export async function getReadiness(
   }
 
   return {
-    status: database && dashboardAuth ? "ready" : "degraded",
+    status:
+      database && dashboardAuth && runtimeConfiguration
+        ? "ready"
+        : "degraded",
     checks: {
       database,
       dashboardAuth,
+      runtimeConfiguration,
     },
   };
 }

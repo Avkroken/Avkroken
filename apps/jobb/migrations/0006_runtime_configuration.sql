@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE runtime_configuration (
+CREATE TABLE IF NOT EXISTS runtime_configuration (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   ciphertext TEXT NOT NULL,
   iv TEXT NOT NULL,
