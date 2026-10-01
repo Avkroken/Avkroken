@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/release.yml"
+      - ".github/workflows/copilot-release-notes.yml"
+      - ".github/release-notes-instructions.md"
       - ".github/scripts/semantic_release.py"
       - ".github/scripts/wait_for_checks.py"
       - ".github/scripts/test_wait_for_checks.py"
@@ -50,6 +52,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s .github/release-required-checks
+          test -s .github/workflows/copilot-release-notes.yml
+          test -s .github/release-notes-instructions.md
           python3 -m py_compile \
             .github/scripts/semantic_release.py \
             .github/scripts/wait_for_checks.py \
@@ -138,7 +142,6 @@ jobs:
             --channel "${CHANNEL}" \
             --notes "${RUNNER_TEMP}/release-notes.md" \
             --output "${GITHUB_OUTPUT}"
-
       - name: Verify existing release anchors
         if: ${{ steps.release.outputs.release == 'true' }}
         shell: bash
@@ -193,3 +196,35 @@ jobs:
             args+=(--prerelease)
           fi
           gh release create "${args[@]}"
+
+      - name: Prepare Copilot release metadata
+        continue-on-error: true
+        if: ${{ steps.release.outputs.release == 'true' }}
+        shell: bash
+        env:
+          BASE_TAG: ${{ steps.release.outputs.base_tag }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${BASE_TAG}" ]]; then
+            base_ref="${BASE_TAG}"
+          else
+            base_ref="$(tr -d '[:space:]' < .github/release-baseline)"
+          fi
+          test -n "${base_ref}"
+          test -n "${TARGET_SHA}"
+          mkdir -p "${RUNNER_TEMP}/copilot-release-inputs"
+          {
+            printf 'BASE_REF=%s\n' "${base_ref}"
+            printf 'HEAD_REF=%s\n' "${TARGET_SHA}"
+          } > "${RUNNER_TEMP}/copilot-release-inputs/release.env"
+
+      - name: Upload Copilot release metadata
+        continue-on-error: true
+        if: ${{ steps.release.outputs.release == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: copilot-release-inputs
+          path: ${{ runner.temp }}/copilot-release-inputs/release.env
+          if-no-files-found: error
+          retention-days: 1
