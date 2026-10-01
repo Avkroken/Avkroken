@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { claimTicket } from "../src/index.js";
 import { handleGitHubCallback, startGitHubLogin } from "../src/github-auth.js";
+import { listPublicAssets, safeAssetName } from "../src/public-assets.js";
 
 const TOKEN = "test-token";
 const GITHUB_USER_ID = 123;
@@ -342,6 +343,52 @@ test("capability-upload är privat efter uppladdning", async () => {
   assert.equal(await privateRead.text(), "private-data");
 });
 
+test("assetfilnamn trunkeras på UTF-8-gräns utan att dela Unicode-tecken", () => {
+  const encoder = new TextEncoder();
+  const omittedEmoji = safeAssetName("a".repeat(177) + "😀");
+  assert.equal(omittedEmoji, "a".repeat(177));
+  assert.ok(encoder.encode(omittedEmoji).byteLength <= 180);
+
+  const retainedEmoji = safeAssetName("a".repeat(176) + "😀");
+  assert.equal(retainedEmoji, "a".repeat(176) + "😀");
+  assert.equal(encoder.encode(retainedEmoji).byteLength, 180);
+});
+
+test("assetdirektlänkar bevarar tomma segment i giltiga R2-nycklar", async () => {
+  const assets = fakeR2([{
+    key: "apps//icon.png",
+    uploaded: new Date("2026-10-01T10:00:00Z"),
+    body: new Uint8Array([1]),
+    httpMetadata: { contentType: "image/png" },
+  }]);
+
+  const listed = await listPublicAssets(assets);
+  assert.equal(listed[0].directUrl, "https://logos.denied.se/apps//icon.png");
+});
+
+test("assetfel degraderar separat utan att blockera privata transferer", async () => {
+  const transfers = fakeR2([{
+    key: "backup/1000.zip",
+    uploaded: new Date(1000),
+    body: "private-data",
+  }]);
+  const assets = fakeR2();
+  assets.list = async () => {
+    throw new Error("asset provider unavailable");
+  };
+
+  const response = await worker.fetch(
+    request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }),
+    env(transfers, assets),
+  );
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.objects.length, 1);
+  assert.equal(data.objects[0].name, "backup");
+  assert.deepEqual(data.assets, []);
+  assert.equal(data.assetState, "unavailable");
+});
+
 test("publik asset-upload kräver admininloggning", async () => {
   const response = await worker.fetch(request("/api/assets/upload/app-icon.png", {
     method: "PUT",
@@ -465,4 +512,5 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /Kopiera länk/);
   assert.match(adminHtml, /naturalWidth/);
   assert.match(adminHtml, / px · /);
+  assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
 });

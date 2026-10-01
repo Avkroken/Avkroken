@@ -26,14 +26,27 @@ function safeDecode(value) {
     return "";
   }
 }
+
+function truncateUtf8(value, maxBytes) {
+  const encoder = new TextEncoder();
+  let output = "";
+  let usedBytes = 0;
+  for (const character of value) {
+    const characterBytes = encoder.encode(character).byteLength;
+    if (usedBytes + characterBytes > maxBytes) break;
+    output += character;
+    usedBytes += characterBytes;
+  }
+  return output;
+}
+
 export function safeAssetName(value) {
   const normalized = String(value || "").normalize("NFKC").trim();
   if (!normalized || normalized === "." || normalized === "..") return null;
   const cleaned = normalized
     .replace(/[\\/\u0000-\u001f\u007f]+/g, "_")
-    .replace(/^\.+/, "")
-    .slice(0, MAX_NAME_BYTES);
-  return cleaned || null;
+    .replace(/^\.+/, "");
+  return truncateUtf8(cleaned, MAX_NAME_BYTES) || null;
 }
 
 function contentTypeFromName(name) {
@@ -62,7 +75,6 @@ function normalizedContentType(value, name) {
 function directUrl(key) {
   const encoded = String(key)
     .split("/")
-    .filter(Boolean)
     .map((part) => encodeURIComponent(part))
     .join("/");
   return `${DIRECT_ORIGIN}/${encoded}`;

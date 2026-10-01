@@ -9,7 +9,7 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 - `src/access.js` är extern entrypoint.
 - `src/index.js` innehåller applikationslogik.
 - R2-bindings är `DUMPEN -> dumpen` för privata transferer och `ASSETS -> avkroken-assets` för publika assets.
-- privata transferer och publika assets använder separata R2-buckets och separata accesskontrakt.
+- privata transferer och publika assets använder separata R2-buckets och separata accesskontrakt; assetfel degraderar separat och får inte blockera privat transferadministration.
 - `avkroken-assets` har den verifierade custom domainen `logos.denied.se`; Dumpen listar och laddar upp via bindingen `ASSETS`, medan direktlänkar går direkt mot custom domainen utan publik bucket-listning.
 - den publika Dumpen-rooten hålls separat från den privilegierade applikationsytan.
 

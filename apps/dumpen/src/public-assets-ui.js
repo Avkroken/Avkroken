@@ -29,7 +29,7 @@ export function publicAssetsMarkup() {
           <input id="asset-files" type="file" multiple>
           <button id="upload-assets" type="button">Ladda upp filer</button>
         </div>
-        <div id="asset-status" class="asset-status"></div>
+        <div id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"></div>
         <div id="asset-empty" class="asset-empty" hidden>Inga publika filer uppladdade ännu.</div>
         <div id="asset-gallery" class="gallery"></div>
         <div id="asset-file-list" class="asset-files"></div>
