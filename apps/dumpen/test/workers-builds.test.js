@@ -12,7 +12,12 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const wrangler = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
   assert.equal(wrangler.name, "dumpen");
   assert.equal(wrangler.observability?.enabled, true);
-  assert.ok(wrangler.r2_buckets?.some(binding => binding.binding === "DUMPEN"));
+  assert.ok(wrangler.r2_buckets?.some(
+    binding => binding.binding === "DUMPEN" && binding.bucket_name === "dumpen"
+  ));
+  assert.ok(wrangler.r2_buckets?.some(
+    binding => binding.binding === "ASSETS" && binding.bucket_name === "avkroken-assets"
+  ));
   assert.ok(wrangler.routes?.some(route => route.pattern === "dumpen.denied.se"));
   assert.deepEqual(wrangler.previews, {});
   const oauthSecret = wrangler.secrets_store_secrets?.find(

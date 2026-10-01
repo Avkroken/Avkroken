@@ -34,7 +34,8 @@
     }
   },
   "r2_buckets": [
-    { "binding": "DUMPEN", "bucket_name": "dumpen" }
+    { "binding": "DUMPEN", "bucket_name": "dumpen" },
+    { "binding": "ASSETS", "bucket_name": "avkroken-assets" }
   ],
   "previews": {},
   "routes": [

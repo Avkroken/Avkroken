@@ -39,12 +39,14 @@ test("privileged admin APIs live under /admin/api", () => {
   assert.deepEqual(accessRoute("/admin/api/objects"), { type: "rewrite", pathname: "/api/objects" });
   assert.deepEqual(accessRoute("/admin/api/tickets"), { type: "rewrite", pathname: "/api/tickets" });
   assert.deepEqual(accessRoute("/admin/api/download/example"), { type: "rewrite", pathname: "/api/download/example" });
+  assert.deepEqual(accessRoute("/admin/api/assets/upload/icon.png", "PUT"), { type: "rewrite", pathname: "/api/assets/upload/icon.png" });
 });
 
 test("legacy privileged API paths redirect into the protected admin namespace", () => {
   assert.deepEqual(accessRoute("/api/objects"), { type: "redirect", pathname: "/admin/api/objects" });
   assert.deepEqual(accessRoute("/api/tickets"), { type: "redirect", pathname: "/admin/api/tickets" });
   assert.deepEqual(accessRoute("/api/download/example"), { type: "redirect", pathname: "/admin/api/download/example" });
+  assert.deepEqual(accessRoute("/api/assets/upload/icon.png", "PUT"), { type: "redirect", pathname: "/admin/api/assets/upload/icon.png" });
 });
 
 test("public capability uploads remain public", () => {

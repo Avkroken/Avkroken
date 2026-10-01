@@ -1,5 +1,9 @@
 import { homePage } from "./page.js";
 import {
+  listPublicAssets,
+  uploadPublicAsset,
+} from "./public-assets.js";
+import {
   authenticatedGitHubUserId,
   githubAuthConfigurationState,
   handleGitHubCallback,
@@ -10,7 +14,6 @@ import {
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 const MAX_BUCKET_BYTES = 500 * 1024 * 1024;
-const RETENTION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 15 * 60 * 1000;
 const INTERNAL_PREFIX = "_system/";
@@ -30,6 +33,10 @@ async function listAll(bucket, options = {}) {
 
 function contentObjects(objects) {
   return objects.filter((obj) => !obj.key.startsWith(INTERNAL_PREFIX));
+}
+
+function transferObjects(objects) {
+  return contentObjects(objects).filter((obj) => !obj.key.startsWith("public/"));
 }
 
 function constantTimeEqual(a, b) {
@@ -88,7 +95,7 @@ function objectStats(objects) {
 
 function groupedObjects(objects) {
   const groups = new Map();
-  for (const obj of contentObjects(objects)) {
+  for (const obj of transferObjects(objects)) {
     const slash = obj.key.indexOf("/");
     const name = slash >= 0 ? obj.key.slice(0, slash) : obj.key;
     if (!groups.has(name)) groups.set(name, []);
@@ -288,7 +295,28 @@ export default {
       if (req.method !== "GET") return new Response("method\n", { status: 405 });
       const denied = await adminDenied(req, env);
       if (denied) return denied;
-      return Response.json({ objects: groupedObjects(await listAll(env.DUMPEN)) }, {
+      const allObjects = await listAll(env.DUMPEN);
+      return Response.json({
+        objects: groupedObjects(allObjects),
+        assets: env.ASSETS ? await listPublicAssets(env.ASSETS) : [],
+        assetState: env.ASSETS ? "available" : "not_configured",
+      }, {
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "upload") {
+      if (req.method !== "PUT" || !segments[3]) return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+      const result = await uploadPublicAsset(req, env.ASSETS, segments[3], {
+        maxUploadBytes: MAX_UPLOAD_BYTES,
+        maxBucketBytes: MAX_BUCKET_BYTES,
+      });
+      if (result.response) return result.response;
+      return Response.json({ asset: result.asset }, {
+        status: 201,
         headers: { "cache-control": "no-store" },
       });
     }
@@ -338,7 +366,7 @@ export default {
       return new Response(homePage(stats, {
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxBucketBytes: MAX_BUCKET_BYTES,
-        retentionDays: RETENTION_DAYS,
+        automaticDeletion: false,
         ticketTtlMinutes: TICKET_TTL_MS / 60000,
         adminPage,
       }), {

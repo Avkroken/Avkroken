@@ -27,7 +27,7 @@ test("shared theme contract keeps Dumpen product accents", () => {
 test("Dumpen main pages use Legacy fallback and expose the selector", () => {
   const dashboard = homePage(
     { totalBytes: 0, objectCount: 0, oldestDays: null },
-    { maxBucketBytes: 524288000, retentionDays: 7, ticketTtlMinutes: 10, adminPage: false },
+    { maxBucketBytes: 524288000, automaticDeletion: false, ticketTtlMinutes: 10, adminPage: false },
   );
   const publicHtml = publicPage();
 
