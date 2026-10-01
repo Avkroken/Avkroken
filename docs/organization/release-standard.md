@@ -111,7 +111,7 @@ Normal release använder repositoryts GitHub Actions `GITHUB_TOKEN` med minsta p
 
 Övriga jobb behåller read-only eller tomma permissions efter behov.
 
-Ingen PAT, bypass eller utökad provider-writeidentitet ska införas för releaseflödet utan separat arkitekturbeslut.
+Canonical SemVer-/GitHub Release-publication använder ingen PAT, bypass eller utökad provider-writeidentitet. Det valfria rådgivande Copilot-jobbet är separat och använder endast den read-only `COPILOT_GITHUB_TOKEN` som beskrivs nedan.
 
 ## Deployment
 
