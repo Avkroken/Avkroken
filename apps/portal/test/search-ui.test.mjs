@@ -73,7 +73,7 @@ test("public repository discovery prefers Skvallerbyttans authenticated read-onl
 
 test("search reuses public gates and bounds GitHub provider reads", () => {
   assert.ok(worker.includes("const GITHUB_CATALOG_CONCURRENCY = 2;"));
-  assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v4")'));
+  assert.ok(worker.includes('const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v5")'));
   assert.ok(worker.includes("await cache.match(DOCS_CACHE_KEY)"));
   assert.ok(worker.includes("ctx.waitUntil(cache.put(DOCS_CACHE_KEY, cachedResponse))"));
   assert.ok(worker.includes("getDocsCatalog(env, ctx, projects)"));

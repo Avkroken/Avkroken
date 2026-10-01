@@ -66,7 +66,7 @@ const GITHUB_API = githubUserRepositoriesApi();
 const CACHE_SECONDS = 300;
 const DOCS_CACHE_SECONDS = 21600;
 const DOC_CONTENT_CACHE_SECONDS = 21600;
-const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v4");
+const DOCS_CACHE_KEY = new Request("https://avkroken-cache.invalid/github-docs-v5");
 const MAX_DOC_DEPTH = 2;
 const MAX_SEARCH_DOCUMENTS = 32;
 const MAX_SEARCH_DOC_CHARS = 120000;
@@ -365,18 +365,35 @@ async function loadServiceDocumentationTrees(env, projects) {
   }
 }
 
+function serviceTreeCoversAppSource(tree, source) {
+  if (!Array.isArray(tree) || !source) return false;
+  const docsPrefix = source.docsRoot + "/";
+  return tree.some(item =>
+    item?.type === "blob" &&
+    typeof item.path === "string" &&
+    (item.path === source.readmePath || item.path.startsWith(docsPrefix))
+  );
+}
+
 async function loadDocsCatalog(projects, env) {
   const serviceTrees = await loadServiceDocumentationTrees(env, projects);
   const fallbackTree = repositoryTreeLoader(env);
-  const loadTree = repo =>
-    serviceTrees.has(repo.name)
-      ? Promise.resolve(serviceTrees.get(repo.name))
-      : fallbackTree(repo);
+  const loadTreeForProject = project => repo => {
+    const serviceTree = serviceTrees.get(repo.name);
+    if (!serviceTree) return fallbackTree(repo);
+
+    const appSource = project?.type === "app" ? appDocsSource(project) : null;
+    if (appSource && !serviceTreeCoversAppSource(serviceTree, appSource)) {
+      return fallbackTree(repo);
+    }
+
+    return Promise.resolve(serviceTree);
+  };
 
   const entries = await mapWithConcurrency(
     projects,
     GITHUB_CATALOG_CONCURRENCY,
-    project => buildProjectDocsEntry(project, loadTree)
+    project => buildProjectDocsEntry(project, loadTreeForProject(project))
   );
 
   const unique = [];
