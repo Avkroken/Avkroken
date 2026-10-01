@@ -7,9 +7,6 @@
     "nodejs_compat"
   ],
   "upload_source_maps": true,
-  "vars": {
-    "TURNSTILE_HOSTNAMES": "jobb.denied.se"
-  },
   "browser": {
     "binding": "BROWSER"
   },

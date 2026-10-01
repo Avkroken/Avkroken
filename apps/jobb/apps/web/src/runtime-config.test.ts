@@ -85,7 +85,6 @@ describe("dashboard-managed runtime configuration", () => {
         notifyEmailTo: "user@example.test",
         notifyEmailFrom: "jobb@example.test",
         notifyWebhookUrl: "https://hooks.example.test/bankid",
-        turnstileSecret: "turnstile-example-secret",
       },
       123,
     );
@@ -101,7 +100,6 @@ describe("dashboard-managed runtime configuration", () => {
     expect(resolved.env.STUDENTCONSULTING_PASSWORD).toBe("example-password");
     expect(resolved.env.STUDENTCONSULTING_AUTOSUBMIT).toBe("true");
     expect(resolved.env.JOB_ALLOWED_COUNTRIES).toBe("SE");
-    expect(resolved.env.TURNSTILE_SECRET).toBe("turnstile-example-secret");
     expect(resolved.view).toMatchObject({
       studentConsultingCredentials: true,
       studentConsultingCredentialsSource: "dashboard",
@@ -109,11 +107,9 @@ describe("dashboard-managed runtime configuration", () => {
       suitabilityPolicy: true,
       bankIdNotification: true,
       notifyWebhookConfigured: true,
-      turnstileConfigured: true,
       managedConfigurationStored: true,
     });
     expect(JSON.stringify(resolved.view)).not.toContain("example-password");
-    expect(JSON.stringify(resolved.view)).not.toContain("turnstile-example-secret");
     expect(JSON.stringify(resolved.view)).not.toContain(
       "https://hooks.example.test/bankid",
     );

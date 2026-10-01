@@ -185,6 +185,21 @@ export async function claimRunStart(
   return getRun(db, input.id);
 }
 
+export async function deleteRunRecords(
+  db: D1Database,
+  id: string,
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare("DELETE FROM notifications WHERE automation_run_id = ?")
+      .bind(id),
+    db
+      .prepare("DELETE FROM integration_probes WHERE automation_run_id = ?")
+      .bind(id),
+    db.prepare("DELETE FROM automation_runs WHERE id = ?").bind(id),
+  ]);
+}
+
 export async function updateRun(
   db: D1Database,
   id: string,

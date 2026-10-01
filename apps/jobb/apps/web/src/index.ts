@@ -38,9 +38,9 @@ import {
   saveRuntimeConfiguration,
   type RuntimeConfigurationUpdate,
 } from "./runtime-config";
-import { verifyTurnstile, type TurnstileEnv } from "./turnstile";
 import {
   claimRunStart,
+  deleteRunRecords,
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   getRun,
@@ -59,7 +59,7 @@ import {
 
 export { JobAutomationWorkflow };
 
-export interface Env extends AutomationEnv, DashboardAuthEnv, TurnstileEnv {
+export interface Env extends AutomationEnv, DashboardAuthEnv {
   DB: D1Database;
   EVIDENCE: R2Bucket;
   BROWSER: BrowserWorker;
@@ -208,22 +208,89 @@ export default {
       }
     }
 
+    const stopRunMatch = url.pathname.match(/^\/api\/runs\/([^/]+)\/stop$/);
+    if (request.method === "POST" && stopRunMatch) {
+      const runId = decodeURIComponent(stopRunMatch[1]);
+      const run = await getRun(env.DB, runId);
+      if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
+      if (run.status !== "running" && run.status !== "needs_user_auth") {
+        return Response.json(
+          { error: "Only active runs can be stopped." },
+          { status: 409 },
+        );
+      }
+
+      if (run.workflow_instance_id) {
+        const instance = await env.JOB_AUTOMATION.get(run.workflow_instance_id);
+        const workflowStatus = await instance.status();
+        if (
+          ["queued", "running", "paused", "waiting", "waitingForPause", "rollingBack"].includes(
+            workflowStatus.status,
+          )
+        ) {
+          try {
+            await instance.terminate();
+          } catch (error) {
+            return jsonError(error, 502);
+          }
+        }
+      }
+
+      await updateRun(env.DB, runId, {
+        status: "failed",
+        lastError: "RUN_STOPPED_BY_USER: körningen stoppades manuellt.",
+        authSessionId: null,
+        authLiveViewUrl: null,
+        authExpiresAt: null,
+        completedAt: new Date().toISOString(),
+      });
+      return Response.json({ runId, status: "failed", stopped: true });
+    }
+
+    const deleteRunMatch = url.pathname.match(/^\/api\/runs\/([^/]+)$/);
+    if (request.method === "DELETE" && deleteRunMatch) {
+      const runId = decodeURIComponent(deleteRunMatch[1]);
+      const detail = await getRunDetail(env.DB, runId);
+      if (!detail) return Response.json({ error: "Run not found" }, { status: 404 });
+      if (detail.run.status === "running" || detail.run.status === "needs_user_auth") {
+        return Response.json(
+          { error: "Stop the run before deleting it." },
+          { status: 409 },
+        );
+      }
+      if (detail.applications.length > 0) {
+        return Response.json(
+          { error: "Runs with application history cannot be deleted." },
+          { status: 409 },
+        );
+      }
+
+      const workflowInstanceId =
+        typeof detail.run.workflow_instance_id === "string"
+          ? detail.run.workflow_instance_id
+          : null;
+      if (workflowInstanceId) {
+        try {
+          const instance = await env.JOB_AUTOMATION.get(workflowInstanceId);
+          await instance.delete();
+        } catch (error) {
+          return jsonError(error, 502);
+        }
+      }
+
+      await deleteRunRecords(env.DB, runId);
+      return Response.json({ runId, deleted: true });
+    }
+
     if (request.method === "POST" && url.pathname === "/api/runs/manual") {
-      const body: { turnstileToken?: string } = await request
-        .json<{ turnstileToken?: string }>()
-        .catch(() => ({}));
       const runtime = await resolveRuntimeConfiguration(env);
       if (
-        !(await verifyTurnstile(
-          request,
-          runtime.env,
-          body.turnstileToken,
-          "manual_run",
-        ))
+        !runtime.view.studentConsultingCredentials ||
+        !runtime.view.studentConsultingAutoSubmit
       ) {
         return Response.json(
-          { error: "Turnstile verification failed." },
-          { status: 403 },
+          { error: "StudentConsulting-konto och autosubmit måste vara konfigurerade." },
+          { status: 409 },
         );
       }
 

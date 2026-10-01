@@ -24,7 +24,7 @@ Systemets hårda mål är **10 verifierade lämpliga ansökningar per kalenderm�
 
 Viktiga säkerhetsgränser:
 
-- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade kanoniska profilrouten **Matcha jobb** (`/sv/min-profil/matcha-jobb/`) utan att vara beroende av en synlig navigationslänk; omdirigeras routen utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
+- StudentConsulting-autosubmit är fail-closed och kräver `STUDENTCONSULTING_AUTOSUBMIT=true`. Kandidater hämtas från den autentiserade kanoniska **Matcha jobb**-profilrouten `/sv/min-profil/matcha-jobb/`; om routen omdirigeras utanför den verifierade profilvyn stoppas körningen. Land enrichas från StudentConsultings publika jobb-API med explicita landsfilter för Sverige/Norge/Danmark när detaljsidan saknar `Land`; olöst eller ambivalent land stoppar kandidaten före autosubmit.
 - En ansökan räknas inte som verifierad förrän exakt StudentConsulting Jobb-ID återfinns i `Ansökningar`.
 - D1 har exakt tio quota-slots per månad. Ett osäkert submit-resultat behåller sin slot som `uncertain`; systemet kompenserar inte med en potentiell elfte ansökan.
 - BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i Cloudflare Browser Run Live View.
@@ -56,9 +56,9 @@ Den skyddade dashboarden kan starta samma pipeline manuellt under den 1:a–14:e
 
 Manuell start kräver:
 
-1. dashboard-autentisering,
-2. same-origin mutation,
-3. giltig Cloudflare Turnstile-token för action `manual_run`,
+1. GitHub-dashboardautentisering,
+2. exakt same-origin mutation guard,
+3. konfigurerat StudentConsulting-konto med autosubmit aktiverat,
 4. öppet applikationsfönster.
 
 Starten gör därefter en atomisk D1-claim: högst en `running`/`needs_user_auth` automation får finnas åt gången över manuella och schemalagda starter. Run-raden skapas eller, för en failed schemalagd retry, återställs till ett rent `running`-state innan Workflow startas. Workflow-ID länkas både direkt efter create och som första Workflow-step. Startfel och Workflow-undantag skrivs tillbaka som `failed`; gamla `running`-rader utan Workflow-länk eller ansökningsaktivitet klassas/reconcileras som orphaned efter fem minuter. Utgångna eller ogiltiga `needs_user_auth`-handoffs reconcileras till `failed` före ny claim och räknas inte som aktiva i dashboarden efter `auth_expires_at`.
@@ -160,12 +160,14 @@ Primära endpoints:
 - `POST /api/configuration` — same-origin, autentiserad write av dashboard-hanterad krypterad runtimekonfiguration.
 - `GET /api/runs/:id` — read-only run-detail.
 - `POST /api/runs/manual` — manuell Workflow-start.
+- `POST /api/runs/:id/stop` — terminerar en aktiv Workflow-instans och finaliserar runnen som manuellt stoppad.
+- `DELETE /api/runs/:id` — raderar terminal run utan ansökningshistorik samt run-bundna probes/notifications och Workflow-state.
 - `POST /api/runs/:id/bankid/check` — fortsätter säkert det autentiserade AF-flödet.
 - `GET /api/jobs/search` — read-only JobSearch.
 
-Alla skyddade mutationer kräver exakt same-origin `Origin`; inkompatibel `Sec-Fetch-Site` avvisas också när headern finns. Detta är ett extra CSRF-skydd ovanpå dashboard-auth. Manuell run kräver dessutom Turnstile.
+Alla skyddade mutationer kräver exakt same-origin `Origin`; inkompatibel `Sec-Fetch-Site` avvisas också när headern finns. Detta är ett extra CSRF-skydd ovanpå dashboard-auth. Manuell run, stop och delete kräver samma GitHub-auth och same-origin-skydd.
 
-Dashboard-CSP tillåter egna scripts/styles samt Turnstile från `https://challenges.cloudflare.com`; `unsafe-inline` används inte.
+Dashboard-CSP tillåter endast egna scripts/styles/connect-källor; `unsafe-inline` används inte och ingen extern Turnstile-scriptkälla behövs.
 
 Login- och browser-felsidor använder separat same-origin CSS på `/assets/auth.css`, strikt CSP utan inline-script och en gemensam felvy med sanitiserad felkod och korrelations-ID. GitHub OAuth-startfel klassas utan att credentials exponeras.
 
@@ -176,7 +178,6 @@ Hemliga värden får aldrig committas. Produktionsvärden kan komma från Cloudf
 Credential-/security-namn:
 
 - `GITHUB_OAUTH_CLIENT_SECRET` — GitHub OAuth-klienthemligheten; produktion läser värdet via Cloudflare Secrets Store-binding medan lokal utveckling kan använda en vanlig runtime-sträng
-- `TURNSTILE_SECRET`
 - `STUDENTCONSULTING_EMAIL`
 - `STUDENTCONSULTING_PASSWORD`
 
@@ -184,7 +185,6 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 
 - `GITHUB_OAUTH_CLIENT_ID` — icke-hemligt GitHub OAuth client ID
 - `JOBB_ALLOWED_GITHUB_IDS` — numeriska GitHub-ID:n som får använda dashboarden
-- `TURNSTILE_HOSTNAMES`
 - `STUDENTCONSULTING_AUTOSUBMIT`
 - `JOB_INCLUDE_TERMS` — valfritt extra positivt filter ovanpå **Matcha jobb**
 - `JOB_EXCLUDE_TERMS`
@@ -197,7 +197,7 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 
 Notifiering kan använda Email binding och/eller HTTPS-webhook.
 
-Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, valfria extra lämplighetsfilter och notifieringsinställningar. Produktions-Turnstile hanteras centralt: Jobb använder Cloudflare-widgeten `denied.se`; dess site key är publik, versionerad klientkonfiguration och `TURNSTILE_SECRET` binds som Worker deployment secret, inte via System-formuläret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord och webhook-URL returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
+Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, valfria extra lämplighetsfilter och notifieringsinställningar. Manuell körning skyddas av GitHub-dashboardens session och exact same-origin mutation guard; Jobb bäddar inte in eller kräver Turnstile. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord och webhook-URL returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
 
 ## Auth, request-säkerhet och privacy
 
@@ -205,7 +205,7 @@ GitHub är Jobbs externa identity provider. Jobb använder Authorization Code + 
 
 GitHub OAuth är fail-closed och enda dashboard-authvägen: komplett klient-, secret- och allowlistkonfiguration krävs, och saknad eller halvkonfigurerad konfiguration ger fel i auth/readiness. Produktionshemligheten binds från Cloudflare Secrets Store som `GITHUB_OAUTH_CLIENT_SECRET`; client ID och allowlist ligger som icke-hemliga Worker-vars. Legacy Basic Auth och OIDC-proxy accepteras inte av koden.
 
-Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname. Dashboardens 10-sekunders polling behåller en redan monterad widget när relevant manuellt startläge är oförändrat, kan initiera widgeten senare om Turnstile-scriptet blir redo efter första renderingen, och tar bort/suppressar widgeten medan en verklig aktiv körning pågår.
+Manuell körning kräver en giltig GitHub-dashboard-session och exact same-origin mutation guard. Körningsdetaljer erbjuder stop för aktiva Workflow-instanser och delete för terminala testkörningar utan ansökningshistorik; körningar med ansökningshistorik kan inte raderas via dashboarden.
 
 Dashboardens mutationsendpoints har same-origin-kontroll. UI-responsen sätter CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` och `Cache-Control: no-store`.
 
@@ -239,7 +239,7 @@ Uppdatera detta dokument när någon av följande ändras:
 - provider-/BankID-/rapportflöde,
 - D1/R2 state eller migrations,
 - dashboard/API-surface,
-- auth, Turnstile, same-origin-regler eller CSP,
+- auth, same-origin-regler eller CSP,
 - Cloudflare bindings/resources/deploymentmodell,
 - repositoryts test-/deployscripts och versionerade runtimekonfiguration,
 - evidensmodell eller integrity semantics,
