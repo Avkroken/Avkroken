@@ -7,12 +7,25 @@ async function readWranglerConfig() {
 }
 
 describe("Worker Preview contract", () => {
-  it("stays fail-closed until isolated state resources are provisioned", async () => {
+  it("binds isolated Preview storage while provider side effects stay fail-closed", async () => {
     const config = await readWranglerConfig();
     const preview = JSON.stringify(config.previews ?? {});
 
-    expect(config.previews?.d1_databases).toBeUndefined();
-    expect(config.previews?.r2_buckets).toBeUndefined();
+    expect(config.previews?.d1_databases).toEqual([
+      {
+        binding: "DB",
+        database_name: "jobb-preview-eu",
+        database_id: "c3a0b24f-b896-4f36-9058-c04f473d27a4",
+        migrations_dir: "migrations",
+      },
+    ]);
+    expect(config.previews?.r2_buckets).toEqual([
+      {
+        binding: "EVIDENCE",
+        bucket_name: "jobb-evidence-preview",
+        jurisdiction: "eu",
+      },
+    ]);
     expect(config.previews?.browser).toEqual({ binding: "BROWSER" });
 
     expect(config.previews?.secrets_store_secrets).toBeUndefined();
@@ -20,8 +33,8 @@ describe("Worker Preview contract", () => {
     expect(config.previews?.send_email).toBeUndefined();
     expect(config.previews?.vars).toBeUndefined();
 
-    expect(preview).not.toContain('"jobb-eu"');
-    expect(preview).not.toContain('"jobb-evidence"');
+    expect(preview).not.toContain('"database_name":"jobb-eu"');
+    expect(preview).not.toContain('"bucket_name":"jobb-evidence"');
     expect(preview).not.toContain('"jobb-automation"');
   });
 });

@@ -38,11 +38,11 @@ Scriptet kräver `WORKERS_CI=1` och `WORKERS_CI_BRANCH=main`, kör `pnpm typeche
 
 ## Worker Preview state
 
-Jobbs Preview är fortsatt fail-closed för provider-/side-effect-state. Den nu beslutade stateplanen är separat D1 `jobb-preview-eu` och separat R2 `jobb-evidence-preview`, båda EU-isolerade. Production-D1 `jobb-eu`, production-R2 `jobb-evidence`, Workflow `jobb-automation`, Email och production OAuth/providercredentials får inte återanvändas i Preview.
+Jobbs Preview har nu separat D1 `jobb-preview-eu` och separat R2 `jobb-evidence-preview`, båda EU-isolerade och bundna endast under `previews`. Production-D1 `jobb-eu`, production-R2 `jobb-evidence`, Workflow `jobb-automation`, Email och production OAuth/providercredentials återanvänds inte i Preview.
 
-Live Cloudflare-inventory 2026-09-30 verifierade att båda planerade previewresurserna saknas. Skapande med den befintliga Wrangler-profilen stoppades av provider-authz eftersom medlemsrollen är Developer Platform Editor och inte har create/delete-rätt för Developer Platform-resurser. Ingen alternativ token skapades och inga productionbindings ändrades.
+Resurserna provisionerades 2026-10-01 med den befintliga write-identiteten `CLOUDFLARE_API_TOKEN_W1` från Cloudflare Secrets Store utan att exportera secretvärdet. Jobbs migrationer `0001`–`0006` applicerades mot preview-D1 med Wranglers ordinarie migrationsmotor och en efterföljande idempotenskontroll gav `No migrations to apply`.
 
-När en auktoriserad create-roll finns ska `jobb-preview-eu` skapas med `jurisdiction=eu`, migrationerna `0001`–`0006` appliceras, och `jobb-evidence-preview` skapas med EU-jurisdiction. Först därefter får `previews.d1_databases`/`previews.r2_buckets` läggas till. Se `../../docs/organization/preview-state-standard.md`.
+Framtida Jobb-migrationer ska appliceras på både production-D1 och `jobb-preview-eu` innan Preview betraktas som aktuell. Provider-side effects ska fortsatt vara fail-closed tills separata previewidentiteter finns. Se `../../docs/organization/preview-state-standard.md`.
 
 ## D1 data locality
 

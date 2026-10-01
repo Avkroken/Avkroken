@@ -145,13 +145,18 @@ test("repository wrangler config satisfies the deployment contract", async () =>
 });
 
 
-test("repository Preview config stays fail-closed without production provider state", async () => {
+test("repository Preview config uses isolated D1 while production provider state stays fail-closed", async () => {
   const raw = await import("node:fs/promises").then(({ readFile }) =>
     readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8")
   );
   const value = JSON.parse(raw);
 
-  assert.equal(value.previews?.d1_databases, undefined);
+  assert.deepEqual(value.previews?.d1_databases, [{
+    binding: "STATS_DB",
+    database_name: "skvallerbyttan-stats-preview-eu",
+    database_id: "0c227e9f-de64-4ffd-ad21-43710deebdce",
+    migrations_dir: "migrations"
+  }]);
   assert.deepEqual(value.previews?.analytics_engine_datasets, [
     { binding: "OBSERVABILITY", dataset: "skvallerbyttan_preview" }
   ]);
@@ -161,9 +166,9 @@ test("repository Preview config stays fail-closed without production provider st
   assert.equal(value.previews?.vars?.CLOUDFLARE_ACCOUNT_ID, undefined);
 
   const preview = JSON.stringify(value.previews ?? {});
-  assert.equal(preview.includes('"skvallerbyttan-stats-eu"'), false);
-  assert.equal(preview.includes('"avkroken"'), false);
-  assert.equal(preview.includes('"skvallerbyttan"'), false);
+  assert.equal(preview.includes('"database_name":"skvallerbyttan-stats-eu"'), false);
+  assert.equal(preview.includes('"service":"avkroken"'), false);
+  assert.equal(preview.includes('"secret_name"'), false);
 
   const oauthSecret = value.secrets_store_secrets?.find(
     item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
