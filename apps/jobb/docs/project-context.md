@@ -2,7 +2,7 @@
 
 Det här dokumentet är den app-specifika, versionsstyrda tekniska kontexten för `Avkroken/Avkroken` / `apps/jobb`.
 
-**Senast verifierad mot repositoryt:** 2026-09-24
+**Senast verifierad mot repositoryt:** 2026-10-01
 
 ## Auktoritet och läsordning
 
@@ -24,7 +24,7 @@ Systemets hårda mål är **10 verifierade lämpliga ansökningar per kalenderm�
 
 Viktiga säkerhetsgränser:
 
-- StudentConsulting-autosubmit är fail-closed och kräver både explicit lämplighetspolicy och `STUDENTCONSULTING_AUTOSUBMIT=true`.
+- StudentConsulting-autosubmit är fail-closed, kräver `STUDENTCONSULTING_AUTOSUBMIT=true` och hämtar kandidater enbart från den autentiserade profilrouten **Matcha jobb**; saknas routen, omdirigeras den utanför profilen eller kan kandidatens land inte säkert bestämmas stoppas kandidaten före autosubmit.
 - En ansökan räknas inte som verifierad förrän exakt StudentConsulting Jobb-ID återfinns i `Ansökningar`.
 - D1 har exakt tio quota-slots per månad. Ett osäkert submit-resultat behåller sin slot som `uncertain`; systemet kompenserar inte med en potentiell elfte ansökan.
 - BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i Cloudflare Browser Run Live View.
@@ -108,8 +108,8 @@ Autonom submission kräver:
 
 - runtime credentials,
 - `STUDENTCONSULTING_AUTOSUBMIT=true`,
-- minst ett explicit `JOB_INCLUDE_TERMS`,
-- att jobbkandidaten passerar allow/exclude/location/country-policy,
+- att kandidaten kommer från den autentiserade **Matcha jobb**-vyn,
+- att jobbkandidaten passerar eventuella extra include/exclude/location/country-filter,
 - ett säkert och entydigt formulärläge,
 - en quota-slot innan submit-side effect.
 
@@ -184,7 +184,7 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 - `JOBB_ALLOWED_GITHUB_IDS` — numeriska GitHub-ID:n som får använda dashboarden
 - `TURNSTILE_HOSTNAMES`
 - `STUDENTCONSULTING_AUTOSUBMIT`
-- `JOB_INCLUDE_TERMS`
+- `JOB_INCLUDE_TERMS` — valfritt extra positivt filter ovanpå **Matcha jobb**
 - `JOB_EXCLUDE_TERMS`
 - `JOB_ALLOWED_LOCATIONS`
 - `JOB_ALLOWED_COUNTRIES`
@@ -195,7 +195,7 @@ Icke-hemliga eller policyrelaterade runtime-värden:
 
 Notifiering kan använda Email binding och/eller HTTPS-webhook.
 
-Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, lämplighetsregler, notifieringsinställningar och Turnstile secret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord, webhook-URL och Turnstile secret returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
+Den autentiserade System-vyn kan spara StudentConsulting-konto, autosubmit, valfria extra lämplighetsfilter och notifieringsinställningar. Produktions-Turnstile hanteras centralt: Jobb använder Cloudflare-widgeten `denied.se`; dess site key är publik, versionerad klientkonfiguration och `TURNSTILE_SECRET` binds som Worker deployment secret, inte via System-formuläret. Det dashboard-hanterade dokumentet krypteras med AES-GCM innan D1-write; krypteringsnyckeln härleds med separat HKDF-context från den befintliga GitHub OAuth-klienthemligheten. StudentConsulting-lösenord och webhook-URL returneras aldrig efter sparning. Vid rotation av OAuth-klienthemligheten måste dashboard-konfigurationen sparas om eftersom gammal ciphertext inte kan dekrypteras med den nya nyckeln.
 
 ## Auth, request-säkerhet och privacy
 

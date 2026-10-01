@@ -5,11 +5,7 @@ import {
 } from "../../../packages/core/src/types";
 import { startArbetsformedlingenHandoff } from "./arbetsformedlingen-handoff";
 import { notifyBankIdRequired, type NotificationEnv } from "./notifier";
-import {
-  evaluateSuitability,
-  suitabilityConfigured,
-  type SuitabilityEnv,
-} from "./policy";
+import { evaluateSuitability, type SuitabilityEnv } from "./policy";
 import { withStudentConsultingProvider, type ProviderEnv } from "./providers";
 import {
   claimMonthlyApplicationSlot,
@@ -295,14 +291,6 @@ async function fillMonthlyApplicationTarget(
   startingVerifiedCount: number,
   canSubmitNow: () => boolean,
 ): Promise<{ verifiedCount: number; error?: string }> {
-  if (!suitabilityConfigured(env)) {
-    return {
-      verifiedCount: startingVerifiedCount,
-      error:
-        "Suitability policy is not configured. Set JOB_INCLUDE_TERMS before enabling autonomous applications.",
-    };
-  }
-
   if (env.STUDENTCONSULTING_AUTOSUBMIT !== "true") {
     return {
       verifiedCount: startingVerifiedCount,

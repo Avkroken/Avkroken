@@ -13,7 +13,12 @@ export interface SuitabilityDecision {
 }
 
 export function suitabilityConfigured(env: SuitabilityEnv): boolean {
-  return csv(env.JOB_INCLUDE_TERMS).length > 0;
+  return [
+    env.JOB_INCLUDE_TERMS,
+    env.JOB_EXCLUDE_TERMS,
+    env.JOB_ALLOWED_LOCATIONS,
+    env.JOB_ALLOWED_COUNTRIES,
+  ].some((value) => csv(value).length > 0);
 }
 
 export function evaluateSuitability(
@@ -23,7 +28,7 @@ export function evaluateSuitability(
   const include = csv(env.JOB_INCLUDE_TERMS).map(normalize);
   const exclude = csv(env.JOB_EXCLUDE_TERMS).map(normalize);
   const locations = csv(env.JOB_ALLOWED_LOCATIONS).map(normalize);
-  const countries = csv(env.JOB_ALLOWED_COUNTRIES || "SE").map((value) =>
+  const countries = csv(env.JOB_ALLOWED_COUNTRIES).map((value) =>
     value.toUpperCase(),
   );
 
@@ -34,9 +39,24 @@ export function evaluateSuitability(
   );
   const reasons: string[] = [];
 
-  if (include.length === 0) {
-    reasons.push("JOB_INCLUDE_TERMS is not configured");
-  } else if (!include.some((term) => haystack.includes(term))) {
+  if (
+    job.discoverySource === "studentconsulting_matcha_jobb" &&
+    !job.countryCode
+  ) {
+    reasons.push("country could not be resolved for matched-profile job");
+  }
+
+  if (
+    include.length === 0 &&
+    job.discoverySource !== "studentconsulting_matcha_jobb"
+  ) {
+    reasons.push(
+      "job did not come from StudentConsulting Matcha jobb and JOB_INCLUDE_TERMS is not configured",
+    );
+  } else if (
+    include.length > 0 &&
+    !include.some((term) => haystack.includes(term))
+  ) {
     reasons.push("no configured include term matched");
   }
 
@@ -52,8 +72,11 @@ export function evaluateSuitability(
 
   if (
     countries.length > 0 &&
-    job.countryCode &&
-    !countries.includes(job.countryCode.toUpperCase())
+    (!job.countryCode || !countries.includes(job.countryCode.toUpperCase())) &&
+    !(
+      job.discoverySource === "studentconsulting_matcha_jobb" &&
+      !job.countryCode
+    )
   ) {
     reasons.push("country is outside configured allowed countries");
   }

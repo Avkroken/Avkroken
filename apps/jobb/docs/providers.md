@@ -9,10 +9,10 @@ Implemented flow:
 1. Open StudentConsulting's `/signin` entry point.
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
-4. Discover jobs from the public job listings.
-5. Read Jobb-ID, location and occupational category from each job page.
-6. Classify Norway and Denmark using StudentConsulting's country-filtered lists; remaining jobs from the Swedish listing are treated as Sweden.
-7. Evaluate the explicit suitability policy before autonomous submission.
+4. Navigate only to the authenticated `/sv/min-profil/...Matcha jobb...` route and discover candidates from that matched list.
+5. Fail closed if the authenticated **Matcha jobb** navigation is missing or redirects outside the verified profile route.
+6. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
+7. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
 8. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
 9. Stop if any visible required application field is unresolved.
 10. Submit only when `STUDENTCONSULTING_AUTOSUBMIT=true` and there is exactly one recognized application submit control.
@@ -23,10 +23,9 @@ Runtime secrets/configuration:
 - `STUDENTCONSULTING_EMAIL`
 - `STUDENTCONSULTING_PASSWORD`
 - `STUDENTCONSULTING_AUTOSUBMIT` (`true` enables submission after policy and form validation)
-- `JOB_INCLUDE_TERMS`
-- optional `JOB_EXCLUDE_TERMS`, `JOB_ALLOWED_LOCATIONS`, and `JOB_ALLOWED_COUNTRIES`
+- optional `JOB_INCLUDE_TERMS`, `JOB_EXCLUDE_TERMS`, `JOB_ALLOWED_LOCATIONS`, and `JOB_ALLOWED_COUNTRIES`
 
-Autosubmit defaults to disabled and suitability fails closed without include terms. These values can be supplied by deployment/runtime or, when absent there, by the authenticated System configuration; deployment values take precedence. Dashboard-managed secrets are encrypted before D1 persistence and are never returned as plaintext. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
+Autosubmit defaults to disabled. Discovery fails closed unless the authenticated **Matcha jobb** profile view is present; `JOB_INCLUDE_TERMS` is optional and, when set, narrows that matched list further. These values can be supplied by deployment/runtime or, when absent there, by the authenticated System configuration; deployment values take precedence. Dashboard-managed secrets are encrypted before D1 persistence and are never returned as plaintext. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
 
 ## Arbetsförmedlingen JobSearch
 

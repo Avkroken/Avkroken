@@ -56,9 +56,56 @@ describe("Stockholm automation window", () => {
 });
 
 describe("suitability policy", () => {
-  it("fails closed until include terms are configured", () => {
+  it("uses Matcha jobb as the primary suitability source", () => {
     expect(suitabilityConfigured({})).toBe(false);
     expect(evaluateSuitability({}, job).suitable).toBe(false);
+    expect(
+      evaluateSuitability(
+        {},
+        { ...job, discoverySource: "studentconsulting_matcha_jobb" },
+      ),
+    ).toEqual({ suitable: true, reasons: [] });
+  });
+
+  it("rejects matched-profile jobs whose country cannot be resolved", () => {
+    expect(
+      evaluateSuitability(
+        {},
+        {
+          ...job,
+          country: undefined,
+          countryCode: undefined,
+          isInternational: false,
+          discoverySource: "studentconsulting_matcha_jobb",
+        },
+      ),
+    ).toEqual({
+      suitable: false,
+      reasons: ["country could not be resolved for matched-profile job"],
+    });
+  });
+
+  it("does not impose a country filter when none is configured", () => {
+    expect(
+      evaluateSuitability(
+        {},
+        {
+          ...job,
+          country: "Norge",
+          countryCode: "NO",
+          isInternational: true,
+          discoverySource: "studentconsulting_matcha_jobb",
+        },
+      ),
+    ).toEqual({ suitable: true, reasons: [] });
+  });
+
+  it("treats any explicit suitability filter as configured", () => {
+    expect(suitabilityConfigured({ JOB_EXCLUDE_TERMS: "senior" })).toBe(true);
+    expect(suitabilityConfigured({ JOB_ALLOWED_LOCATIONS: "Stockholm" })).toBe(
+      true,
+    );
+    expect(suitabilityConfigured({ JOB_ALLOWED_COUNTRIES: "SE" })).toBe(true);
   });
 
   it("accepts a matching allowed job", () => {
@@ -81,5 +128,22 @@ describe("suitability policy", () => {
         { ...job, title: "Senior IT-support", countryCode: "NO" },
       ).suitable,
     ).toBe(false);
+  });
+
+  it("rejects unknown country when an allowlist is configured", () => {
+    expect(
+      evaluateSuitability(
+        { JOB_ALLOWED_COUNTRIES: "SE" },
+        {
+          ...job,
+          country: "Okänt land",
+          countryCode: undefined,
+          discoverySource: "studentconsulting_matcha_jobb",
+        },
+      ),
+    ).toEqual({
+      suitable: false,
+      reasons: ["country could not be resolved for matched-profile job"],
+    });
   });
 });

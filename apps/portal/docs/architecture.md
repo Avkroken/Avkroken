@@ -378,7 +378,7 @@ Portal-shellen har ett gemensamt komponent- och tokenlager. Dokumentroten bär `
 
 ## Repository-, app- och dokumentationsadapter
 
-`src/docs-source.mjs` separerar Portalens route-identitet från providerkoordinaterna. Själva repository-inventoryn för README/`docs/` kommer primärt från `PortalObservationsService.getPublicDocumentationIndex()`, som gör autentiserade read-only Git-tree-läsningar i Skvallerbyttan och returnerar endast sanerade Markdown-paths. Portalens egen credential-fria Git-tree-läsning är fallback.
+`src/docs-source.mjs` separerar Portalens route-identitet från providerkoordinaterna. Själva repository-inventoryn för README/`docs/` kommer primärt från `PortalObservationsService.getPublicDocumentationIndex()`, som gör autentiserade read-only Git-tree-läsningar i Skvallerbyttan och returnerar endast sanerade Markdown-paths. Portalens egen credential-fria Git-tree-läsning är fallback. Om RPC-tree:n för ett publicerat app-source-repository inte innehåller någon path under appens förväntade README/`docs/` behandlas just den appkällan som degraded och verifieras med fallback-tree:n; övriga repositorykällor fortsätter använda RPC-resultatet.
 
 Dokumentationsadaptern:
 

@@ -374,11 +374,13 @@ function buildConfigurationView(
       deployment.STUDENTCONSULTING_AUTOSUBMIT,
       stored?.studentConsultingAutoSubmit,
     ),
-    suitabilityPolicy: csv(effective.JOB_INCLUDE_TERMS).length > 0,
-    suitabilityPolicySource: sourceOf(
-      deployment.JOB_INCLUDE_TERMS,
-      stored?.jobIncludeTerms,
-    ),
+    suitabilityPolicy: [
+      effective.JOB_INCLUDE_TERMS,
+      effective.JOB_EXCLUDE_TERMS,
+      effective.JOB_ALLOWED_LOCATIONS,
+      effective.JOB_ALLOWED_COUNTRIES,
+    ].some((value) => csv(value).length > 0),
+    suitabilityPolicySource: suitabilityFilterSource(deployment, stored),
     jobIncludeTerms: effective.JOB_INCLUDE_TERMS ?? "",
     jobExcludeTerms: effective.JOB_EXCLUDE_TERMS ?? "",
     jobAllowedLocations: effective.JOB_ALLOWED_LOCATIONS ?? "",
@@ -412,10 +414,6 @@ function validateEffectiveConfiguration(
     deployment.STUDENTCONSULTING_PASSWORD,
     stored.studentConsultingPassword,
   );
-  const includeTerms = preferDeployment(
-    deployment.JOB_INCLUDE_TERMS,
-    stored.jobIncludeTerms,
-  );
   const autosubmit = preferDeployment(
     deployment.STUDENTCONSULTING_AUTOSUBMIT,
     stored.studentConsultingAutoSubmit === undefined
@@ -424,12 +422,9 @@ function validateEffectiveConfiguration(
         ? "true"
         : "false",
   );
-  if (
-    autosubmit === "true" &&
-    (!email || !password || csv(includeTerms).length === 0)
-  ) {
+  if (autosubmit === "true" && (!email || !password)) {
     throw new Error(
-      "Autosubmit kan bara aktiveras när StudentConsulting-konto och minst en inkluderande lämplighetsregel är konfigurerade.",
+      "Autosubmit kan bara aktiveras när StudentConsulting-konto är konfigurerat.",
     );
   }
 
@@ -473,6 +468,22 @@ function pairSource(
   const second = sourceOf(secondDeployment, secondManaged);
   if (first === second) return first;
   if (first === "missing" && second === "missing") return "missing";
+  return "mixed";
+}
+
+function suitabilityFilterSource(
+  deployment: RuntimeConfigEnv,
+  stored: StoredRuntimeConfiguration | null,
+): RuntimeConfigSource {
+  const sources = [
+    sourceOf(deployment.JOB_INCLUDE_TERMS, stored?.jobIncludeTerms),
+    sourceOf(deployment.JOB_EXCLUDE_TERMS, stored?.jobExcludeTerms),
+    sourceOf(deployment.JOB_ALLOWED_LOCATIONS, stored?.jobAllowedLocations),
+    sourceOf(deployment.JOB_ALLOWED_COUNTRIES, stored?.jobAllowedCountries),
+  ].filter((source) => source !== "missing");
+
+  if (sources.length === 0) return "missing";
+  if (sources.every((source) => source === sources[0])) return sources[0];
   return "mixed";
 }
 

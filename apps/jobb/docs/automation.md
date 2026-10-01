@@ -90,6 +90,7 @@ Autonomous application submission additionally requires:
 
 ```text
 STUDENTCONSULTING_AUTOSUBMIT=true
+# Optional extra filter on top of StudentConsulting Matcha jobb:
 JOB_INCLUDE_TERMS=supporttekniker,it-support,helpdesk
 ```
 
@@ -101,9 +102,9 @@ JOB_ALLOWED_LOCATIONS=Stockholm,Uppsala
 JOB_ALLOWED_COUNTRIES=SE
 ```
 
-The application engine fails closed when `JOB_INCLUDE_TERMS` is missing. This prevents a fresh public deployment from applying indiscriminately.
+The application engine discovers StudentConsulting candidates only from the authenticated **Matcha jobb** profile route and fails closed if that route is missing or redirects elsewhere. A candidate must also have a resolvable supported country code before autosubmit; unknown country remains fail-closed. `JOB_INCLUDE_TERMS` is optional and acts only as an additional narrowing filter.
 
-The protected System view can manage StudentConsulting credentials, autosubmit, suitability rules, BankID notification settings and `TURNSTILE_SECRET`. The password, webhook URL and Turnstile secret are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
+The protected System view can manage StudentConsulting credentials, autosubmit, optional extra suitability filters and BankID notification settings. Production Turnstile is managed centrally: Jobb uses the Cloudflare widget `denied.se`; its public site key is versioned client configuration, while `TURNSTILE_SECRET` is a Worker deployment secret and is not entered in the dashboard. The StudentConsulting password and webhook URL are write-only from the browser's perspective and are never returned after saving. `POST /api/configuration` is authenticated, same-origin protected and stores one encrypted configuration document in D1.
 
 `TURNSTILE_HOSTNAMES` is non-secret hostname configuration. Production uses `jobb.denied.se`; local development values belong in an ignored `.dev.vars` file.
 

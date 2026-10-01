@@ -119,6 +119,21 @@ describe("dashboard-managed runtime configuration", () => {
     );
   });
 
+  it("reports any configured extra suitability filter as active", async () => {
+    const state = fakeDb();
+    const runtimeEnv = env(state.db);
+
+    await saveRuntimeConfiguration(
+      runtimeEnv,
+      { jobExcludeTerms: "senior" },
+      123,
+    );
+
+    const resolved = await resolveRuntimeConfiguration(runtimeEnv);
+    expect(resolved.view.suitabilityPolicy).toBe(true);
+    expect(resolved.view.suitabilityPolicySource).toBe("dashboard");
+  });
+
   it("keeps deployment values authoritative over dashboard values", async () => {
     const state = fakeDb();
     const runtimeEnv = env(state.db);
@@ -184,7 +199,7 @@ describe("dashboard-managed runtime configuration", () => {
     ).rejects.toThrow(/0006_runtime_configuration/);
   });
 
-  it("fails closed when autosubmit lacks credentials or include rules", async () => {
+  it("fails closed when autosubmit lacks StudentConsulting credentials", async () => {
     const state = fakeDb();
     await expect(
       saveRuntimeConfiguration(
@@ -193,6 +208,29 @@ describe("dashboard-managed runtime configuration", () => {
         123,
       ),
     ).rejects.toThrow(/Autosubmit/);
+  });
+
+  it("allows autosubmit without include terms when credentials are configured", async () => {
+    const state = fakeDb();
+    const runtimeEnv = env(state.db);
+
+    await saveRuntimeConfiguration(
+      runtimeEnv,
+      {
+        studentConsulting: {
+          email: "user@example.test",
+          password: "example-password",
+        },
+        studentConsultingAutoSubmit: true,
+      },
+      123,
+    );
+
+    const resolved = await resolveRuntimeConfiguration(runtimeEnv);
+    expect(resolved.env.STUDENTCONSULTING_AUTOSUBMIT).toBe("true");
+    expect(resolved.env.JOB_INCLUDE_TERMS).toBeUndefined();
+    expect(resolved.view.studentConsultingCredentials).toBe(true);
+    expect(resolved.view.suitabilityPolicy).toBe(false);
   });
 
   it("can recover safely after the OAuth encryption key rotates", async () => {
