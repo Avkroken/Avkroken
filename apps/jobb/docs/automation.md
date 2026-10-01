@@ -32,7 +32,7 @@ I produktion läses client secret via Cloudflare Secrets Store-bindingen `GITHUB
 
 The protected dashboard exposes **Kör nu** only during the active application window, the **1st–14th** of each calendar month in `Europe/Stockholm`. Outside that window the UI disables the action and the API rejects manual runs.
 
-Manual start is protected by dashboard authentication, an exact same-origin mutation check and Cloudflare Turnstile server-side validation for action `manual_run`. The same-origin guard is also applied to the authenticated BankID continuation POST endpoint.
+Manual start is protected by dashboard authentication, an exact same-origin mutation check and Cloudflare Turnstile server-side validation for action `manual_run`. The same-origin guard is also applied to the authenticated BankID continuation POST endpoint. Dashboard polling preserves an already mounted Turnstile widget while the manual-start state is unchanged; if the Turnstile client library becomes available after initial render, a later poll initializes it without rebuilding the overview. A real active run suppresses/removes the widget because a new manual start is not allowed, and the widget is mounted again when the run leaves the active state.
 
 The button pre-creates the D1 run, starts a Cloudflare Workflow, immediately links the Workflow instance ID, and returns control to the browser. Workflow exceptions are persisted back to the run as `failed` before being rethrown to Cloudflare. Legacy running rows without a Workflow link or application activity are treated as orphaned after five minutes and are reconciled before a new run starts. Progress, failures, completed applications, quota state, notification state and BankID handoff state are displayed by the dashboard.
 

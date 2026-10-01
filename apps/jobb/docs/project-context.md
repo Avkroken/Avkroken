@@ -203,7 +203,7 @@ GitHub är Jobbs externa identity provider. Jobb använder Authorization Code + 
 
 GitHub OAuth är fail-closed och enda dashboard-authvägen: komplett klient-, secret- och allowlistkonfiguration krävs, och saknad eller halvkonfigurerad konfiguration ger fel i auth/readiness. Produktionshemligheten binds från Cloudflare Secrets Store som `GITHUB_OAUTH_CLIENT_SECRET`; client ID och allowlist ligger som icke-hemliga Worker-vars. Legacy Basic Auth och OIDC-proxy accepteras inte av koden.
 
-Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname.
+Turnstile används på user-triggered manuell körning och valideras server-side mot secret, action och tillåtet hostname. Dashboardens 10-sekunders polling behåller en redan monterad widget när relevant manuellt startläge är oförändrat, kan initiera widgeten senare om Turnstile-scriptet blir redo efter första renderingen, och tar bort/suppressar widgeten medan en verklig aktiv körning pågår.
 
 Dashboardens mutationsendpoints har same-origin-kontroll. UI-responsen sätter CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` och `Cache-Control: no-store`.
 
