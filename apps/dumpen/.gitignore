@@ -1,3 +1,4 @@
 node_modules/
 .wrangler/
+.asset-work/
 .dev.vars
