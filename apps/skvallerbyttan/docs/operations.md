@@ -68,11 +68,11 @@ Cloudflare-mutationer för deployment utförs av Workers Builds med Cloudflare-�
 
 ### Worker Preview state
 
-Skvallerbyttans Preview har ett separat Analytics Engine-dataset men saknar medvetet production-providerbindings. Den beslutade stateplanen lägger till separat D1 `skvallerbyttan-stats-preview-eu` med EU-jurisdiction; production-D1 `skvallerbyttan-stats-eu` får aldrig återanvändas i Preview.
+Skvallerbyttans Preview har separat Analytics Engine-dataset och separat D1 `skvallerbyttan-stats-preview-eu`, skapad med EU-jurisdiction och bunden endast under `previews`. Production-D1 `skvallerbyttan-stats-eu` återanvänds inte.
 
-Live Cloudflare-inventory 2026-09-30 verifierade att preview-D1 saknas. Skapandeförsök med befintlig Wrangler OAuth-profil stoppades av provider-authz eftersom medlemsrollen är Developer Platform Editor och saknar create/delete-rätt. Ingen ny token skapades, inga runtime-secrets kopierades och inga productionbindings ändrades.
+Preview-D1 provisionerades 2026-10-01 med befintliga `CLOUDFLARE_API_TOKEN_W1` i Cloudflare Secrets Store utan att exportera secretvärdet. Migrationerna `0001`–`0006` applicerades med Wranglers ordinarie migrationsmotor och idempotenskontrollen gav `No migrations to apply`.
 
-När en auktoriserad create-roll finns ska preview-D1 skapas, migrationerna `0001`–`0006` appliceras och bindingen därefter läggas under `previews.d1_databases`. Preview ska fortsatt inte binda production Service Bindings, Secrets Store-tokenklasser, GitHub App private key, webhooksecrets eller machine read token. Se `../../docs/organization/preview-state-standard.md`.
+Preview binder fortsatt inte production Service Bindings, Secrets Store-tokenklasser, GitHub App private key, webhooksecrets, machine read token eller Cloudflare account-tokenklasser. Framtida D1-migrationer ska appliceras på både production och preview innan Preview betraktas som aktuell. Se `../../docs/organization/preview-state-standard.md`.
 
 ### Runtime credential contract
 

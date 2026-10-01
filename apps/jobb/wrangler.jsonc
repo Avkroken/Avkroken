@@ -79,6 +79,21 @@
   "previews": {
     "browser": {
       "binding": "BROWSER"
-    }
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "jobb-preview-eu",
+        "database_id": "c3a0b24f-b896-4f36-9058-c04f473d27a4",
+        "migrations_dir": "migrations"
+      }
+    ],
+    "r2_buckets": [
+      {
+        "binding": "EVIDENCE",
+        "bucket_name": "jobb-evidence-preview",
+        "jurisdiction": "eu"
+      }
+    ]
   }
 }

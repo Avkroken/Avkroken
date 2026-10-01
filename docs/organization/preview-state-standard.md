@@ -13,12 +13,12 @@ D1/R2 blir isolerade först när Preview binds mot andra resurser än production
 
 ## Canonical previewresurser
 
-| App | Binding | Previewresurs | Jurisdiction | Status 2026-09-30 |
+| App | Binding | Previewresurs | Jurisdiction | Status 2026-10-01 |
 | --- | --- | --- | --- | --- |
-| Jobb | `DB` | `jobb-preview-eu` | EU | saknas hos provider |
-| Jobb | `EVIDENCE` | `jobb-evidence-preview` | EU | saknas hos provider |
-| Skvallerbyttan | `STATS_DB` | `skvallerbyttan-stats-preview-eu` | EU | saknas hos provider |
-| Skvallerbyttan | `OBSERVABILITY` | `skvallerbyttan_preview` | providerdataset | redan konfigurerad |
+| Jobb | `DB` | `jobb-preview-eu` | EU | provisionerad, migration `0001`–`0006` applicerad |
+| Jobb | `EVIDENCE` | `jobb-evidence-preview` | EU | provisionerad |
+| Skvallerbyttan | `STATS_DB` | `skvallerbyttan-stats-preview-eu` | EU | provisionerad, migration `0001`–`0006` applicerad |
+| Skvallerbyttan | `OBSERVABILITY` | `skvallerbyttan_preview` | providerdataset | konfigurerad |
 
 Dessa namn ska inte återanvändas av production.
 
@@ -35,31 +35,25 @@ Cloudflare dokumenterar att Preview service bindings anropar den bundna Workerns
 att Workflow-bindings använder ett redan existerande Workflow. Därför lämnas de bortkopplade tills dedikerade
 previewtargets faktiskt finns.
 
-## Providerblocker 2026-09-30
+## Provisionering genomförd 2026-10-01
 
-Live inventory verifierade att preview-D1/R2-resurserna ovan saknas. Provisioneringsförsök med den befintliga
-`avkroken` Wrangler OAuth-profilen avvisades med Cloudflare error 10000.
+Live providerstate verifierades före och efter provisionering. De tre previewresurserna ovan skapades med
+befintliga `CLOUDFLARE_API_TOKEN_W1` i Cloudflare Secrets Store. Secretvärdet exporterades aldrig: en temporär
+zone edge-preview fick Secrets Store-bindingen och exponerade endast hårdkodade, idempotenta create-anrop för
+de tre beslutade resursnamnen. Den temporära Workern och lokala filer togs bort direkt efteråt.
 
-OAuth-granten annonserar relevanta produktscopes, men kontomedlemskapet är Developer Platform Editor.
-Cloudflares rollmodell tillåter Editor att ändra befintliga Developer Platform-resurser men inte skapa/radera dem.
-Resursskapande kräver en auktoriserad Developer Platform Admin-/motsvarande create-roll. Skapa inte en ny API-token
-som workaround.
+Båda D1-databaserna skapades med `jurisdiction=eu`; R2-bucketen skapades med EU-jurisdiction. Jobbs migrationer
+`0001`–`0006` och Skvallerbyttans `0001`–`0006` applicerades därefter med Wranglers ordinarie
+migrationsmotor. En separat temporär edge-preview proxy tillät endast D1 `POST .../query` mot exakt de två
+preview-UUID:erna och injicerade W1 inne i Cloudflare. Efter applicering gav båda databaserna
+`No migrations to apply` vid idempotenskontroll.
 
-## Provisioneringsordning när create-rätt finns
+Repositorybindings ska peka direkt på dessa verkliga resurs-ID:n. Workflow, Email, Secrets Store-bindings,
+production Service Bindings och providercredentials ska fortsatt vara frånkopplade i Preview.
 
-1. Skapa `jobb-preview-eu` som D1 med `jurisdiction=eu`.
-2. Applicera Jobbs migrationer `0001`–`0005` mot previewdatabasen.
-3. Skapa `jobb-evidence-preview` som R2 med EU-jurisdiction.
-4. Lägg D1/R2-bindings under `apps/jobb/wrangler.jsonc -> previews`; behåll Workflow/Email/secrets/provider-vars frånkopplade.
-5. Skapa `skvallerbyttan-stats-preview-eu` som D1 med `jurisdiction=eu`.
-6. Applicera Skvallerbyttans migrationer `0001`–`0006`.
-7. Lägg D1-bindingen under `apps/skvallerbyttan/wrangler.jsonc -> previews`; behåll befintligt preview-AE-dataset.
-8. Kör apparnas fulla test/typecheck/dry-run och skapa en Preview.
-9. Verifiera att Preview aldrig refererar till production-D1/R2/Workflow/service/secrets.
-
-Cloudflare rekommenderar en separat Wrangler-konfiguration för D1 Preview-migrationer som pekar på exakt samma
-previewdatabas som `previews.d1_databases`. Den filen ska skapas först när verkliga database IDs finns; placeholders
-ska inte mergas till `main`.
+Vid framtida D1-migration ska samma SQL-version appliceras på både production och respektive preview-D1 innan
+Preview accepteras som aktuell. W1 ska fortsatt användas server-side från Secrets Store; secretvärdet får inte
+exporteras till terminal, GitHub Actions eller repositoryfiler.
 
 ## Vad "stateful Preview" betyder här
 
