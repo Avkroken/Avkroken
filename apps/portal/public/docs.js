@@ -6,7 +6,7 @@
   const docsPageTabs = document.querySelector("#docs-page-tabs");
   const docsLinks = document.querySelector("#docs-links");
   const docsContent = document.querySelector("#docs-content");
-  const docsCatalogUrl = "/api/docs?catalog=v5";
+  const docsCatalogUrl = "/api/docs?catalog=v6";
 
   let catalog = null;
   let activeRepo = null;
