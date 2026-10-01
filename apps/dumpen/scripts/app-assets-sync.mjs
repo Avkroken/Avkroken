@@ -98,9 +98,14 @@ export async function syncAppAssets({
         }
 
         const bytes = (await readFileFn(destination)).byteLength;
-        generated.push({ app, theme, size, key, bytes });
-        if (shouldUpload) await uploadVariant(key, destination);
+        generated.push({ app, theme, size, key, bytes, file: destination });
       }
+    }
+  }
+
+  if (shouldUpload) {
+    for (const variant of generated) {
+      await uploadVariant(variant.key, variant.file);
     }
   }
 
@@ -110,6 +115,6 @@ export async function syncAppAssets({
     uploadedObjects: shouldUpload ? generated.length * 2 : 0,
     sizes,
     outputRoot,
-    variants: generated,
+    variants: generated.map(({ file: _file, ...variant }) => variant),
   };
 }

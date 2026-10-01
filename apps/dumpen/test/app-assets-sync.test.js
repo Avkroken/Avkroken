@@ -14,7 +14,8 @@ function fakeImageAdapter(sourceSize = 1254) {
       async metadata() {
         if (dimensions.has(file)) return dimensions.get(file);
         if (file.includes(path.sep + "source" + path.sep)) {
-          return { width: sourceSize, height: sourceSize };
+          const size = typeof sourceSize === "function" ? sourceSize(file) : sourceSize;
+          return { width: size, height: size };
         }
         return {};
       },
@@ -58,6 +59,31 @@ test("app asset sync requires fresh live sources before upload", async () => {
     /--upload requires --fetch/,
   );
   assert.equal(wranglerCalls, 0);
+});
+
+test("app asset sync validates the full batch before the first live put", async () => {
+  const calls = [];
+  await assert.rejects(
+    syncAppAssets({
+      workRoot: path.resolve("/tmp/dumpen-assets-test"),
+      shouldFetch: true,
+      shouldUpload: true,
+      apps: { demo: [1, 2] },
+      sizes: [256, 512],
+      sourceSize: 1254,
+      bucket: "test-assets",
+      wrangler: async (args) => { calls.push(args); },
+      image: fakeImageAdapter((file) => file.endsWith("demo-2.png") ? 1000 : 1254),
+      mkdirFn: async () => {},
+      readFileFn: async () => new Uint8Array([1]),
+    }),
+    /Source image must be 1254×1254/,
+  );
+  assert.deepEqual(calls.map((args) => args.slice(0, 3)), [
+    ["r2", "object", "get"],
+    ["r2", "object", "get"],
+  ]);
+  assert.equal(calls.some((args) => args[2] === "put"), false);
 });
 
 test("app asset sync writes exactly canonical and hotlink mirror variants", async () => {

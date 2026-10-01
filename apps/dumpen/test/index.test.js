@@ -565,5 +565,6 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, / px · /);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
+  assert.match(adminHtml, /await loadObjects\(\);\s*\$\('#asset-status'\)\.textContent=done\+/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });

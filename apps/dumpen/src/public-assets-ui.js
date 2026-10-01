@@ -174,8 +174,8 @@ $('#upload-assets')?.addEventListener('click',async()=>{
       done+=1;
     }
     input.value='';
-    $('#asset-status').textContent=done+' fil'+(done===1?'':'er')+' uppladdad'+(done===1?'':'e')+'.';
     await loadObjects();
+    $('#asset-status').textContent=done+' fil'+(done===1?'':'er')+' uppladdad'+(done===1?'':'e')+'.';
   }catch(err){$('#asset-status').textContent=err.message||'Uppladdningen misslyckades.'}
   finally{$('#upload-assets').disabled=false}
 });
