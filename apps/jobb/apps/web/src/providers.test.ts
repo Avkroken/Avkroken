@@ -66,7 +66,12 @@ describe("trusted URL validation", () => {
 });
 
 function fakeLocator(
-  items: Array<{ text?: string; href?: string }> = [],
+  items: Array<{
+    text?: string;
+    href?: string;
+    dataHref?: string;
+    dataUrl?: string;
+  }> = [],
   index = 0,
 ): BrowserLocator {
   return {
@@ -87,6 +92,8 @@ function fakeLocator(
     async dispatchEvent() {},
     async getAttribute(name: string) {
       if (name === "href") return items[index]?.href ?? null;
+      if (name === "data-href") return items[index]?.dataHref ?? null;
+      if (name === "data-url") return items[index]?.dataUrl ?? null;
       return null;
     },
     async innerText() {
@@ -115,7 +122,13 @@ const countryIndexFetcher: typeof fetch = async (_input, init) => {
   );
 };
 
-function matchedProfilePage(options: { redirectMatched?: boolean } = {}): BrowserPage {
+function matchedProfilePage(
+  options: {
+    redirectMatched?: boolean;
+    jobLinkAttribute?: "href" | "data-href" | "data-url";
+    explicitEmpty?: boolean;
+  } = {},
+): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/";
 
   return {
@@ -134,11 +147,28 @@ function matchedProfilePage(options: { redirectMatched?: boolean } = {}): Browse
         current.pathname === "/sv/min-profil/matcha-jobb/" &&
         selector.includes("/sv/lediga-jobb/")
       ) {
+        if (options.explicitEmpty) return fakeLocator();
+        const attribute = options.jobLinkAttribute ?? "href";
+        const expectedSelector =
+          attribute === "href"
+            ? 'a[href*="/sv/lediga-jobb/"]'
+            : `[${attribute}*="/sv/lediga-jobb/"]`;
+        if (selector !== expectedSelector) return fakeLocator();
+
         return fakeLocator([
-          {
-            href: "/sv/lediga-jobb/stockholm/supporttekniker/87178/",
-          },
+          attribute === "href"
+            ? { href: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
+            : attribute === "data-href"
+              ? { dataHref: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" }
+              : { dataUrl: "/sv/lediga-jobb/stockholm/supporttekniker/87178/" },
         ]);
+      }
+      if (
+        current.pathname === "/sv/min-profil/matcha-jobb/" &&
+        selector === "body" &&
+        options.explicitEmpty
+      ) {
+        return fakeLocator([{ text: "0 matchande jobb" }]);
       }
       if (
         current.pathname ===
@@ -194,6 +224,47 @@ describe("StudentConsulting authenticated discovery", () => {
         countryCode: "SE",
       }),
     ]);
+  });
+
+  it.each(["data-href", "data-url"] as const)(
+    "discovers trusted job URLs from %s cards on Matcha jobb",
+    async (jobLinkAttribute) => {
+      const provider = new StudentConsultingProvider({
+        page: matchedProfilePage({ jobLinkAttribute }),
+        credentials: {
+          async getStudentConsultingCredentials() {
+            return { username: "user@example.test", password: "not-used" };
+          },
+        },
+        maxPagesPerSource: 1,
+        fetcher: countryIndexFetcher,
+      });
+
+      await expect(provider.discover()).resolves.toEqual([
+        expect.objectContaining({
+          provider: "studentconsulting",
+          externalId: "87178",
+          discoverySource: "studentconsulting_matcha_jobb",
+        }),
+      ]);
+    },
+  );
+
+  it("distinguishes an explicit empty Matcha jobb profile", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({ explicitEmpty: true }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /STUDENTCONSULTING_NO_MATCHED_JOBS/,
+    );
   });
 
   it("fails closed if Matcha jobb redirects to a public listing", async () => {

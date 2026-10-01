@@ -9,8 +9,8 @@ Implemented flow:
 1. Open StudentConsulting's `/signin` entry point.
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
-4. Navigate only to the authenticated `/sv/min-profil/...Matcha jobb...` route and discover candidates from that matched list.
-5. Fail closed if the authenticated **Matcha jobb** navigation is missing or redirects outside the verified profile route.
+4. Navigate only to the canonical authenticated `/sv/min-profil/matcha-jobb/` route and discover candidates from that matched list.
+5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href` or `data-url`; fail closed on redirects or untrusted URL shapes.
 6. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
 7. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
 8. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
@@ -25,7 +25,7 @@ Runtime secrets/configuration:
 - `STUDENTCONSULTING_AUTOSUBMIT` (`true` enables submission after policy and form validation)
 - optional `JOB_INCLUDE_TERMS`, `JOB_EXCLUDE_TERMS`, `JOB_ALLOWED_LOCATIONS`, and `JOB_ALLOWED_COUNTRIES`
 
-Autosubmit defaults to disabled. Discovery fails closed unless the authenticated **Matcha jobb** profile view is present; `JOB_INCLUDE_TERMS` is optional and, when set, narrows that matched list further. These values can be supplied by deployment/runtime or, when absent there, by the authenticated System configuration; deployment values take precedence. Dashboard-managed secrets are encrypted before D1 persistence and are never returned as plaintext. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
+Autosubmit defaults to disabled. Discovery fails closed unless the authenticated **Matcha jobb** profile view is present. A provider-rendered empty matched list is reported separately from a page where no trusted job-detail URL can be discovered; neither condition falls back to the public listing. `JOB_INCLUDE_TERMS` is optional and, when set, narrows that matched list further. These values can be supplied by deployment/runtime or, when absent there, by the authenticated System configuration; deployment values take precedence. Dashboard-managed secrets are encrypted before D1 persistence and are never returned as plaintext. A definitely failed submission may release its reserved quota slot; an ambiguous result remains `uncertain` so the system cannot compensate with a possible 11th application.
 
 ## Arbetsförmedlingen JobSearch
 
