@@ -77,7 +77,7 @@ test("app asset sync validates the full batch before the first live put", async 
       mkdirFn: async () => {},
       readFileFn: async () => new Uint8Array([1]),
     }),
-    /Source image must be 1254×1254/,
+    /Source apps\/demo\/demo-2\.png must be 1254×1254; observed 1000×1000\./,
   );
   assert.deepEqual(calls.map((args) => args.slice(0, 3)), [
     ["r2", "object", "get"],

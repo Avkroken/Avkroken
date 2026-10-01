@@ -402,6 +402,20 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
   assert.equal(listed[3].mirror, false);
 });
 
+test("okända appkategorier använder sitt namn även om det matchar Object.prototype", async () => {
+  const uploaded = new Date("2026-10-01T10:00:00Z");
+  const png = { uploaded, body: new Uint8Array([1]), httpMetadata: { contentType: "image/png" } };
+  const assets = fakeR2([
+    { ...png, key: "apps/constructor/constructor-1.png" },
+    { ...png, key: "apps/dozzle/dozzle-1.png" },
+  ]);
+
+  const listed = await listPublicAssets(assets);
+  const unknown = listed.find((asset) => asset.appCategory === "constructor");
+  assert.equal(unknown.appLabel, "constructor");
+  assert.equal(typeof unknown.appLabel, "string");
+});
+
 test("assetfel degraderar separat utan att blockera privata transferer", async () => {
   const transfers = fakeR2([{
     key: "backup/1000.zip",

@@ -80,7 +80,11 @@ export async function syncAppAssets({
       const source = await ensureSource(app, theme);
       const sourceMeta = await image(source).metadata();
       if (sourceMeta.width !== sourceSize || sourceMeta.height !== sourceSize) {
-        throw new Error("Source image must be " + sourceSize + "×" + sourceSize + ".");
+        const sourceKey = "apps/" + app + "/" + app + "-" + theme + ".png";
+        throw new Error(
+          "Source " + sourceKey + " must be " + sourceSize + "×" + sourceSize
+          + "; observed " + sourceMeta.width + "×" + sourceMeta.height + ".",
+        );
       }
 
       for (const size of sizes) {
@@ -94,7 +98,10 @@ export async function syncAppAssets({
 
         const meta = await image(destination).metadata();
         if (meta.width !== size || meta.height !== size) {
-          throw new Error("Generated image has unexpected dimensions.");
+          throw new Error(
+            "Generated " + key + " must be " + size + "×" + size
+            + "; observed " + meta.width + "×" + meta.height + ".",
+          );
         }
 
         const bytes = (await readFileFn(destination)).byteLength;

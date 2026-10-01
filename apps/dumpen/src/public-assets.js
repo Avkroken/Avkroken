@@ -90,7 +90,7 @@ function managedAssetId(key) {
 
 const APP_SOURCE_PIXEL_SIZE = 1254;
 
-const APP_LABELS = {
+const APP_LABELS = Object.assign(Object.create(null), {
   dozzle: "Dozzle",
   maintainerr: "Maintainerr",
   plex: "Plex",
@@ -99,7 +99,7 @@ const APP_LABELS = {
   radarr: "Radarr",
   sonarr: "Sonarr",
   tautulli: "Tautulli",
-};
+});
 
 function appAssetMetadata(key) {
   const mirror = key.startsWith("hotlink-ok/apps/");
