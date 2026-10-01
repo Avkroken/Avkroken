@@ -43,7 +43,7 @@ type TreeEntry = {
 
 type ReleaseInput = Record<string, unknown>;
 
-const MARKDOWN_PATH = /^(?:README\.(?:md|markdown)|docs\/[A-Za-z0-9._/-]+\.(?:md|markdown)|apps\/skvallerbyttan\/(?:README\.(?:md|markdown)|docs\/[A-Za-z0-9._/-]+\.(?:md|markdown)))$/i;
+const MARKDOWN_PATH = /^(?:README\.(?:md|markdown)|docs\/[A-Za-z0-9._/-]+\.(?:md|markdown)|apps\/(?:dumpen|skvallerbyttan)\/(?:README\.(?:md|markdown)|docs\/[A-Za-z0-9._/-]+\.(?:md|markdown)))$/i;
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]+$/;
 const MAX_MARKDOWN_PATHS = 400;
 const MAX_RELEASE_BODY = 20_000;

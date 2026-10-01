@@ -6,7 +6,7 @@ import {
   publicMarkdownPaths,
 } from "../src/portal-github-public-model";
 
-test("public documentation index keeps repository docs plus allowlisted Skvallerbyttan app docs", () => {
+test("public documentation index keeps repository docs plus explicitly allowlisted public app docs", () => {
   const paths = publicMarkdownPaths([
     { type: "blob", path: "README.md" },
     { type: "blob", path: "docs/index.md" },
@@ -14,6 +14,8 @@ test("public documentation index keeps repository docs plus allowlisted Skvaller
     { type: "blob", path: "apps/skvallerbyttan/README.md" },
     { type: "blob", path: "apps/skvallerbyttan/docs/index.md" },
     { type: "blob", path: "apps/skvallerbyttan/docs/security.md" },
+    { type: "blob", path: "apps/dumpen/README.md" },
+    { type: "blob", path: "apps/dumpen/docs/index.md" },
     { type: "blob", path: "apps/jobb/README.md" },
     { type: "blob", path: "apps/jobb/docs/index.md" },
     { type: "blob", path: "src/private.md" },
@@ -22,6 +24,8 @@ test("public documentation index keeps repository docs plus allowlisted Skvaller
   ]);
 
   assert.deepEqual(paths, [
+    "apps/dumpen/docs/index.md",
+    "apps/dumpen/README.md",
     "apps/skvallerbyttan/docs/index.md",
     "apps/skvallerbyttan/docs/security.md",
     "apps/skvallerbyttan/README.md",
