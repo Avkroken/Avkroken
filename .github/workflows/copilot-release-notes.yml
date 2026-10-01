@@ -1,0 +1,137 @@
+name: Copilot release notes
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  advisory:
+    name: Copilot release notes
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check for release metadata
+        id: metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          count="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RELEASE_RUN_ID}/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == "copilot-release-inputs" and .expired == false)] | length')"
+          if [[ "${count}" -gt 0 ]]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::Release run produced no Copilot metadata; no advisory summary is needed."
+          fi
+
+      - name: Download release metadata
+        if: ${{ steps.metadata.outputs.available == 'true' }}
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: copilot-release-inputs
+          path: ${{ runner.temp }}/copilot-release-inputs
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Load release range
+        id: range
+        if: ${{ steps.metadata.outputs.available == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          metadata="${RUNNER_TEMP}/copilot-release-inputs/release.env"
+          base_ref="$(sed -n 's/^BASE_REF=//p' "${metadata}")"
+          head_ref="$(sed -n 's/^HEAD_REF=//p' "${metadata}")"
+          test -n "${base_ref}"
+          test -n "${head_ref}"
+          echo "base_ref=${base_ref}" >> "${GITHUB_OUTPUT}"
+          echo "head_ref=${head_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout release target
+        if: ${{ steps.metadata.outputs.available == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.range.outputs.head_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Copilot CLI
+        id: install
+        if: ${{ steps.metadata.outputs.available == 'true' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global @github/copilot@1.0.90 detect-libc@2.1.2
+          copilot --version
+
+      - name: Resolve Copilot access
+        id: copilot
+        if: ${{ steps.install.outcome == 'success' }}
+        shell: bash
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${COPILOT_GITHUB_TOKEN}" ]]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::COPILOT_GITHUB_TOKEN is not configured; deterministic release notes remain canonical."
+          fi
+
+      - name: Generate Copilot release notes
+        id: copilot_notes
+        if: ${{ steps.copilot.outputs.enabled == 'true' }}
+        continue-on-error: true
+        uses: github/copilot-release-notes@29ba181a86b88f3acee62a03369033edfa982ab9 # v1.0.3
+        with:
+          base-ref: ${{ steps.range.outputs.base_ref }}
+          head-ref: ${{ steps.range.outputs.head_ref }}
+          instructions: .github/release-notes-instructions.md
+          pr-strategy: github-api
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+
+      - name: Publish advisory Copilot summary
+        if: ${{ steps.copilot_notes.outcome == 'success' }}
+        shell: bash
+        env:
+          RELEASE_NOTES: ${{ steps.copilot_notes.outputs.release-notes }}
+          UNCERTAIN_ENTRIES: ${{ steps.copilot_notes.outputs.uncertain-entries }}
+          SKIPPED_PRS: ${{ steps.copilot_notes.outputs.skipped-prs }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          notes=os.environ.get("RELEASE_NOTES","").strip()
+          uncertain=json.loads(os.environ.get("UNCERTAIN_ENTRIES") or "[]")
+          skipped=json.loads(os.environ.get("SKIPPED_PRS") or "[]")
+          with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a",encoding="utf-8") as h:
+              h.write("# Advisory Copilot release notes\n\n")
+              h.write("Canonical GitHub Release notes remain deterministic. This AI summary is review-only; upstream v1.0.3 may omit rebase-merged PRs.\n\n")
+              if notes: h.write(notes+"\n\n")
+              if uncertain: h.write(f"⚠️ {len(uncertain)} uncertain entr{'y' if len(uncertain)==1 else 'ies'} require review.\n\n")
+              if skipped: h.write(f"ℹ️ {len(skipped)} PR(s) were skipped by the Copilot generator.\n")
+          PYCODE
+
+      - name: Report Copilot fallback
+        if: ${{ always() && steps.metadata.outputs.available == 'true' && (steps.install.outcome == 'failure' || steps.copilot_notes.outcome == 'failure') }}
+        shell: bash
+        run: echo "::notice::Copilot advisory generation failed; canonical GitHub Release is unaffected."
