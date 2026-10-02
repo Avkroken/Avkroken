@@ -4,6 +4,9 @@ import {
   deleteRunRecords,
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
+  isRetryablePreSubmitFailure,
+  requeueFailedPreSubmitApplication,
+  type ApplicationForJobRow,
   type AutomationRunRow,
 } from "./storage";
 
@@ -53,6 +56,111 @@ function claimDb(changes: number, row = runRow()) {
 
   return { db, sql, binds };
 }
+
+function applicationRow(
+  overrides: Partial<ApplicationForJobRow> = {},
+): ApplicationForJobRow {
+  return {
+    id: "application:studentconsulting:87544",
+    status: "failed",
+    applied_at: null,
+    verified_at: null,
+    automation_run_id: "manual:old",
+    report_month: "2026-10",
+    ...overrides,
+  };
+}
+
+describe("application retry state", () => {
+  it("retries only definite pre-submit failures", () => {
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({ automation_run_id: "manual:new" }),
+        "manual:new",
+      ),
+    ).toBe(true);
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({
+          automation_run_id: "manual:new",
+          applied_at: "2026-10-02T12:00:00Z",
+        }),
+        "manual:new",
+      ),
+    ).toBe(false);
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({
+          automation_run_id: "manual:new",
+          verified_at: "2026-10-02T12:01:00Z",
+        }),
+        "manual:new",
+      ),
+    ).toBe(false);
+
+    for (const status of [
+      "queued",
+      "applying",
+      "submitted",
+      "verified",
+      "needs_user_action",
+    ]) {
+      expect(
+        isRetryablePreSubmitFailure(
+          applicationRow({
+            automation_run_id: "manual:new",
+            status,
+          }),
+          "manual:new",
+        ),
+      ).toBe(false);
+    }
+
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({ automation_run_id: "manual:other" }),
+        "manual:new",
+      ),
+    ).toBe(false);
+  });
+
+  it("atomically requeues only one definite pre-submit failed application", async () => {
+    const fake = claimDb(1);
+
+    await expect(
+      requeueFailedPreSubmitApplication(fake.db, {
+        id: "application:studentconsulting:87544",
+        runId: "manual:new",
+        reportMonth: "2026-10",
+      }),
+    ).resolves.toBe(true);
+
+    expect(fake.sql).toHaveLength(1);
+    expect(fake.sql[0]).toContain("SET status = 'queued'");
+    expect(fake.sql[0]).toContain("automation_run_id = ?");
+    expect(fake.sql[0]).toContain("report_month = ?");
+    expect(fake.sql[0]).toContain("status = 'failed'");
+    expect(fake.sql[0]).toContain("applied_at IS NULL");
+    expect(fake.sql[0]).toContain("verified_at IS NULL");
+    expect(fake.binds[0]).toEqual([
+      "2026-10",
+      "application:studentconsulting:87544",
+      "manual:new",
+    ]);
+  });
+
+  it("rejects a lost retry race when no failed row was changed", async () => {
+    const fake = claimDb(0);
+
+    await expect(
+      requeueFailedPreSubmitApplication(fake.db, {
+        id: "application:studentconsulting:87544",
+        runId: "manual:new",
+        reportMonth: "2026-10",
+      }),
+    ).resolves.toBe(false);
+  });
+});
 
 describe("automation run claims", () => {
   it("uses one atomic statement to reject overlapping active runs", async () => {

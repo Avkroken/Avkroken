@@ -43,9 +43,31 @@ När en ändring rör objektoperationer:
 3. undvik generella list-/dumpoperationer som felsökningsgenväg;
 4. testa felutfall separat från happy path.
 
-R2-innehåll ska behandlas som applikationsdata, inte dokumentationsdata. `DUMPEN -> dumpen` är privat transferstorage. `ASSETS -> avkroken-assets` är den befintliga asset-bucketen; dess exakta objekt-URL:er är publika via `logos.denied.se`, men inventory och upload är fortsatt adminskyddade.
+R2-innehåll ska behandlas som applikationsdata, inte dokumentationsdata. `DUMPEN -> dumpen` är privat transferstorage och privat capability-state. `ASSETS -> avkroken-assets` är den befintliga asset-bucketen; dess exakta objekt-URL:er är publika via `logos.denied.se`, men inventory och generell upload är fortsatt adminskyddade. Den enda publika write-routen är den kortlivade, engångs- och path-låsta `PUT /api/asset-upload/<token>` för tema-v2 staging.
 
-Live 2026-10-01: `dumpen` skapades 2026-09-29T20:05:35.526Z och hade 0 objekt / 0 B. `avkroken-assets` hade 78 objekt / 96,7 MB: 39 canonical `apps/...`-objekt och 39 motsvarande `hotlink-ok/apps/...`-speglar. Custom domain `logos.denied.se` var aktiv och `r2.dev` avstängt. Båda buckets hade endast standardregeln för abort av ofullständiga multipart-uploads efter 7 dagar och ingen automatisk objektradering.
+Live 2026-10-02: `dumpen` och `avkroken-assets` är available i rätt konto. Wrangler-profilen `avkroken` har fungerande R2 object write; resize-synken genomförde 124 lyckade writes och representativa liveobjekt lästes tillbaka med matchande SHA-256. Cloudflares bucket-metrik för object count/storage kan eftersläpa och ska inte användas som ensam verifiering. Custom domain `logos.denied.se` är aktiv och `r2.dev` är avstängt. Båda buckets har endast standardregeln för abort av ofullständiga multipart-uploads efter 7 dagar och ingen automatisk objektradering.
+
+### Tema-v2 staging via engångs-HTTP-ticket
+
+Staging-upload sker en fil i taget. Mintning får bara skapa tickets för nycklar som matchar `staging/themes-v2/apps/<app>/<app>-<1..7>.png`; uploaden accepterar bara PNG, gäller i 15 minuter och får inte skriva över en befintlig staging-fil.
+
+Från MP100 kan driftkommandot skapa ticket-state direkt i privata `DUMPEN` utan att exponera en permanent credential:
+
+```bash
+npm run assets:ticket -- staging/themes-v2/apps/plex/plex-2.png
+```
+
+Kommandot skriver en kortlivad `uploadUrl`. Skicka därefter exakt en fil till den URL:en:
+
+```bash
+curl --fail-with-body \
+  -X PUT \
+  -H 'Content-Type: image/png' \
+  --data-binary @plex-2.png \
+  '<uploadUrl>'
+```
+
+Verifiera efter varje fil genom att läsa tillbaka exakt staging-nyckel från R2 och jämföra dimension/hash med källan. Staging-objekt visas inte i Dumpens vanliga asset-inventory. Canonical `apps/...` och `hotlink-ok/apps/...` uppdateras först efter att hela 56-originalmatrisen har granskats.
 
 ### App Launcher-varianter
 
@@ -73,7 +95,7 @@ npm run assets:sync -- --fetch --upload
 
 `--upload` kräver `--fetch`; lokala original får inte vara källa för en live-upload. Hela batchens original måste vara exakt 1254×1254 och samtliga genererade dimensioner valideras före första PUT. Upload skriver sedan varje canonical-variant följd av dess hotlink-spegel, seriellt, med `image/png`. En full körning skriver 62 canonical-varianter och 62 speglar. Körningen avbryts vid första fel; om felet inträffar under upload kan tidigare PUT redan ha lyckats och ingen rollback görs.
 
-Live-verifiering 2026-10-01: den lokala Wrangler-profilen kan läsa `avkroken-assets` men object PUT returnerar 403 eftersom OAuth-identiteten saknar `k2.write`. Därför är 62 lokala storleksvarianter verifierade, medan live-bucketen fortsatt ligger på 78 objekt tills samma identitet har refreshats med R2 write-scope. Ingen partiell upload observerades.
+Live-verifiering 2026-10-02: Wrangler-profilen `avkroken` har fungerande object PUT mot `avkroken-assets`. Den verifierade resize-synken skrev 62 storleksvarianter till canonical-paths och 62 motsvarande `hotlink-ok`-speglar; representativa objekt hämtades tillbaka och matchade lokala filer med SHA-256. Bucketens aggregerade object-count kan eftersläpa.
 
 ## Deployment
 
@@ -122,7 +144,7 @@ Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkon
 
 ### Nuvarande providerläge
 
-Live-verifiering 2026-10-01 visar att `dumpen` och `avkroken-assets` finns i det repository-deklarerade Cloudflare-kontot. Wrangler kan läsa bucket-inventory, public-access-state och lifecycle direkt. `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200, och `https://logos.denied.se/apps/plex/plex-256.png` svarar HTTP 200 med `image/png`. Workers Builds logg-API har tidigare varit permission-denied för den lokala identiteten och ska inte beskrivas som läst utan en ny lyckad direktkontroll.
+Live-verifiering 2026-10-02 visar att `dumpen` och `avkroken-assets` finns i det repository-deklarerade Cloudflare-kontot. Wrangler kan läsa och skriva R2-objekt samt läsa bucket-inventory, public-access-state och lifecycle direkt. `https://dumpen.denied.se/` samt `/robots.txt` svarar HTTP 200, och exakta asset-URL:er via `logos.denied.se` är tillgängliga. Workers Builds logg-API har tidigare varit permission-denied för den lokala identiteten och ska inte beskrivas som läst utan en ny lyckad direktkontroll.
 
 `wrangler.jsonc` binder den befintliga delade GitHub OAuth-klientens publika client ID och den neutralt namngivna Cloudflare Secrets Store-bindingen `GITHUB_OAUTH_CLIENT_SECRET`; bindingen återanvänder den redan existerande OAuth-hemligheten i samma store i stället för att skapa en ny credential. Adminåtkomst begränsas av `DUMPEN_ALLOWED_GITHUB_IDS`. De gamla `DUMPEN_ADMIN_USER`/`DUMPEN_ADMIN_PASSWORD` används inte längre. Legacy machine upload fortsätter använda `DUMPEN_TOKEN`. R2-bindings är `DUMPEN -> dumpen` och `ASSETS -> avkroken-assets`; previewblocket förblir tomt så production-buckets inte binds i branch previews.
 

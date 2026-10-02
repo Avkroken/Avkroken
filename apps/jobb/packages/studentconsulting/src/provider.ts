@@ -9,10 +9,10 @@ import { isHostOrSubdomain } from "../../core/src/url";
 import type { BrowserLocator, BrowserPage } from "./browser";
 
 const DEFAULT_BASE_URL = "https://www.studentconsulting.com";
+const PROFILE_URL = `${DEFAULT_BASE_URL}/sv/profil/`;
 const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
-const MATCHED_JOBS_URL = `${DEFAULT_BASE_URL}/sv/min-profil/matcha-jobb/`;
 const MATCHED_LISTING_WAIT_MS = 15_000;
 const JOB_OPENINGS_API = `${DEFAULT_BASE_URL}/api/v1/jobopenings`;
 const COUNTRY_PAGE_SIZE = 200;
@@ -68,15 +68,23 @@ export class StudentConsultingProvider implements JobProvider {
 
   async authenticate(): Promise<AuthenticationState> {
     try {
-      const { username, password } =
-        await this.credentials.getStudentConsultingCredentials();
-      const redirectUrl = `${DEFAULT_BASE_URL}/sv/`;
+      const redirectUrl = PROFILE_URL;
       const loginUrl = `${DEFAULT_BASE_URL}/signin?language=sv-SE&redirectUrl=${encodeURIComponent(redirectUrl)}`;
 
       await this.page.goto(loginUrl, {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
+
+      if (
+        normalizeStudentConsultingProfileAreaUrl(this.page.url()) &&
+        !(await hasVisibleStudentConsultingLoginControls(this.page))
+      ) {
+        return { status: "authenticated" };
+      }
+
+      const { username, password } =
+        await this.credentials.getStudentConsultingCredentials();
 
       const email = await firstVisible(this.page, [
         'input[type="email"]',
@@ -130,6 +138,23 @@ export class StudentConsultingProvider implements JobProvider {
           message: `Unexpected login redirect host: ${host}`,
         };
       }
+      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+        return {
+          status: "failed",
+          code: "STUDENTCONSULTING_PROFILE_NOT_REACHED",
+          message:
+            "StudentConsulting authentication did not reach the authenticated /sv/profil/ area.",
+        };
+      }
+
+      if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+        return {
+          status: "failed",
+          code: "STUDENTCONSULTING_LOGIN_FAILED",
+          message:
+            "StudentConsulting remained on a visible login form after authentication.",
+        };
+      }
 
       return { status: "authenticated" };
     } catch (error) {
@@ -142,22 +167,62 @@ export class StudentConsultingProvider implements JobProvider {
   }
 
   async discover(): Promise<JobCandidate[]> {
-    const matchedJobsUrl = normalizeStudentConsultingMatchedJobsUrl(
-      MATCHED_JOBS_URL,
-    );
-    if (!matchedJobsUrl) {
-      throw new Error(
-        "STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: Matcha jobb-routen kunde inte valideras.",
-      );
-    }
-
-    await this.page.goto(matchedJobsUrl, {
+    await this.page.goto(PROFILE_URL, {
       waitUntil: "domcontentloaded",
       timeout: 30_000,
     });
-    if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+    if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
       throw new Error(
-        "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+        "STUDENTCONSULTING_PROFILE_REDIRECTED: den autentiserade profilentryn lämnade /sv/profil/.",
+      );
+    }
+    if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+      throw new Error(
+        "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: profilsessionen är inte autentiserad.",
+      );
+    }
+
+    const matchedNavigation = await findMatchedJobsNavigation(this.page);
+    if (matchedNavigation.status === "invalid") {
+      throw new Error(
+        `STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: synlig Matcha jobb-navigation kunde inte valideras (${matchedNavigation.reason}${matchedNavigation.path ? `, path=${matchedNavigation.path}` : ""}).`,
+      );
+    }
+    if (matchedNavigation.status === "absent") {
+      const profilePaths =
+        matchedNavigation.profilePaths.length > 0
+          ? matchedNavigation.profilePaths.join(",")
+          : "(none)";
+      const diagnostics = matchedNavigation.diagnostics;
+      throw new Error(
+        `STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND: ingen verifierad jobbmatchningsnavigation hittades; profilePaths=${profilePaths}; anchors=${diagnostics.anchors}; visibleAnchors=${diagnostics.visibleAnchors}; controls=${diagnostics.controls}; visibleControls=${diagnostics.visibleControls}; semanticMatches=${diagnostics.semanticMatches}; visibleSemanticMatches=${diagnostics.visibleSemanticMatches}; dataHref=${diagnostics.dataHref}; dataUrl=${diagnostics.dataUrl}; onclick=${diagnostics.onclick}.`,
+      );
+    }
+
+    const matchedJobsUrl = matchedNavigation.url;
+    const inPlaceListing =
+      matchedNavigation.status === "in_place"
+        ? matchedNavigation.listing
+        : undefined;
+    const matchedRouteSource =
+      matchedNavigation.status === "in_place"
+        ? "visible_navigation_in_place"
+        : "visible_navigation";
+
+    if (!inPlaceListing) {
+      await this.page.goto(matchedJobsUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+      if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+        throw new Error(
+          "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+        );
+      }
+    }
+    if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+      throw new Error(
+        "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: Matcha jobb kräver en autentiserad profilsession.",
       );
     }
 
@@ -173,22 +238,47 @@ export class StudentConsultingProvider implements JobProvider {
     for (let pageNumber = 1; pageNumber <= this.maxPagesPerSource; pageNumber += 1) {
       if (candidates.size >= this.maxJobs) break;
 
-      const listingUrl = withPage(matchedJobsUrl, pageNumber);
-      await this.page.goto(listingUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-      if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
-        throw new Error(
-          "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
-        );
-      }
+      if (inPlaceListing && pageNumber > 1) break;
 
-      const listing = await collectJobLinks(this.page);
+      let listing: MatchedListingObservation;
+      if (inPlaceListing) {
+        listing = inPlaceListing;
+      } else {
+        const listingUrl = withPage(matchedJobsUrl, pageNumber);
+        await this.page.goto(listingUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+        if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+          throw new Error(
+            "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+          );
+        }
+        if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+          throw new Error(
+            "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: Matcha jobb-listningen kräver en autentiserad profilsession.",
+          );
+        }
+
+        listing = await collectJobLinks(this.page);
+      }
       if (listing.links.length === 0) {
         if (pageNumber === 1 && listing.explicitEmpty) {
           throw new Error(
             "STUDENTCONSULTING_NO_MATCHED_JOBS: Matcha jobb rapporterade inga matchande jobb.",
+          );
+        }
+        if (pageNumber === 1) {
+          const diagnostics = listing.diagnostics ?? {
+            anchors: 0,
+            dataHref: 0,
+            dataUrl: 0,
+            onclick: 0,
+            iframes: 0,
+            jobLike: 0,
+          };
+          throw new Error(
+            `STUDENTCONSULTING_MATCHED_PROFILE_UNRECOGNIZED: source=${matchedRouteSource}, route=${new URL(matchedJobsUrl).pathname}, anchors=${diagnostics.anchors}, dataHref=${diagnostics.dataHref}, dataUrl=${diagnostics.dataUrl}, onclick=${diagnostics.onclick}, iframes=${diagnostics.iframes}, jobLike=${diagnostics.jobLike}.`,
           );
         }
         break;
@@ -319,21 +409,60 @@ export class StudentConsultingProvider implements JobProvider {
 
   async verify(job: JobCandidate): Promise<boolean> {
     try {
-      await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+      await this.page.goto(PROFILE_URL, {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
+      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) return false;
 
-      const applicationsUrl = await findApplicationsUrl(this.page);
-      if (!applicationsUrl) return false;
+      const authenticatedStatus = await readAuthenticatedApplicationStatus(
+        this.page,
+        job.externalId,
+        job.countryCode,
+      );
+      if (authenticatedStatus) {
+        console.info("StudentConsulting authenticated application status", {
+          externalId: job.externalId,
+          found: authenticatedStatus.found,
+          applied: authenticatedStatus.applied,
+        });
+        if (authenticatedStatus.found && authenticatedStatus.applied) {
+          return true;
+        }
+      }
 
-      await this.page.goto(applicationsUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
+      const applicationsNavigation = await findApplicationsNavigation(
+        this.page,
+        job.externalId,
+      );
+      if (!applicationsNavigation) return false;
+
+      if (applicationsNavigation.status === "found") {
+        await this.page.goto(applicationsNavigation.url, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+        const current = normalizeStudentConsultingVisibleMatchedJobsUrl(
+          this.page.url(),
+        );
+        if (
+          !current ||
+          new URL(current).pathname !==
+            new URL(applicationsNavigation.url).pathname
+        ) {
+          return false;
+        }
+      }
+
+      const applicationsEvidence = await pageContainsExactJobReference(
+        this.page,
+        job.externalId,
+      );
+      console.info("StudentConsulting applications verification", {
+        externalId: job.externalId,
+        verified: applicationsEvidence,
       });
-
-      const bodyText = await safeInnerText(this.page.locator("body").first());
-      return containsExactJobId(bodyText, job.externalId);
+      return applicationsEvidence;
     } catch {
       return false;
     }
@@ -452,20 +581,376 @@ function extractStudentConsultingJobUrlCandidates(value: string): string[] {
 
 export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   const normalized = normalize(label);
-  return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
+  if (/^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized)) {
+    return true;
+  }
+  return (
+    /(?:^|\s)jobbmatchning(?:ar)?(?:\s|$)/i.test(normalized) ||
+    /\bmatchning(?:ar)?\s+mot\s+jobb(?:\s|$)/i.test(normalized)
+  );
+}
+
+function normalizeStudentConsultingMainOriginUrl(
+  value: string,
+): string | null {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    if (parsed.protocol !== "https:") return null;
+    if (parsed.origin !== expected.origin) return null;
+    if (parsed.username || parsed.password) return null;
+
+    return new URL(
+      `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      DEFAULT_BASE_URL,
+    ).toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStudentConsultingProfileAreaUrl(
+  value: string,
+): string | null {
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
+  if (!safe) return null;
+
+  const pathname = new URL(safe).pathname;
+  if (!/^\/sv\/profil(?:\/|$)/i.test(pathname)) return null;
+  return safe;
 }
 
 export function normalizeStudentConsultingMatchedJobsUrl(
   value: string,
 ): string | null {
-  const safe = normalizeStudentConsultingUrl(value);
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
-  if (!/^\/sv\/min-profil\/matcha-jobb\/?$/i.test(pathname)) {
+  if (
+    !/^\/sv\/(?:min-profil|profil)\/(?:matcha|matchade|matchande)-jobb\/?$/i.test(
+      pathname,
+    )
+  ) {
     return null;
   }
   return safe;
+}
+
+interface LandingNavigationDiagnostics {
+  anchors: number;
+  visibleAnchors: number;
+  controls: number;
+  visibleControls: number;
+  semanticMatches: number;
+  visibleSemanticMatches: number;
+  dataHref: number;
+  dataUrl: number;
+  onclick: number;
+}
+
+type MatchedJobsNavigation =
+  | {
+      status: "absent";
+      profilePaths: string[];
+      diagnostics: LandingNavigationDiagnostics;
+    }
+  | { status: "found"; url: string }
+  | {
+      status: "in_place";
+      url: string;
+      listing: MatchedListingObservation;
+    }
+  | {
+      status: "invalid";
+      reason: "missing_href" | "untrusted_href" | "ambiguous";
+      path?: string;
+    };
+
+function normalizeStudentConsultingVisibleMatchedJobsUrl(
+  value: string,
+): string | null {
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
+  if (!safe) return null;
+
+  const pathname = new URL(safe).pathname;
+  if (!/^\/sv\/(?:min-profil|profil)\/.+/i.test(pathname)) return null;
+  return safe;
+}
+
+function safeStudentConsultingPath(value: string): string | undefined {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.origin !== expected.origin ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return undefined;
+    }
+    return parsed.pathname;
+  } catch {
+    return undefined;
+  }
+}
+
+function isStudentConsultingNavigationPlaceholder(value: string): boolean {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.origin === expected.origin &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.pathname === "/" &&
+      parsed.search === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function findMatchedJobsNavigation(
+  page: BrowserPage,
+  allowPlaceholderClick = true,
+): Promise<MatchedJobsNavigation> {
+  const anchors = page.locator("a");
+  const count = await anchors.count();
+  const validUrls = new Set<string>();
+  const profilePaths = new Set<string>();
+  let visibleAnchors = 0;
+  let anchorSemanticMatches = 0;
+  let visibleAnchorSemanticMatches = 0;
+  const placeholderAnchors: BrowserLocator[] = [];
+  let invalidReason: "missing_href" | "untrusted_href" | undefined;
+  let invalidPath: string | undefined;
+
+  for (let index = 0; index < count; index += 1) {
+    const anchor = anchors.nth(index);
+    const href = await anchor.getAttribute("href");
+    const dataHref = await anchor.getAttribute("data-href");
+    const dataUrl = await anchor.getAttribute("data-url");
+    const navigationValues = [href, dataHref, dataUrl].filter(
+      (value): value is string => Boolean(value),
+    );
+
+    for (const value of navigationValues) {
+      const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(value);
+      if (profileUrl) profilePaths.add(new URL(profileUrl).pathname);
+    }
+
+    const label = await safeInnerText(anchor);
+    const semanticMatch = isStudentConsultingMatchedJobsLabel(label);
+    if (semanticMatch) anchorSemanticMatches += 1;
+
+    const visible = await anchor.isVisible();
+    if (visible) visibleAnchors += 1;
+    if (!visible || !semanticMatch) continue;
+    visibleAnchorSemanticMatches += 1;
+
+    const safeUrls = new Set(
+      navigationValues
+        .map((value) => normalizeStudentConsultingVisibleMatchedJobsUrl(value))
+        .filter((value): value is string => Boolean(value)),
+    );
+    if (safeUrls.size > 1) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+    if (safeUrls.size === 1) {
+      const unsafeValue = navigationValues.find(
+        (value) =>
+          !normalizeStudentConsultingVisibleMatchedJobsUrl(value) &&
+          !isStudentConsultingNavigationPlaceholder(value),
+      );
+      if (unsafeValue) {
+        invalidReason = "untrusted_href";
+        invalidPath = safeStudentConsultingPath(unsafeValue);
+        continue;
+      }
+      validUrls.add([...safeUrls][0]);
+      continue;
+    }
+
+    if (navigationValues.length === 0) {
+      invalidReason = "missing_href";
+      continue;
+    }
+
+    if (
+      navigationValues.every((value) =>
+        isStudentConsultingNavigationPlaceholder(value),
+      )
+    ) {
+      placeholderAnchors.push(anchor);
+      continue;
+    }
+
+    invalidReason = "untrusted_href";
+    invalidPath =
+      navigationValues.map(safeStudentConsultingPath).find(Boolean) ?? undefined;
+  }
+
+  if (invalidReason) {
+    return { status: "invalid", reason: invalidReason, path: invalidPath };
+  }
+  if (validUrls.size > 1) {
+    return { status: "invalid", reason: "ambiguous" };
+  }
+  if (validUrls.size === 1) {
+    return { status: "found", url: [...validUrls][0] };
+  }
+
+  if (placeholderAnchors.length > 0 && allowPlaceholderClick) {
+    if (
+      placeholderAnchors.length !== 1 ||
+      visibleAnchorSemanticMatches !== placeholderAnchors.length
+    ) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+
+    try {
+      await placeholderAnchors[0].click({ timeout: 10_000 });
+      await page.waitForTimeout(400);
+    } catch {
+      return { status: "invalid", reason: "missing_href" };
+    }
+
+    const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(
+      page.url(),
+    );
+    if (clickedUrl) {
+      return { status: "found", url: clickedUrl };
+    }
+
+    const rescanned = await findMatchedJobsNavigation(page, false);
+    if (rescanned.status !== "absent") return rescanned;
+
+    const inPlaceUrl = normalizeStudentConsultingProfileAreaUrl(page.url());
+    if (inPlaceUrl) {
+      const listing = await collectJobLinks(page);
+      if (listing.links.length > 0 || listing.explicitEmpty) {
+        return { status: "in_place", url: inPlaceUrl, listing };
+      }
+    }
+
+    const safeCurrent = normalizeStudentConsultingMainOriginUrl(page.url());
+    return {
+      status: "invalid",
+      reason: "untrusted_href",
+      path: safeCurrent ? new URL(safeCurrent).pathname : undefined,
+    };
+  }
+
+  if (visibleAnchorSemanticMatches === placeholderAnchors.length) {
+    const controls = page.locator(
+      'button,[role="link"],[data-href],[data-url],[onclick]',
+    );
+    const controlCount = await controls.count();
+    const matchingControls: BrowserLocator[] = [];
+    let visibleControls = 0;
+    let controlSemanticMatches = 0;
+    let visibleControlSemanticMatches = 0;
+
+    for (let index = 0; index < controlCount; index += 1) {
+      const control = controls.nth(index);
+
+      for (const attribute of ["data-href", "data-url"] as const) {
+        const value = await control.getAttribute(attribute);
+        if (!value) continue;
+        const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(value);
+        if (profileUrl) profilePaths.add(new URL(profileUrl).pathname);
+      }
+
+      const label = await safeInnerText(control);
+      const semanticMatch = isStudentConsultingMatchedJobsLabel(label);
+      if (semanticMatch) controlSemanticMatches += 1;
+
+      const visible = await control.isVisible();
+      if (visible) visibleControls += 1;
+      if (!visible || !semanticMatch) continue;
+
+      visibleControlSemanticMatches += 1;
+      matchingControls.push(control);
+    }
+
+    if (matchingControls.length > 1) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+
+    if (matchingControls.length === 1) {
+      try {
+        await matchingControls[0].click({ timeout: 10_000 });
+        await page.waitForTimeout(400);
+      } catch {
+        return { status: "invalid", reason: "missing_href" };
+      }
+
+      const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(
+        page.url(),
+      );
+      if (clickedUrl) {
+        return { status: "found", url: clickedUrl };
+      }
+
+      const safeCurrent = normalizeStudentConsultingMainOriginUrl(page.url());
+      return {
+        status: "invalid",
+        reason: "untrusted_href",
+        path: safeCurrent ? new URL(safeCurrent).pathname : undefined,
+      };
+    }
+
+    const [dataHref, dataUrl, onclick] = await Promise.all([
+      page.locator("[data-href]").count(),
+      page.locator("[data-url]").count(),
+      page.locator("[onclick]").count(),
+    ]);
+
+    return {
+      status: "absent",
+      profilePaths: [...profilePaths].sort().slice(0, 20),
+      diagnostics: {
+        anchors: count,
+        visibleAnchors,
+        controls: controlCount,
+        visibleControls,
+        semanticMatches: anchorSemanticMatches + controlSemanticMatches,
+        visibleSemanticMatches:
+          visibleAnchorSemanticMatches + visibleControlSemanticMatches,
+        dataHref,
+        dataUrl,
+        onclick,
+      },
+    };
+  }
+  if (invalidReason) {
+    return { status: "invalid", reason: invalidReason, path: invalidPath };
+  }
+  if (validUrls.size !== 1) {
+    return { status: "invalid", reason: "ambiguous" };
+  }
+  return { status: "found", url: [...validUrls][0] };
+}
+
+async function hasVisibleStudentConsultingLoginControls(
+  page: BrowserPage,
+): Promise<boolean> {
+  const password = await firstVisible(page, [
+    'input[type="password"]',
+    'input[autocomplete="current-password"]',
+  ]);
+  if (!password) return false;
+
+  const username = await firstVisible(page, [
+    'input[type="email"]',
+    'input[autocomplete="username"]',
+    'input[name="Email"]',
+    'input[name="email"]',
+  ]);
+  return Boolean(username);
 }
 
 export async function loadStudentConsultingCountryIndex(
@@ -539,16 +1024,28 @@ export async function loadStudentConsultingCountryIndex(
 }
 
 function isSameMatchedJobsRoute(current: string, expected: string): boolean {
-  const currentSafe = normalizeStudentConsultingMatchedJobsUrl(current);
-  const expectedSafe = normalizeStudentConsultingMatchedJobsUrl(expected);
+  const currentSafe = normalizeStudentConsultingMainOriginUrl(current);
+  const expectedSafe =
+    normalizeStudentConsultingVisibleMatchedJobsUrl(expected) ??
+    normalizeStudentConsultingMatchedJobsUrl(expected);
   if (!currentSafe || !expectedSafe) return false;
 
   return new URL(currentSafe).pathname === new URL(expectedSafe).pathname;
 }
 
+interface MatchedListingDiagnostics {
+  anchors: number;
+  dataHref: number;
+  dataUrl: number;
+  onclick: number;
+  iframes: number;
+  jobLike: number;
+}
+
 interface MatchedListingObservation {
   links: string[];
   explicitEmpty: boolean;
+  diagnostics?: MatchedListingDiagnostics;
 }
 
 async function collectJobLinks(
@@ -591,10 +1088,29 @@ async function collectJobLinks(
   }
 
   const bodyText = await safeInnerText(page.locator("body").first());
+  const explicitEmpty = matchedListingExplicitlyEmpty(bodyText);
   return {
     links: [],
-    explicitEmpty: matchedListingExplicitlyEmpty(bodyText),
+    explicitEmpty,
+    diagnostics: explicitEmpty
+      ? undefined
+      : await describeMatchedListingStructure(page),
   };
+}
+
+async function describeMatchedListingStructure(
+  page: BrowserPage,
+): Promise<MatchedListingDiagnostics> {
+  const [anchors, dataHref, dataUrl, onclick, iframes, jobLike] =
+    await Promise.all([
+      page.locator("a[href]").count(),
+      page.locator("[data-href]").count(),
+      page.locator("[data-url]").count(),
+      page.locator("[onclick]").count(),
+      page.locator("iframe").count(),
+      page.locator('[class*="job"], [id*="job"]').count(),
+    ]);
+  return { anchors, dataHref, dataUrl, onclick, iframes, jobLike };
 }
 
 function matchedListingExplicitlyEmpty(text: string): boolean {
@@ -714,23 +1230,255 @@ async function findApplicationSubmit(
   return matches.length === 1 ? matches[0] : null;
 }
 
-async function findApplicationsUrl(page: BrowserPage): Promise<string | null> {
+interface AuthenticatedApplicationStatus {
+  found: boolean;
+  applied: boolean;
+}
+
+async function readAuthenticatedApplicationStatus(
+  page: BrowserPage,
+  externalId: string,
+  countryCode?: string,
+): Promise<AuthenticatedApplicationStatus | null> {
+  if (!page.evaluate) return null;
+
+  const countries = STUDENTCONSULTING_COUNTRIES.filter(
+    (country) => !countryCode || country.countryCode === countryCode,
+  ).map((country) => ({ id: country.id, name: country.country }));
+  const targets =
+    countries.length > 0
+      ? countries
+      : STUDENTCONSULTING_COUNTRIES.map((country) => ({
+          id: country.id,
+          name: country.country,
+        }));
+
+  try {
+    return await page.evaluate(
+      async (input) => {
+        for (const country of input.countries) {
+          const response = await fetch("/api/v1/jobopenings", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              accept: "application/json",
+              "accept-language": "sv-SE",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              locations: [
+                {
+                  type: "country",
+                  id: country.id,
+                  name: country.name,
+                },
+              ],
+              professions: [],
+              schemas: [],
+              types: [],
+              keywords: [],
+              onlySummer: false,
+              onlyInternal: false,
+              sortOrder: 0,
+              page: 1,
+              pageSize: 200,
+            }),
+          });
+          if (!response.ok) continue;
+
+          const payload = (await response.json()) as {
+            data?: Array<{ url?: string; is_applied?: boolean }>;
+          };
+          const rows = Array.isArray(payload.data) ? payload.data : [];
+          const row = rows.find(
+            (candidate) =>
+              candidate.url?.match(/\/(\d+)\/?(?:\?.*)?$/)?.[1] ===
+              input.externalId,
+          );
+          if (row) {
+            return { found: true, applied: row.is_applied === true };
+          }
+        }
+
+        return { found: false, applied: false };
+      },
+      { externalId, countries: targets },
+    );
+  } catch {
+    return null;
+  }
+}
+
+type ApplicationsNavigation =
+  | { status: "found"; url: string }
+  | { status: "in_place" };
+
+function isApplicationsLabel(label: string): boolean {
+  return /^(ansökningar|applications|søknader|ansøgninger)$/i.test(label.trim());
+}
+
+async function findApplicationsNavigation(
+  page: BrowserPage,
+  externalId: string,
+  allowPlaceholderClick = true,
+): Promise<ApplicationsNavigation | null> {
   const anchors = page.locator("a");
   const count = Math.min(await anchors.count(), 300);
-  const accepted = /^(ansökningar|applications|søknader|ansøgninger)$/i;
+  const safeUrls = new Set<string>();
+  const placeholderAnchors: BrowserLocator[] = [];
 
   for (let index = 0; index < count; index += 1) {
     const anchor = anchors.nth(index);
     if (!(await anchor.isVisible())) continue;
-    const label = (await safeInnerText(anchor)).trim();
-    if (!accepted.test(label)) continue;
+    const label = await safeInnerText(anchor);
+    if (!isApplicationsLabel(label)) continue;
 
-    const href = await anchor.getAttribute("href");
-    if (!href) continue;
-    const safeUrl = normalizeStudentConsultingUrl(href);
-    if (safeUrl) return safeUrl;
+    const navigationValues = (
+      await Promise.all([
+        anchor.getAttribute("href"),
+        anchor.getAttribute("data-href"),
+        anchor.getAttribute("data-url"),
+      ])
+    ).filter((value): value is string => Boolean(value));
+
+    const trusted = new Set(
+      navigationValues
+        .map((value) => normalizeStudentConsultingVisibleMatchedJobsUrl(value))
+        .filter((value): value is string => Boolean(value)),
+    );
+    if (trusted.size > 1) return null;
+    if (trusted.size === 1) {
+      const hasUnsafeAlternative = navigationValues.some(
+        (value) =>
+          !normalizeStudentConsultingVisibleMatchedJobsUrl(value) &&
+          !isStudentConsultingNavigationPlaceholder(value),
+      );
+      if (hasUnsafeAlternative) return null;
+      safeUrls.add([...trusted][0]);
+      continue;
+    }
+
+    if (
+      navigationValues.length > 0 &&
+      navigationValues.every((value) =>
+        isStudentConsultingNavigationPlaceholder(value),
+      )
+    ) {
+      placeholderAnchors.push(anchor);
+      continue;
+    }
+
+    return null;
+  }
+
+  if (safeUrls.size > 1) return null;
+  if (safeUrls.size === 1) return { status: "found", url: [...safeUrls][0] };
+
+  if (placeholderAnchors.length === 1 && allowPlaceholderClick) {
+    const hadReferenceBeforeClick = await pageContainsExactJobReference(
+      page,
+      externalId,
+    );
+    try {
+      await placeholderAnchors[0].click({ timeout: 10_000 });
+      await page.waitForTimeout(400);
+    } catch {
+      return null;
+    }
+
+    const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(page.url());
+    if (clickedUrl && new URL(clickedUrl).pathname !== new URL(PROFILE_URL).pathname) {
+      return { status: "found", url: clickedUrl };
+    }
+
+    const rescanned = await findApplicationsNavigation(
+      page,
+      externalId,
+      false,
+    );
+    if (rescanned) return rescanned;
+
+    if (
+      normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+      !hadReferenceBeforeClick &&
+      (await pageContainsExactJobReference(page, externalId))
+    ) {
+      return { status: "in_place" };
+    }
+    return null;
+  }
+
+  const controls = page.locator(
+    'button,[role="link"],[data-href],[data-url],[onclick]',
+  );
+  const controlCount = Math.min(await controls.count(), 300);
+  const matchingControls: BrowserLocator[] = [];
+
+  for (let index = 0; index < controlCount; index += 1) {
+    const control = controls.nth(index);
+    if (!(await control.isVisible())) continue;
+    const label = await safeInnerText(control);
+    if (!isApplicationsLabel(label)) continue;
+    matchingControls.push(control);
+  }
+
+  if (matchingControls.length !== 1) return null;
+
+  const hadReferenceBeforeClick = await pageContainsExactJobReference(
+    page,
+    externalId,
+  );
+  try {
+    await matchingControls[0].click({ timeout: 10_000 });
+    await page.waitForTimeout(400);
+  } catch {
+    return null;
+  }
+
+  const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(page.url());
+  if (clickedUrl && new URL(clickedUrl).pathname !== new URL(PROFILE_URL).pathname) {
+    return { status: "found", url: clickedUrl };
+  }
+  if (
+    normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+    !hadReferenceBeforeClick &&
+    (await pageContainsExactJobReference(page, externalId))
+  ) {
+    return { status: "in_place" };
   }
   return null;
+}
+
+async function pageContainsExactJobReference(
+  page: BrowserPage,
+  externalId: string,
+): Promise<boolean> {
+  const bodyText = await safeInnerText(page.locator("body").first());
+  if (containsExactJobId(bodyText, externalId)) return true;
+
+  const selectors = [
+    { selector: "a[href]", attribute: "href" },
+    { selector: "[data-href]", attribute: "data-href" },
+    { selector: "[data-url]", attribute: "data-url" },
+    { selector: "[onclick]", attribute: "onclick" },
+  ] as const;
+
+  for (const source of selectors) {
+    const elements = page.locator(source.selector);
+    const count = await elements.count();
+    for (let index = 0; index < count; index += 1) {
+      const value = await elements.nth(index).getAttribute(source.attribute);
+      if (!value) continue;
+      for (const candidate of extractStudentConsultingJobUrlCandidates(value)) {
+        const safeJobUrl = normalizeStudentConsultingJobUrl(candidate);
+        if (!safeJobUrl) continue;
+        const match = new URL(safeJobUrl).pathname.match(/\/(\d+)\/?$/);
+        if (match?.[1] === externalId.trim()) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function waitForSubmissionToSettle(

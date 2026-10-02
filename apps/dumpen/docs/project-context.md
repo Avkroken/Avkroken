@@ -1,6 +1,6 @@
 # Projektkontext
 
-**Senast verifierad:** 2026-10-01
+**Senast verifierad:** 2026-10-02
 
 ## Ansvar
 
@@ -33,7 +33,7 @@ Dumpen är en Cloudflare Worker med R2-lagring och ett explicit access-/routingl
 
 ## Live provider-state
 
-Verifierat 2026-10-01 med den autentiserade Wrangler-profilen och faktisk runtime:
+Verifierat 2026-10-02 med den autentiserade Wrangler-profilen och faktisk runtime:
 
 - Worker `dumpen`: **available** — `wrangler deployments list` och `wrangler versions list` visar aktiva versioner/deployments i det deklarerade kontot;
 - senaste observerade deployment: **2026-09-30T02:42:42Z**;
@@ -41,7 +41,7 @@ Verifierat 2026-10-01 med den autentiserade Wrangler-profilen och faktisk runtim
 - `https://dumpen.denied.se/robots.txt`: **available** — HTTP 200;
 - Workers Builds logg-API: **permission_denied** för den lokala Wrangler-identiteten (`403`), så enskilda provider-buildloggar får inte beskrivas som lästa när de endast syns som GitHub-checkstatus;
 - R2-bucket `dumpen`: **available** — skapad 2026-09-29T20:05:35.526Z och 0 objekt / 0 B vid kontrollen; den behålls för privata transferer;
-- R2-bucket `avkroken-assets`: **available** — 78 objekt / 96,7 MB vid kontrollen. Det motsvarar 39 canonical objekt under `apps/...` och 39 hotlink-speglar under `hotlink-ok/apps/...`; canonical-setet innehåller 31 numrerade temabilder och 8 äldre `*-256.png`-filer;
+- R2-bucket `avkroken-assets`: **available** — den äldre bucket-metriken visade 78 objekt / 96,7 MB vid kontrollen 2026-10-01. Den 2026-10-02 genomförda resize-synken skrev 124 nya objekt (62 canonical-varianter + 62 `hotlink-ok`-speglar) med exit code 0, och representativa liveobjekt hämtades tillbaka med matchande SHA-256. R2:s object-count/storage-metrik kan eftersläpa och används därför inte som ensam per-object-verifiering;
 - `avkroken-assets` public access: **available** — `r2.dev` är avstängt och custom domain `logos.denied.se` är aktiv med TLS; `https://logos.denied.se/apps/plex/plex-256.png` svarade HTTP 200 som `image/png`;
 - R2 lifecycle för båda berörda buckets: **available** — enda live-regeln är Cloudflares standardregel som avbryter ofullständiga multipart-uploads efter 7 dagar; ingen automatisk objektradering är konfigurerad.
 
@@ -68,9 +68,11 @@ Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, present
 
 ## Storage
 
-R2-bucketen `dumpen` är durable storage för privata transferer. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`. Dumpens logiska App Launcher-inventory använder canonical `apps/...`-objekt och döljer både `hotlink-ok/apps/...`-speglar och äldre `<app>-256.png`-filer som klassas som legacy. Andra objekt under `hotlink-ok/` döljs inte av spegelfiltret.
+R2-bucketen `dumpen` är durable storage för privata transferer och privat capability-state. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`. Dumpens logiska App Launcher-inventory använder canonical `apps/...`-objekt, döljer `hotlink-ok/apps/...`-speglar och ofärdiga `staging/...`-objekt och behandlar äldre `<app>-256.png` som legacy så de inte skapar falska teman. Andra objekt under `hotlink-ok/` behålls i inventoryn.
 
-Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`. Temabilder använder `<app>-<tema>.png` som original och `<app>-<tema>-256.png` respektive `<app>-<tema>-512.png` som normaliserade storleksvarianter; UI:t härleder appkategori, tema och pixelstorlek från detta kontrakt och kan filtrera på alla tre. Nya generiska admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL. Dumpen exponerar ingen publik inventory-route; endast R2-custom-domainens exakta object-URL:er är publika.
+Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`. Temabilder använder `<app>-<tema>.png` som original och `<app>-<tema>-256.png` respektive `<app>-<tema>-512.png` som normaliserade storleksvarianter; UI:t härleder appkategori, tema och pixelstorlek från detta kontrakt och kan filtrera på alla tre. Nya generiska admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL.
+
+Tema-v2-produktion använder en separat engångscapability: en adminsession eller det lokala driftkommandot mintar en 15-minuters ticket i privata `DUMPEN`; den publika capability-URL:n `/api/asset-upload/<token>` får därefter göra exakt en PNG-write till en förutbestämd nyckel under `staging/themes-v2/apps/<app>/<app>-<1..7>.png`. Capabilityn accepterar inte canonical `apps/...`-nycklar, andra appar eller andra teman, skriver inte över befintlig staging-fil och försvinner efter lyckad användning. Dumpen exponerar ingen publik inventory-route; endast R2-custom-domainens exakta object-URL:er är publika.
 
 Dokumentation, debugoutput och loggning får inte dumpa objektinnehåll som en generell felsökningsmekanism.
 
