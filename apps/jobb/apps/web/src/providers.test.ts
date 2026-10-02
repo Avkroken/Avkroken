@@ -374,6 +374,8 @@ function applicationsVerificationPage(
     applicationsDataUrl?: string;
     applicationsClickRoute?: string;
     applicationsInlineAfterClick?: boolean;
+    redirectApplicationsTo?: string;
+    profileBodyText?: string;
     applicationsBodyText?: string;
     applicationsJobHref?: string;
   } = {},
@@ -384,7 +386,14 @@ function applicationsVerificationPage(
 
   return {
     async goto(url: string) {
-      currentUrl = url;
+      const pathname = new URL(url).pathname;
+      currentUrl =
+        pathname === applicationsRoute && options.redirectApplicationsTo
+          ? new URL(
+              options.redirectApplicationsTo,
+              "https://www.studentconsulting.com",
+            ).toString()
+          : url;
     },
     url() {
       return currentUrl;
@@ -428,6 +437,14 @@ function applicationsVerificationPage(
         return fakeLocator([
           { text: options.applicationsBodyText ?? "" },
         ]);
+      }
+      if (
+        current.pathname === "/sv/profil/" &&
+        !applicationsClicked &&
+        selector === "body" &&
+        options.profileBodyText
+      ) {
+        return fakeLocator([{ text: options.profileBodyText }]);
       }
       if (
         showingApplications &&
@@ -552,6 +569,31 @@ describe("StudentConsulting application verification", () => {
     });
 
     await expect(provider.verify(verificationJob)).resolves.toBe(true);
+  });
+
+  it("rejects a trusted Ansökningar URL that redirects to another profile view", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsBodyText: "Jobb-ID 87570",
+        redirectApplicationsTo: "/sv/profil/matcha-jobb/",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
+  });
+
+  it("does not treat a pre-existing profile job reference as an in-place applications view", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsHref: "/",
+        profileBodyText: "Jobb-ID 87570",
+        applicationsInlineAfterClick: false,
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
   });
 
   it("rejects untrusted Ansökningar navigation", async () => {

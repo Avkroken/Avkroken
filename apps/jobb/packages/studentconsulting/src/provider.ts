@@ -417,6 +417,7 @@ export class StudentConsultingProvider implements JobProvider {
 
       const applicationsNavigation = await findApplicationsNavigation(
         this.page,
+        job.externalId,
       );
       if (!applicationsNavigation) return false;
 
@@ -425,7 +426,14 @@ export class StudentConsultingProvider implements JobProvider {
           waitUntil: "domcontentloaded",
           timeout: 30_000,
         });
-        if (!normalizeStudentConsultingVisibleMatchedJobsUrl(this.page.url())) {
+        const current = normalizeStudentConsultingVisibleMatchedJobsUrl(
+          this.page.url(),
+        );
+        if (
+          !current ||
+          new URL(current).pathname !==
+            new URL(applicationsNavigation.url).pathname
+        ) {
           return false;
         }
       }
@@ -1208,6 +1216,7 @@ function isApplicationsLabel(label: string): boolean {
 
 async function findApplicationsNavigation(
   page: BrowserPage,
+  externalId: string,
   allowPlaceholderClick = true,
 ): Promise<ApplicationsNavigation | null> {
   const anchors = page.locator("a");
@@ -1263,6 +1272,10 @@ async function findApplicationsNavigation(
   if (safeUrls.size === 1) return { status: "found", url: [...safeUrls][0] };
 
   if (placeholderAnchors.length === 1 && allowPlaceholderClick) {
+    const hadReferenceBeforeClick = await pageContainsExactJobReference(
+      page,
+      externalId,
+    );
     try {
       await placeholderAnchors[0].click({ timeout: 10_000 });
       await page.waitForTimeout(400);
@@ -1275,10 +1288,18 @@ async function findApplicationsNavigation(
       return { status: "found", url: clickedUrl };
     }
 
-    const rescanned = await findApplicationsNavigation(page, false);
+    const rescanned = await findApplicationsNavigation(
+      page,
+      externalId,
+      false,
+    );
     if (rescanned) return rescanned;
 
-    if (normalizeStudentConsultingProfileAreaUrl(page.url())) {
+    if (
+      normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+      !hadReferenceBeforeClick &&
+      (await pageContainsExactJobReference(page, externalId))
+    ) {
       return { status: "in_place" };
     }
     return null;
@@ -1300,6 +1321,10 @@ async function findApplicationsNavigation(
 
   if (matchingControls.length !== 1) return null;
 
+  const hadReferenceBeforeClick = await pageContainsExactJobReference(
+    page,
+    externalId,
+  );
   try {
     await matchingControls[0].click({ timeout: 10_000 });
     await page.waitForTimeout(400);
@@ -1311,9 +1336,14 @@ async function findApplicationsNavigation(
   if (clickedUrl && new URL(clickedUrl).pathname !== new URL(PROFILE_URL).pathname) {
     return { status: "found", url: clickedUrl };
   }
-  return normalizeStudentConsultingProfileAreaUrl(page.url())
-    ? { status: "in_place" }
-    : null;
+  if (
+    normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+    !hadReferenceBeforeClick &&
+    (await pageContainsExactJobReference(page, externalId))
+  ) {
+    return { status: "in_place" };
+  }
+  return null;
 }
 
 async function pageContainsExactJobReference(
