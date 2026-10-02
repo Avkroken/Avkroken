@@ -376,10 +376,12 @@ export class StudentConsultingProvider implements JobProvider {
         };
       }
 
-      // Dispatch the already-validated unique submit control directly so a
-      // successful return means the external click side effect was emitted.
-      await submit.dispatchEvent("click");
+      // Use a real locator click. Synthetic dispatchEvent("click") does not
+      // reliably execute the browser's default form-submit activation.
+      // Fail closed once activation begins: if the click throws after a submit
+      // side effect, reconciliation must prove the exact Jobb-ID before retrying.
       submissionAttempted = true;
+      await submit.click({ timeout: 10_000 });
       await waitForSubmissionToSettle(this.page, SUBMISSION_SETTLE_MS);
 
       if (await this.verify(job)) {

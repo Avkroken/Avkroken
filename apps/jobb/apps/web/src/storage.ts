@@ -305,6 +305,8 @@ export interface ApplicationForJobRow {
   verified_at: string | null;
   automation_run_id: string | null;
   report_month: string;
+  last_attempt_error_code: string | null;
+  last_attempt_error_message: string | null;
 }
 
 export async function getApplicationForJob(
@@ -315,7 +317,21 @@ export async function getApplicationForJob(
   return db
     .prepare(
       `SELECT a.id, a.status, a.applied_at, a.verified_at,
-              a.automation_run_id, a.report_month
+              a.automation_run_id, a.report_month,
+              (
+                SELECT aa.error_code
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_error_code,
+              (
+                SELECT aa.error_message
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_error_message
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE j.provider = ? AND j.external_id = ?
@@ -329,11 +345,25 @@ export function isRetryablePreSubmitFailure(
   application: ApplicationForJobRow,
   runId: string,
 ): boolean {
+  if (
+    application.status !== "failed" ||
+    application.applied_at !== null ||
+    application.verified_at !== null
+  ) {
+    return false;
+  }
+
+  if (application.automation_run_id === runId) return true;
+
+  if (application.last_attempt_error_code === "APPLICATION_NOT_APPLIED") {
+    return true;
+  }
+
   return (
-    application.automation_run_id === runId &&
-    application.status === "failed" &&
-    application.applied_at === null &&
-    application.verified_at === null
+    application.last_attempt_error_code === "APPLICATION_FAILED" &&
+    application.last_attempt_error_message?.startsWith(
+      "STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:",
+    ) === true
   );
 }
 
@@ -350,14 +380,34 @@ export async function requeueFailedPreSubmitApplication(
       `UPDATE applications
        SET status = 'queued',
            report_month = ?,
+           automation_run_id = ?,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = ?
-         AND automation_run_id = ?
          AND status = 'failed'
          AND applied_at IS NULL
-         AND verified_at IS NULL`,
+         AND verified_at IS NULL
+         AND (
+           automation_run_id = ?
+           OR EXISTS (
+             SELECT 1
+             FROM application_attempts aa
+             WHERE aa.application_id = applications.id
+               AND aa.attempt_no = (
+                 SELECT MAX(latest.attempt_no)
+                 FROM application_attempts latest
+                 WHERE latest.application_id = applications.id
+               )
+               AND (
+                 aa.error_code = 'APPLICATION_NOT_APPLIED'
+                 OR (
+                   aa.error_code = 'APPLICATION_FAILED'
+                   AND aa.error_message LIKE 'STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:%'
+                 )
+               )
+           )
+         )`,
     )
-    .bind(input.reportMonth, input.id, input.runId)
+    .bind(input.reportMonth, input.runId, input.id, input.runId)
     .run();
 
   return Number(result.meta.changes ?? 0) === 1;

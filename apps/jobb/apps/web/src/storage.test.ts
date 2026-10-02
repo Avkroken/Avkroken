@@ -70,6 +70,8 @@ function applicationRow(
     verified_at: null,
     automation_run_id: "manual:old",
     report_month: "2026-10",
+    last_attempt_error_code: null,
+    last_attempt_error_message: null,
     ...overrides,
   };
 }
@@ -121,7 +123,32 @@ describe("application retry state", () => {
 
     expect(
       isRetryablePreSubmitFailure(
-        applicationRow({ automation_run_id: "manual:other" }),
+        applicationRow({
+          automation_run_id: "manual:other",
+          last_attempt_error_code: "APPLICATION_NOT_APPLIED",
+        }),
+        "manual:new",
+      ),
+    ).toBe(true);
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({
+          automation_run_id: "manual:other",
+          last_attempt_error_code: "APPLICATION_FAILED",
+          last_attempt_error_message:
+            "STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND: StudentConsulting login form could not be identified.",
+        }),
+        "manual:new",
+      ),
+    ).toBe(true);
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({
+          automation_run_id: "manual:other",
+          last_attempt_error_code: "APPLICATION_FAILED",
+          last_attempt_error_message:
+            "APPLICATION_REQUIRES_INPUT: a required application field is empty.",
+        }),
         "manual:new",
       ),
     ).toBe(false);
@@ -145,8 +172,10 @@ describe("application retry state", () => {
     expect(fake.sql[0]).toContain("status = 'failed'");
     expect(fake.sql[0]).toContain("applied_at IS NULL");
     expect(fake.sql[0]).toContain("verified_at IS NULL");
+    expect(fake.sql[0]).toContain("APPLICATION_NOT_APPLIED");
     expect(fake.binds[0]).toEqual([
       "2026-10",
+      "manual:new",
       "application:studentconsulting:87544",
       "manual:new",
     ]);
