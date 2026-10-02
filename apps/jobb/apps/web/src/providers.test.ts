@@ -161,6 +161,8 @@ function matchedProfilePage(
     matchedNavDataHref?: string;
     matchedNavDataUrl?: string;
     matchedNavClickRoute?: string;
+    matchedNavAfterClickHref?: string;
+    matchedNavAfterClickJobHref?: string;
     matchedNavLabel?: string;
     matchedNavControl?: "anchor" | "button";
     matchedNavVisible?: boolean;
@@ -174,6 +176,7 @@ function matchedProfilePage(
 ): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/profil/";
   let matchedRouteVisits = 0;
+  let matchedNavClicked = false;
   const profileLandingRoute = "/sv/profil/";
   const matchedProfileRoute =
     options.matchedProfileRoute ?? "/sv/profil/matcha-jobb/";
@@ -201,23 +204,35 @@ function matchedProfilePage(
           options.matchedNavHref === undefined
             ? matchedProfileRoute
             : (options.matchedNavHref ?? undefined);
-        return fakeLocator([
+        const items = [
           {
             text: options.matchedNavLabel ?? "Matcha jobb",
             href,
             dataHref: options.matchedNavDataHref,
             dataUrl: options.matchedNavDataUrl,
-            onClick: options.matchedNavClickRoute
-              ? () => {
-                  currentUrl = new URL(
-                    options.matchedNavClickRoute!,
-                    "https://www.studentconsulting.com",
-                  ).toString();
-                }
-              : undefined,
+            onClick: () => {
+              matchedNavClicked = true;
+              if (options.matchedNavClickRoute) {
+                currentUrl = new URL(
+                  options.matchedNavClickRoute,
+                  "https://www.studentconsulting.com",
+                ).toString();
+              }
+            },
             visible: options.matchedNavVisible,
           },
-        ]);
+        ];
+        if (matchedNavClicked && options.matchedNavAfterClickHref) {
+          items.push({
+            text: "Mina jobbmatchningar",
+            href: options.matchedNavAfterClickHref,
+            dataHref: undefined,
+            dataUrl: undefined,
+            onClick: () => {},
+            visible: true,
+          });
+        }
+        return fakeLocator(items);
       }
       if (
         current.pathname === profileLandingRoute &&
@@ -236,6 +251,14 @@ function matchedProfilePage(
             },
           },
         ]);
+      }
+      if (
+        current.pathname === profileLandingRoute &&
+        matchedNavClicked &&
+        options.matchedNavAfterClickJobHref &&
+        selector === "a[href]"
+      ) {
+        return fakeLocator([{ href: options.matchedNavAfterClickJobHref }]);
       }
       if (
         current.pathname === matchedProfileRoute &&
@@ -426,6 +449,62 @@ describe("StudentConsulting authenticated discovery", () => {
         matchedNavLabel: "Mina jobbmatchningar",
         matchedNavHref: "/",
         matchedNavClickRoute: "/sv/profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("rescans profile navigation after a root-placeholder toggle click", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavHref: "/",
+        matchedNavAfterClickHref: "/sv/profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("discovers inline matched jobs after a root-placeholder toggle click", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavHref: "/",
+        matchedNavAfterClickJobHref:
+          "/sv/lediga-jobb/stockholm/supporttekniker/87178/",
       }),
       credentials: {
         async getStudentConsultingCredentials() {

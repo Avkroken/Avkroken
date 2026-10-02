@@ -192,16 +192,25 @@ export class StudentConsultingProvider implements JobProvider {
     }
 
     const matchedJobsUrl = matchedNavigation.url;
-    const matchedRouteSource = "visible_navigation";
+    const inPlaceListing =
+      matchedNavigation.status === "in_place"
+        ? matchedNavigation.listing
+        : undefined;
+    const matchedRouteSource =
+      matchedNavigation.status === "in_place"
+        ? "visible_navigation_in_place"
+        : "visible_navigation";
 
-    await this.page.goto(matchedJobsUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 30_000,
-    });
-    if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
-      throw new Error(
-        "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
-      );
+    if (!inPlaceListing) {
+      await this.page.goto(matchedJobsUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+      if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+        throw new Error(
+          "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+        );
+      }
     }
     if (await hasVisibleStudentConsultingLoginControls(this.page)) {
       throw new Error(
@@ -221,23 +230,30 @@ export class StudentConsultingProvider implements JobProvider {
     for (let pageNumber = 1; pageNumber <= this.maxPagesPerSource; pageNumber += 1) {
       if (candidates.size >= this.maxJobs) break;
 
-      const listingUrl = withPage(matchedJobsUrl, pageNumber);
-      await this.page.goto(listingUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-      if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
-        throw new Error(
-          "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
-        );
-      }
-      if (await hasVisibleStudentConsultingLoginControls(this.page)) {
-        throw new Error(
-          "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: Matcha jobb-listningen kräver en autentiserad profilsession.",
-        );
-      }
+      if (inPlaceListing && pageNumber > 1) break;
 
-      const listing = await collectJobLinks(this.page);
+      let listing: MatchedListingObservation;
+      if (inPlaceListing) {
+        listing = inPlaceListing;
+      } else {
+        const listingUrl = withPage(matchedJobsUrl, pageNumber);
+        await this.page.goto(listingUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+        if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
+          throw new Error(
+            "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+          );
+        }
+        if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+          throw new Error(
+            "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: Matcha jobb-listningen kräver en autentiserad profilsession.",
+          );
+        }
+
+        listing = await collectJobLinks(this.page);
+      }
       if (listing.links.length === 0) {
         if (pageNumber === 1 && listing.explicitEmpty) {
           throw new Error(
@@ -595,6 +611,11 @@ type MatchedJobsNavigation =
     }
   | { status: "found"; url: string }
   | {
+      status: "in_place";
+      url: string;
+      listing: MatchedListingObservation;
+    }
+  | {
       status: "invalid";
       reason: "missing_href" | "untrusted_href" | "ambiguous";
       path?: string;
@@ -648,6 +669,7 @@ function isStudentConsultingNavigationPlaceholder(value: string): boolean {
 
 async function findMatchedJobsNavigation(
   page: BrowserPage,
+  allowPlaceholderClick = true,
 ): Promise<MatchedJobsNavigation> {
   const anchors = page.locator("a");
   const count = await anchors.count();
@@ -725,14 +747,20 @@ async function findMatchedJobsNavigation(
       navigationValues.map(safeStudentConsultingPath).find(Boolean) ?? undefined;
   }
 
-  if (placeholderAnchors.length > 0) {
-    if (invalidReason) {
-      return { status: "invalid", reason: invalidReason, path: invalidPath };
-    }
+  if (invalidReason) {
+    return { status: "invalid", reason: invalidReason, path: invalidPath };
+  }
+  if (validUrls.size > 1) {
+    return { status: "invalid", reason: "ambiguous" };
+  }
+  if (validUrls.size === 1) {
+    return { status: "found", url: [...validUrls][0] };
+  }
+
+  if (placeholderAnchors.length > 0 && allowPlaceholderClick) {
     if (
       placeholderAnchors.length !== 1 ||
-      visibleAnchorSemanticMatches !== 1 ||
-      validUrls.size > 0
+      visibleAnchorSemanticMatches !== placeholderAnchors.length
     ) {
       return { status: "invalid", reason: "ambiguous" };
     }
@@ -751,6 +779,17 @@ async function findMatchedJobsNavigation(
       return { status: "found", url: clickedUrl };
     }
 
+    const rescanned = await findMatchedJobsNavigation(page, false);
+    if (rescanned.status !== "absent") return rescanned;
+
+    const inPlaceUrl = normalizeStudentConsultingProfileAreaUrl(page.url());
+    if (inPlaceUrl) {
+      const listing = await collectJobLinks(page);
+      if (listing.links.length > 0 || listing.explicitEmpty) {
+        return { status: "in_place", url: inPlaceUrl, listing };
+      }
+    }
+
     const safeCurrent = normalizeStudentConsultingMainOriginUrl(page.url());
     return {
       status: "invalid",
@@ -759,7 +798,7 @@ async function findMatchedJobsNavigation(
     };
   }
 
-  if (visibleAnchorSemanticMatches === 0) {
+  if (visibleAnchorSemanticMatches === placeholderAnchors.length) {
     const controls = page.locator(
       'button,[role="link"],[data-href],[data-url],[onclick]',
     );
