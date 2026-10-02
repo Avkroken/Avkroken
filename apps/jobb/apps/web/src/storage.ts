@@ -109,6 +109,7 @@ export async function failExpiredBankIdRuns(
            completed_at = COALESCE(completed_at, CURRENT_TIMESTAMP),
            updated_at = CURRENT_TIMESTAMP
        WHERE status = 'needs_user_auth'
+         AND auth_session_id IS NOT NULL
          AND (
            auth_expires_at IS NULL
            OR datetime(auth_expires_at) IS NULL

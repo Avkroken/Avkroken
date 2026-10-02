@@ -42,11 +42,9 @@ The Worker exposes a protected read-only endpoint:
 
 BankID/e-identification remains user-controlled.
 
-`startArbetsformedlingenHandoff()` acquires a reusable Cloudflare Browser Run session, navigates to Mina sidor, follows the public `Logga in` flow and creates a Live View URL. The browser connection is then disconnected while the remote session remains alive.
+Arbetsförmedlingen reporting is completed in the user's own browser. The authenticated Jobb dashboard opens the public Mina sidor URL in a normal browser tab; no Cloudflare Browser Run Live View is used for the user-facing BankID/report flow.
 
-The user performs the e-identification step in Live View. `getArbetsformedlingenHandoffStatus()` reconnects to the same Browser Run session and determines whether the authenticated Mina sidor UI is present.
-
-The Browser Run session ID is sensitive session state. It is stored server-side and is not exposed as a long-lived public browser credential. The ephemeral Live View URL is surfaced only inside the authenticated dashboard while user action is required.
+After Arbetsförmedlingen itself confirms that the report has been submitted, the user explicitly confirms that result in Jobb. The confirmation endpoint is authenticated and same-origin protected, records the report as user-confirmed local-browser submission, and clears any legacy remote-session metadata.
 
 ## Authenticated activity-report adapter
 
@@ -65,7 +63,7 @@ After BankID succeeds:
 9. If Save is ambiguous, the next pass verifies whether the exact Jobb-ID already exists instead of clicking Save again blindly.
 10. Final report submission persists `submitting` before the external submit action and verifies confirmation before marking the report `submitted`.
 
-Since June 2026, Arbetsförmedlingen can require answers to activities transferred from a handlingsplan. The adapter does not invent those answers. Any unresolved required question leaves the Browser Run session available for the user and the flow resumes only after the user has acted.
+Since June 2026, Arbetsförmedlingen can require answers to activities transferred from a handlingsplan. Jobb does not invent those answers. They are answered directly by the user in Arbetsförmedlingen's own browser UI before the user confirms submission back in Jobb.
 
 ## Evidence and diagnostics
 

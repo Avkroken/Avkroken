@@ -3,8 +3,10 @@ import {
   type JobCandidate,
 } from "../../../packages/core/src/types";
 import type { StudentConsultingProvider } from "../../../packages/studentconsulting/src/provider";
-import { startArbetsformedlingenHandoff } from "./arbetsformedlingen-handoff";
-import { notifyBankIdRequired, type NotificationEnv } from "./notifier";
+import {
+  notifyActivityReportActionRequired,
+  type NotificationEnv,
+} from "./notifier";
 import { evaluateSuitability, type SuitabilityEnv } from "./policy";
 import { withStudentConsultingProvider, type ProviderEnv } from "./providers";
 import {
@@ -240,18 +242,17 @@ export async function executeAutomation(
 
   await setReportStatus(env.DB, reportMonth, "ready", reportCoverageNote);
 
-  const handoff = await startArbetsformedlingenHandoff(env.BROWSER);
   await setReportStatus(env.DB, reportMonth, "needs_user_auth", reportCoverageNote);
   await updateRun(env.DB, runId, {
     status: "needs_user_auth",
     verifiedCount,
-    authSessionId: handoff.sessionId,
-    authLiveViewUrl: handoff.liveViewUrl,
-    authExpiresAt: handoff.expiresAt,
+    authSessionId: null,
+    authLiveViewUrl: null,
+    authExpiresAt: null,
     lastNotifiedAt: new Date().toISOString(),
   });
 
-  const notifications = await notifyBankIdRequired(env, runId, handoff.expiresAt);
+  const notifications = await notifyActivityReportActionRequired(env, runId);
   for (const notification of notifications) {
     await recordNotification(env.DB, {
       id: crypto.randomUUID(),
@@ -271,7 +272,7 @@ export async function executeAutomation(
     verifiedCount,
     message:
       (reportCoverageNote ? reportCoverageNote + " " : "") +
-      "BankID krävs innan aktivitetsrapporten kan skickas in.",
+      "Öppna Arbetsförmedlingen i din egen webbläsare, logga in med BankID och skicka aktivitetsrapporten där.",
   };
 }
 

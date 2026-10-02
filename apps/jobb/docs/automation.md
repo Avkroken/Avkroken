@@ -48,8 +48,8 @@ A scheduled run:
 2. Applies only to configured suitable StudentConsulting jobs.
 3. Uses exactly ten D1 quota slots for the month; an 11th automatic submission cannot acquire a slot.
 4. Never counts an application as verified until the exact StudentConsulting Jobb-ID is proven from authenticated state. Verification first queries the same-origin job-openings API inside Browser Run and requires the exact row to have `is_applied=true`; otherwise it falls back to the authenticated `Ansökningar` view, where the exact Jobb-ID must appear as text or in a trusted StudentConsulting job-detail URL. `Ansökningar` navigation uses the same exact-origin/profile-area fail-closed rules as discovery and may handle placeholder/data-navigation or one semantic SPA click; reconciliation never resubmits an uncertain application.
-5. During the 1st–14th reporting window, prepares the previous calendar month's activity report and starts the user-controlled BankID handoff.
-6. Sends a notification when BankID is required.
+5. During the 1st–14th reporting window, prepares the previous calendar month's activity-report context and waits for the user to continue in Arbetsförmedlingen in their own browser.
+6. Sends a notification when the report needs user action.
 
 ## Exact monthly quota
 
@@ -123,21 +123,17 @@ An optional generic HTTPS webhook can be configured with:
 NOTIFY_WEBHOOK_URL=https://example.com/hooks/bankid
 ```
 
-The notification links to the protected dashboard. It does not expose the ephemeral Browser Run Live View URL outside the authenticated dashboard.
+The notification links to the protected dashboard. It does not expose a remote browser session.
 
-## BankID and authenticated form discovery
+## BankID and local-browser activity reporting
 
-The application can start and retain an Arbetsförmedlingen browser session and display the BankID handoff in the dashboard. The user must personally complete the BankID/e-identification step.
+The activity report is completed in the user's own browser. The dashboard exposes **Öppna Arbetsförmedlingen**, which opens the public Mina sidor URL on the current device. BankID/e-identification, any mandatory handlingsplan questions, and the final external submission remain entirely in Arbetsförmedlingen's own UI.
 
-While a handoff is active, the dashboard shows an **Öppna BankID** action for the ephemeral Live View URL and a separate **Jag är klar – kontrollera** action. The dashboard may also poll the authenticated session, but it never performs the BankID step for the user. After BankID succeeds, a fail-closed integration probe navigates to the activity report and stores its **form schema**, not the user's entered values. The probe records items such as headings, input/select/button names, control types, list options and sanitized link paths. It never reads or stores input values.
+Jobb shows the locally verified applications that actually belong to the previous month as reporting context. Missing historical Jobb records do not block submission and are never replaced by fabricated or backdated activities.
 
-The probe exists because the authenticated activity-report form is not publicly documented as a write API. The report adapter uses semantic labels/roles and the verified probe instead of guessing private endpoints.
+After Arbetsförmedlingen itself shows that the report is submitted, the user selects **Jag har skickat in rapporten** in Jobb. That mutation is authenticated, same-origin protected, and requires an explicit confirmation payload. Jobb then marks the report `submitted` with external reference `manual:user-confirmed-local-browser` and completes the waiting run. Until that explicit confirmation, the run remains `needs_user_auth`.
 
-After a successful BankID login, the adapter loads the verified applications that actually belong to the previous month. If Jobb lacks historical records for part or all of that month, the report flow still continues with the activities it can substantiate; it never fabricates or backdates applications. It validates application dates in Europe/Stockholm, includes the StudentConsulting Jobb-ID together with the employer name, resolves occupations through JobTech Taxonomy, marks international applications as outside Sweden, and fills Swedish locations through the structured location control.
-
-Each activity is idempotent: D1 persists `pending → save_attempted → saved` before/after the external Save side effect. If Save returns an ambiguous result, the next pass first checks whether the exact Jobb-ID is already present and never blindly clicks Save again. The final report submission uses the same rule: `reports.status='submitting'` is persisted before the external submit click; later retries verify confirmation instead of resubmitting.
-
-Since June 2026, Arbetsförmedlingen can also require answers to activities transferred from the user's handlingsplan. The automation does **not** invent those answers. Any unresolved required question leaves the Browser Run session available in the dashboard for the user; after the user answers, polling resumes the same report flow.
+Legacy Browser Run probe/submission code remains isolated for compatibility but is not used by the dashboard's report workflow.
 
 ## D1 migrations
 

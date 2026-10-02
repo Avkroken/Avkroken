@@ -456,6 +456,7 @@ describe("automation run claims", () => {
     await failExpiredBankIdRuns(db);
 
     expect(statement).toContain("status = 'needs_user_auth'");
+    expect(statement).toContain("auth_session_id IS NOT NULL");
     expect(statement).toContain("auth_expires_at IS NULL");
     expect(statement).toContain("datetime(auth_expires_at) IS NULL");
     expect(statement).toContain("datetime(auth_expires_at) <= datetime('now')");

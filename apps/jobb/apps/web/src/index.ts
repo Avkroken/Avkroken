@@ -2,6 +2,7 @@ import type { BrowserWorker } from "@cloudflare/playwright";
 import { MONTHLY_APPLICATION_TARGET } from "../../../packages/core/src/types";
 import { getArbetsformedlingenHandoffStatus } from "./arbetsformedlingen-handoff";
 import { submitArbetsformedlingenActivityReport } from "./arbetsformedlingen-report";
+import { markReportSubmitted } from "./report-storage";
 import {
   authorizeDashboardRequest,
   dashboardAuthMode,
@@ -44,6 +45,7 @@ import {
 } from "./runtime-config";
 import {
   claimRunStart,
+  countVerifiedApplications,
   deleteRunRecords,
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
@@ -328,17 +330,6 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/api/runs/manual") {
-      const runtime = await resolveRuntimeConfiguration(env);
-      if (
-        !runtime.view.studentConsultingCredentials ||
-        !runtime.view.studentConsultingAutoSubmit
-      ) {
-        return Response.json(
-          { error: "StudentConsulting-konto och autosubmit måste vara konfigurerade." },
-          { status: 409 },
-        );
-      }
-
       const now = new Date();
       if (!isApplicationAutomationWindow(now)) {
         return Response.json(
@@ -352,6 +343,23 @@ export default {
 
       const applicationMonth = currentMonthKey(now);
       const reportMonth = previousMonthKey(now);
+      const verifiedCount = await countVerifiedApplications(env.DB, applicationMonth);
+      const targetReached = verifiedCount >= MONTHLY_APPLICATION_TARGET;
+      if (!targetReached) {
+        const runtime = await resolveRuntimeConfiguration(env);
+        if (
+          !runtime.view.studentConsultingCredentials ||
+          !runtime.view.studentConsultingAutoSubmit
+        ) {
+          return Response.json(
+            {
+              error:
+                "StudentConsulting-konto och autosubmit måste vara konfigurerade så länge månadsmålet inte är uppnått.",
+            },
+            { status: 409 },
+          );
+        }
+      }
       await failExpiredBankIdRuns(env.DB);
       await failOrphanedRunningRuns(env.DB);
 
@@ -405,6 +413,92 @@ export default {
         { runId, workflowInstanceId: instance.id, status: "queued" },
         { status: 202 },
       );
+    }
+
+    const manualReportSubmittedMatch = url.pathname.match(
+      /^\/api\/runs\/([^/]+)\/report\/manual-submitted$/,
+    );
+    if (request.method === "POST" && manualReportSubmittedMatch) {
+      const runId = decodeURIComponent(manualReportSubmittedMatch[1]);
+      const body = await request.json<{ confirmed?: boolean }>().catch(() => null);
+      if (!body?.confirmed) {
+        return Response.json(
+          {
+            error:
+              "Bekräfta endast efter att Arbetsförmedlingen visar att aktivitetsrapporten är inskickad.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const run = await getRun(env.DB, runId);
+      if (!run) return Response.json({ error: "Run not found" }, { status: 404 });
+      if (!isActivityReportWindow(new Date())) {
+        return Response.json(
+          {
+            error:
+              "Aktivitetsrapporten kan bara hanteras under rapportfönstret 1:a–14:e (Europe/Stockholm).",
+          },
+          { status: 409 },
+        );
+      }
+
+      const report = await env.DB
+        .prepare("SELECT status FROM reports WHERE report_month = ?")
+        .bind(run.report_month)
+        .first<{ status: string }>();
+      if (report?.status === "submitted") {
+        return Response.json({
+          runId,
+          reportMonth: run.report_month,
+          status: "submitted",
+          alreadySubmitted: true,
+        });
+      }
+      if (run.status !== "needs_user_auth") {
+        return Response.json(
+          {
+            error:
+              "Körningen väntar inte på lokal rapportåtgärd och kan därför inte bekräftas som inskickad.",
+          },
+          { status: 409 },
+        );
+      }
+      if (
+        !report ||
+        !["ready", "needs_user_auth", "failed"].includes(report.status)
+      ) {
+        return Response.json(
+          {
+            error:
+              "Rapporten är inte i ett läge där en lokal webbläsarbekräftelse kan registreras.",
+          },
+          { status: 409 },
+        );
+      }
+
+      await markReportSubmitted(
+        env.DB,
+        run.report_month,
+        "manual:user-confirmed-local-browser",
+      );
+      await updateRun(env.DB, runId, {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        lastError: null,
+        authSessionId: null,
+        authLiveViewUrl: null,
+        authExpiresAt: null,
+      });
+
+      return Response.json({
+        runId,
+        reportMonth: run.report_month,
+        status: "submitted",
+        verification: "user_confirmed_local_browser",
+        message:
+          "Aktivitetsrapporten är registrerad som inskickad efter din uttryckliga bekräftelse i den lokala webbläsaren.",
+      });
     }
 
     const bankIdMatch = url.pathname.match(
