@@ -530,7 +530,7 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
     { appCategory: "dozzle", theme: "1", pixelSize: 512, variant: "resized" },
   ]);
   assert.equal(listed.slice(0, 3).every((asset) => asset.appLabel === "Dozzle"), true);
-  assert.equal(listed.slice(0, 3).every((asset) => asset.themeLabel === "Tema 1"), true);
+  assert.equal(listed.slice(0, 3).every((asset) => asset.themeLabel === "Neon Glass"), true);
   assert.equal(listed[3].mirror, false);
 });
 
@@ -620,7 +620,7 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(plex.appCategory, "plex");
   assert.equal(plex.appLabel, "Plex");
   assert.equal(plex.theme, "1");
-  assert.equal(plex.themeLabel, "Tema 1");
+  assert.equal(plex.themeLabel, "Neon Glass");
   assert.equal(plex.pixelSize, 256);
   assert.equal(plex.pixelLabel, "256×256");
 });

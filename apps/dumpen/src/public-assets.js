@@ -1,3 +1,5 @@
+import { appThemeLabel } from "./app-theme-contract.js";
+
 const MANAGED_PREFIX = "uploads/";
 const ASSET_ID = /^[0-9a-f]{32}$/;
 const MAX_NAME_BYTES = 180;
@@ -121,7 +123,7 @@ function appAssetMetadata(key) {
     return {
       mirror, logicalKey, app, appCategory: app,
       appLabel: APP_LABELS[app] || app,
-      theme: sized[1], themeLabel: "Tema " + sized[1],
+      theme: sized[1], themeLabel: appThemeLabel(sized[1]),
       pixelSize, pixelLabel: pixelSize + "×" + pixelSize,
       variant: "resized", legacy: false,
     };
@@ -130,7 +132,7 @@ function appAssetMetadata(key) {
     return {
       mirror, logicalKey, app, appCategory: app,
       appLabel: APP_LABELS[app] || app,
-      theme: original[1], themeLabel: "Tema " + original[1],
+      theme: original[1], themeLabel: appThemeLabel(original[1]),
       pixelSize: APP_SOURCE_PIXEL_SIZE,
       pixelLabel: APP_SOURCE_PIXEL_SIZE + "×" + APP_SOURCE_PIXEL_SIZE,
       variant: "original", legacy: false,

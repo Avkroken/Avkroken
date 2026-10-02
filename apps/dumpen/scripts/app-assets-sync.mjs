@@ -1,16 +1,11 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
-export const APP_ASSET_APPS = {
-  dozzle: [1, 2, 3, 4, 5, 6],
-  maintainerr: [1, 2, 3],
-  plex: [1, 2, 3],
-  prowlarr: [1, 2, 3],
-  qbittorrent: [1, 2, 3],
-  radarr: [1, 2, 3, 4, 5, 6, 7],
-  sonarr: [1, 2, 3],
-  tautulli: [1, 2, 3],
-};
+import { APP_THEME_APPS, APP_THEME_IDS } from "../src/app-theme-contract.js";
+
+export const APP_ASSET_APPS = Object.fromEntries(
+  APP_THEME_APPS.map((app) => [app, [...APP_THEME_IDS]]),
+);
 
 export const APP_ASSET_SOURCE_SIZE = 1254;
 export const APP_ASSET_SIZES = [256, 512];

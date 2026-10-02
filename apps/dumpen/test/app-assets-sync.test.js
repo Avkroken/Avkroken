@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import { syncAppAssets } from "../scripts/app-assets-sync.mjs";
+import { APP_ASSET_APPS, syncAppAssets } from "../scripts/app-assets-sync.mjs";
 
 function fakeImageAdapter(sourceSize = 1254) {
   const dimensions = new Map();
@@ -37,6 +37,14 @@ function fakeImageAdapter(sourceSize = 1254) {
 
   return image;
 }
+
+test("app asset contract contains seven synchronized themes for all eight apps", () => {
+  assert.equal(Object.keys(APP_ASSET_APPS).length, 8);
+  for (const themes of Object.values(APP_ASSET_APPS)) {
+    assert.deepEqual(themes, [1, 2, 3, 4, 5, 6, 7]);
+  }
+  assert.equal(Object.values(APP_ASSET_APPS).flat().length, 56);
+});
 
 test("app asset sync launches Wrangler through Node instead of platform cmd shims", async () => {
   const wrapper = await readFile(new URL("../scripts/sync-app-assets.mjs", import.meta.url), "utf8");
