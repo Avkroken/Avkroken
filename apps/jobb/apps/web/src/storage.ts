@@ -305,6 +305,7 @@ export interface ApplicationForJobRow {
   verified_at: string | null;
   automation_run_id: string | null;
   report_month: string;
+  last_attempt_no: number | null;
   last_attempt_error_code: string | null;
   last_attempt_error_message: string | null;
 }
@@ -318,6 +319,13 @@ export async function getApplicationForJob(
     .prepare(
       `SELECT a.id, a.status, a.applied_at, a.verified_at,
               a.automation_run_id, a.report_month,
+              (
+                SELECT aa.attempt_no
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_no,
               (
                 SELECT aa.error_code
                 FROM application_attempts aa
@@ -359,11 +367,23 @@ export function isRetryablePreSubmitFailure(
     return true;
   }
 
-  return (
-    application.last_attempt_error_code === "APPLICATION_FAILED" &&
+  if (application.last_attempt_error_code !== "APPLICATION_FAILED") {
+    return false;
+  }
+
+  if (
     application.last_attempt_error_message?.startsWith(
       "STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:",
     ) === true
+  ) {
+    return true;
+  }
+
+  return (
+    application.last_attempt_error_message?.startsWith(
+      "APPLICATION_REQUIRES_INPUT:",
+    ) === true &&
+    (application.last_attempt_no ?? Number.MAX_SAFE_INTEGER) < 5
   );
 }
 
@@ -401,7 +421,13 @@ export async function requeueFailedPreSubmitApplication(
                  aa.error_code = 'APPLICATION_NOT_APPLIED'
                  OR (
                    aa.error_code = 'APPLICATION_FAILED'
-                   AND aa.error_message LIKE 'STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:%'
+                   AND (
+                     aa.error_message LIKE 'STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:%'
+                     OR (
+                       aa.error_message LIKE 'APPLICATION_REQUIRES_INPUT:%'
+                       AND aa.attempt_no < 5
+                     )
+                   )
                  )
                )
            )

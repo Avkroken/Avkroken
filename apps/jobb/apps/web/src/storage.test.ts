@@ -70,6 +70,7 @@ function applicationRow(
     verified_at: null,
     automation_run_id: "manual:old",
     report_month: "2026-10",
+    last_attempt_no: null,
     last_attempt_error_code: null,
     last_attempt_error_message: null,
     ...overrides,
@@ -145,6 +146,19 @@ describe("application retry state", () => {
       isRetryablePreSubmitFailure(
         applicationRow({
           automation_run_id: "manual:other",
+          last_attempt_no: 4,
+          last_attempt_error_code: "APPLICATION_FAILED",
+          last_attempt_error_message:
+            "APPLICATION_REQUIRES_INPUT: a required application field is empty.",
+        }),
+        "manual:new",
+      ),
+    ).toBe(true);
+    expect(
+      isRetryablePreSubmitFailure(
+        applicationRow({
+          automation_run_id: "manual:other",
+          last_attempt_no: 5,
           last_attempt_error_code: "APPLICATION_FAILED",
           last_attempt_error_message:
             "APPLICATION_REQUIRES_INPUT: a required application field is empty.",
@@ -173,6 +187,8 @@ describe("application retry state", () => {
     expect(fake.sql[0]).toContain("applied_at IS NULL");
     expect(fake.sql[0]).toContain("verified_at IS NULL");
     expect(fake.sql[0]).toContain("APPLICATION_NOT_APPLIED");
+    expect(fake.sql[0]).toContain("APPLICATION_REQUIRES_INPUT");
+    expect(fake.sql[0]).toContain("aa.attempt_no < 5");
     expect(fake.binds[0]).toEqual([
       "2026-10",
       "manual:new",
