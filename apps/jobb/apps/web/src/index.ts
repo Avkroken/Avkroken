@@ -32,7 +32,11 @@ import { captureAndPersistActivityReportProbe } from "./probe-service";
 import { createArbetsformedlingenProvider } from "./providers";
 import { readinessResponse } from "./readiness";
 import { requireSameOriginMutation } from "./request-security";
-import type { AutomationEnv } from "./runner";
+import {
+  confirmApplicationNotSubmitted,
+  recheckApplicationAttention,
+  type AutomationEnv,
+} from "./runner";
 import {
   resolveRuntimeConfiguration,
   saveRuntimeConfiguration,
@@ -193,6 +197,47 @@ export default {
         );
       } catch (error) {
         return jsonError(error, 400);
+      }
+    }
+
+    const applicationRecheckMatch = url.pathname.match(
+      /^\/api\/applications\/([^/]+)\/recheck$/,
+    );
+    if (request.method === "POST" && applicationRecheckMatch) {
+      try {
+        const applicationId = decodeURIComponent(applicationRecheckMatch[1]);
+        const runtime = await resolveRuntimeConfiguration(env);
+        const result = await recheckApplicationAttention(runtime.env, applicationId);
+        if (!result) {
+          return Response.json({ error: "Application not found" }, { status: 404 });
+        }
+        return Response.json(result, {
+          headers: { "cache-control": "no-store" },
+        });
+      } catch (error) {
+        return jsonError(error, 500);
+      }
+    }
+
+    const applicationNotSubmittedMatch = url.pathname.match(
+      /^\/api\/applications\/([^/]+)\/not-submitted$/,
+    );
+    if (request.method === "POST" && applicationNotSubmittedMatch) {
+      try {
+        const applicationId = decodeURIComponent(applicationNotSubmittedMatch[1]);
+        const runtime = await resolveRuntimeConfiguration(env);
+        const result = await confirmApplicationNotSubmitted(
+          runtime.env,
+          applicationId,
+        );
+        if (!result) {
+          return Response.json({ error: "Application not found" }, { status: 404 });
+        }
+        return Response.json(result, {
+          headers: { "cache-control": "no-store" },
+        });
+      } catch (error) {
+        return jsonError(error, 500);
       }
     }
 

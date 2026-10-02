@@ -6,8 +6,8 @@
 
 The protected dashboard is the operational control plane for the automation. It has five top-level views:
 
-- **Översikt** — monthly target, all ten quota slots, report state and active attention signals.
-- **Ansökningar** — filterable applications with run linkage, latest diagnostics and evidence count.
+- **Översikt** — monthly target, ten visible result slots filled only by verified applications, report state and active attention signals. Internal `uncertain` quota reservations are shown as separate safety blockers instead of consuming a visible approved slot.
+- **Ansökningar** — filterable applications with run linkage, latest diagnostics and evidence count. On narrow screens the application table becomes mobile cards. `needs_user_action` rows expose a provider-backed **Kontrollera igen** action and an explicit **Markera ej inskickad** resolution; only provider-confirmed applied state can promote an application to `verified`.
 - **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state.
 - **Aktivitetsrapport** — report status and per-activity `pending`, `save_attempted` and `saved` state.
 - **System** — runtime configuration status, a protected configuration editor and notification history; write-only secrets are never read back into the browser.
@@ -60,7 +60,7 @@ A scheduled run:
 - A verified submission marks its slot verified.
 - An ambiguous/unknown result keeps the slot as `uncertain` rather than allowing a replacement application that could accidentally become number 11.
 
-This is deliberately fail-closed: the automation will never knowingly submit more than ten jobs in a calendar month. If an external site leaves the result ambiguous, the dashboard reports the problem and blocks additional submissions until it is resolved.
+This is deliberately fail-closed: the automation will never knowingly submit more than ten jobs in a calendar month. If an external site leaves the result ambiguous, the dashboard reports the problem and blocks additional submissions until it is resolved. These internal reservations are safety holds, not completion credit: dashboard `quotaUsed` and the ten visible monthly result slots count only `verified` applications. An authenticated user may recheck the provider state or explicitly confirm that an uncertain application was not submitted; the latter releases the safety hold but never turns the application into a successful result.
 
 ## Error diagnostics
 

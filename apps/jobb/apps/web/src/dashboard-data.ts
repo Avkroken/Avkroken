@@ -6,11 +6,31 @@ import {
   previousMonthKey,
 } from "./time";
 
-interface QuotaSlotRow {
-  slot_no: number;
-  application_id: string | null;
-  state: "free" | "reserved" | "submitted" | "verified" | "uncertain";
+export interface VerifiedApplicationSlotRow {
+  application_id: string;
   updated_at: string | null;
+}
+
+export function buildVerifiedQuotaSlots(
+  verifiedApplications: readonly VerifiedApplicationSlotRow[],
+  target: number = MONTHLY_APPLICATION_TARGET,
+) {
+  return Array.from({ length: target }, (_, index) => {
+    const verifiedApplication = verifiedApplications[index];
+    return verifiedApplication
+      ? {
+          slot_no: index + 1,
+          application_id: verifiedApplication.application_id,
+          state: "verified" as const,
+          updated_at: verifiedApplication.updated_at,
+        }
+      : {
+          slot_no: index + 1,
+          application_id: null,
+          state: "free" as const,
+          updated_at: null,
+        };
+  });
 }
 
 interface DashboardRunState {
@@ -57,8 +77,8 @@ export async function getDashboardData(
 
   const [
     progress,
-    quota,
-    quotaRows,
+    unresolvedApplications,
+    verifiedApplications,
     report,
     reportItems,
     runs,
@@ -79,21 +99,22 @@ export async function getDashboardData(
       .first<{ verified: number }>(),
     db
       .prepare(
-        `SELECT COUNT(*) AS occupied
-         FROM monthly_application_slots
-         WHERE report_month = ? AND state <> 'free'`,
+        `SELECT COUNT(*) AS count
+         FROM applications
+         WHERE report_month = ? AND status = 'needs_user_action'`,
       )
       .bind(applicationMonth)
-      .first<{ occupied: number }>(),
+      .first<{ count: number }>(),
     db
       .prepare(
-        `SELECT slot_no, application_id, state, updated_at
-         FROM monthly_application_slots
-         WHERE report_month = ?
-         ORDER BY slot_no`,
+        `SELECT id AS application_id, verified_at AS updated_at
+         FROM applications
+         WHERE report_month = ? AND status = 'verified'
+         ORDER BY verified_at, id
+         LIMIT ?`,
       )
-      .bind(applicationMonth)
-      .all<QuotaSlotRow>(),
+      .bind(applicationMonth, MONTHLY_APPLICATION_TARGET)
+      .all<VerifiedApplicationSlotRow>(),
     db
       .prepare(
         `SELECT report_month, target_count, status, submitted_at, last_error, updated_at
@@ -196,19 +217,9 @@ export async function getDashboardData(
       .first<{ count: number }>(),
   ]);
 
-  const quotaSlots = Array.from({ length: MONTHLY_APPLICATION_TARGET }, (_, index) => {
-    const slotNo = index + 1;
-    return (
-      quotaRows.results.find((slot) => Number(slot.slot_no) === slotNo) ?? {
-        slot_no: slotNo,
-        application_id: null,
-        state: "free" as const,
-        updated_at: null,
-      }
-    );
-  });
+  const quotaSlots = buildVerifiedQuotaSlots(verifiedApplications.results);
 
-  const uncertainSlots = quotaSlots.filter((slot) => slot.state === "uncertain").length;
+  const uncertainSlots = Number(unresolvedApplications?.count ?? 0);
   const dashboardRuns = runs.results.map((run) => {
     if (!run || typeof run !== "object" || !("status" in run)) return run;
     return {
@@ -250,7 +261,7 @@ export async function getDashboardData(
     reportMonth,
     target: MONTHLY_APPLICATION_TARGET,
     verified: Number(progress?.verified ?? 0),
-    quotaUsed: Number(quota?.occupied ?? 0),
+    quotaUsed: Number(progress?.verified ?? 0),
     quotaSlots,
     applicationWindowOpen: isApplicationAutomationWindow(),
     report: report ?? null,

@@ -5,6 +5,7 @@ import {
   renderDashboardStyles,
 } from "./dashboard";
 import {
+  buildVerifiedQuotaSlots,
   isExpiredBankIdDashboardRun,
   isOrphanedDashboardRun,
 } from "./dashboard-data";
@@ -84,6 +85,41 @@ describe("dashboard run state", () => {
   });
 });
 
+describe("dashboard application quota", () => {
+  it("fills visible monthly slots only with verified applications", () => {
+    expect(
+      buildVerifiedQuotaSlots(
+        [
+          {
+            application_id: "application:studentconsulting:87567",
+            updated_at: "2026-10-02T13:03:40.204Z",
+          },
+        ],
+        3,
+      ),
+    ).toEqual([
+      {
+        slot_no: 1,
+        application_id: "application:studentconsulting:87567",
+        state: "verified",
+        updated_at: "2026-10-02T13:03:40.204Z",
+      },
+      {
+        slot_no: 2,
+        application_id: null,
+        state: "free",
+        updated_at: null,
+      },
+      {
+        slot_no: 3,
+        application_id: null,
+        state: "free",
+        updated_at: null,
+      },
+    ]);
+  });
+});
+
 describe("dashboard rendering", () => {
   it("renders operational navigation without embedding credential names", async () => {
     const response = renderDashboard();
@@ -124,6 +160,8 @@ describe("dashboard rendering", () => {
     expect(cssText).toContain("rgba(36,231,232,.11)");
     expect(cssText).toContain("rgba(213,29,203,.10)");
     expect(cssText).toContain("background-size:42px 42px");
+    expect(cssText).toContain(".app-cards");
+    expect(cssText).toContain(".applications-table{display:none}");
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("/api/configuration");
     expect(jsText).toContain("Spara konfiguration");
@@ -140,5 +178,11 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("method:action==='stop'?'POST':'DELETE'");
     expect(jsText).toContain("GitHub-inloggad, same-origin skyddad pipeline");
     expect(jsText).toContain("Övergivna körningar");
+    expect(jsText).toContain("Osäkra ansökningar");
+    expect(jsText).toContain("Godkända ansökningar");
+    expect(jsText).toContain("Kontrollera igen");
+    expect(jsText).toContain("Markera ej inskickad");
+    expect(jsText).toContain("/api/applications/");
+    expect(jsText).toContain("not-submitted");
   });
 });
