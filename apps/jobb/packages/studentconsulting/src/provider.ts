@@ -9,6 +9,7 @@ import { isHostOrSubdomain } from "../../core/src/url";
 import type { BrowserLocator, BrowserPage } from "./browser";
 
 const DEFAULT_BASE_URL = "https://www.studentconsulting.com";
+const PROFILE_URL = `${DEFAULT_BASE_URL}/sv/profil/`;
 const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
@@ -69,7 +70,7 @@ export class StudentConsultingProvider implements JobProvider {
     try {
       const { username, password } =
         await this.credentials.getStudentConsultingCredentials();
-      const redirectUrl = `${DEFAULT_BASE_URL}/sv/`;
+      const redirectUrl = PROFILE_URL;
       const loginUrl = `${DEFAULT_BASE_URL}/signin?language=sv-SE&redirectUrl=${encodeURIComponent(redirectUrl)}`;
 
       await this.page.goto(loginUrl, {
@@ -129,6 +130,14 @@ export class StudentConsultingProvider implements JobProvider {
           message: `Unexpected login redirect host: ${host}`,
         };
       }
+      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+        return {
+          status: "failed",
+          code: "STUDENTCONSULTING_PROFILE_NOT_REACHED",
+          message:
+            "StudentConsulting authentication did not reach the authenticated /sv/profil/ area.",
+        };
+      }
 
       if (await hasVisibleStudentConsultingLoginControls(this.page)) {
         return {
@@ -150,10 +159,15 @@ export class StudentConsultingProvider implements JobProvider {
   }
 
   async discover(): Promise<JobCandidate[]> {
-    await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+    await this.page.goto(PROFILE_URL, {
       waitUntil: "domcontentloaded",
       timeout: 30_000,
     });
+    if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+      throw new Error(
+        "STUDENTCONSULTING_PROFILE_REDIRECTED: den autentiserade profilentryn lämnade /sv/profil/.",
+      );
+    }
     if (await hasVisibleStudentConsultingLoginControls(this.page)) {
       throw new Error(
         "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: profilsessionen är inte autentiserad.",
@@ -371,10 +385,11 @@ export class StudentConsultingProvider implements JobProvider {
 
   async verify(job: JobCandidate): Promise<boolean> {
     try {
-      await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+      await this.page.goto(PROFILE_URL, {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
+      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) return false;
 
       const applicationsUrl = await findApplicationsUrl(this.page);
       if (!applicationsUrl) return false;
@@ -532,6 +547,17 @@ function normalizeStudentConsultingMainOriginUrl(
   }
 }
 
+function normalizeStudentConsultingProfileAreaUrl(
+  value: string,
+): string | null {
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
+  if (!safe) return null;
+
+  const pathname = new URL(safe).pathname;
+  if (!/^\/sv\/profil(?:\/|$)/i.test(pathname)) return null;
+  return safe;
+}
+
 export function normalizeStudentConsultingMatchedJobsUrl(
   value: string,
 ): string | null {
@@ -540,7 +566,7 @@ export function normalizeStudentConsultingMatchedJobsUrl(
 
   const pathname = new URL(safe).pathname;
   if (
-    !/^\/sv\/min-profil\/(?:matcha|matchade|matchande)-jobb\/?$/i.test(
+    !/^\/sv\/(?:min-profil|profil)\/(?:matcha|matchade|matchande)-jobb\/?$/i.test(
       pathname,
     )
   ) {
@@ -581,7 +607,7 @@ function normalizeStudentConsultingVisibleMatchedJobsUrl(
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
-  if (!/^\/sv\/min-profil\/.+/i.test(pathname)) return null;
+  if (!/^\/sv\/(?:min-profil|profil)\/.+/i.test(pathname)) return null;
   return safe;
 }
 

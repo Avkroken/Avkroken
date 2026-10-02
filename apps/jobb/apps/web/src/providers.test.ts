@@ -54,6 +54,11 @@ describe("trusted URL validation", () => {
     );
     expect(
       normalizeStudentConsultingMatchedJobsUrl(
+        "https://www.studentconsulting.com/sv/profil/matcha-jobb/",
+      ),
+    ).toBe("https://www.studentconsulting.com/sv/profil/matcha-jobb/");
+    expect(
+      normalizeStudentConsultingMatchedJobsUrl(
         "https://profile.studentconsulting.com/sv/min-profil/matcha-jobb/",
       ),
     ).toBeNull();
@@ -164,10 +169,11 @@ function matchedProfilePage(
     explicitEmpty?: boolean;
   } = {},
 ): BrowserPage {
-  let currentUrl = "https://www.studentconsulting.com/sv/";
+  let currentUrl = "https://www.studentconsulting.com/sv/profil/";
   let matchedRouteVisits = 0;
+  const profileLandingRoute = "/sv/profil/";
   const matchedProfileRoute =
-    options.matchedProfileRoute ?? "/sv/min-profil/matcha-jobb/";
+    options.matchedProfileRoute ?? "/sv/profil/matcha-jobb/";
 
   return {
     async goto(url: string) {
@@ -184,7 +190,7 @@ function matchedProfilePage(
     locator(selector: string) {
       const current = new URL(currentUrl);
       if (
-        current.pathname === "/sv/" &&
+        current.pathname === profileLandingRoute &&
         selector === "a" &&
         (options.matchedNavControl ?? "anchor") === "anchor"
       ) {
@@ -201,7 +207,7 @@ function matchedProfilePage(
         ]);
       }
       if (
-        current.pathname === "/sv/" &&
+        current.pathname === profileLandingRoute &&
         selector ===
           'button,[role="link"],[data-href],[data-url],[onclick]' &&
         options.matchedNavControl === "button"
@@ -443,23 +449,39 @@ describe("StudentConsulting authenticated discovery", () => {
     );
   });
 
-  it("rejects visible Matcha jobb navigation outside the authenticated profile area", async () => {
-    const provider = new StudentConsultingProvider({
-      page: matchedProfilePage({
-        matchedNavHref: "/sv/lediga-jobb/",
-      }),
-      credentials: {
-        async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
+  it.each([
+    "/sv/lediga-jobb/",
+    "/sv/for-jobbsokare/jobbmatchning/",
+  ])(
+    "rejects visible Matcha jobb navigation outside the authenticated profile area: %s",
+    async (matchedNavHref) => {
+      const provider = new StudentConsultingProvider({
+        page: matchedProfilePage({
+          matchedNavHref,
+        }),
+        credentials: {
+          async getStudentConsultingCredentials() {
+            return {
+              username: "user@example.test",
+              password: ["test", "placeholder"].join("-"),
+            };
+          },
         },
-      },
-      maxPagesPerSource: 1,
-      fetcher: countryIndexFetcher,
-    });
+        maxPagesPerSource: 1,
+        fetcher: countryIndexFetcher,
+      });
 
-    await expect(provider.discover()).rejects.toThrow(
-      /STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID:.*untrusted_href.*\/sv\/lediga-jobb\//,
-    );
+      let message = "";
+      try {
+        await provider.discover();
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).toContain(
+        "STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID",
+      );
+      expect(message).toContain("untrusted_href");
+      expect(message).toContain(`path=${matchedNavHref}`);
   });
 
   it("rejects matched-profile navigation on a StudentConsulting subdomain", async () => {
