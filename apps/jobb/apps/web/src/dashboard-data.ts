@@ -40,6 +40,7 @@ interface DashboardRunState {
   target_count?: number | null;
   workflow_instance_id?: string | null;
   application_count?: number | null;
+  auth_live_view_url?: string | null;
   auth_expires_at?: string | null;
   updated_at?: string | null;
 }
@@ -51,7 +52,12 @@ export function isExpiredBankIdDashboardRun(
   nowMs = Date.now(),
 ): boolean {
   if (run.status !== "needs_user_auth") return false;
+
+  // Local-browser report handoffs intentionally have no Browser Run session
+  // or expiry. Only legacy remote Browser Run handoffs can expire.
+  if (!run.auth_live_view_url && !run.auth_expires_at) return false;
   if (!run.auth_expires_at) return true;
+
   const expiresAtMs = Date.parse(run.auth_expires_at);
   return !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
 }

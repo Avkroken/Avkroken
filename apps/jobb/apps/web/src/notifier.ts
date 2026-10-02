@@ -22,10 +22,9 @@ export interface NotificationResult {
   error?: string;
 }
 
-export async function notifyBankIdRequired(
+export async function notifyActivityReportActionRequired(
   env: NotificationEnv,
   runId: string,
-  expiresAt: string,
 ): Promise<NotificationResult[]> {
   const dashboardUrl = env.PUBLIC_BASE_URL?.replace(/\/$/, "") ?? "";
   const results: NotificationResult[] = [];
@@ -35,11 +34,11 @@ export async function notifyBankIdRequired(
       await env.EMAIL.send({
         to: env.NOTIFY_EMAIL_TO,
         from: env.NOTIFY_EMAIL_FROM,
-        subject: "Jobb: BankID krävs för aktivitetsrapporten",
+        subject: "Jobb: aktivitetsrapporten behöver skickas in",
         text: [
-          "Jobbautomation väntar på din BankID-signering.",
+          "Öppna Jobb-dashboarden på din egen enhet och fortsätt aktivitetsrapporten i din vanliga webbläsare.",
           dashboardUrl ? `Öppna dashboarden: ${dashboardUrl}` : "Öppna jobb-dashboarden.",
-          `Sessionen gäller till ${expiresAt}.`,
+          "Logga in hos Arbetsförmedlingen med BankID i din egen webbläsare och skicka rapporten där.",
           `Körning: ${runId}`,
         ].join("\n"),
       });
@@ -59,11 +58,11 @@ export async function notifyBankIdRequired(
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          event: "bankid_required",
+          event: "activity_report_action_required",
           runId,
-          expiresAt,
           dashboardUrl: dashboardUrl || undefined,
-          message: "Jobbautomation väntar på BankID-signering.",
+          message:
+            "Aktivitetsrapporten behöver slutföras i användarens egen webbläsare.",
         }),
       });
       if (!response.ok) throw new Error(`Webhook returned HTTP ${response.status}`);

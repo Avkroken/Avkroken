@@ -27,7 +27,7 @@ Viktiga säkerhetsgränser:
 - StudentConsulting-autosubmit är fail-closed och kräver `STUDENTCONSULTING_AUTOSUBMIT=true`. OIDC-flödet returnerar till den verifierade profilentryn `https://www.studentconsulting.com/sv/profil/`; discovery och verifiering återbesöker samma entry i stället för publika `/sv/`. Om `/signin` återanvänder en redan autentiserad Browser Run-session och landar direkt i profilområdet utan synliga login-kontroller accepteras sessionen utan ny credential-read eller formulärsubmit; auth godtas bara på exakt StudentConsulting-origin under `/sv/profil/`. Jobbmatchningsnavigation identifieras semantiskt via etablerade **Matcha jobb**-varianter samt explicita former av `Jobbmatchning(ar)` och `Matchning(ar) mot jobb`; orelaterade publika etiketter accepteras inte. En semantisk matchningsanchor måste ge exakt en betrodd route under `/sv/profil/...` eller äldre observerade `/sv/min-profil/...`. Ett benign root-placeholder i `href` får kombineras med exakt en betrodd `data-href` eller `data-url`. Saknas sådan data-route får exakt en synlig semantisk placeholder-anchor klickas. Om URL:en ligger kvar på profilentryn reskannas navigationen en gång efter en nytillkommen betrodd semantisk route/kontroll, utan rekursivt omklick av samma placeholder. Resultat-routen måste validera till det betrodda profilområdet. Externa, credential-bärande, utanför-profil-redirects eller ambivalenta alternativ failar stängt. Om sådan ankarlänk saknas får en enda entydig synlig button/role-link/data-navigation-kontroll aktiveras, men destinations-URL:en måste efter klick passera samma origin-/profilvalidering. Saknad/otillåten/ambivalent matchningsnavigation stoppar körningen och ingen hårdkodad profilfallback används. Vid saknad träff får diagnostik endast exponera högst 20 same-origin `/sv/profil/...`- eller äldre `/sv/min-profil/...`-paths samt strukturräknare för totala/synliga anchors och kontroller, semantiska matchningar och `data-href`/`data-url`/`onclick`; aldrig etiketter, profiltext, queryvärden, attributpayloads eller inputvärden. Synliga login-kontroller kontrolleras efter auth, profilöppning och varje listing-navigation. Okänd vald matched-page-struktur rapporterar endast sanerade elementräknare. Land enrichas från StudentConsultings publika jobb-API med explicita landsfilter för Sverige/Norge/Danmark när detaljsidan saknar `Land`; olöst eller ambivalent land stoppar kandidaten före autosubmit.
 - En ansökan räknas inte som verifierad förrän exakt StudentConsulting Jobb-ID bevisas i autentiserat state. Först läses StudentConsultings same-origin job-openings API inne i Browser Run och exakt raden måste ha `is_applied=true`; annars används den autentiserade `Ansökningar`-vyn och exakt Jobb-ID måste finnas som text eller i en betrodd StudentConsulting job-detail-URL. `Ansökningar`-navigation använder exakt origin/profilområde och failar stängt vid extern, credential-bärande eller ambivalent navigation; reconciliation skickar aldrig om en uncertain ansökan.
 - D1 har exakt tio interna quota-reservationer per månad. Ett definitivt pre-submit-fel får släppa sin reservation och kan återköas atomiskt endast av samma automation run när application-raden fortfarande är `failed` med `applied_at IS NULL` och `verified_at IS NULL`; nästa försök får högre `attempt_no` och application-historiken flyttas inte mellan runs. `queued`, `applying`, `submitted`, `verified`, `needs_user_action` eller någon rad som kan ha skickats återköas inte. Ett osäkert submit-resultat behåller reservationen som `uncertain`; systemet kompenserar inte med en potentiell elfte ansökan. Dashboardens tio synliga månadsplatser är däremot mål-/resultatplatser och fylls endast av `verified` ansökningar; `needs_user_action` visas separat som en säkerhetsspärr och räknas inte som godkänd ansökan.
-- BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i Cloudflare Browser Run Live View.
+- BankID/e-identifikation automatiseras aldrig. Användaren genomför den själv i sin vanliga webbläsare på Arbetsförmedlingens Mina sidor; Jobb använder inte Browser Run Live View för rapportinlämningen.
 - Arbetsförmedlingens rapportflöde är idempotent runt externa Save/Submit-side effects och återupprepar inte ett osäkert side effect blint.
 - Obligatoriska handlingsplanfrågor besvaras inte automatiskt när ett säkert svar saknas.
 - Credentials, Browser Run-sessioner och hemligheter ska inte exponeras i publika dokument, dashboarddata eller loggar.
@@ -121,16 +121,14 @@ Ett definitivt misslyckande kan frigöra en reserverad slot. Ett osäkert result
 
 Den publika JobSearch-integrationen är read-only och används för jobbdata.
 
-Aktivitetsrapportering använder en separat autentiserad Browser Run-session:
+Aktivitetsrapportering använder användarens egen webbläsare:
 
-1. systemet startar en handoff till Mina sidor,
-2. användaren genomför BankID/e-identifikation,
-3. systemet verifierar autentiserat state,
-4. en sanitiserad form-probe verifierar den faktiska UI-strukturen,
-5. verifierade ansökningar som faktiskt hör till föregående månad laddas; saknad historik blockerar inte rapportsubmission och inga aktiviteter fabriceras eller bakdateras,
-6. occupation löses fail-closed via JobTech Taxonomy,
-7. aktiviteter sparas idempotent,
-8. slutlig rapportsubmission verifieras före `submitted`.
+1. Jobb visar en länk till Arbetsförmedlingens Mina sidor,
+2. användaren öppnar Arbetsförmedlingen på sin egen enhet och genomför BankID/e-identifikation,
+3. användaren fyller eventuella obligatoriska frågor och skickar rapporten i Arbetsförmedlingens eget UI,
+4. Jobb fabricerar eller bakdaterar inga aktiviteter; verifierade ansökningar som faktiskt hör till föregående månad visas som underlag,
+5. efter att Arbetsförmedlingen visar inskickningsbekräftelse bekräftar användaren detta uttryckligen i Jobb,
+6. Jobb lagrar rapporten som `submitted` med en spårbar markör för användarbekräftad lokal webbläsarsubmission.
 
 Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens ifyllda inputvärden.
 

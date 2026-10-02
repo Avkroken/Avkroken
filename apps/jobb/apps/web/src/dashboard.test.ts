@@ -49,6 +49,19 @@ describe("dashboard run state", () => {
     ).toBe(false);
   });
 
+  it("keeps local-browser report handoffs active without Browser Run expiry", () => {
+    expect(
+      isExpiredBankIdDashboardRun(
+        {
+          status: "needs_user_auth",
+          auth_live_view_url: null,
+          auth_expires_at: null,
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+
   it("counts only the latest unresolved application failure as operational", () => {
     expect(
       isOperationallyFailedDashboardRun(
@@ -204,8 +217,11 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("/api/configuration");
     expect(jsText).toContain("Spara konfiguration");
-    expect(jsText).toContain("Öppna BankID");
-    expect(jsText).toContain("Jag är klar – kontrollera");
+    expect(jsText).toContain("Öppna Arbetsförmedlingen");
+    expect(jsText).toContain("Aktivitetsrapport i din webbläsare");
+    expect(jsText).toContain("Jag har skickat in rapporten");
+    expect(jsText).toContain("/report/manual-submitted");
+    expect(jsText).not.toContain("live.browser.run");
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");
     expect(jsText).toContain("Domain=.denied.se");
