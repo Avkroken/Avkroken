@@ -656,6 +656,7 @@ async function findMatchedJobsNavigation(
   let visibleAnchors = 0;
   let anchorSemanticMatches = 0;
   let visibleAnchorSemanticMatches = 0;
+  const placeholderAnchors: BrowserLocator[] = [];
   let invalidReason: "missing_href" | "untrusted_href" | undefined;
   let invalidPath: string | undefined;
 
@@ -710,9 +711,52 @@ async function findMatchedJobsNavigation(
       continue;
     }
 
+    if (
+      navigationValues.every((value) =>
+        isStudentConsultingNavigationPlaceholder(value),
+      )
+    ) {
+      placeholderAnchors.push(anchor);
+      continue;
+    }
+
     invalidReason = "untrusted_href";
     invalidPath =
       navigationValues.map(safeStudentConsultingPath).find(Boolean) ?? undefined;
+  }
+
+  if (placeholderAnchors.length > 0) {
+    if (invalidReason) {
+      return { status: "invalid", reason: invalidReason, path: invalidPath };
+    }
+    if (
+      placeholderAnchors.length !== 1 ||
+      visibleAnchorSemanticMatches !== 1 ||
+      validUrls.size > 0
+    ) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+
+    try {
+      await placeholderAnchors[0].click({ timeout: 10_000 });
+      await page.waitForTimeout(400);
+    } catch {
+      return { status: "invalid", reason: "missing_href" };
+    }
+
+    const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(
+      page.url(),
+    );
+    if (clickedUrl) {
+      return { status: "found", url: clickedUrl };
+    }
+
+    const safeCurrent = normalizeStudentConsultingMainOriginUrl(page.url());
+    return {
+      status: "invalid",
+      reason: "untrusted_href",
+      path: safeCurrent ? new URL(safeCurrent).pathname : undefined,
+    };
   }
 
   if (visibleAnchorSemanticMatches === 0) {
