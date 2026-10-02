@@ -21,11 +21,13 @@ import {
   createRun,
   ensureReport,
   finishAttempt,
+  getApplicationForJob,
   getRun,
-  hasApplicationForJob,
+  isRetryablePreSubmitFailure,
   nextAttemptNumber,
   persistJob,
   recordNotification,
+  requeueFailedPreSubmitApplication,
   scheduledRunId,
   setApplicationStatus,
   setReportStatus,
@@ -378,11 +380,21 @@ async function fillMonthlyApplicationTarget(
         break;
       }
 
-      if (await hasApplicationForJob(env.DB, job.provider, job.externalId)) {
+      const existingApplication = await getApplicationForJob(
+        env.DB,
+        job.provider,
+        job.externalId,
+      );
+      if (
+        existingApplication &&
+        !isRetryablePreSubmitFailure(existingApplication, runId)
+      ) {
         continue;
       }
 
-      const applicationId = `application:${job.provider}:${job.externalId}`;
+      const applicationId =
+        existingApplication?.id ??
+        `application:${job.provider}:${job.externalId}`;
       const reservationOwner = `${runId}:${crypto.randomUUID()}`;
       const quotaClaim = await claimMonthlyApplicationSlot(
         env.DB,
@@ -406,12 +418,28 @@ async function fillMonthlyApplicationTarget(
 
       try {
         const jobId = await persistJob(env.DB, job);
-        await createApplication(env.DB, {
-          id: applicationId,
-          jobId,
-          runId,
-          reportMonth: applicationMonth,
-        });
+        if (existingApplication) {
+          const requeued = await requeueFailedPreSubmitApplication(env.DB, {
+            id: applicationId,
+            runId,
+            reportMonth: applicationMonth,
+          });
+          if (!requeued) {
+            await releaseMonthlyApplicationSlot(
+              env.DB,
+              applicationId,
+              reservationOwner,
+            );
+            continue;
+          }
+        } else {
+          await createApplication(env.DB, {
+            id: applicationId,
+            jobId,
+            runId,
+            reportMonth: applicationMonth,
+          });
+        }
 
         const claim = await env.DB
           .prepare(

@@ -55,7 +55,7 @@ A scheduled run:
 
 `migrations/0004_monthly_application_quota.sql` creates ten slots for each month. A slot is reserved **before** StudentConsulting submission starts.
 
-- A definitely failed submission releases its reservation.
+- A definitely failed pre-submit attempt releases its reservation. The same automation run may atomically requeue only its own `failed` application with `applied_at IS NULL` and `verified_at IS NULL`, creating the next numbered attempt without transferring application history between runs. Submitted, uncertain/user-action, verified, queued/applying, or otherwise possibly-sent applications are never requeued for a replacement submit.
 - A confirmed submission keeps its slot.
 - A verified submission marks its slot verified.
 - An ambiguous/unknown result keeps the slot as `uncertain` rather than allowing a replacement application that could accidentally become number 11.
