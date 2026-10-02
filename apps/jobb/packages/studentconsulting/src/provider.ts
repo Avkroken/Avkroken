@@ -171,8 +171,9 @@ export class StudentConsultingProvider implements JobProvider {
         matchedNavigation.profilePaths.length > 0
           ? matchedNavigation.profilePaths.join(",")
           : "(none)";
+      const diagnostics = matchedNavigation.diagnostics;
       throw new Error(
-        `STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND: ingen verifierad jobbmatchningsnavigation hittades; profilePaths=${profilePaths}.`,
+        `STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND: ingen verifierad jobbmatchningsnavigation hittades; profilePaths=${profilePaths}; anchors=${diagnostics.anchors}; visibleAnchors=${diagnostics.visibleAnchors}; controls=${diagnostics.controls}; visibleControls=${diagnostics.visibleControls}; semanticMatches=${diagnostics.semanticMatches}; visibleSemanticMatches=${diagnostics.visibleSemanticMatches}; dataHref=${diagnostics.dataHref}; dataUrl=${diagnostics.dataUrl}; onclick=${diagnostics.onclick}.`,
       );
     }
 
@@ -548,8 +549,24 @@ export function normalizeStudentConsultingMatchedJobsUrl(
   return safe;
 }
 
+interface LandingNavigationDiagnostics {
+  anchors: number;
+  visibleAnchors: number;
+  controls: number;
+  visibleControls: number;
+  semanticMatches: number;
+  visibleSemanticMatches: number;
+  dataHref: number;
+  dataUrl: number;
+  onclick: number;
+}
+
 type MatchedJobsNavigation =
-  | { status: "absent"; profilePaths: string[] }
+  | {
+      status: "absent";
+      profilePaths: string[];
+      diagnostics: LandingNavigationDiagnostics;
+    }
   | { status: "found"; url: string }
   | {
       status: "invalid";
@@ -575,14 +592,14 @@ async function findMatchedJobsNavigation(
   const count = await anchors.count();
   const validUrls = new Set<string>();
   const profilePaths = new Set<string>();
-  let matchingLabels = 0;
+  let visibleAnchors = 0;
+  let anchorSemanticMatches = 0;
+  let visibleAnchorSemanticMatches = 0;
   let invalidReason: "missing_href" | "untrusted_href" | undefined;
   let invalidPath: string | undefined;
 
   for (let index = 0; index < count; index += 1) {
     const anchor = anchors.nth(index);
-    if (!(await anchor.isVisible())) continue;
-
     const href = await anchor.getAttribute("href");
     if (href) {
       const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(href);
@@ -590,8 +607,13 @@ async function findMatchedJobsNavigation(
     }
 
     const label = await safeInnerText(anchor);
-    if (!isStudentConsultingMatchedJobsLabel(label)) continue;
-    matchingLabels += 1;
+    const semanticMatch = isStudentConsultingMatchedJobsLabel(label);
+    if (semanticMatch) anchorSemanticMatches += 1;
+
+    const visible = await anchor.isVisible();
+    if (visible) visibleAnchors += 1;
+    if (!visible || !semanticMatch) continue;
+    visibleAnchorSemanticMatches += 1;
 
     if (!href) {
       invalidReason = "missing_href";
@@ -619,18 +641,35 @@ async function findMatchedJobsNavigation(
     validUrls.add(safeUrl);
   }
 
-  if (matchingLabels === 0) {
+  if (visibleAnchorSemanticMatches === 0) {
     const controls = page.locator(
       'button,[role="link"],[data-href],[data-url],[onclick]',
     );
     const controlCount = await controls.count();
     const matchingControls: BrowserLocator[] = [];
+    let visibleControls = 0;
+    let controlSemanticMatches = 0;
+    let visibleControlSemanticMatches = 0;
 
     for (let index = 0; index < controlCount; index += 1) {
       const control = controls.nth(index);
-      if (!(await control.isVisible())) continue;
+
+      for (const attribute of ["data-href", "data-url"] as const) {
+        const value = await control.getAttribute(attribute);
+        if (!value) continue;
+        const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(value);
+        if (profileUrl) profilePaths.add(new URL(profileUrl).pathname);
+      }
+
       const label = await safeInnerText(control);
-      if (!isStudentConsultingMatchedJobsLabel(label)) continue;
+      const semanticMatch = isStudentConsultingMatchedJobsLabel(label);
+      if (semanticMatch) controlSemanticMatches += 1;
+
+      const visible = await control.isVisible();
+      if (visible) visibleControls += 1;
+      if (!visible || !semanticMatch) continue;
+
+      visibleControlSemanticMatches += 1;
       matchingControls.push(control);
     }
 
@@ -661,9 +700,27 @@ async function findMatchedJobsNavigation(
       };
     }
 
+    const [dataHref, dataUrl, onclick] = await Promise.all([
+      page.locator("[data-href]").count(),
+      page.locator("[data-url]").count(),
+      page.locator("[onclick]").count(),
+    ]);
+
     return {
       status: "absent",
       profilePaths: [...profilePaths].sort().slice(0, 20),
+      diagnostics: {
+        anchors: count,
+        visibleAnchors,
+        controls: controlCount,
+        visibleControls,
+        semanticMatches: anchorSemanticMatches + controlSemanticMatches,
+        visibleSemanticMatches:
+          visibleAnchorSemanticMatches + visibleControlSemanticMatches,
+        dataHref,
+        dataUrl,
+        onclick,
+      },
     };
   }
   if (invalidReason) {

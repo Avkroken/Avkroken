@@ -93,6 +93,7 @@ function fakeLocator(
     dataUrl?: string;
     onclick?: string;
     onClick?: () => void;
+    visible?: boolean;
   }> = [],
   index = 0,
 ): BrowserLocator {
@@ -107,7 +108,7 @@ function fakeLocator(
       return fakeLocator(items, 0);
     },
     async isVisible() {
-      return Boolean(items[index]);
+      return Boolean(items[index]) && items[index]?.visible !== false;
     },
     async fill() {},
     async click() {
@@ -154,6 +155,7 @@ function matchedProfilePage(
     matchedNavHref?: string | null;
     matchedNavLabel?: string;
     matchedNavControl?: "anchor" | "button";
+    matchedNavVisible?: boolean;
     authOnMatchedVisit?: number;
     jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
     jobLinkValue?: string;
@@ -191,7 +193,11 @@ function matchedProfilePage(
             ? matchedProfileRoute
             : (options.matchedNavHref ?? undefined);
         return fakeLocator([
-          { text: options.matchedNavLabel ?? "Matcha jobb", href },
+          {
+            text: options.matchedNavLabel ?? "Matcha jobb",
+            href,
+            visible: options.matchedNavVisible,
+          },
         ]);
       }
       if (
@@ -410,6 +416,30 @@ describe("StudentConsulting authenticated discovery", () => {
 
     await expect(provider.discover()).rejects.toThrow(
       /STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND:.*profilePaths=\/sv\/min-profil\/jobbmatchningar\//,
+    );
+  });
+
+  it("reports sanitized landing structure when matching navigation is hidden", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/min-profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavVisible: false,
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /profilePaths=\/sv\/min-profil\/mina-jobbmatchningar\/; anchors=1; visibleAnchors=0; controls=0; visibleControls=0; semanticMatches=1; visibleSemanticMatches=0; dataHref=0; dataUrl=0; onclick=0/,
     );
   });
 
