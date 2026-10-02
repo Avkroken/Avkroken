@@ -51,6 +51,7 @@ test("legacy privileged API paths redirect into the protected admin namespace", 
 
 test("public capability uploads remain public", () => {
   assert.deepEqual(accessRoute("/api/upload/token"), { type: "pass", pathname: "/api/upload/token" });
+  assert.deepEqual(accessRoute("/api/asset-upload/token", "PUT"), { type: "pass", pathname: "/api/asset-upload/token" });
 });
 
 test("legacy token upload routes remain unchanged for existing automation", () => {

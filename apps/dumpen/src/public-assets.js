@@ -191,7 +191,7 @@ export async function listPublicAssets(bucket) {
   const objects = await listAll(bucket);
   return objects
     .map(assetRecord)
-    .filter((asset) => asset && !asset.mirror && !asset.legacy)
+    .filter((asset) => asset && !asset.mirror && !asset.legacy && !asset.key.startsWith("staging/"))
     .sort((a, b) => {
       if (a.app && b.app) {
         const appOrder = a.appLabel.localeCompare(b.appLabel, "sv");

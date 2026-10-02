@@ -1,5 +1,11 @@
 import { homePage } from "./page.js";
 import {
+  ASSET_CLAIM_PREFIX,
+  ASSET_TICKET_PREFIX,
+  isPngBytes,
+  isThemeStagingKey,
+} from "./asset-upload-ticket.js";
+import {
   listPublicAssets,
   uploadPublicAsset,
 } from "./public-assets.js";
@@ -157,14 +163,63 @@ async function createUploadTicket(req, env) {
   }, { status: 201, headers: { "cache-control": "no-store" } });
 }
 
-export async function claimTicket(bucket, digest) {
+async function createAssetUploadTicket(req, env) {
+  const denied = await adminDenied(req, env);
+  if (denied) return denied;
+  if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+
+  let payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return new Response("invalid json\n", { status: 400 });
+  }
+  const targetKey = String(payload?.targetKey || "");
+  if (!isThemeStagingKey(targetKey)) {
+    return new Response("invalid staging key\n", { status: 400 });
+  }
+
+  const token = randomHex(32);
+  const digest = await sha256Hex(token);
+  const expiresAt = Date.now() + TICKET_TTL_MS;
+  await env.DUMPEN.put(
+    `${ASSET_TICKET_PREFIX}${digest}.json`,
+    JSON.stringify({
+      kind: "asset-upload",
+      targetKey,
+      contentType: "image/png",
+      expiresAt,
+      maxBytes: MAX_UPLOAD_BYTES,
+    }),
+    { httpMetadata: { contentType: "application/json" } },
+  );
+
+  const origin = new URL(req.url).origin;
+  return Response.json({
+    uploadUrl: `${origin}/api/asset-upload/${token}`,
+    targetKey,
+    expiresAt: new Date(expiresAt).toISOString(),
+    maxUploadBytes: MAX_UPLOAD_BYTES,
+    oneTime: true,
+  }, { status: 201, headers: { "cache-control": "no-store" } });
+}
+
+async function claimAtPrefix(bucket, prefix, digest) {
   const condition = new Headers({ "if-none-match": "*" });
   const result = await bucket.put(
-    `${CLAIM_PREFIX}${digest}`,
+    `${prefix}${digest}`,
     String(Date.now()),
     { onlyIf: condition, httpMetadata: { contentType: "text/plain" } },
   );
   return result !== null;
+}
+
+export async function claimTicket(bucket, digest) {
+  return claimAtPrefix(bucket, CLAIM_PREFIX, digest);
+}
+
+async function claimAssetTicket(bucket, digest) {
+  return claimAtPrefix(bucket, ASSET_CLAIM_PREFIX, digest);
 }
 
 function generatedName(now) {
@@ -218,6 +273,87 @@ async function capabilityUpload(req, env, token) {
   await env.DUMPEN.delete(ticketKey);
 
   return Response.json({ name, key }, {
+    status: 201,
+    headers: { "cache-control": "no-store" },
+  });
+}
+
+async function assetCapabilityUpload(req, env, token) {
+  if (!/^[0-9a-f]{64}$/i.test(token || "")) {
+    return new Response("invalid asset upload ticket\n", { status: 404 });
+  }
+  if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+
+  const digest = await sha256Hex(token);
+  const ticketKey = `${ASSET_TICKET_PREFIX}${digest}.json`;
+  const ticketObject = await env.DUMPEN.get(ticketKey);
+  if (!ticketObject) {
+    return new Response("invalid or used asset upload ticket\n", { status: 410 });
+  }
+
+  let ticket;
+  try {
+    ticket = JSON.parse(await r2Text(ticketObject));
+  } catch {
+    return new Response("invalid asset upload ticket\n", { status: 410 });
+  }
+
+  if (ticket?.kind !== "asset-upload" || !isThemeStagingKey(ticket?.targetKey)) {
+    return new Response("invalid asset upload ticket\n", { status: 410 });
+  }
+  if (!Number.isFinite(ticket.expiresAt) || ticket.expiresAt <= Date.now()) {
+    await env.DUMPEN.delete(ticketKey);
+    return new Response("asset upload ticket expired\n", { status: 410 });
+  }
+
+  const maxBytes = Math.min(Number(ticket.maxBytes) || MAX_UPLOAD_BYTES, MAX_UPLOAD_BYTES);
+  const declaredLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    return new Response("too large\n", { status: 413 });
+  }
+
+  const body = await req.arrayBuffer();
+  if (body.byteLength > maxBytes) return new Response("too large\n", { status: 413 });
+  if (!isPngBytes(body)) return new Response("png required\n", { status: 415 });
+
+  if (await env.ASSETS.head(ticket.targetKey)) {
+    await env.DUMPEN.delete(ticketKey);
+    return new Response("asset already exists\n", { status: 409 });
+  }
+
+  const existing = await listAll(env.ASSETS);
+  const usedBytes = existing.reduce((sum, object) => sum + (Number(object.size) || 0), 0);
+  if (usedBytes + body.byteLength > MAX_BUCKET_BYTES) {
+    return new Response("asset storage full\n", { status: 507 });
+  }
+
+  if (!(await claimAssetTicket(env.DUMPEN, digest))) {
+    return new Response("asset upload ticket already used\n", { status: 409 });
+  }
+
+  const onlyIf = new Headers({ "if-none-match": "*" });
+  let result;
+  try {
+    result = await env.ASSETS.put(ticket.targetKey, body, {
+      onlyIf,
+      httpMetadata: {
+        contentType: "image/png",
+        cacheControl: "max-age=31536000",
+      },
+      customMetadata: {
+        kind: "theme-v2-staging",
+        source: "one-time-asset-capability",
+      },
+    });
+  } finally {
+    await env.DUMPEN.delete(ticketKey);
+  }
+
+  if (result === null) return new Response("asset already exists\n", { status: 409 });
+  return Response.json({
+    key: ticket.targetKey,
+    size: body.byteLength,
+  }, {
     status: 201,
     headers: { "cache-control": "no-store" },
   });
@@ -314,6 +450,11 @@ export default {
       });
     }
 
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "tickets") {
+      if (req.method !== "POST") return new Response("method\n", { status: 405 });
+      return createAssetUploadTicket(req, env);
+    }
+
     if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "upload") {
       if (req.method !== "PUT" || !segments[3]) return new Response("method\n", { status: 405 });
       const denied = await adminDenied(req, env);
@@ -328,6 +469,11 @@ export default {
         status: 201,
         headers: { "cache-control": "no-store" },
       });
+    }
+
+    if (segments[0] === "api" && segments[1] === "asset-upload") {
+      if (req.method !== "PUT") return new Response("method\n", { status: 405 });
+      return assetCapabilityUpload(req, env, segments[2]);
     }
 
     if (segments[0] === "api" && segments[1] === "tickets") {
