@@ -127,7 +127,7 @@ The notification links to the protected dashboard. It does not expose a remote b
 
 ## BankID and local-browser activity reporting
 
-The activity report is completed in the user's own browser. The dashboard exposes **Öppna Arbetsförmedlingen**, which opens the public Mina sidor URL on the current device. BankID/e-identification, any mandatory handlingsplan questions, and the final external submission remain entirely in Arbetsförmedlingen's own UI.
+The activity report is completed in the user's own browser. The dashboard exposes **Öppna aktivitetsrapporten**, which deep-links directly to Arbetsförmedlingen's activity-report service on the current device. If the user is not authenticated, Arbetsförmedlingen handles the e-identification step before the user continues in its own UI. BankID/e-identification, any mandatory handlingsplan questions, and the final external submission remain entirely in Arbetsförmedlingen's own UI.
 
 Jobb shows the locally verified applications that actually belong to the previous month as reporting context. Missing historical Jobb records do not block submission and are never replaced by fabricated or backdated activities.
 

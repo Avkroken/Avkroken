@@ -217,7 +217,8 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("/api/configuration");
     expect(jsText).toContain("Spara konfiguration");
-    expect(jsText).toContain("Öppna Arbetsförmedlingen");
+    expect(jsText).toContain("Öppna aktivitetsrapporten");
+    expect(jsText).toContain("/for-arbetssokande/mina-sidor/aktivitetsrapportera");
     expect(jsText).toContain("Aktivitetsrapport i din webbläsare");
     expect(jsText).toContain("Jag har skickat in rapporten");
     expect(jsText).toContain("/report/manual-submitted");
