@@ -1,8 +1,8 @@
 import {
   MONTHLY_APPLICATION_TARGET,
   type JobCandidate,
-  type JobProvider,
 } from "../../../packages/core/src/types";
+import type { StudentConsultingProvider } from "../../../packages/studentconsulting/src/provider";
 import { startArbetsformedlingenHandoff } from "./arbetsformedlingen-handoff";
 import { notifyBankIdRequired, type NotificationEnv } from "./notifier";
 import { evaluateSuitability, type SuitabilityEnv } from "./policy";
@@ -27,6 +27,7 @@ import {
   nextAttemptNumber,
   persistJob,
   recordNotification,
+  reclassifyApplicationNotSubmitted,
   requeueFailedPreSubmitApplication,
   scheduledRunId,
   setApplicationStatus,
@@ -42,6 +43,8 @@ import {
   isScheduledSafetyWindow,
   previousMonthKey,
 } from "./time";
+
+const NOT_APPLIED_RECONCILIATION_GRACE_MS = 5 * 60 * 1_000;
 
 export interface AutomationEnv
   extends ProviderEnv,
@@ -654,7 +657,7 @@ function summarizeRejections(rejectionCounts: Map<string, number>): string {
 
 async function reconcilePendingApplications(
   env: AutomationEnv,
-  provider: JobProvider,
+  provider: StudentConsultingProvider,
   applicationMonth: string,
   runId: string,
 ): Promise<number> {
@@ -688,8 +691,31 @@ async function reconcilePendingApplications(
 
     if (job.provider !== "studentconsulting") continue;
 
-    const verified = await provider.verify(job);
-    if (!verified) continue;
+    const applicationState = await provider.inspectApplicationStatus(job);
+    if (applicationState === "not_applied") {
+      const appliedAtMs = row.applied_at ? Date.parse(row.applied_at) : Number.NaN;
+      if (
+        !Number.isFinite(appliedAtMs) ||
+        Date.now() - appliedAtMs < NOT_APPLIED_RECONCILIATION_GRACE_MS
+      ) {
+        continue;
+      }
+
+      const reclassified = await reclassifyApplicationNotSubmitted(
+        env.DB,
+        row.id,
+      );
+      if (reclassified) {
+        await recordApplicationDiagnostic(
+          env.DB,
+          row.id,
+          "APPLICATION_NOT_APPLIED",
+          "Authenticated StudentConsulting status confirmed that the exact Jobb-ID is not applied; the uncertain quota slot was released.",
+        );
+      }
+      continue;
+    }
+    if (applicationState !== "applied") continue;
 
     const verifiedAt = new Date().toISOString();
     const attemptNo = await nextAttemptNumber(env.DB, row.id);
@@ -729,7 +755,7 @@ async function persistVerificationEvidence(
         job,
         appliedAt,
         verifiedAt,
-        verification: "StudentConsulting Ansökningar exact Jobb-ID match",
+        verification: "StudentConsulting authenticated exact Jobb-ID verification",
       }),
       { httpMetadata: { contentType: "application/json" } },
     );

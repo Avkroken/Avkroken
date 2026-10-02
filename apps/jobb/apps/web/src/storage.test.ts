@@ -5,6 +5,7 @@ import {
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   isRetryablePreSubmitFailure,
+  reclassifyApplicationNotSubmitted,
   requeueFailedPreSubmitApplication,
   type ApplicationForJobRow,
   type AutomationRunRow,
@@ -159,6 +160,81 @@ describe("application retry state", () => {
         reportMonth: "2026-10",
       }),
     ).resolves.toBe(false);
+  });
+});
+
+describe("definite not-applied reconciliation", () => {
+  function reclassifyDb(
+    current: {
+      status: string;
+      applied_at: string | null;
+      verified_at: string | null;
+      slot_state: string;
+    } | null,
+    changes: [number, number] = [1, 1],
+  ) {
+    const sql: string[] = [];
+    const binds: unknown[][] = [];
+
+    const db = {
+      prepare(statement: string) {
+        sql.push(statement);
+        return {
+          bind(...values: unknown[]) {
+            binds.push(values);
+            return this;
+          },
+          async first() {
+            return current;
+          },
+        };
+      },
+      async batch() {
+        return changes.map((count) => ({ meta: { changes: count } }));
+      },
+    } as unknown as D1Database;
+
+    return { db, sql, binds };
+  }
+
+  it("atomically frees an uncertain slot only after a definite not-applied result", async () => {
+    const fake = reclassifyDb({
+      status: "needs_user_action",
+      applied_at: "2026-10-02T12:27:17.152Z",
+      verified_at: null,
+      slot_state: "uncertain",
+    });
+
+    await expect(
+      reclassifyApplicationNotSubmitted(
+        fake.db,
+        "application:studentconsulting:87570",
+      ),
+    ).resolves.toBe(true);
+
+    expect(fake.sql.some((statement) => statement.includes("state = 'free'"))).toBe(
+      true,
+    );
+    expect(
+      fake.sql.some((statement) => statement.includes("applied_at = NULL")),
+    ).toBe(true);
+  });
+
+  it("does not free a submitted or verified application", async () => {
+    const fake = reclassifyDb({
+      status: "submitted",
+      applied_at: "2026-10-02T12:27:17.152Z",
+      verified_at: null,
+      slot_state: "submitted",
+    });
+
+    await expect(
+      reclassifyApplicationNotSubmitted(
+        fake.db,
+        "application:studentconsulting:87570",
+      ),
+    ).resolves.toBe(false);
+    expect(fake.sql).toHaveLength(1);
   });
 });
 
