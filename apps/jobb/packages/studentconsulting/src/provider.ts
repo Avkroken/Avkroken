@@ -611,6 +611,41 @@ function normalizeStudentConsultingVisibleMatchedJobsUrl(
   return safe;
 }
 
+function safeStudentConsultingPath(value: string): string | undefined {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.origin !== expected.origin ||
+      parsed.username ||
+      parsed.password
+    ) {
+      return undefined;
+    }
+    return parsed.pathname;
+  } catch {
+    return undefined;
+  }
+}
+
+function isStudentConsultingNavigationPlaceholder(value: string): boolean {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.origin === expected.origin &&
+      !parsed.username &&
+      !parsed.password &&
+      parsed.pathname === "/" &&
+      parsed.search === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function findMatchedJobsNavigation(
   page: BrowserPage,
 ): Promise<MatchedJobsNavigation> {
@@ -627,8 +662,14 @@ async function findMatchedJobsNavigation(
   for (let index = 0; index < count; index += 1) {
     const anchor = anchors.nth(index);
     const href = await anchor.getAttribute("href");
-    if (href) {
-      const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(href);
+    const dataHref = await anchor.getAttribute("data-href");
+    const dataUrl = await anchor.getAttribute("data-url");
+    const navigationValues = [href, dataHref, dataUrl].filter(
+      (value): value is string => Boolean(value),
+    );
+
+    for (const value of navigationValues) {
+      const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(value);
       if (profileUrl) profilePaths.add(new URL(profileUrl).pathname);
     }
 
@@ -641,30 +682,37 @@ async function findMatchedJobsNavigation(
     if (!visible || !semanticMatch) continue;
     visibleAnchorSemanticMatches += 1;
 
-    if (!href) {
+    const safeUrls = new Set(
+      navigationValues
+        .map((value) => normalizeStudentConsultingVisibleMatchedJobsUrl(value))
+        .filter((value): value is string => Boolean(value)),
+    );
+    if (safeUrls.size > 1) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+    if (safeUrls.size === 1) {
+      const unsafeValue = navigationValues.find(
+        (value) =>
+          !normalizeStudentConsultingVisibleMatchedJobsUrl(value) &&
+          !isStudentConsultingNavigationPlaceholder(value),
+      );
+      if (unsafeValue) {
+        invalidReason = "untrusted_href";
+        invalidPath = safeStudentConsultingPath(unsafeValue);
+        continue;
+      }
+      validUrls.add([...safeUrls][0]);
+      continue;
+    }
+
+    if (navigationValues.length === 0) {
       invalidReason = "missing_href";
       continue;
     }
 
-    const safeUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(href);
-    if (!safeUrl) {
-      invalidReason = "untrusted_href";
-      try {
-        const parsed = new URL(href, DEFAULT_BASE_URL);
-        const expected = new URL(DEFAULT_BASE_URL);
-        invalidPath =
-          parsed.protocol === "https:" &&
-          parsed.origin === expected.origin &&
-          !parsed.username &&
-          !parsed.password
-            ? parsed.pathname
-            : undefined;
-      } catch {
-        invalidPath = undefined;
-      }
-      continue;
-    }
-    validUrls.add(safeUrl);
+    invalidReason = "untrusted_href";
+    invalidPath =
+      navigationValues.map(safeStudentConsultingPath).find(Boolean) ?? undefined;
   }
 
   if (visibleAnchorSemanticMatches === 0) {
