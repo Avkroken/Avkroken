@@ -160,6 +160,7 @@ function matchedProfilePage(
     matchedNavHref?: string | null;
     matchedNavDataHref?: string;
     matchedNavDataUrl?: string;
+    matchedNavClickRoute?: string;
     matchedNavLabel?: string;
     matchedNavControl?: "anchor" | "button";
     matchedNavVisible?: boolean;
@@ -206,6 +207,14 @@ function matchedProfilePage(
             href,
             dataHref: options.matchedNavDataHref,
             dataUrl: options.matchedNavDataUrl,
+            onClick: options.matchedNavClickRoute
+              ? () => {
+                  currentUrl = new URL(
+                    options.matchedNavClickRoute!,
+                    "https://www.studentconsulting.com",
+                  ).toString();
+                }
+              : undefined,
             visible: options.matchedNavVisible,
           },
         ]);
@@ -389,6 +398,34 @@ describe("StudentConsulting authenticated discovery", () => {
         matchedNavLabel: "Mina jobbmatchningar",
         matchedNavHref: "/",
         matchedNavDataUrl: "/sv/profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("clicks one semantic root-placeholder anchor and validates its destination", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavHref: "/",
+        matchedNavClickRoute: "/sv/profil/mina-jobbmatchningar/",
       }),
       credentials: {
         async getStudentConsultingCredentials() {
