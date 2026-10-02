@@ -9,9 +9,9 @@ Implemented flow:
 1. Open StudentConsulting's `/signin` entry point.
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
-4. After login, revisit the authenticated Swedish profile landing page and use a visible trusted **Matcha jobb** navigation link when one is exposed. Accepted profile routes are restricted to `/sv/min-profil/matcha-jobb/`, `/sv/min-profil/matchade-jobb/` or `/sv/min-profil/matchande-jobb/`; the canonical `matcha-jobb` route remains a fallback when navigation is not rendered.
-5. Reject visible login controls after authentication or on the matched-profile page, and fail closed on redirects or profile routes outside the trusted allowlist.
-6. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority.
+4. After login, revisit the authenticated Swedish profile landing page and use a visible **Matcha jobb** navigation link when one is exposed. Its URL must use the exact configured origin `https://www.studentconsulting.com`, contain no URL credentials, and stay inside `/sv/min-profil/`; a visible but missing/untrusted/ambiguous link fails closed. The canonical `/sv/min-profil/matcha-jobb/` route is used only when no matching navigation item is rendered at all.
+5. Reject visible login controls after authentication, after opening the matched profile, and after every paginated listing navigation. Redirects outside the selected verified profile route fail closed.
+6. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority. If the first matched page is neither explicitly empty nor exposes a trusted job URL, the provider emits only structural counts (anchors/data attributes/onclick/iframes/job-like elements), never profile text or input values.
 7. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
 8. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
 9. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
