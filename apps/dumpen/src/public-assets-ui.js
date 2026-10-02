@@ -113,8 +113,8 @@ function rebuildAssetFilters(assets){
   const sizes=[...new Set(structured.map((asset)=>assetFilterValue(asset,'size')).filter(Boolean))]
     .sort((a,b)=>a==='original'?-1:b==='original'?1:Number(a)-Number(b))
     .map((value)=>({value,label:value==='original'?'Original':value+'×'+value}));
-  const themes=[...new Set(structured.map((asset)=>asset.theme))]
-    .sort((a,b)=>Number(a)-Number(b)).map((value)=>({value,label:'Tema '+value}));
+  const themes=[...new Map(structured.map((asset)=>[asset.theme,asset.themeLabel||('Tema '+asset.theme)])).entries()]
+    .sort((a,b)=>Number(a[0])-Number(b[0])).map(([value,label])=>({value,label}));
   fillAssetFilter('#asset-filter-app',apps,'Alla appar');
   fillAssetFilter('#asset-filter-size',sizes,'Alla storlekar');
   fillAssetFilter('#asset-filter-theme',themes,'Alla teman');

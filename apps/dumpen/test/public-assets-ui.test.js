@@ -58,4 +58,5 @@ test("each asset filter select binds the change handler used by the browser scri
   const script = publicAssetsScript();
   assert.match(script, /filterAssetCards\(document\.querySelectorAll/);
   assert.match(script, /bindAssetFilterChanges\(/);
+  assert.match(script, /asset\.themeLabel/);
 });

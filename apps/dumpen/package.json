@@ -10,6 +10,7 @@
     "deploy": "wrangler deploy --strict",
     "verify:production": "node scripts/verify-production.mjs",
     "deploy:workers-builds": "node scripts/workers-build-production.mjs",
+    "assets:themes:render": "node scripts/render-theme-assets.mjs",
     "assets:sync": "node scripts/sync-app-assets.mjs",
     "assets:ticket": "node scripts/create-theme-asset-ticket.mjs"
   },
