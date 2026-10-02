@@ -235,22 +235,24 @@ export async function executeAutomation(
   const reportableCount = await countVerifiedApplications(env.DB, reportMonth);
   if (reportableCount < MONTHLY_APPLICATION_TARGET) {
     const message =
-      `Previous month ${reportMonth} has only ${reportableCount}/${MONTHLY_APPLICATION_TARGET} verified applications. ` +
-      "Applications made now cannot be backdated into the previous month.";
+      `Föregående månad ${reportMonth} har bara ${reportableCount}/${MONTHLY_APPLICATION_TARGET} verifierade ansökningar. ` +
+      "Ansökningar som görs nu kan inte bakdateras till föregående månad.";
     await setReportStatus(env.DB, reportMonth, "failed", message);
     await updateRun(env.DB, runId, {
-      status: "failed",
+      status: "completed",
       verifiedCount,
-      lastError: message,
+      lastError: null,
       completedAt: new Date().toISOString(),
     });
     return {
       runId,
-      status: "failed",
+      status: "completed",
       applicationMonth,
       reportMonth,
       verifiedCount,
-      message,
+      message:
+        `Månadsmålet ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} är uppnått. ` +
+        `Aktivitetsrapporten för ${reportMonth} saknar historiskt underlag och påverkar inte ansökningskörningens status.`,
     };
   }
 

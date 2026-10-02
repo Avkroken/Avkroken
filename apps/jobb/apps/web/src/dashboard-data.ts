@@ -35,6 +35,9 @@ export function buildVerifiedQuotaSlots(
 
 interface DashboardRunState {
   status: string;
+  application_month?: string | null;
+  verified_count?: number | null;
+  target_count?: number | null;
   workflow_instance_id?: string | null;
   application_count?: number | null;
   auth_expires_at?: string | null;
@@ -51,6 +54,17 @@ export function isExpiredBankIdDashboardRun(
   if (!run.auth_expires_at) return true;
   const expiresAtMs = Date.parse(run.auth_expires_at);
   return !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
+}
+
+export function isOperationallyFailedDashboardRun(
+  run: DashboardRunState,
+  applicationMonth: string,
+): boolean {
+  return (
+    run.application_month === applicationMonth &&
+    run.status === "failed" &&
+    Number(run.verified_count ?? 0) < Number(run.target_count ?? MONTHLY_APPLICATION_TARGET)
+  );
 }
 
 export function isOrphanedDashboardRun(
@@ -85,7 +99,6 @@ export async function getDashboardData(
     applications,
     notifications,
     reportActivities,
-    failedRuns,
     failedNotifications,
     ambiguousReportItems,
   ] = await Promise.all([
@@ -194,14 +207,6 @@ export async function getDashboardData(
     db
       .prepare(
         `SELECT COUNT(*) AS count
-         FROM automation_runs
-         WHERE application_month = ? AND status = 'failed'`,
-      )
-      .bind(applicationMonth)
-      .first<{ count: number }>(),
-    db
-      .prepare(
-        `SELECT COUNT(*) AS count
          FROM notifications
          WHERE status = 'failed'
            AND created_at >= datetime('now', '-30 days')`,
@@ -254,6 +259,23 @@ export async function getDashboardData(
         (run.status === "running" &&
           (!("orphaned" in run) || run.orphaned !== true))),
   );
+  const latestApplicationRun = dashboardRuns.find(
+    (run) =>
+      run &&
+      typeof run === "object" &&
+      "application_month" in run &&
+      run.application_month === applicationMonth,
+  );
+  const failedRuns =
+    latestApplicationRun &&
+    typeof latestApplicationRun === "object" &&
+    "status" in latestApplicationRun &&
+    isOperationallyFailedDashboardRun(
+      latestApplicationRun as unknown as DashboardRunState,
+      applicationMonth,
+    )
+      ? 1
+      : 0;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -273,7 +295,7 @@ export async function getDashboardData(
     notifications: notifications.results,
     attention: {
       uncertainSlots,
-      failedRuns: Number(failedRuns?.count ?? 0),
+      failedRuns,
       failedNotifications: Number(failedNotifications?.count ?? 0),
       ambiguousReportItems: Number(ambiguousReportItems?.count ?? 0),
       orphanedRuns,
