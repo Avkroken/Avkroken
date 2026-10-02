@@ -156,6 +156,21 @@ async function mintTicket(e, adminCookie = ADMIN_COOKIE) {
   return response.json();
 }
 
+async function mintAssetTicket(e, targetKey, adminCookie = ADMIN_COOKIE) {
+  const response = await worker.fetch(request("/api/assets/tickets", {
+    method: "POST",
+    body: JSON.stringify({ targetKey }),
+    headers: {
+      cookie: adminCookie,
+      "content-type": "application/json",
+    },
+  }), e);
+  assert.equal(response.status, 201);
+  return response.json();
+}
+
+const PNG_BODY = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
+
 const versions = [
   { key: "regelverk/1000.zip", uploaded: new Date(1000), body: "old" },
   { key: "regelverk/3000.zip", uploaded: new Date(3000), body: "new" },
@@ -343,6 +358,122 @@ test("capability-upload är privat efter uppladdning", async () => {
   assert.equal(await privateRead.text(), "private-data");
 });
 
+test("asset-ticket kräver admininloggning", async () => {
+  const response = await worker.fetch(request("/api/assets/tickets", {
+    method: "POST",
+    body: JSON.stringify({ targetKey: "staging/themes-v2/apps/plex/plex-2.png" }),
+    headers: { "content-type": "application/json" },
+  }), env());
+  assert.equal(response.status, 401);
+});
+
+test("asset-ticket accepterar bara låsta theme-v2 staging-nycklar", async () => {
+  const e = env();
+  for (const targetKey of [
+    "apps/plex/plex-2.png",
+    "staging/themes-v2/apps/plex/plex-8.png",
+    "staging/themes-v2/apps/plex/sonarr-2.png",
+    "staging/themes-v2/apps/unknown/unknown-2.png",
+    "staging/themes-v2/apps/plex/../plex-2.png",
+  ]) {
+    const response = await worker.fetch(request("/api/assets/tickets", {
+      method: "POST",
+      body: JSON.stringify({ targetKey }),
+      headers: {
+        cookie: ADMIN_COOKIE,
+        "content-type": "application/json",
+      },
+    }), e);
+    assert.equal(response.status, 400, targetKey);
+  }
+});
+
+test("admin kan skapa kortlivad asset-ticket för exakt staging-nyckel", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const e = env(transfers, assets);
+  const targetKey = "staging/themes-v2/apps/plex/plex-2.png";
+  const data = await mintAssetTicket(e, targetKey);
+
+  assert.match(data.uploadUrl, /^https:\/\/dumpen\.denied\.se\/api\/asset-upload\/[0-9a-f]{64}$/);
+  assert.equal(data.targetKey, targetKey);
+  assert.equal(data.oneTime, true);
+  assert.equal(data.maxUploadBytes, 20 * MiB);
+  assert.ok(new Date(data.expiresAt).getTime() > Date.now());
+  assert.equal(transfers.keys().filter((key) => key.startsWith("_system/asset-tickets/")).length, 1);
+  assert.equal(assets.keys().length, 0);
+});
+
+test("asset-ticket skriver PNG till ASSETS och kan inte återanvändas", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const e = env(transfers, assets);
+  const targetKey = "staging/themes-v2/apps/plex/plex-2.png";
+  const ticket = await mintAssetTicket(e, targetKey);
+  const path = new URL(ticket.uploadUrl).pathname;
+
+  const first = await worker.fetch(request(path, {
+    method: "PUT",
+    body: PNG_BODY,
+    headers: { "content-type": "image/png" },
+  }), e);
+  assert.equal(first.status, 201);
+  assert.deepEqual(await first.json(), { key: targetKey, size: PNG_BODY.byteLength });
+  assert.equal(assets.has(targetKey), true);
+  assert.equal(transfers.keys().filter((key) => key.startsWith("_system/asset-tickets/")).length, 0);
+  const put = assets.puts.find((entry) => entry.key === targetKey);
+  assert.equal(put.options.httpMetadata.contentType, "image/png");
+  assert.equal(put.options.customMetadata.kind, "theme-v2-staging");
+
+  const replay = await worker.fetch(request(path, {
+    method: "PUT",
+    body: PNG_BODY,
+  }), e);
+  assert.equal(replay.status, 410);
+});
+
+test("fel filtyp förbrukar inte asset-ticket", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const e = env(transfers, assets);
+  const targetKey = "staging/themes-v2/apps/tautulli/tautulli-2.png";
+  const ticket = await mintAssetTicket(e, targetKey);
+  const path = new URL(ticket.uploadUrl).pathname;
+
+  const bad = await worker.fetch(request(path, {
+    method: "PUT",
+    body: new Uint8Array([1, 2, 3]),
+  }), e);
+  assert.equal(bad.status, 415);
+
+  const retry = await worker.fetch(request(path, {
+    method: "PUT",
+    body: PNG_BODY,
+  }), e);
+  assert.equal(retry.status, 201);
+  assert.equal(assets.has(targetKey), true);
+});
+
+test("asset-ticket skriver aldrig över befintlig staging-fil", async () => {
+  const targetKey = "staging/themes-v2/apps/radarr/radarr-3.png";
+  const transfers = fakeR2();
+  const assets = fakeR2([{
+    key: targetKey,
+    uploaded: new Date(),
+    body: PNG_BODY,
+    httpMetadata: { contentType: "image/png" },
+  }]);
+  const e = env(transfers, assets);
+  const ticket = await mintAssetTicket(e, targetKey);
+
+  const response = await worker.fetch(request(new URL(ticket.uploadUrl).pathname, {
+    method: "PUT",
+    body: PNG_BODY,
+  }), e);
+  assert.equal(response.status, 409);
+  assert.equal(transfers.keys().filter((key) => key.startsWith("_system/asset-tickets/")).length, 0);
+});
+
 test("assetfilnamn trunkeras på UTF-8-gräns utan att dela Unicode-tecken", () => {
   const encoder = new TextEncoder();
   const omittedEmoji = safeAssetName("a".repeat(177) + "😀");
@@ -377,6 +508,7 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1.png" },
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-256.png" },
     { ...png, key: "hotlink-ok/apps/dozzle/dozzle-1-512.png" },
+    { ...png, key: "staging/themes-v2/apps/dozzle/dozzle-2.png" },
     { ...png, key: "hotlink-ok/manual.png" },
   ]);
 
