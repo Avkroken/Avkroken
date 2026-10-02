@@ -477,6 +477,40 @@ function applicationsVerificationPage(
   };
 }
 
+function dynamicRequiredApplicationPage(): BrowserPage {
+  let currentUrl = "https://www.studentconsulting.com/sv/profil/";
+
+  return {
+    async goto(url: string) {
+      currentUrl =
+        new URL(url).pathname === "/signin"
+          ? "https://www.studentconsulting.com/sv/profil/"
+          : url;
+    },
+    url() {
+      return currentUrl;
+    },
+    locator(selector: string) {
+      const pathname = new URL(currentUrl).pathname;
+      if (
+        /\/sv\/lediga-jobb\//.test(pathname) &&
+        selector === "body"
+      ) {
+        return fakeLocator([{ text: "Fakta om jobbet\nJobb-ID 87570" }]);
+      }
+      if (
+        /\/sv\/lediga-jobb\//.test(pathname) &&
+        selector.includes("data-val-required")
+      ) {
+        return fakeLocator([{}]);
+      }
+      return fakeLocator();
+    },
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+  };
+}
+
 const verificationJob: JobCandidate = {
   provider: "studentconsulting",
   externalId: "87570",
@@ -557,6 +591,21 @@ describe("StudentConsulting application verification", () => {
     await expect(provider.verify(verificationJob)).resolves.toBe(true);
   });
 
+  it("classifies an authenticated exact Jobb-ID as definitely not applied", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        authenticatedStatus: { found: true, applied: false },
+        applicationsHref: "https://evil.test/sv/profil/ansokningar/",
+      }),
+      credentials,
+    });
+
+    await expect(
+      provider.inspectApplicationStatus(verificationJob),
+    ).resolves.toBe("not_applied");
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
+  });
+
   it("verifies an exact Jobb-ID through a trusted Ansökningar link", async () => {
     const provider = new StudentConsultingProvider({
       page: applicationsVerificationPage({
@@ -630,6 +679,31 @@ describe("StudentConsulting application verification", () => {
     });
 
     await expect(provider.verify(verificationJob)).resolves.toBe(false);
+  });
+});
+
+describe("StudentConsulting application submission guard", () => {
+  it("stops before submit when StudentConsulting uses data-val-required", async () => {
+    const provider = new StudentConsultingProvider({
+      page: dynamicRequiredApplicationPage(),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      autoSubmit: true,
+    });
+
+    await expect(provider.apply(verificationJob)).resolves.toEqual(
+      expect.objectContaining({
+        status: "failed",
+        submissionAttempted: false,
+        error: expect.stringContaining("APPLICATION_REQUIRES_INPUT"),
+      }),
+    );
   });
 });
 

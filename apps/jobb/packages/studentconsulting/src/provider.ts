@@ -407,19 +407,26 @@ export class StudentConsultingProvider implements JobProvider {
     }
   }
 
-  async verify(job: JobCandidate): Promise<boolean> {
+  async inspectApplicationStatus(
+    job: JobCandidate,
+  ): Promise<"applied" | "not_applied" | "unknown"> {
     try {
       await this.page.goto(PROFILE_URL, {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
-      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) return false;
+      if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+        return "unknown";
+      }
 
       const authenticatedStatus = await readAuthenticatedApplicationStatus(
         this.page,
         job.externalId,
         job.countryCode,
       );
+      const authenticatedNotApplied =
+        authenticatedStatus?.found === true &&
+        authenticatedStatus.applied === false;
       if (authenticatedStatus) {
         console.info("StudentConsulting authenticated application status", {
           externalId: job.externalId,
@@ -427,7 +434,7 @@ export class StudentConsultingProvider implements JobProvider {
           applied: authenticatedStatus.applied,
         });
         if (authenticatedStatus.found && authenticatedStatus.applied) {
-          return true;
+          return "applied";
         }
       }
 
@@ -435,37 +442,43 @@ export class StudentConsultingProvider implements JobProvider {
         this.page,
         job.externalId,
       );
-      if (!applicationsNavigation) return false;
-
-      if (applicationsNavigation.status === "found") {
-        await this.page.goto(applicationsNavigation.url, {
-          waitUntil: "domcontentloaded",
-          timeout: 30_000,
-        });
-        const current = normalizeStudentConsultingVisibleMatchedJobsUrl(
-          this.page.url(),
-        );
-        if (
-          !current ||
-          new URL(current).pathname !==
-            new URL(applicationsNavigation.url).pathname
-        ) {
-          return false;
+      if (applicationsNavigation) {
+        if (applicationsNavigation.status === "found") {
+          await this.page.goto(applicationsNavigation.url, {
+            waitUntil: "domcontentloaded",
+            timeout: 30_000,
+          });
+          const current = normalizeStudentConsultingVisibleMatchedJobsUrl(
+            this.page.url(),
+          );
+          if (
+            !current ||
+            new URL(current).pathname !==
+              new URL(applicationsNavigation.url).pathname
+          ) {
+            return "unknown";
+          }
         }
+
+        const applicationsEvidence = await pageContainsExactJobReference(
+          this.page,
+          job.externalId,
+        );
+        console.info("StudentConsulting applications verification", {
+          externalId: job.externalId,
+          verified: applicationsEvidence,
+        });
+        if (applicationsEvidence) return "applied";
       }
 
-      const applicationsEvidence = await pageContainsExactJobReference(
-        this.page,
-        job.externalId,
-      );
-      console.info("StudentConsulting applications verification", {
-        externalId: job.externalId,
-        verified: applicationsEvidence,
-      });
-      return applicationsEvidence;
+      return authenticatedNotApplied ? "not_applied" : "unknown";
     } catch {
-      return false;
+      return "unknown";
     }
+  }
+
+  async verify(job: JobCandidate): Promise<boolean> {
+    return (await this.inspectApplicationStatus(job)) === "applied";
   }
 
   private async readJob(
@@ -1138,7 +1151,17 @@ async function validateRequiredControls(
   page: BrowserPage,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const controls = page.locator(
-    "input[required], textarea[required], select[required]",
+    [
+      "input[required]",
+      "textarea[required]",
+      "select[required]",
+      "input[data-val-required]",
+      "textarea[data-val-required]",
+      "select[data-val-required]",
+      'input[aria-required="true"]',
+      'textarea[aria-required="true"]',
+      'select[aria-required="true"]',
+    ].join(", "),
   );
   const count = Math.min(await controls.count(), 100);
   const checkedRadioGroups = new Set<string>();

@@ -350,6 +350,83 @@ export async function requeueFailedPreSubmitApplication(
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+export async function reclassifyApplicationNotSubmitted(
+  db: D1Database,
+  applicationId: string,
+): Promise<boolean> {
+  const current = await db
+    .prepare(
+      `SELECT a.status, a.applied_at, a.verified_at, s.state AS slot_state
+       FROM applications a
+       JOIN monthly_application_slots s ON s.application_id = a.id
+       WHERE a.id = ?
+       LIMIT 1`,
+    )
+    .bind(applicationId)
+    .first<{
+      status: string;
+      applied_at: string | null;
+      verified_at: string | null;
+      slot_state: string;
+    }>();
+
+  if (
+    !current ||
+    current.status !== "needs_user_action" ||
+    current.applied_at === null ||
+    current.verified_at !== null ||
+    current.slot_state !== "uncertain"
+  ) {
+    return false;
+  }
+
+  const [applicationResult, slotResult] = await db.batch([
+    db
+      .prepare(
+        `UPDATE applications
+         SET status = 'failed',
+             applied_at = NULL,
+             verified_at = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?
+           AND status = 'needs_user_action'
+           AND applied_at IS NOT NULL
+           AND verified_at IS NULL
+           AND EXISTS (
+             SELECT 1
+             FROM monthly_application_slots s
+             WHERE s.application_id = applications.id
+               AND s.state = 'uncertain'
+           )`,
+      )
+      .bind(applicationId),
+    db
+      .prepare(
+        `UPDATE monthly_application_slots
+         SET application_id = NULL,
+             reservation_owner = NULL,
+             state = 'free',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE application_id = ?
+           AND state = 'uncertain'
+           AND EXISTS (
+             SELECT 1
+             FROM applications a
+             WHERE a.id = ?
+               AND a.status = 'failed'
+               AND a.applied_at IS NULL
+               AND a.verified_at IS NULL
+           )`,
+      )
+      .bind(applicationId, applicationId),
+  ]);
+
+  return (
+    Number(applicationResult.meta.changes ?? 0) === 1 &&
+    Number(slotResult.meta.changes ?? 0) === 1
+  );
+}
+
 export async function persistJob(
   db: D1Database,
   job: JobCandidate,
