@@ -506,7 +506,10 @@ export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   if (/^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized)) {
     return true;
   }
-  return normalized.includes("jobb") && normalized.includes("match");
+  return (
+    /(?:^|\s)jobbmatchning(?:ar)?(?:\s|$)/i.test(normalized) ||
+    /\bmatchning(?:ar)?\s+mot\s+jobb(?:\s|$)/i.test(normalized)
+  );
 }
 
 function normalizeStudentConsultingMainOriginUrl(
@@ -599,7 +602,15 @@ async function findMatchedJobsNavigation(
     if (!safeUrl) {
       invalidReason = "untrusted_href";
       try {
-        invalidPath = new URL(href, DEFAULT_BASE_URL).pathname;
+        const parsed = new URL(href, DEFAULT_BASE_URL);
+        const expected = new URL(DEFAULT_BASE_URL);
+        invalidPath =
+          parsed.protocol === "https:" &&
+          parsed.origin === expected.origin &&
+          !parsed.username &&
+          !parsed.password
+            ? parsed.pathname
+            : undefined;
       } catch {
         invalidPath = undefined;
       }

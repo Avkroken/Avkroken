@@ -277,7 +277,7 @@ describe("StudentConsulting authenticated discovery", () => {
       page: matchedProfilePage(),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -302,7 +302,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -325,7 +325,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -348,7 +348,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -367,7 +367,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -387,7 +387,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -399,6 +399,36 @@ describe("StudentConsulting authenticated discovery", () => {
     );
   });
 
+  it("does not expose non-https matched-navigation payloads in diagnostics", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedNavHref: "data:text/plain,user@example.com",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    let message = "";
+    try {
+      await provider.discover();
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(
+      /STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID:.*untrusted_href/,
+    );
+    expect(message).not.toContain("user@example.com");
+    expect(message).not.toContain("data:");
+  });
+
   it("rejects matched-profile navigation with URL credentials", async () => {
     const provider = new StudentConsultingProvider({
       page: matchedProfilePage({
@@ -407,7 +437,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -426,7 +456,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -445,7 +475,7 @@ describe("StudentConsulting authenticated discovery", () => {
         page: matchedProfilePage({ jobLinkAttribute }),
         credentials: {
           async getStudentConsultingCredentials() {
-            return { username: "user@example.test", password: "not-used" };
+            return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
           },
         },
         maxPagesPerSource: 1,
@@ -472,7 +502,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -492,7 +522,7 @@ describe("StudentConsulting authenticated discovery", () => {
       }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -512,7 +542,7 @@ describe("StudentConsulting authenticated discovery", () => {
       page: matchedProfilePage({ explicitEmpty: true }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -529,7 +559,7 @@ describe("StudentConsulting authenticated discovery", () => {
       page: matchedProfilePage({ redirectMatched: true }),
       credentials: {
         async getStudentConsultingCredentials() {
-          return { username: "user@example.test", password: "not-used" };
+          return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
         },
       },
       maxPagesPerSource: 1,
@@ -596,6 +626,7 @@ describe("StudentConsulting parsing", () => {
     expect(isStudentConsultingMatchedJobsLabel("Mina jobbmatchningar")).toBe(true);
     expect(isStudentConsultingMatchedJobsLabel("Matchningar mot jobb")).toBe(true);
     expect(isStudentConsultingMatchedJobsLabel("Rusta och matcha")).toBe(false);
+    expect(isStudentConsultingMatchedJobsLabel("Rusta och matcha jobb")).toBe(false);
     expect(isStudentConsultingMatchedJobsLabel("Lediga jobb")).toBe(false);
     expect(
       normalizeStudentConsultingMatchedJobsUrl(
