@@ -47,7 +47,7 @@ A scheduled run:
 1. Counts already verified applications for the current calendar month.
 2. Applies only to configured suitable StudentConsulting jobs.
 3. Uses exactly ten D1 quota slots for the month; an 11th automatic submission cannot acquire a slot.
-4. Never counts an application as verified until the exact StudentConsulting Jobb-ID is proven from the authenticated `Ansökningar` view, either as exact visible text or as the ID in a trusted StudentConsulting job-detail URL. `Ansökningar` navigation uses the same exact-origin/profile-area fail-closed rules as discovery and may handle placeholder/data-navigation or one semantic SPA click; reconciliation never resubmits an uncertain application.
+4. Never counts an application as verified until the exact StudentConsulting Jobb-ID is proven from authenticated state. Verification first queries the same-origin job-openings API inside Browser Run and requires the exact row to have `is_applied=true`; otherwise it falls back to the authenticated `Ansökningar` view, where the exact Jobb-ID must appear as text or in a trusted StudentConsulting job-detail URL. `Ansökningar` navigation uses the same exact-origin/profile-area fail-closed rules as discovery and may handle placeholder/data-navigation or one semantic SPA click; reconciliation never resubmits an uncertain application.
 5. During the 1st–14th reporting window, prepares the previous calendar month's activity report and starts the user-controlled BankID handoff.
 6. Sends a notification when BankID is required.
 

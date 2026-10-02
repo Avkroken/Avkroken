@@ -378,6 +378,7 @@ function applicationsVerificationPage(
     profileBodyText?: string;
     applicationsBodyText?: string;
     applicationsJobHref?: string;
+    authenticatedStatus?: { found: boolean; applied: boolean };
   } = {},
 ): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/profil/";
@@ -464,6 +465,15 @@ function applicationsVerificationPage(
     },
     async waitForLoadState() {},
     async waitForTimeout() {},
+    async evaluate<T, A>(
+      _pageFunction: (arg: A) => T | Promise<T>,
+      _arg: A,
+    ): Promise<T> {
+      if (!options.authenticatedStatus) {
+        throw new Error("evaluate not configured");
+      }
+      return options.authenticatedStatus as T;
+    },
   };
 }
 
@@ -471,6 +481,7 @@ const verificationJob: JobCandidate = {
   provider: "studentconsulting",
   externalId: "87570",
   title: "Testjobb",
+  countryCode: "SE",
   isInternational: false,
   sourceUrl:
     "https://www.studentconsulting.com/sv/lediga-jobb/stockholm/testjobb/87570/",
@@ -533,6 +544,18 @@ describe("StudentConsulting application verification", () => {
       };
     },
   };
+
+  it("verifies from the authenticated StudentConsulting applied status", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        authenticatedStatus: { found: true, applied: true },
+        applicationsHref: "https://evil.test/sv/profil/ansokningar/",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(true);
+  });
 
   it("verifies an exact Jobb-ID through a trusted Ansökningar link", async () => {
     const provider = new StudentConsultingProvider({

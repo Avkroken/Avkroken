@@ -27,4 +27,8 @@ export interface BrowserPage {
     options?: { timeout?: number },
   ): Promise<void>;
   waitForTimeout(timeout: number): Promise<void>;
+  evaluate?<T, A>(
+    pageFunction: (arg: A) => T | Promise<T>,
+    arg: A,
+  ): Promise<T>;
 }

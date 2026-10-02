@@ -415,6 +415,22 @@ export class StudentConsultingProvider implements JobProvider {
       });
       if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) return false;
 
+      const authenticatedStatus = await readAuthenticatedApplicationStatus(
+        this.page,
+        job.externalId,
+        job.countryCode,
+      );
+      if (authenticatedStatus) {
+        console.info("StudentConsulting authenticated application status", {
+          externalId: job.externalId,
+          found: authenticatedStatus.found,
+          applied: authenticatedStatus.applied,
+        });
+        if (authenticatedStatus.found && authenticatedStatus.applied) {
+          return true;
+        }
+      }
+
       const applicationsNavigation = await findApplicationsNavigation(
         this.page,
         job.externalId,
@@ -438,7 +454,15 @@ export class StudentConsultingProvider implements JobProvider {
         }
       }
 
-      return pageContainsExactJobReference(this.page, job.externalId);
+      const applicationsEvidence = await pageContainsExactJobReference(
+        this.page,
+        job.externalId,
+      );
+      console.info("StudentConsulting applications verification", {
+        externalId: job.externalId,
+        verified: applicationsEvidence,
+      });
+      return applicationsEvidence;
     } catch {
       return false;
     }
@@ -1204,6 +1228,85 @@ async function findApplicationSubmit(
     if (accepted.test(label)) matches.push(control);
   }
   return matches.length === 1 ? matches[0] : null;
+}
+
+interface AuthenticatedApplicationStatus {
+  found: boolean;
+  applied: boolean;
+}
+
+async function readAuthenticatedApplicationStatus(
+  page: BrowserPage,
+  externalId: string,
+  countryCode?: string,
+): Promise<AuthenticatedApplicationStatus | null> {
+  if (!page.evaluate) return null;
+
+  const countries = STUDENTCONSULTING_COUNTRIES.filter(
+    (country) => !countryCode || country.countryCode === countryCode,
+  ).map((country) => ({ id: country.id, name: country.country }));
+  const targets =
+    countries.length > 0
+      ? countries
+      : STUDENTCONSULTING_COUNTRIES.map((country) => ({
+          id: country.id,
+          name: country.country,
+        }));
+
+  try {
+    return await page.evaluate(
+      async (input) => {
+        for (const country of input.countries) {
+          const response = await fetch("/api/v1/jobopenings", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              accept: "application/json",
+              "accept-language": "sv-SE",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              locations: [
+                {
+                  type: "country",
+                  id: country.id,
+                  name: country.name,
+                },
+              ],
+              professions: [],
+              schemas: [],
+              types: [],
+              keywords: [],
+              onlySummer: false,
+              onlyInternal: false,
+              sortOrder: 0,
+              page: 1,
+              pageSize: 200,
+            }),
+          });
+          if (!response.ok) continue;
+
+          const payload = (await response.json()) as {
+            data?: Array<{ url?: string; is_applied?: boolean }>;
+          };
+          const rows = Array.isArray(payload.data) ? payload.data : [];
+          const row = rows.find(
+            (candidate) =>
+              candidate.url?.match(/\/(\d+)\/?(?:\?.*)?$/)?.[1] ===
+              input.externalId,
+          );
+          if (row) {
+            return { found: true, applied: row.is_applied === true };
+          }
+        }
+
+        return { found: false, applied: false };
+      },
+      { externalId, countries: targets },
+    );
+  } catch {
+    return null;
+  }
 }
 
 type ApplicationsNavigation =
