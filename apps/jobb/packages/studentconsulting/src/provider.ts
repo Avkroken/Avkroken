@@ -415,16 +415,30 @@ export class StudentConsultingProvider implements JobProvider {
       });
       if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) return false;
 
-      const applicationsUrl = await findApplicationsUrl(this.page);
-      if (!applicationsUrl) return false;
+      const applicationsNavigation = await findApplicationsNavigation(
+        this.page,
+        job.externalId,
+      );
+      if (!applicationsNavigation) return false;
 
-      await this.page.goto(applicationsUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
+      if (applicationsNavigation.status === "found") {
+        await this.page.goto(applicationsNavigation.url, {
+          waitUntil: "domcontentloaded",
+          timeout: 30_000,
+        });
+        const current = normalizeStudentConsultingVisibleMatchedJobsUrl(
+          this.page.url(),
+        );
+        if (
+          !current ||
+          new URL(current).pathname !==
+            new URL(applicationsNavigation.url).pathname
+        ) {
+          return false;
+        }
+      }
 
-      const bodyText = await safeInnerText(this.page.locator("body").first());
-      return containsExactJobId(bodyText, job.externalId);
+      return pageContainsExactJobReference(this.page, job.externalId);
     } catch {
       return false;
     }
@@ -1192,23 +1206,176 @@ async function findApplicationSubmit(
   return matches.length === 1 ? matches[0] : null;
 }
 
-async function findApplicationsUrl(page: BrowserPage): Promise<string | null> {
+type ApplicationsNavigation =
+  | { status: "found"; url: string }
+  | { status: "in_place" };
+
+function isApplicationsLabel(label: string): boolean {
+  return /^(ansökningar|applications|søknader|ansøgninger)$/i.test(label.trim());
+}
+
+async function findApplicationsNavigation(
+  page: BrowserPage,
+  externalId: string,
+  allowPlaceholderClick = true,
+): Promise<ApplicationsNavigation | null> {
   const anchors = page.locator("a");
   const count = Math.min(await anchors.count(), 300);
-  const accepted = /^(ansökningar|applications|søknader|ansøgninger)$/i;
+  const safeUrls = new Set<string>();
+  const placeholderAnchors: BrowserLocator[] = [];
 
   for (let index = 0; index < count; index += 1) {
     const anchor = anchors.nth(index);
     if (!(await anchor.isVisible())) continue;
-    const label = (await safeInnerText(anchor)).trim();
-    if (!accepted.test(label)) continue;
+    const label = await safeInnerText(anchor);
+    if (!isApplicationsLabel(label)) continue;
 
-    const href = await anchor.getAttribute("href");
-    if (!href) continue;
-    const safeUrl = normalizeStudentConsultingUrl(href);
-    if (safeUrl) return safeUrl;
+    const navigationValues = (
+      await Promise.all([
+        anchor.getAttribute("href"),
+        anchor.getAttribute("data-href"),
+        anchor.getAttribute("data-url"),
+      ])
+    ).filter((value): value is string => Boolean(value));
+
+    const trusted = new Set(
+      navigationValues
+        .map((value) => normalizeStudentConsultingVisibleMatchedJobsUrl(value))
+        .filter((value): value is string => Boolean(value)),
+    );
+    if (trusted.size > 1) return null;
+    if (trusted.size === 1) {
+      const hasUnsafeAlternative = navigationValues.some(
+        (value) =>
+          !normalizeStudentConsultingVisibleMatchedJobsUrl(value) &&
+          !isStudentConsultingNavigationPlaceholder(value),
+      );
+      if (hasUnsafeAlternative) return null;
+      safeUrls.add([...trusted][0]);
+      continue;
+    }
+
+    if (
+      navigationValues.length > 0 &&
+      navigationValues.every((value) =>
+        isStudentConsultingNavigationPlaceholder(value),
+      )
+    ) {
+      placeholderAnchors.push(anchor);
+      continue;
+    }
+
+    return null;
+  }
+
+  if (safeUrls.size > 1) return null;
+  if (safeUrls.size === 1) return { status: "found", url: [...safeUrls][0] };
+
+  if (placeholderAnchors.length === 1 && allowPlaceholderClick) {
+    const hadReferenceBeforeClick = await pageContainsExactJobReference(
+      page,
+      externalId,
+    );
+    try {
+      await placeholderAnchors[0].click({ timeout: 10_000 });
+      await page.waitForTimeout(400);
+    } catch {
+      return null;
+    }
+
+    const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(page.url());
+    if (clickedUrl && new URL(clickedUrl).pathname !== new URL(PROFILE_URL).pathname) {
+      return { status: "found", url: clickedUrl };
+    }
+
+    const rescanned = await findApplicationsNavigation(
+      page,
+      externalId,
+      false,
+    );
+    if (rescanned) return rescanned;
+
+    if (
+      normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+      !hadReferenceBeforeClick &&
+      (await pageContainsExactJobReference(page, externalId))
+    ) {
+      return { status: "in_place" };
+    }
+    return null;
+  }
+
+  const controls = page.locator(
+    'button,[role="link"],[data-href],[data-url],[onclick]',
+  );
+  const controlCount = Math.min(await controls.count(), 300);
+  const matchingControls: BrowserLocator[] = [];
+
+  for (let index = 0; index < controlCount; index += 1) {
+    const control = controls.nth(index);
+    if (!(await control.isVisible())) continue;
+    const label = await safeInnerText(control);
+    if (!isApplicationsLabel(label)) continue;
+    matchingControls.push(control);
+  }
+
+  if (matchingControls.length !== 1) return null;
+
+  const hadReferenceBeforeClick = await pageContainsExactJobReference(
+    page,
+    externalId,
+  );
+  try {
+    await matchingControls[0].click({ timeout: 10_000 });
+    await page.waitForTimeout(400);
+  } catch {
+    return null;
+  }
+
+  const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(page.url());
+  if (clickedUrl && new URL(clickedUrl).pathname !== new URL(PROFILE_URL).pathname) {
+    return { status: "found", url: clickedUrl };
+  }
+  if (
+    normalizeStudentConsultingProfileAreaUrl(page.url()) &&
+    !hadReferenceBeforeClick &&
+    (await pageContainsExactJobReference(page, externalId))
+  ) {
+    return { status: "in_place" };
   }
   return null;
+}
+
+async function pageContainsExactJobReference(
+  page: BrowserPage,
+  externalId: string,
+): Promise<boolean> {
+  const bodyText = await safeInnerText(page.locator("body").first());
+  if (containsExactJobId(bodyText, externalId)) return true;
+
+  const selectors = [
+    { selector: "a[href]", attribute: "href" },
+    { selector: "[data-href]", attribute: "data-href" },
+    { selector: "[data-url]", attribute: "data-url" },
+    { selector: "[onclick]", attribute: "onclick" },
+  ] as const;
+
+  for (const source of selectors) {
+    const elements = page.locator(source.selector);
+    const count = await elements.count();
+    for (let index = 0; index < count; index += 1) {
+      const value = await elements.nth(index).getAttribute(source.attribute);
+      if (!value) continue;
+      for (const candidate of extractStudentConsultingJobUrlCandidates(value)) {
+        const safeJobUrl = normalizeStudentConsultingJobUrl(candidate);
+        if (!safeJobUrl) continue;
+        const match = new URL(safeJobUrl).pathname.match(/\/(\d+)\/?$/);
+        if (match?.[1] === externalId.trim()) return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function waitForSubmissionToSettle(

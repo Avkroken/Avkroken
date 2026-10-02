@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mapJobTechHit } from "../../../packages/arbetsformedlingen/src/provider";
+import type { JobCandidate } from "../../../packages/core/src/types";
 import { isHostOrSubdomain } from "../../../packages/core/src/url";
 import type {
   BrowserLocator,
@@ -366,6 +367,115 @@ function matchedProfilePage(
   };
 }
 
+function applicationsVerificationPage(
+  options: {
+    applicationsHref?: string | null;
+    applicationsDataHref?: string;
+    applicationsDataUrl?: string;
+    applicationsClickRoute?: string;
+    applicationsInlineAfterClick?: boolean;
+    redirectApplicationsTo?: string;
+    profileBodyText?: string;
+    applicationsBodyText?: string;
+    applicationsJobHref?: string;
+  } = {},
+): BrowserPage {
+  let currentUrl = "https://www.studentconsulting.com/sv/profil/";
+  let applicationsClicked = false;
+  const applicationsRoute = "/sv/profil/ansokningar/";
+
+  return {
+    async goto(url: string) {
+      const pathname = new URL(url).pathname;
+      currentUrl =
+        pathname === applicationsRoute && options.redirectApplicationsTo
+          ? new URL(
+              options.redirectApplicationsTo,
+              "https://www.studentconsulting.com",
+            ).toString()
+          : url;
+    },
+    url() {
+      return currentUrl;
+    },
+    locator(selector: string) {
+      const current = new URL(currentUrl);
+      if (
+        current.pathname === "/sv/profil/" &&
+        selector === "a"
+      ) {
+        const href =
+          options.applicationsHref === undefined
+            ? applicationsRoute
+            : (options.applicationsHref ?? undefined);
+        return fakeLocator([
+          {
+            text: "Ansökningar",
+            href,
+            dataHref: options.applicationsDataHref,
+            dataUrl: options.applicationsDataUrl,
+            onClick: () => {
+              applicationsClicked = true;
+              if (options.applicationsClickRoute) {
+                currentUrl = new URL(
+                  options.applicationsClickRoute,
+                  "https://www.studentconsulting.com",
+                ).toString();
+              }
+            },
+          },
+        ]);
+      }
+
+      const showingApplications =
+        current.pathname === applicationsRoute ||
+        (current.pathname === "/sv/profil/" &&
+          applicationsClicked &&
+          options.applicationsInlineAfterClick === true);
+
+      if (showingApplications && selector === "body") {
+        return fakeLocator([
+          { text: options.applicationsBodyText ?? "" },
+        ]);
+      }
+      if (
+        current.pathname === "/sv/profil/" &&
+        !applicationsClicked &&
+        selector === "body" &&
+        options.profileBodyText
+      ) {
+        return fakeLocator([{ text: options.profileBodyText }]);
+      }
+      if (
+        showingApplications &&
+        selector === "a[href]" &&
+        options.applicationsJobHref
+      ) {
+        return fakeLocator([{ href: options.applicationsJobHref }]);
+      }
+      if (
+        current.pathname === "/sv/profil/" &&
+        selector ===
+          'button,[role="link"],[data-href],[data-url],[onclick]'
+      ) {
+        return fakeLocator();
+      }
+      return fakeLocator();
+    },
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+  };
+}
+
+const verificationJob: JobCandidate = {
+  provider: "studentconsulting",
+  externalId: "87570",
+  title: "Testjobb",
+  isInternational: false,
+  sourceUrl:
+    "https://www.studentconsulting.com/sv/lediga-jobb/stockholm/testjobb/87570/",
+};
+
 describe("StudentConsulting authentication", () => {
   it("reuses an already authenticated profile session before reading credentials", async () => {
     let credentialReads = 0;
@@ -411,6 +521,92 @@ describe("StudentConsulting authentication", () => {
         code: "STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND",
       }),
     );
+  });
+});
+
+describe("StudentConsulting application verification", () => {
+  const credentials = {
+    async getStudentConsultingCredentials() {
+      return {
+        username: "user@example.test",
+        password: ["test", "placeholder"].join("-"),
+      };
+    },
+  };
+
+  it("verifies an exact Jobb-ID through a trusted Ansökningar link", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsBodyText: "Jobb-ID 87570",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(true);
+  });
+
+  it("verifies an inline Ansökningar list after clicking a root placeholder", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsHref: "/",
+        applicationsInlineAfterClick: true,
+        applicationsBodyText: "Jobb-ID 87570",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(true);
+  });
+
+  it("verifies from an exact trusted job-detail URL when Jobb-ID is not text", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsBodyText: "Ansökan mottagen",
+        applicationsJobHref:
+          "/sv/lediga-jobb/stockholm/testjobb/87570/",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(true);
+  });
+
+  it("rejects a trusted Ansökningar URL that redirects to another profile view", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsBodyText: "Jobb-ID 87570",
+        redirectApplicationsTo: "/sv/profil/matcha-jobb/",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
+  });
+
+  it("does not treat a pre-existing profile job reference as an in-place applications view", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsHref: "/",
+        profileBodyText: "Jobb-ID 87570",
+        applicationsInlineAfterClick: false,
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
+  });
+
+  it("rejects untrusted Ansökningar navigation", async () => {
+    const provider = new StudentConsultingProvider({
+      page: applicationsVerificationPage({
+        applicationsHref:
+          "https://evil.test/sv/profil/ansokningar/",
+        applicationsBodyText: "Jobb-ID 87570",
+      }),
+      credentials,
+    });
+
+    await expect(provider.verify(verificationJob)).resolves.toBe(false);
   });
 });
 
