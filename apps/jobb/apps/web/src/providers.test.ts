@@ -44,6 +44,26 @@ describe("trusted URL validation", () => {
     ).toBeNull();
   });
 
+  it("requires the exact configured origin for matched-profile routes", () => {
+    expect(
+      normalizeStudentConsultingMatchedJobsUrl(
+        "https://www.studentconsulting.com/sv/min-profil/matcha-jobb/",
+      ),
+    ).toBe(
+      "https://www.studentconsulting.com/sv/min-profil/matcha-jobb/",
+    );
+    expect(
+      normalizeStudentConsultingMatchedJobsUrl(
+        "https://profile.studentconsulting.com/sv/min-profil/matcha-jobb/",
+      ),
+    ).toBeNull();
+    expect(
+      normalizeStudentConsultingMatchedJobsUrl(
+        "https://user:secret@www.studentconsulting.com/sv/min-profil/matcha-jobb/",
+      ),
+    ).toBeNull();
+  });
+
   it("only accepts StudentConsulting job-detail paths", () => {
     expect(
       normalizeStudentConsultingJobUrl(
@@ -310,6 +330,46 @@ describe("StudentConsulting authenticated discovery", () => {
 
     await expect(provider.discover()).rejects.toThrow(
       /STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID:.*untrusted_href.*\/sv\/lediga-jobb\//,
+    );
+  });
+
+  it("rejects matched-profile navigation on a StudentConsulting subdomain", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedNavHref:
+          "https://profile.studentconsulting.com/sv/min-profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID:.*untrusted_href/,
+    );
+  });
+
+  it("rejects matched-profile navigation with URL credentials", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedNavHref:
+          "https://user:secret@www.studentconsulting.com/sv/min-profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID:.*untrusted_href/,
     );
   });
 

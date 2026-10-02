@@ -511,10 +511,29 @@ export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
 }
 
+function normalizeStudentConsultingMainOriginUrl(
+  value: string,
+): string | null {
+  try {
+    const parsed = new URL(value, DEFAULT_BASE_URL);
+    const expected = new URL(DEFAULT_BASE_URL);
+    if (parsed.protocol !== "https:") return null;
+    if (parsed.origin !== expected.origin) return null;
+    if (parsed.username || parsed.password) return null;
+
+    return new URL(
+      `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      DEFAULT_BASE_URL,
+    ).toString();
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeStudentConsultingMatchedJobsUrl(
   value: string,
 ): string | null {
-  const safe = normalizeStudentConsultingUrl(value);
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
@@ -540,7 +559,7 @@ type MatchedJobsNavigation =
 function normalizeStudentConsultingVisibleMatchedJobsUrl(
   value: string,
 ): string | null {
-  const safe = normalizeStudentConsultingUrl(value);
+  const safe = normalizeStudentConsultingMainOriginUrl(value);
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
@@ -680,7 +699,7 @@ export async function loadStudentConsultingCountryIndex(
 }
 
 function isSameMatchedJobsRoute(current: string, expected: string): boolean {
-  const currentSafe = normalizeStudentConsultingUrl(current);
+  const currentSafe = normalizeStudentConsultingMainOriginUrl(current);
   const expectedSafe =
     normalizeStudentConsultingVisibleMatchedJobsUrl(expected) ??
     normalizeStudentConsultingMatchedJobsUrl(expected);
