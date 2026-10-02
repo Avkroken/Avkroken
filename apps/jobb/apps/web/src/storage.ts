@@ -285,22 +285,69 @@ export async function countVerifiedApplications(
   return Number(row?.count ?? 0);
 }
 
-export async function hasApplicationForJob(
+export interface ApplicationForJobRow {
+  id: string;
+  status: string;
+  applied_at: string | null;
+  verified_at: string | null;
+  automation_run_id: string | null;
+  report_month: string;
+}
+
+export async function getApplicationForJob(
   db: D1Database,
   provider: string,
   externalId: string,
-): Promise<boolean> {
-  const row = await db
+): Promise<ApplicationForJobRow | null> {
+  return db
     .prepare(
-      `SELECT a.id
+      `SELECT a.id, a.status, a.applied_at, a.verified_at,
+              a.automation_run_id, a.report_month
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE j.provider = ? AND j.external_id = ?
        LIMIT 1`,
     )
     .bind(provider, externalId)
-    .first<{ id: string }>();
-  return Boolean(row);
+    .first<ApplicationForJobRow>();
+}
+
+export function isRetryablePreSubmitFailure(
+  application: ApplicationForJobRow,
+  runId: string,
+): boolean {
+  return (
+    application.automation_run_id === runId &&
+    application.status === "failed" &&
+    application.applied_at === null &&
+    application.verified_at === null
+  );
+}
+
+export async function requeueFailedPreSubmitApplication(
+  db: D1Database,
+  input: {
+    id: string;
+    runId: string;
+    reportMonth: string;
+  },
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE applications
+       SET status = 'queued',
+           report_month = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?
+         AND automation_run_id = ?
+         AND status = 'failed'
+         AND applied_at IS NULL
+         AND verified_at IS NULL`,
+    )
+    .bind(input.reportMonth, input.id, input.runId)
+    .run();
+
+  return Number(result.meta.changes ?? 0) === 1;
 }
 
 export async function persistJob(
