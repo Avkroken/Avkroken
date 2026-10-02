@@ -149,6 +149,7 @@ function matchedProfilePage(
     redirectMatched?: boolean;
     matchedProfileRoute?: string;
     matchedNavHref?: string | null;
+    matchedNavLabel?: string;
     authOnMatchedVisit?: number;
     jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
     jobLinkValue?: string;
@@ -181,7 +182,9 @@ function matchedProfilePage(
           options.matchedNavHref === undefined
             ? matchedProfileRoute
             : (options.matchedNavHref ?? undefined);
-        return fakeLocator([{ text: "Matcha jobb", href }]);
+        return fakeLocator([
+          { text: options.matchedNavLabel ?? "Matcha jobb", href },
+        ]);
       }
       if (
         current.pathname === matchedProfileRoute &&
@@ -312,6 +315,49 @@ describe("StudentConsulting authenticated discovery", () => {
         discoverySource: "studentconsulting_matcha_jobb",
       }),
     ]);
+  });
+
+  it("recognizes current-style jobbmatchning navigation labels", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/min-profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("does not fall back to the obsolete canonical route when navigation is absent", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedNavLabel: "Profil",
+        matchedNavHref: "/sv/min-profil/jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).rejects.toThrow(
+      /STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND:.*profilePaths=\/sv\/min-profil\/jobbmatchningar\//,
+    );
   });
 
   it("rejects visible Matcha jobb navigation outside the authenticated profile area", async () => {
@@ -546,6 +592,10 @@ describe("StudentConsulting parsing", () => {
   it("recognizes the authenticated Matcha jobb navigation label and route", () => {
     expect(isStudentConsultingMatchedJobsLabel("Matcha jobb")).toBe(true);
     expect(isStudentConsultingMatchedJobsLabel("Matcha jobb 12")).toBe(true);
+    expect(isStudentConsultingMatchedJobsLabel("Jobbmatchning")).toBe(true);
+    expect(isStudentConsultingMatchedJobsLabel("Mina jobbmatchningar")).toBe(true);
+    expect(isStudentConsultingMatchedJobsLabel("Matchningar mot jobb")).toBe(true);
+    expect(isStudentConsultingMatchedJobsLabel("Rusta och matcha")).toBe(false);
     expect(isStudentConsultingMatchedJobsLabel("Lediga jobb")).toBe(false);
     expect(
       normalizeStudentConsultingMatchedJobsUrl(

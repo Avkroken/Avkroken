@@ -12,7 +12,6 @@ const DEFAULT_BASE_URL = "https://www.studentconsulting.com";
 const STUDENTCONSULTING_DOMAIN = "studentconsulting.com";
 const STUDENTCONSULTING_IDP = "id.studentconsulting.com";
 const SUBMISSION_SETTLE_MS = 15_000;
-const MATCHED_JOBS_URL = `${DEFAULT_BASE_URL}/sv/min-profil/matcha-jobb/`;
 const MATCHED_LISTING_WAIT_MS = 15_000;
 const JOB_OPENINGS_API = `${DEFAULT_BASE_URL}/api/v1/jobopenings`;
 const COUNTRY_PAGE_SIZE = 200;
@@ -167,22 +166,18 @@ export class StudentConsultingProvider implements JobProvider {
         `STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: synlig Matcha jobb-navigation kunde inte valideras (${matchedNavigation.reason}${matchedNavigation.path ? `, path=${matchedNavigation.path}` : ""}).`,
       );
     }
-
-    const fallbackMatchedJobsUrl =
-      normalizeStudentConsultingMatchedJobsUrl(MATCHED_JOBS_URL);
-    const matchedJobsUrl =
-      matchedNavigation.status === "found"
-        ? matchedNavigation.url
-        : fallbackMatchedJobsUrl;
-    const matchedRouteSource =
-      matchedNavigation.status === "found"
-        ? "visible_navigation"
-        : "canonical_fallback";
-    if (!matchedJobsUrl) {
+    if (matchedNavigation.status === "absent") {
+      const profilePaths =
+        matchedNavigation.profilePaths.length > 0
+          ? matchedNavigation.profilePaths.join(",")
+          : "(none)";
       throw new Error(
-        "STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: Matcha jobb-routen kunde inte valideras.",
+        `STUDENTCONSULTING_MATCHED_PROFILE_NAVIGATION_NOT_FOUND: ingen verifierad jobbmatchningsnavigation hittades; profilePaths=${profilePaths}.`,
       );
     }
+
+    const matchedJobsUrl = matchedNavigation.url;
+    const matchedRouteSource = "visible_navigation";
 
     await this.page.goto(matchedJobsUrl, {
       waitUntil: "domcontentloaded",
@@ -508,7 +503,10 @@ function extractStudentConsultingJobUrlCandidates(value: string): string[] {
 
 export function isStudentConsultingMatchedJobsLabel(label: string): boolean {
   const normalized = normalize(label);
-  return /^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized);
+  if (/^(matcha jobb|matchade jobb|matchande jobb)(?:\s|$)/i.test(normalized)) {
+    return true;
+  }
+  return normalized.includes("jobb") && normalized.includes("match");
 }
 
 function normalizeStudentConsultingMainOriginUrl(
@@ -548,7 +546,7 @@ export function normalizeStudentConsultingMatchedJobsUrl(
 }
 
 type MatchedJobsNavigation =
-  | { status: "absent" }
+  | { status: "absent"; profilePaths: string[] }
   | { status: "found"; url: string }
   | {
       status: "invalid";
@@ -573,6 +571,7 @@ async function findMatchedJobsNavigation(
   const anchors = page.locator("a");
   const count = await anchors.count();
   const validUrls = new Set<string>();
+  const profilePaths = new Set<string>();
   let matchingLabels = 0;
   let invalidReason: "missing_href" | "untrusted_href" | undefined;
   let invalidPath: string | undefined;
@@ -580,11 +579,17 @@ async function findMatchedJobsNavigation(
   for (let index = 0; index < count; index += 1) {
     const anchor = anchors.nth(index);
     if (!(await anchor.isVisible())) continue;
+
+    const href = await anchor.getAttribute("href");
+    if (href) {
+      const profileUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(href);
+      if (profileUrl) profilePaths.add(new URL(profileUrl).pathname);
+    }
+
     const label = await safeInnerText(anchor);
     if (!isStudentConsultingMatchedJobsLabel(label)) continue;
     matchingLabels += 1;
 
-    const href = await anchor.getAttribute("href");
     if (!href) {
       invalidReason = "missing_href";
       continue;
@@ -593,14 +598,22 @@ async function findMatchedJobsNavigation(
     const safeUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(href);
     if (!safeUrl) {
       invalidReason = "untrusted_href";
-      const observed = normalizeStudentConsultingUrl(href);
-      if (observed) invalidPath = new URL(observed).pathname;
+      try {
+        invalidPath = new URL(href, DEFAULT_BASE_URL).pathname;
+      } catch {
+        invalidPath = undefined;
+      }
       continue;
     }
     validUrls.add(safeUrl);
   }
 
-  if (matchingLabels === 0) return { status: "absent" };
+  if (matchingLabels === 0) {
+    return {
+      status: "absent",
+      profilePaths: [...profilePaths].sort().slice(0, 20),
+    };
+  }
   if (invalidReason) {
     return { status: "invalid", reason: invalidReason, path: invalidPath };
   }
