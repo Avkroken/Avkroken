@@ -24,6 +24,7 @@ import {
   getApplicationForJob,
   getRun,
   isRetryablePreSubmitFailure,
+  listRetryableFailedJobs,
   nextAttemptNumber,
   persistJob,
   recordNotification,
@@ -348,25 +349,31 @@ async function fillMonthlyApplicationTarget(
       };
     }
 
-    const discovered = await provider.discover();
+    const [retryableFailed, discovered] = await Promise.all([
+      listRetryableFailedJobs(env.DB, applicationMonth, runId),
+      provider.discover(),
+    ]);
     const rejectionCounts = new Map<string, number>();
-    const suitable = [
+    const candidates = [
       ...new Map(
-        discovered
-          .filter((job) => {
-            const assessment = evaluateSuitability(env, job);
-            if (assessment.suitable) return true;
-            for (const reason of assessment.reasons) {
-              rejectionCounts.set(reason, (rejectionCounts.get(reason) ?? 0) + 1);
-            }
-            return false;
-          })
-          .map((job) => [`${job.provider}:${job.externalId}`, job] as const),
+        [...retryableFailed, ...discovered].map(
+          (job) => [`${job.provider}:${job.externalId}`, job] as const,
+        ),
       ).values(),
     ];
+    const suitable = candidates.filter((job) => {
+      const assessment = evaluateSuitability(env, job);
+      if (assessment.suitable) return true;
+      for (const reason of assessment.reasons) {
+        rejectionCounts.set(reason, (rejectionCounts.get(reason) ?? 0) + 1);
+      }
+      return false;
+    });
     console.info("StudentConsulting discovery evaluated", {
       runId,
+      retryableFailedCount: retryableFailed.length,
       discoveredCount: discovered.length,
+      candidateCount: candidates.length,
       suitableCount: suitable.length,
       rejectionCounts: Object.fromEntries(rejectionCounts),
     });
@@ -644,11 +651,11 @@ async function fillMonthlyApplicationTarget(
         verifiedCount < MONTHLY_APPLICATION_TARGET
           ? occupied >= MONTHLY_APPLICATION_TARGET
             ? `${Math.max(0, occupied - verifiedCount)} ansökningar väntar på säker verifiering och bara ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} är godkända. De räknas inte som godkända platser, men nya skick stoppas tills de verifierats eller markerats som inte inskickade.`
-            : discovered.length === 0
-              ? "STUDENTCONSULTING_MATCHED_PROFILE_EMPTY: Matcha jobb innehöll inga upptäckbara jobblänkar."
+            : candidates.length === 0
+              ? "STUDENTCONSULTING_MATCHED_PROFILE_EMPTY: inga retrybara tidigare försök eller upptäckbara Matcha-jobb återstår."
               : suitable.length === 0
-                ? `STUDENTCONSULTING_NO_SUITABLE_MATCHES: ${discovered.length} Matcha-jobb hittades men alla stoppades av fail-closed policy. ${summarizeRejections(rejectionCounts)}`
-                : `Only ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} suitable verified applications could be completed. ${discovered.length} Matcha-jobb hittades och ${suitable.length} passerade policy.`
+                ? `STUDENTCONSULTING_NO_SUITABLE_MATCHES: ${candidates.length} kandidater granskades (${retryableFailed.length} retry, ${discovered.length} Matcha-jobb) men alla stoppades av fail-closed policy. ${summarizeRejections(rejectionCounts)}`
+                : `Only ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} suitable verified applications could be completed. ${retryableFailed.length} tidigare failures återköades, ${discovered.length} Matcha-jobb hittades och ${suitable.length} kandidater passerade policy.`
           : undefined,
     };
   });

@@ -8,7 +8,7 @@ The protected dashboard is the operational control plane for the automation. It 
 
 - **Översikt** — monthly target, ten visible result slots filled only by verified applications, report state and active attention signals. Internal `uncertain` quota reservations are shown as separate safety blockers instead of consuming a visible approved slot.
 - **Ansökningar** — filterable applications with run linkage, latest diagnostics and evidence count. On narrow screens the application table becomes mobile cards. `needs_user_action` rows expose a provider-backed **Kontrollera igen** action and an explicit **Markera ej inskickad** resolution; only provider-confirmed applied state can promote an application to `verified`.
-- **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state.
+- **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state. On narrow screens both run history and attempt history use cards instead of wide tables.
 - **Aktivitetsrapport** — report status and per-activity `pending`, `save_attempted` and `saved` state.
 - **System** — runtime configuration status, a protected configuration editor and notification history; write-only secrets are never read back into the browser.
 
@@ -68,6 +68,8 @@ Application attempts persist a machine-readable `error_code` plus the provider's
 
 - `APPLICATION_FAILED` — StudentConsulting rejected or failed the application.
 - `APPLICATION_UNKNOWN` — submission outcome could not be determined safely.
+- Definite pre-submit failures are retryable across later runs even if the job is no longer present in the current Matcha jobb page. `APPLICATION_REQUIRES_INPUT` is retried once per run rather than being permanently capped by attempt count.
+- For StudentConsulting application questions, the automation may only answer facts explicitly approved by the user. It expands experience questions and selects `Ingen erfarenhet` when that exact option is available, and uses `Behöver jobb.` for the known motivation/Pitch field. Other unresolved required questions remain fail-closed.
 - `VERIFICATION_FAILED` — submission was reported, but the exact Jobb-ID was not found in `Ansökningar`.
 - `UNEXPECTED_APPLICATION_ERROR` — browser/provider automation raised an unexpected error.
 

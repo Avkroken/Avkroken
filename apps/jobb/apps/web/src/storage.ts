@@ -382,9 +382,63 @@ export function isRetryablePreSubmitFailure(
   return (
     application.last_attempt_error_message?.startsWith(
       "APPLICATION_REQUIRES_INPUT:",
-    ) === true &&
-    (application.last_attempt_no ?? Number.MAX_SAFE_INTEGER) < 5
+    ) === true
   );
+}
+
+export async function listRetryableFailedJobs(
+  db: D1Database,
+  reportMonth: string,
+  runId: string,
+): Promise<JobCandidate[]> {
+  const rows = await db
+    .prepare(
+      `SELECT a.id, a.status, a.applied_at, a.verified_at,
+              a.automation_run_id, a.report_month, j.raw_json,
+              (
+                SELECT aa.attempt_no
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_no,
+              (
+                SELECT aa.error_code
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_error_code,
+              (
+                SELECT aa.error_message
+                FROM application_attempts aa
+                WHERE aa.application_id = a.id
+                ORDER BY aa.attempt_no DESC
+                LIMIT 1
+              ) AS last_attempt_error_message
+       FROM applications a
+       JOIN jobs j ON j.id = a.job_id
+       WHERE a.report_month = ?
+         AND a.status = 'failed'
+         AND a.applied_at IS NULL
+         AND a.verified_at IS NULL
+       ORDER BY a.updated_at, a.id
+       LIMIT 50`,
+    )
+    .bind(reportMonth)
+    .all<ApplicationForJobRow & { raw_json: string | null }>();
+
+  const jobs: JobCandidate[] = [];
+  for (const row of rows.results) {
+    if (!isRetryablePreSubmitFailure(row, runId) || !row.raw_json) continue;
+    try {
+      const job = JSON.parse(row.raw_json) as JobCandidate;
+      if (job.provider === "studentconsulting") jobs.push(job);
+    } catch {
+      // Invalid persisted payload is not safe to retry.
+    }
+  }
+  return jobs;
 }
 
 export async function requeueFailedPreSubmitApplication(
@@ -423,10 +477,7 @@ export async function requeueFailedPreSubmitApplication(
                    aa.error_code = 'APPLICATION_FAILED'
                    AND (
                      aa.error_message LIKE 'STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND:%'
-                     OR (
-                       aa.error_message LIKE 'APPLICATION_REQUIRES_INPUT:%'
-                       AND aa.attempt_no < 5
-                     )
+                     OR aa.error_message LIKE 'APPLICATION_REQUIRES_INPUT:%'
                    )
                  )
                )

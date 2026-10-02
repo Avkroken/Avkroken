@@ -161,7 +161,9 @@ describe("dashboard rendering", () => {
     expect(cssText).toContain("rgba(213,29,203,.10)");
     expect(cssText).toContain("background-size:42px 42px");
     expect(cssText).toContain(".app-cards");
-    expect(cssText).toContain(".applications-table{display:none}");
+    expect(cssText).toContain(".run-cards");
+    expect(cssText).toContain(".attempt-cards");
+    expect(cssText).toContain(".applications-table,.runs-table,.attempts-table{display:none}");
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("/api/configuration");
     expect(jsText).toContain("Spara konfiguration");
@@ -182,6 +184,9 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("Godkända ansökningar");
     expect(jsText).toContain("Kontrollera igen");
     expect(jsText).toContain("Markera ej inskickad");
+    expect(jsText).toContain("function runCard");
+    expect(jsText).toContain('class="run-cards"');
+    expect(jsText).toContain('class="attempt-cards"');
     expect(jsText).toContain("/api/applications/");
     expect(jsText).toContain("not-submitted");
   });

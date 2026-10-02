@@ -106,6 +106,7 @@ function fakeLocator(
     type?: string;
     checked?: boolean;
     visible?: boolean;
+    ariaExpanded?: string;
   }> = [],
   index = 0,
 ): BrowserLocator {
@@ -137,6 +138,7 @@ function fakeLocator(
       if (name === "onclick") return items[index]?.onclick ?? null;
       if (name === "name") return items[index]?.name ?? null;
       if (name === "type") return items[index]?.type ?? null;
+      if (name === "aria-expanded") return items[index]?.ariaExpanded ?? null;
       return null;
     },
     async innerText() {
@@ -603,6 +605,106 @@ function dynamicRequiredApplicationPage(): BrowserPage {
   };
 }
 
+function experienceApplicationPage(): {
+  page: BrowserPage;
+  experienceExpanded: () => boolean;
+  noExperienceSelected: () => boolean;
+  submitClicks: () => number;
+} {
+  let currentUrl = "https://www.studentconsulting.com/sv/profil/";
+  let expanded = false;
+  let submitted = false;
+  let submitClicks = 0;
+  const radio = {
+    type: "radio",
+    name: "experience",
+    checked: false,
+  };
+
+  return {
+    page: {
+      async goto(url: string) {
+        currentUrl =
+          new URL(url).pathname === "/signin"
+            ? "https://www.studentconsulting.com/sv/profil/"
+            : url;
+      },
+      url() {
+        return currentUrl;
+      },
+      locator(selector: string) {
+        const pathname = new URL(currentUrl).pathname;
+        if (!/\/sv\/lediga-jobb\//.test(pathname)) return fakeLocator();
+
+        if (selector === "body") {
+          return fakeLocator([
+            {
+              text: submitted
+                ? "Tack för din ansökan"
+                : "Fakta om jobbet\nJobb-ID 87570",
+            },
+          ]);
+        }
+        if (
+          selector ===
+          'button[aria-expanded],[role="button"][aria-expanded],summary,[data-toggle="collapse"],[data-bs-toggle="collapse"]'
+        ) {
+          return fakeLocator([
+            {
+              text: "Erfarenhet",
+              ariaExpanded: expanded ? "true" : "false",
+              onClick() {
+                expanded = true;
+              },
+            },
+          ]);
+        }
+        if (selector === 'label,button,[role="radio"]') {
+          return expanded
+            ? fakeLocator([
+                {
+                  text: "Ingen erfarenhet",
+                  onClick() {
+                    radio.checked = true;
+                  },
+                },
+              ])
+            : fakeLocator();
+        }
+        if (selector.includes("input[required]")) {
+          return fakeLocator([radio]);
+        }
+        if (selector === 'input[type="radio"][name="experience"]') {
+          return fakeLocator([radio]);
+        }
+        if (selector === 'button, input[type="submit"]') {
+          return fakeLocator([
+            {
+              text: "Ansök",
+              onClick() {
+                submitClicks += 1;
+                submitted = true;
+              },
+            },
+          ]);
+        }
+        return fakeLocator();
+      },
+      async waitForLoadState() {},
+      async waitForTimeout() {},
+      async evaluate<T, A>(
+        _pageFunction: (arg: A) => T | Promise<T>,
+        _arg: A,
+      ): Promise<T> {
+        return { found: true, applied: submitted } as T;
+      },
+    },
+    experienceExpanded: () => expanded,
+    noExperienceSelected: () => radio.checked,
+    submitClicks: () => submitClicks,
+  };
+}
+
 const verificationJob: JobCandidate = {
   provider: "studentconsulting",
   externalId: "87570",
@@ -798,7 +900,7 @@ describe("StudentConsulting application submission guard", () => {
       }),
     );
     expect(harness.pitchValue()).toBe(buildStudentConsultingPitch(job));
-    expect(harness.pitchValue()).toContain("Testjobb i Stockholm");
+    expect(harness.pitchValue()).toBe("Behöver jobb.");
     expect(harness.submitClicks()).toBe(1);
   });
 
@@ -821,6 +923,32 @@ describe("StudentConsulting application submission guard", () => {
       expect.objectContaining({ status: "submitted" }),
     );
     expect(harness.pitchValue()).toBe("Min redan sparade motivation.");
+    expect(harness.submitClicks()).toBe(1);
+  });
+
+  it("expands the experience question and selects Ingen erfarenhet before submit", async () => {
+    const harness = experienceApplicationPage();
+    const provider = new StudentConsultingProvider({
+      page: harness.page,
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      autoSubmit: true,
+    });
+
+    await expect(provider.apply(verificationJob)).resolves.toEqual(
+      expect.objectContaining({
+        status: "submitted",
+        submissionAttempted: true,
+      }),
+    );
+    expect(harness.experienceExpanded()).toBe(true);
+    expect(harness.noExperienceSelected()).toBe(true);
     expect(harness.submitClicks()).toBe(1);
   });
 

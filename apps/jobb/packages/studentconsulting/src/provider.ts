@@ -1151,17 +1151,62 @@ async function firstVisible(
   return null;
 }
 
-export function buildStudentConsultingPitch(job: JobCandidate): string {
-  const role = job.title.trim();
-  const location = job.location?.trim();
-  const where = location ? ` i ${location}` : "";
-  return `Jag är intresserad av tjänsten ${role}${where} och vill gärna veta mer om rollen och arbetsuppgifterna. Jag berättar gärna mer om min motivation i nästa steg.`;
+export function buildStudentConsultingPitch(_job: JobCandidate): string {
+  return "Behöver jobb.";
+}
+
+async function expandExperienceQuestion(page: BrowserPage): Promise<void> {
+  const controls = page.locator(
+    'button[aria-expanded],[role="button"][aria-expanded],summary,[data-toggle="collapse"],[data-bs-toggle="collapse"]',
+  );
+  const count = Math.min(await controls.count(), 100);
+  let clicked = false;
+
+  for (let index = 0; index < count; index += 1) {
+    const control = controls.nth(index);
+    if (!(await control.isVisible())) continue;
+    const label = normalize(await safeInnerText(control));
+    if (!/(erfarenhet|experience)/i.test(label)) continue;
+    if ((await control.getAttribute("aria-expanded")) === "true") continue;
+    await control.click({ timeout: 5_000 });
+    clicked = true;
+  }
+
+  if (clicked) await page.waitForTimeout(250);
+}
+
+function isNoExperienceAnswer(label: string): boolean {
+  const normalized = normalize(label);
+  return /^(ingen.*erfarenhet|saknar.*erfarenhet|0\s*(års?|år|year|years)?\s*(erfarenhet|experience)?|none|no experience)$/.test(
+    normalized,
+  );
+}
+
+async function selectNoExperienceAnswer(page: BrowserPage): Promise<void> {
+  const candidates = page.locator('label,button,[role="radio"]');
+  const count = Math.min(await candidates.count(), 150);
+  const matches: BrowserLocator[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const candidate = candidates.nth(index);
+    if (!(await candidate.isVisible())) continue;
+    if (isNoExperienceAnswer(await safeInnerText(candidate))) {
+      matches.push(candidate);
+    }
+  }
+
+  if (matches.length === 1) {
+    await matches[0].click({ timeout: 5_000 });
+  }
 }
 
 async function fillKnownSafeRequiredControls(
   page: BrowserPage,
   job: JobCandidate,
 ): Promise<void> {
+  await expandExperienceQuestion(page);
+  await selectNoExperienceAnswer(page);
+
   const pitchFields = page.locator('textarea#Pitch, textarea[name="Pitch"]');
   const count = Math.min(await pitchFields.count(), 2);
   if (count !== 1) return;
