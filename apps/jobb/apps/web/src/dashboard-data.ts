@@ -109,6 +109,8 @@ export async function getDashboardData(
     reportActivities,
     failedNotifications,
     ambiguousReportItems,
+    calendarApplications,
+    activityExports,
   ] = await Promise.all([
     db
       .prepare(
@@ -236,6 +238,21 @@ export async function getDashboardData(
       )
       .bind(reportMonth)
       .first<{ count: number }>(),
+    db
+      .prepare(
+        `SELECT report_month, applied_at, verified_at
+         FROM applications
+         WHERE status = 'verified' AND applied_at IS NOT NULL
+         ORDER BY report_month, applied_at, id`,
+      )
+      .all(),
+    db
+      .prepare(
+        `SELECT report_month, target_count, item_count, ready_at, created_at
+         FROM activity_report_exports
+         ORDER BY report_month DESC`,
+      )
+      .all(),
   ]);
 
   const quotaSlots = buildVerifiedQuotaSlots(verifiedApplications.results);
@@ -308,6 +325,8 @@ export async function getDashboardData(
     reportSaved: Number(reportItems?.saved ?? 0),
     reportItems: Number(reportItems?.total ?? 0),
     reportActivities: reportActivities.results,
+    activityCalendar: calendarApplications.results,
+    activityExports: activityExports.results,
     runs: dashboardRuns,
     applications: applications.results,
     notifications: notifications.results,

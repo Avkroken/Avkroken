@@ -1493,12 +1493,15 @@ describe("StudentConsulting parsing", () => {
       Malmö
       Yrkeskategori
       Industri / Produktion
+      Omfattning
+      Heltid
     `);
 
     expect(parsed).toEqual({
       externalId: "87178",
       location: "Malmö",
       occupation: "Industri / Produktion",
+      scope: "Heltid",
       isInternational: false,
     });
   });
@@ -1625,6 +1628,8 @@ describe("JobTech mapping", () => {
         country_code: "199",
       },
       occupation: { concept_id: "abc", label: "Supporttekniker" },
+      working_hours_type: { concept_id: "full", label: "Heltid" },
+      scope_of_work: { min: 100, max: 100 },
       application_details: {
         url: "https://example.test/apply",
         reference: "REF-123",
@@ -1639,6 +1644,7 @@ describe("JobTech mapping", () => {
       countryCode: "SE",
       isInternational: false,
       occupationConceptId: "abc",
+      scope: "Heltid",
       applicationReference: "REF-123",
     });
   });

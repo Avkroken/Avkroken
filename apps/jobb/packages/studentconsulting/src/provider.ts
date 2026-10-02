@@ -42,6 +42,7 @@ export interface ParsedStudentConsultingJob {
   externalId?: string;
   location?: string;
   occupation?: string;
+  scope?: string;
   country?: string;
   countryCode?: string;
   isInternational: boolean;
@@ -516,6 +517,7 @@ export class StudentConsultingProvider implements JobProvider {
           ? parsed.isInternational
           : (indexedCountry?.isInternational ?? parsed.isInternational),
       occupation: parsed.occupation,
+      scope: parsed.scope,
       applicationUrl: safeJobUrl,
       discoverySource: "studentconsulting_matcha_jobb",
       sourceUrl: safeJobUrl,
@@ -536,6 +538,7 @@ export function parseStudentConsultingJobText(
     externalId,
     location: readFact(facts, "Ort"),
     occupation: readFact(facts, "Yrkeskategori"),
+    scope: readFact(facts, "Omfattning"),
     ...country,
   };
 }

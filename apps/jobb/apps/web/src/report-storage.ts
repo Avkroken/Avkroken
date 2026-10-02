@@ -7,6 +7,7 @@ export interface ReportApplicationRow {
   countryCode: string | null;
   isInternational: boolean;
   appliedAt: string;
+  verifiedAt: string | null;
   rawJson: string | null;
 }
 
@@ -25,7 +26,7 @@ export async function loadVerifiedReportApplications(
 ): Promise<ReportApplicationRow[]> {
   const rows = await db
     .prepare(
-      `SELECT a.id AS application_id, a.applied_at,
+      `SELECT a.id AS application_id, a.applied_at, a.verified_at,
               j.external_id, j.title, j.employer, j.location, j.country_code,
               j.is_international, j.raw_json
        FROM applications a
@@ -39,6 +40,7 @@ export async function loadVerifiedReportApplications(
     .all<{
       application_id: string;
       applied_at: string;
+      verified_at: string | null;
       external_id: string;
       title: string;
       employer: string | null;
@@ -57,6 +59,7 @@ export async function loadVerifiedReportApplications(
     countryCode: row.country_code,
     isInternational: Boolean(row.is_international),
     appliedAt: row.applied_at,
+    verifiedAt: row.verified_at,
     rawJson: row.raw_json,
   }));
 }

@@ -1,6 +1,7 @@
 import type { BrowserWorker } from "@cloudflare/playwright";
 import { MONTHLY_APPLICATION_TARGET } from "../../../packages/core/src/types";
 import { getArbetsformedlingenHandoffStatus } from "./arbetsformedlingen-handoff";
+import { getMonthlyActivityExport } from "./activity-export";
 import { submitArbetsformedlingenActivityReport } from "./arbetsformedlingen-report";
 import {
   getReportActivityItem,
@@ -174,6 +175,32 @@ export default {
       } catch (error) {
         return jsonError(error, 500);
       }
+    }
+
+    const activityExportMatch = url.pathname.match(
+      /^\/api\/reports\/(\d{4}-\d{2})\/export\.txt$/,
+    );
+    if (request.method === "GET" && activityExportMatch) {
+      const reportMonth = activityExportMatch[1];
+      const monthlyExport = await getMonthlyActivityExport(env.DB, reportMonth);
+      if (!monthlyExport) {
+        return new Response("Månadsfilen är inte klar ännu.", {
+          status: 404,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "cache-control": "no-store",
+          },
+        });
+      }
+
+      return new Response(monthlyExport.content_text, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "content-disposition": `attachment; filename="aktivitetsrapport_${reportMonth}_jobbsok.txt"`,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        },
+      });
     }
 
     if (request.method === "POST" && url.pathname === "/api/configuration") {

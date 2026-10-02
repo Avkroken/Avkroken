@@ -13,6 +13,7 @@ export interface JobCandidate {
   isInternational: boolean;
   occupation?: string;
   occupationConceptId?: string;
+  scope?: string;
   applicationUrl?: string;
   applicationReference?: string;
   discoverySource?: "studentconsulting_matcha_jobb";
