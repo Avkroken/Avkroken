@@ -139,6 +139,27 @@ function fakeLocator(
   };
 }
 
+function authenticationRedirectPage(targetUrl: string): BrowserPage {
+  let currentUrl = "https://www.studentconsulting.com/signin";
+
+  return {
+    async goto(url: string) {
+      currentUrl =
+        new URL(url).pathname === "/signin"
+          ? targetUrl
+          : url;
+    },
+    url() {
+      return currentUrl;
+    },
+    locator() {
+      return fakeLocator();
+    },
+    async waitForLoadState() {},
+    async waitForTimeout() {},
+  };
+}
+
 const countryIndexFetcher: typeof fetch = async (_input, init) => {
   const request = JSON.parse(String(init?.body ?? "{}")) as {
     locations?: Array<{ id?: number }>;
@@ -344,6 +365,54 @@ function matchedProfilePage(
     async waitForTimeout() {},
   };
 }
+
+describe("StudentConsulting authentication", () => {
+  it("reuses an already authenticated profile session before reading credentials", async () => {
+    let credentialReads = 0;
+    const provider = new StudentConsultingProvider({
+      page: authenticationRedirectPage(
+        "https://www.studentconsulting.com/sv/profil/",
+      ),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          credentialReads += 1;
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+    });
+
+    await expect(provider.authenticate()).resolves.toEqual({
+      status: "authenticated",
+    });
+    expect(credentialReads).toBe(0);
+  });
+
+  it("does not treat a public StudentConsulting page without a login form as authenticated", async () => {
+    const provider = new StudentConsultingProvider({
+      page: authenticationRedirectPage(
+        "https://www.studentconsulting.com/sv/",
+      ),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+    });
+
+    await expect(provider.authenticate()).resolves.toEqual(
+      expect.objectContaining({
+        status: "failed",
+        code: "STUDENTCONSULTING_LOGIN_FORM_NOT_FOUND",
+      }),
+    );
+  });
+});
 
 describe("StudentConsulting authenticated discovery", () => {
   it("discovers from the canonical authenticated Matcha jobb route", async () => {

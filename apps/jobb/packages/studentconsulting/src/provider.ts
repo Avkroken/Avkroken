@@ -68,8 +68,6 @@ export class StudentConsultingProvider implements JobProvider {
 
   async authenticate(): Promise<AuthenticationState> {
     try {
-      const { username, password } =
-        await this.credentials.getStudentConsultingCredentials();
       const redirectUrl = PROFILE_URL;
       const loginUrl = `${DEFAULT_BASE_URL}/signin?language=sv-SE&redirectUrl=${encodeURIComponent(redirectUrl)}`;
 
@@ -77,6 +75,16 @@ export class StudentConsultingProvider implements JobProvider {
         waitUntil: "domcontentloaded",
         timeout: 30_000,
       });
+
+      if (
+        normalizeStudentConsultingProfileAreaUrl(this.page.url()) &&
+        !(await hasVisibleStudentConsultingLoginControls(this.page))
+      ) {
+        return { status: "authenticated" };
+      }
+
+      const { username, password } =
+        await this.credentials.getStudentConsultingCredentials();
 
       const email = await firstVisible(this.page, [
         'input[type="email"]',
