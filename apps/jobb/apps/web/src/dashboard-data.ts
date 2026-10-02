@@ -93,13 +93,15 @@ export async function getDashboardData(
   configuration: RuntimeConfigurationView,
 ) {
   const applicationMonth = currentMonthKey();
-  const reportMonth = previousMonthKey();
+  const reportMonth = applicationMonth;
+  const submissionReportMonth = previousMonthKey();
 
   const [
     progress,
     unresolvedApplications,
     verifiedApplications,
     report,
+    submissionReport,
     reportItems,
     runs,
     applications,
@@ -140,6 +142,13 @@ export async function getDashboardData(
          FROM reports WHERE report_month = ?`,
       )
       .bind(reportMonth)
+      .first(),
+    db
+      .prepare(
+        `SELECT report_month, target_count, status, submitted_at, last_error, updated_at
+         FROM reports WHERE report_month = ?`,
+      )
+      .bind(submissionReportMonth)
       .first(),
     db
       .prepare(
@@ -201,7 +210,8 @@ export async function getDashboardData(
       .prepare(
         `SELECT rai.application_id, rai.external_id, rai.state, rai.last_error, rai.updated_at,
                 a.applied_at, a.verified_at,
-                j.title, j.employer, j.location, j.country_code
+                j.title, j.employer, j.location, j.country_code,
+                j.is_international, j.source_url
          FROM report_activity_items rai
          JOIN applications a ON a.id = rai.application_id
          JOIN jobs j ON j.id = a.job_id
@@ -287,12 +297,14 @@ export async function getDashboardData(
     generatedAt: new Date().toISOString(),
     applicationMonth,
     reportMonth,
+    submissionReportMonth,
     target: MONTHLY_APPLICATION_TARGET,
     verified: Number(progress?.verified ?? 0),
     quotaUsed: Number(progress?.verified ?? 0),
     quotaSlots,
     applicationWindowOpen: isApplicationAutomationWindow(),
     report: report ?? null,
+    submissionReport: submissionReport ?? null,
     reportSaved: Number(reportItems?.saved ?? 0),
     reportItems: Number(reportItems?.total ?? 0),
     reportActivities: reportActivities.results,
