@@ -127,6 +127,7 @@ const countryIndexFetcher: typeof fetch = async (_input, init) => {
 function matchedProfilePage(
   options: {
     redirectMatched?: boolean;
+    matchedProfileRoute?: string;
     jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
     jobLinkValue?: string;
     leadingHrefCount?: number;
@@ -135,11 +136,14 @@ function matchedProfilePage(
   } = {},
 ): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/";
+  const matchedProfileRoute =
+    options.matchedProfileRoute ?? "/sv/min-profil/matcha-jobb/";
 
   return {
     async goto(url: string) {
       currentUrl =
-        options.redirectMatched && new URL(url).pathname.includes("/matcha-jobb/")
+        options.redirectMatched &&
+        new URL(url).pathname === matchedProfileRoute
           ? "https://www.studentconsulting.com/sv/lediga-jobb/"
           : url;
     },
@@ -148,8 +152,13 @@ function matchedProfilePage(
     },
     locator(selector: string) {
       const current = new URL(currentUrl);
+      if (current.pathname === "/sv/" && selector === "a[href]") {
+        return fakeLocator([
+          { text: "Matcha jobb", href: matchedProfileRoute },
+        ]);
+      }
       if (
-        current.pathname === "/sv/min-profil/matcha-jobb/" &&
+        current.pathname === matchedProfileRoute &&
         ["a[href]", "[data-href]", "[data-url]", "[onclick]"].includes(selector)
       ) {
         if (options.explicitEmpty) return fakeLocator();
@@ -178,7 +187,7 @@ function matchedProfilePage(
         return fakeLocator([...leading, jobItem]);
       }
       if (
-        current.pathname === "/sv/min-profil/matcha-jobb/" &&
+        current.pathname === matchedProfileRoute &&
         selector === "body" &&
         (options.explicitEmpty || options.matchedBodyText)
       ) {
@@ -238,6 +247,28 @@ describe("StudentConsulting authenticated discovery", () => {
         title: "IT-supporttekniker",
         discoverySource: "studentconsulting_matcha_jobb",
         countryCode: "SE",
+      }),
+    ]);
+  });
+
+  it("uses a trusted visible Matcha jobb profile-route variant", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/min-profil/matchade-jobb/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return { username: "user@example.test", password: "not-used" };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
       }),
     ]);
   });
@@ -423,7 +454,9 @@ describe("StudentConsulting parsing", () => {
       normalizeStudentConsultingMatchedJobsUrl(
         "https://www.studentconsulting.com/sv/min-profil/matchade-jobb/",
       ),
-    ).toBeNull();
+    ).toBe(
+      "https://www.studentconsulting.com/sv/min-profil/matchade-jobb/",
+    );
     expect(
       normalizeStudentConsultingMatchedJobsUrl(
         "https://www.studentconsulting.com/sv/min-profil/",
