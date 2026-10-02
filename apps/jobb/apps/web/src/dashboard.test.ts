@@ -213,6 +213,8 @@ describe("dashboard rendering", () => {
     expect(cssText).toContain(".app-cards");
     expect(cssText).toContain(".run-cards");
     expect(cssText).toContain(".attempt-cards");
+    expect(cssText).toContain(".activity-calendar");
+    expect(cssText).toContain(".calendar-day.download-ready");
     expect(cssText).toContain(".applications-table,.runs-table,.attempts-table{display:none}");
     expect(jsText).toContain("/api/dashboard");
     expect(jsText).toContain("/api/configuration");
@@ -223,6 +225,10 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("Föregående rapport är inskickad");
     expect(jsText).toContain("/report/manual-submitted");
     expect(jsText).toContain("/api/reports/");
+    expect(jsText).toContain("/export.txt");
+    expect(jsText).toContain("Ladda ner .txt");
+    expect(jsText).toContain("TXT klar");
+    expect(jsText).toContain("Jobbsökning");
     expect(jsText).toContain("/saved");
     expect(jsText).toContain("/aktivitetsrapportera/lagg-till-aktivitet");
     expect(jsText).toContain("Sparat – visa nästa jobb");

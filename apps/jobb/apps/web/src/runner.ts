@@ -7,6 +7,7 @@ import {
   notifyActivityReportActionRequired,
   type NotificationEnv,
 } from "./notifier";
+import { ensureMonthlyActivityExport } from "./activity-export";
 import { evaluateSuitability, type SuitabilityEnv } from "./policy";
 import {
   ensureReportActivityItems,
@@ -204,6 +205,7 @@ export async function executeAutomation(
     env.DB,
     applicationMonth,
   );
+  await ensureMonthlyActivityExport(env.DB, applicationMonth, currentMonthApplications);
   await ensureReportActivityItems(
     env.DB,
     applicationMonth,
@@ -831,9 +833,18 @@ export async function recheckApplicationAttention(
     await finishAttempt(env.DB, attemptId, "verified");
     await reconcileMonthlyApplicationSlotState(env.DB, applicationId, "verified");
 
+    const verifiedCount = await countVerifiedApplications(env.DB, row.report_month);
     if (row.automation_run_id) {
-      const verifiedCount = await countVerifiedApplications(env.DB, row.report_month);
       await updateRun(env.DB, row.automation_run_id, { verifiedCount });
+    }
+    if (verifiedCount >= MONTHLY_APPLICATION_TARGET) {
+      const monthlyApplications = await loadVerifiedReportApplications(env.DB, row.report_month);
+      await ensureMonthlyActivityExport(env.DB, row.report_month, monthlyApplications);
+      await ensureReportActivityItems(
+        env.DB,
+        row.report_month,
+        monthlyApplications.slice(0, MONTHLY_APPLICATION_TARGET),
+      );
     }
 
     await persistVerificationEvidence(

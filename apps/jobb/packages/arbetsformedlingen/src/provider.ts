@@ -37,6 +37,11 @@ interface JobTechApplicationDetails {
   reference?: string | null;
 }
 
+interface JobTechScopeOfWork {
+  min?: number | null;
+  max?: number | null;
+}
+
 export interface JobTechSearchHit {
   id?: string | null;
   headline?: string | null;
@@ -44,6 +49,8 @@ export interface JobTechSearchHit {
   employer?: JobTechEmployer | null;
   workplace_address?: JobTechWorkplaceAddress | null;
   occupation?: JobTechTaxonomyItem | null;
+  working_hours_type?: JobTechTaxonomyItem | null;
+  scope_of_work?: JobTechScopeOfWork | null;
   application_details?: JobTechApplicationDetails | null;
 }
 
@@ -138,10 +145,25 @@ export function mapJobTechHit(
     isInternational: Boolean(country || rawCountryCode) && !isSweden,
     occupation: hit.occupation?.label?.trim() || undefined,
     occupationConceptId: hit.occupation?.concept_id?.trim() || undefined,
+    scope:
+      hit.working_hours_type?.label?.trim() ||
+      formatScopeOfWork(hit.scope_of_work) ||
+      undefined,
     applicationUrl: hit.application_details?.url?.trim() || undefined,
     applicationReference: hit.application_details?.reference?.trim() || undefined,
     sourceUrl,
   };
+}
+
+function formatScopeOfWork(scope?: JobTechScopeOfWork | null): string | null {
+  const min = scope?.min;
+  const max = scope?.max;
+  if (typeof min !== "number" && typeof max !== "number") return null;
+  if (typeof min === "number" && typeof max === "number") {
+    return min === max ? `${min} %` : `${min}–${max} %`;
+  }
+  if (typeof min === "number") return `Minst ${min} %`;
+  return `Högst ${max} %`;
 }
 
 function isSwedishLocation(

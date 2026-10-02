@@ -84,6 +84,7 @@ D1-migrationerna är canonical schemahistorik:
 - `0004_monthly_application_quota.sql` — exakt tio quota-slots per månad.
 - `0005_activity_report_submission.sql` — idempotent state för rapportaktiviteter.
 - `0006_runtime_configuration.sql` — krypterad dashboard-hanterad runtimekonfiguration.
+- `0007_monthly_activity_exports.sql` — oföränderlig månadsfil för aktivitetsrapportens manuella underlag, med dagen då filen blev klar.
 
 Centrala stateflöden:
 
@@ -144,7 +145,7 @@ Top-level-vyer:
 - **Översikt** — månadsmål, rapportstate, blockers och tio synliga resultatplatser som endast fylls av verifierade ansökningar; osäkra interna reservationer visas separat.
 - **Ansökningar** — filtrerbar ansökningshistorik, fel, run-koppling och evidence-count. På mobil visas kort i stället för den breda tabellen. `needs_user_action` kan kontrolleras mot StudentConsulting igen eller uttryckligen markeras som ej inskickad.
 - **Körningar** — run history och read-only drill-down till applications, attempts, evidence, notifications och probe-state. På mobil visas både körningar och attempts som kort i stället för breda tabeller. När 10/10 ansökningar är verifierade räknas körningen som completed även om föregående månads separata aktivitetsrapport saknar historiskt underlag; sådana rapportluckor visas som icke-blockerande noteringar och historiska failed-runs räknas inte som aktiva blockers.
-- **Aktivitetsrapport** — aktuell månads aktivitetskö och föregående månads separata submission-state. Per aktivitet används `pending/save_attempted/saved`. Dashboarden visar nästa verifierade jobb med kända formulärfält, länkar direkt till Arbetsförmedlingens `lagg-till-aktivitet`-vy och till källannonsen; användaren bekräftar därefter varje sparad aktivitet så kön går vidare.
+- **Aktivitetsrapport** — aktuell månads aktivitetskö och föregående månads separata submission-state. Per aktivitet används `pending/save_attempted/saved`. Dashboarden visar nästa verifierade jobb med kända formulärfält, länkar direkt till Arbetsförmedlingens `lagg-till-aktivitet`-vy och till källannonsen; användaren bekräftar därefter varje sparad aktivitet så kön går vidare. Vyn innehåller dessutom en månadsvis kalender: dagar med verifierade jobbsökningar markeras separat, och dagen då 10/10 gav en sparad `.txt`-fil markeras med en annan status. Klick på den dagen visar nedladdningsknappen.
 - **System** — konfigurationsstatus, skyddad konfigurationseditor och notifieringshistorik. Skrivkänsliga hemligheter visas aldrig igen efter sparning.
 
 Primära endpoints:
