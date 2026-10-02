@@ -219,9 +219,12 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("Spara konfiguration");
     expect(jsText).toContain("Öppna aktivitetsrapporten");
     expect(jsText).toContain("/for-arbetssokande/mina-sidor/aktivitetsrapportera");
-    expect(jsText).toContain("Aktivitetsrapport i din webbläsare");
-    expect(jsText).toContain("Jag har skickat in rapporten");
+    expect(jsText).toContain("Nästa sökta jobb");
+    expect(jsText).toContain("Föregående rapport är inskickad");
     expect(jsText).toContain("/report/manual-submitted");
+    expect(jsText).toContain("/api/reports/");
+    expect(jsText).toContain("/saved");
+    expect(jsText).toContain("Kopiera uppgifter");
     expect(jsText).not.toContain("live.browser.run");
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");
@@ -239,8 +242,9 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("saknar underlag");
     expect(jsText).toContain("function reportOnlyRunFailure");
     expect(jsText).toContain("Senaste ansökningskörningen misslyckades");
-    expect(jsText).toContain("Fortsätt rapport");
-    expect(jsText).toContain("Nästa körning fortsätter bara aktivitetsrapporten.");
+    expect(jsText).toContain("Fortsätt föregående rapport");
+    expect(jsText).toContain("Förbered aktivitetskö");
+    expect(jsText).toContain("Den aktuella aktivitetskön är förberedd.");
     expect(jsText).toContain("Kontrollera igen");
     expect(jsText).toContain("Markera ej inskickad");
     expect(jsText).toContain("function runCard");
@@ -248,5 +252,6 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain('class="attempt-cards"');
     expect(jsText).toContain("/api/applications/");
     expect(jsText).toContain("not-submitted");
+    expect(() => new Function(jsText)).not.toThrow();
   });
 });

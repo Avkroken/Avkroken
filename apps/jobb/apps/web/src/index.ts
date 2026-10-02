@@ -2,7 +2,11 @@ import type { BrowserWorker } from "@cloudflare/playwright";
 import { MONTHLY_APPLICATION_TARGET } from "../../../packages/core/src/types";
 import { getArbetsformedlingenHandoffStatus } from "./arbetsformedlingen-handoff";
 import { submitArbetsformedlingenActivityReport } from "./arbetsformedlingen-report";
-import { markReportSubmitted } from "./report-storage";
+import {
+  getReportActivityItem,
+  markReportSubmitted,
+  setReportActivityItemState,
+} from "./report-storage";
 import {
   authorizeDashboardRequest,
   dashboardAuthMode,
@@ -413,6 +417,73 @@ export default {
         { runId, workflowInstanceId: instance.id, status: "queued" },
         { status: 202 },
       );
+    }
+
+    const reportItemSavedMatch = url.pathname.match(
+      /^\/api\/reports\/(\d{4}-\d{2})\/items\/([^/]+)\/saved$/,
+    );
+    if (request.method === "POST" && reportItemSavedMatch) {
+      const reportMonth = reportItemSavedMatch[1];
+      const applicationId = decodeURIComponent(reportItemSavedMatch[2]);
+      const body = await request.json<{ confirmed?: boolean }>().catch(() => null);
+      if (!body?.confirmed) {
+        return Response.json(
+          {
+            error:
+              "Bekräfta endast efter att Arbetsförmedlingen har sparat just den här aktiviteten.",
+          },
+          { status: 400 },
+        );
+      }
+      if (reportMonth !== currentMonthKey(new Date())) {
+        return Response.json(
+          {
+            error:
+              "Endast den aktuella månadens aktivitetskö kan markeras som sparad här.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const item = await getReportActivityItem(env.DB, reportMonth, applicationId);
+      if (!item) {
+        return Response.json({ error: "Rapportaktiviteten hittades inte." }, { status: 404 });
+      }
+
+      await setReportActivityItemState(
+        env.DB,
+        reportMonth,
+        applicationId,
+        "saved",
+        null,
+      );
+
+      const progress = await env.DB
+        .prepare(
+          `SELECT
+             SUM(CASE WHEN state = 'saved' THEN 1 ELSE 0 END) AS saved,
+             COUNT(*) AS total
+           FROM report_activity_items
+           WHERE report_month = ?`,
+        )
+        .bind(reportMonth)
+        .first<{ saved: number | null; total: number }>();
+
+      const saved = Number(progress?.saved ?? 0);
+      const total = Number(progress?.total ?? 0);
+      if (total >= MONTHLY_APPLICATION_TARGET && saved >= MONTHLY_APPLICATION_TARGET) {
+        await setReportStatus(env.DB, reportMonth, "ready");
+      }
+
+      return Response.json({
+        reportMonth,
+        applicationId,
+        state: "saved",
+        saved,
+        total,
+        target: MONTHLY_APPLICATION_TARGET,
+        message: `Sparad i aktivitetsrapporten: ${saved}/${MONTHLY_APPLICATION_TARGET}.`,
+      });
     }
 
     const manualReportSubmittedMatch = url.pathname.match(

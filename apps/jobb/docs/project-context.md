@@ -126,9 +126,10 @@ Aktivitetsrapportering använder användarens egen webbläsare:
 1. Jobb visar en länk till Arbetsförmedlingens Mina sidor,
 2. användaren öppnar Arbetsförmedlingen på sin egen enhet och genomför BankID/e-identifikation,
 3. användaren fyller eventuella obligatoriska frågor och skickar rapporten i Arbetsförmedlingens eget UI,
-4. Jobb fabricerar eller bakdaterar inga aktiviteter; verifierade ansökningar som faktiskt hör till föregående månad visas som underlag,
-5. efter att Arbetsförmedlingen visar inskickningsbekräftelse bekräftar användaren detta uttryckligen i Jobb,
-6. Jobb lagrar rapporten som `submitted` med en spårbar markör för användarbekräftad lokal webbläsarsubmission.
+4. Jobb skiljer på aktuell aktivitetsmånad och föregående rapportmånad: en ansökan som görs i oktober hör till oktobers aktivitetskö även om rapporten skickas först nästa månad,
+5. Jobb fabricerar eller bakdaterar inga aktiviteter; kända fält visas i en styrd kö och okända fält lämnas för uttrycklig kontroll,
+6. efter att Arbetsförmedlingen visar att en aktivitet är sparad bekräftar användaren detta per jobb i Jobb; när föregående månads slutliga rapport visas som inskickad bekräftas även den separat,
+7. Jobb lagrar föregående slutrapport som `submitted` med en spårbar markör för användarbekräftad lokal webbläsarsubmission.
 
 Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens ifyllda inputvärden.
 
@@ -143,7 +144,7 @@ Top-level-vyer:
 - **Översikt** — månadsmål, rapportstate, blockers och tio synliga resultatplatser som endast fylls av verifierade ansökningar; osäkra interna reservationer visas separat.
 - **Ansökningar** — filtrerbar ansökningshistorik, fel, run-koppling och evidence-count. På mobil visas kort i stället för den breda tabellen. `needs_user_action` kan kontrolleras mot StudentConsulting igen eller uttryckligen markeras som ej inskickad.
 - **Körningar** — run history och read-only drill-down till applications, attempts, evidence, notifications och probe-state. På mobil visas både körningar och attempts som kort i stället för breda tabeller. När 10/10 ansökningar är verifierade räknas körningen som completed även om föregående månads separata aktivitetsrapport saknar historiskt underlag; sådana rapportluckor visas som icke-blockerande noteringar och historiska failed-runs räknas inte som aktiva blockers.
-- **Aktivitetsrapport** — rapportstatus och per-aktivitet `pending/save_attempted/saved`.
+- **Aktivitetsrapport** — aktuell månads aktivitetskö och föregående månads separata submission-state. Per aktivitet används `pending/save_attempted/saved`, och dashboarden visar nästa verifierade jobb med kända formulärfält.
 - **System** — konfigurationsstatus, skyddad konfigurationseditor och notifieringshistorik. Skrivkänsliga hemligheter visas aldrig igen efter sparning.
 
 Primära endpoints:

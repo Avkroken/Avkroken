@@ -8,6 +8,10 @@ import {
   type NotificationEnv,
 } from "./notifier";
 import { evaluateSuitability, type SuitabilityEnv } from "./policy";
+import {
+  ensureReportActivityItems,
+  loadVerifiedReportApplications,
+} from "./report-storage";
 import { withStudentConsultingProvider, type ProviderEnv } from "./providers";
 import {
   claimMonthlyApplicationSlot,
@@ -150,6 +154,7 @@ export async function executeAutomation(
     authExpiresAt: null,
   });
 
+  await ensureReport(env.DB, applicationMonth, MONTHLY_APPLICATION_TARGET);
   await ensureReport(env.DB, reportMonth, MONTHLY_APPLICATION_TARGET);
 
   let verifiedCount = await countVerifiedApplications(env.DB, applicationMonth);
@@ -195,6 +200,16 @@ export async function executeAutomation(
     }
   }
 
+  const currentMonthApplications = await loadVerifiedReportApplications(
+    env.DB,
+    applicationMonth,
+  );
+  await ensureReportActivityItems(
+    env.DB,
+    applicationMonth,
+    currentMonthApplications.slice(0, MONTHLY_APPLICATION_TARGET),
+  );
+
   const reportNow = clock();
   if (!isActivityReportWindow(reportNow)) {
     await updateRun(env.DB, runId, {
@@ -209,7 +224,7 @@ export async function executeAutomation(
       reportMonth,
       verifiedCount,
       message:
-        "Current-month application target reached. Activity reporting is only opened between the 1st and 14th.",
+        `Månadsmålet är uppnått och ${Math.min(currentMonthApplications.length, MONTHLY_APPLICATION_TARGET)}/${MONTHLY_APPLICATION_TARGET} aktiviteter för ${applicationMonth} är förberedda. Föregående månads rapport hanteras bara under 1:a–14:e.`,
     };
   }
 
@@ -230,7 +245,8 @@ export async function executeAutomation(
       applicationMonth,
       reportMonth,
       verifiedCount,
-      message: "The previous month's activity report is already submitted.",
+      message:
+        `Föregående månads rapport är redan inskickad. ${Math.min(currentMonthApplications.length, MONTHLY_APPLICATION_TARGET)}/${MONTHLY_APPLICATION_TARGET} aktiviteter för ${applicationMonth} är förberedda för den aktuella månadsrapporten.`,
     };
   }
 
