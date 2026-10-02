@@ -5,6 +5,7 @@ import {
   failExpiredBankIdRuns,
   failOrphanedRunningRuns,
   isRetryablePreSubmitFailure,
+  listRetryableFailedJobs,
   reclassifyApplicationNotSubmitted,
   requeueFailedPreSubmitApplication,
   shouldDelayNotAppliedReclassification,
@@ -158,14 +159,54 @@ describe("application retry state", () => {
       isRetryablePreSubmitFailure(
         applicationRow({
           automation_run_id: "manual:other",
-          last_attempt_no: 5,
+          last_attempt_no: 12,
           last_attempt_error_code: "APPLICATION_FAILED",
           last_attempt_error_message:
             "APPLICATION_REQUIRES_INPUT: a required application field is empty.",
         }),
         "manual:new",
       ),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it("loads persisted retryable failures for a later run", async () => {
+    const job = {
+      provider: "studentconsulting" as const,
+      externalId: "87581",
+      title: "Kundservice",
+      isInternational: false,
+      sourceUrl:
+        "https://www.studentconsulting.com/sv/lediga-jobb/vasteras/kundservice/87581",
+    };
+    const db = {
+      prepare() {
+        return {
+          bind() {
+            return this;
+          },
+          async all() {
+            return {
+              results: [
+                {
+                  ...applicationRow({
+                    automation_run_id: "manual:old",
+                    last_attempt_no: 7,
+                    last_attempt_error_code: "APPLICATION_FAILED",
+                    last_attempt_error_message:
+                      "APPLICATION_REQUIRES_INPUT: a required application field is empty.",
+                  }),
+                  raw_json: JSON.stringify(job),
+                },
+              ],
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    await expect(
+      listRetryableFailedJobs(db, "2026-10", "manual:new"),
+    ).resolves.toEqual([job]);
   });
 
   it("atomically requeues only one definite pre-submit failed application", async () => {
@@ -188,7 +229,7 @@ describe("application retry state", () => {
     expect(fake.sql[0]).toContain("verified_at IS NULL");
     expect(fake.sql[0]).toContain("APPLICATION_NOT_APPLIED");
     expect(fake.sql[0]).toContain("APPLICATION_REQUIRES_INPUT");
-    expect(fake.sql[0]).toContain("aa.attempt_no < 5");
+    expect(fake.sql[0]).not.toContain("aa.attempt_no < 5");
     expect(fake.binds[0]).toEqual([
       "2026-10",
       "manual:new",
