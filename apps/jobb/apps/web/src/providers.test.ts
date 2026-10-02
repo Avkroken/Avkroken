@@ -158,6 +158,8 @@ function matchedProfilePage(
     redirectMatched?: boolean;
     matchedProfileRoute?: string;
     matchedNavHref?: string | null;
+    matchedNavDataHref?: string;
+    matchedNavDataUrl?: string;
     matchedNavLabel?: string;
     matchedNavControl?: "anchor" | "button";
     matchedNavVisible?: boolean;
@@ -202,6 +204,8 @@ function matchedProfilePage(
           {
             text: options.matchedNavLabel ?? "Matcha jobb",
             href,
+            dataHref: options.matchedNavDataHref,
+            dataUrl: options.matchedNavDataUrl,
             visible: options.matchedNavVisible,
           },
         ]);
@@ -364,6 +368,34 @@ describe("StudentConsulting authenticated discovery", () => {
       credentials: {
         async getStudentConsultingCredentials() {
           return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("uses a trusted data-url when the matched anchor href is a root placeholder", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavHref: "/",
+        matchedNavDataUrl: "/sv/profil/mina-jobbmatchningar/",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
         },
       },
       maxPagesPerSource: 1,
