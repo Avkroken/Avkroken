@@ -222,7 +222,8 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("saknar underlag");
     expect(jsText).toContain("function reportOnlyRunFailure");
     expect(jsText).toContain("Senaste ansökningskörningen misslyckades");
-    expect(jsText).toContain("Månadsmålet '+d.verified+'/'+d.target+' är redan uppnått.");
+    expect(jsText).toContain("Fortsätt rapport");
+    expect(jsText).toContain("Nästa körning fortsätter bara aktivitetsrapporten.");
     expect(jsText).toContain("Kontrollera igen");
     expect(jsText).toContain("Markera ej inskickad");
     expect(jsText).toContain("function runCard");

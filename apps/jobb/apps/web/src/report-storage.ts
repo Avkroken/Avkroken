@@ -1,5 +1,3 @@
-import { MONTHLY_APPLICATION_TARGET } from "../../../packages/core/src/types";
-
 export interface ReportApplicationRow {
   applicationId: string;
   externalId: string;
@@ -50,12 +48,6 @@ export async function loadVerifiedReportApplications(
       raw_json: string | null;
     }>();
 
-  if (rows.results.length !== MONTHLY_APPLICATION_TARGET) {
-    throw new Error(
-      `REPORT_APPLICATION_COUNT_MISMATCH: expected exactly ${MONTHLY_APPLICATION_TARGET} verified applications for ${reportMonth}, found ${rows.results.length}.`,
-    );
-  }
-
   return rows.results.map((row) => ({
     applicationId: row.application_id,
     externalId: row.external_id,
@@ -74,6 +66,7 @@ export async function ensureReportActivityItems(
   reportMonth: string,
   applications: ReportApplicationRow[],
 ): Promise<void> {
+  if (applications.length === 0) return;
   await db.batch(
     applications.map((application) =>
       db

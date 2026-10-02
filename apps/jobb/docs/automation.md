@@ -133,7 +133,7 @@ While a handoff is active, the dashboard shows an **Öppna BankID** action for t
 
 The probe exists because the authenticated activity-report form is not publicly documented as a write API. The report adapter uses semantic labels/roles and the verified probe instead of guessing private endpoints.
 
-After a successful BankID login, the adapter loads exactly ten verified applications from the previous month. It validates the application dates in Europe/Stockholm, includes the StudentConsulting Jobb-ID together with the employer name, resolves occupations through JobTech Taxonomy, marks international applications as outside Sweden, and fills Swedish locations through the structured location control.
+After a successful BankID login, the adapter loads the verified applications that actually belong to the previous month. If Jobb lacks historical records for part or all of that month, the report flow still continues with the activities it can substantiate; it never fabricates or backdates applications. It validates application dates in Europe/Stockholm, includes the StudentConsulting Jobb-ID together with the employer name, resolves occupations through JobTech Taxonomy, marks international applications as outside Sweden, and fills Swedish locations through the structured location control.
 
 Each activity is idempotent: D1 persists `pending → save_attempted → saved` before/after the external Save side effect. If Save returns an ambiguous result, the next pass first checks whether the exact Jobb-ID is already present and never blindly clicks Save again. The final report submission uses the same rule: `reports.status='submitting'` is persisted before the external submit click; later retries verify confirmation instead of resubmitting.
 
