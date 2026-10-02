@@ -7,6 +7,7 @@ import {
 import {
   buildVerifiedQuotaSlots,
   isExpiredBankIdDashboardRun,
+  isOperationallyFailedDashboardRun,
   isOrphanedDashboardRun,
 } from "./dashboard-data";
 
@@ -44,6 +45,42 @@ describe("dashboard run state", () => {
           auth_expires_at: "2026-10-01T15:46:00.000Z",
         },
         now,
+      ),
+    ).toBe(false);
+  });
+
+  it("counts only the latest unresolved application failure as operational", () => {
+    expect(
+      isOperationallyFailedDashboardRun(
+        {
+          status: "failed",
+          application_month: "2026-10",
+          verified_count: 9,
+          target_count: 10,
+        },
+        "2026-10",
+      ),
+    ).toBe(true);
+    expect(
+      isOperationallyFailedDashboardRun(
+        {
+          status: "failed",
+          application_month: "2026-10",
+          verified_count: 10,
+          target_count: 10,
+        },
+        "2026-10",
+      ),
+    ).toBe(false);
+    expect(
+      isOperationallyFailedDashboardRun(
+        {
+          status: "failed",
+          application_month: "2026-09",
+          verified_count: 0,
+          target_count: 10,
+        },
+        "2026-10",
       ),
     ).toBe(false);
   });
@@ -182,6 +219,10 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("Övergivna körningar");
     expect(jsText).toContain("Osäkra ansökningar");
     expect(jsText).toContain("Godkända ansökningar");
+    expect(jsText).toContain("saknar underlag");
+    expect(jsText).toContain("function reportOnlyRunFailure");
+    expect(jsText).toContain("Senaste ansökningskörningen misslyckades");
+    expect(jsText).toContain("Månadsmålet '+d.verified+'/'+d.target+' är redan uppnått.");
     expect(jsText).toContain("Kontrollera igen");
     expect(jsText).toContain("Markera ej inskickad");
     expect(jsText).toContain("function runCard");

@@ -6,9 +6,9 @@
 
 The protected dashboard is the operational control plane for the automation. It has five top-level views:
 
-- **Översikt** — monthly target, ten visible result slots filled only by verified applications, report state and active attention signals. Internal `uncertain` quota reservations are shown as separate safety blockers instead of consuming a visible approved slot.
+- **Översikt** — monthly target, ten visible result slots filled only by verified applications, report state and active attention signals. Internal `uncertain` quota reservations are shown as separate safety blockers instead of consuming a visible approved slot. Historical failed runs do not inflate the active-attention count after a later run resolves the monthly target.
 - **Ansökningar** — filterable applications with run linkage, latest diagnostics and evidence count. On narrow screens the application table becomes mobile cards. `needs_user_action` rows expose a provider-backed **Kontrollera igen** action and an explicit **Markera ej inskickad** resolution; only provider-confirmed applied state can promote an application to `verified`.
-- **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state. On narrow screens both run history and attempt history use cards instead of wide tables.
+- **Körningar** — run history with read-only drill-down to applications, attempts, evidence metadata, notifications and probe state. On narrow screens both run history and attempt history use cards instead of wide tables. A run that reached 10/10 applications is displayed as completed even when the separate previous-month report lacks historical source data; that report limitation remains visible as a non-blocking note.
 - **Aktivitetsrapport** — report status and per-activity `pending`, `save_attempted` and `saved` state.
 - **System** — runtime configuration status, a protected configuration editor and notification history; write-only secrets are never read back into the browser.
 
