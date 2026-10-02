@@ -224,7 +224,10 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("/report/manual-submitted");
     expect(jsText).toContain("/api/reports/");
     expect(jsText).toContain("/saved");
-    expect(jsText).toContain("Kopiera uppgifter");
+    expect(jsText).toContain("/aktivitetsrapportera/lagg-till-aktivitet");
+    expect(jsText).toContain("Sparat – visa nästa jobb");
+    expect(jsText).toContain("Öppna annonsen");
+    expect(jsText).toContain("function inferredScope");
     expect(jsText).not.toContain("live.browser.run");
     expect(jsText).toContain("avkroken.theme");
     expect(jsText).toContain("avkroken_theme");
