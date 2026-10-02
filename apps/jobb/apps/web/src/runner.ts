@@ -350,14 +350,20 @@ async function fillMonthlyApplicationTarget(
 
     const discovered = await provider.discover();
     const rejectionCounts = new Map<string, number>();
-    const suitable = discovered.filter((job) => {
-      const assessment = evaluateSuitability(env, job);
-      if (assessment.suitable) return true;
-      for (const reason of assessment.reasons) {
-        rejectionCounts.set(reason, (rejectionCounts.get(reason) ?? 0) + 1);
-      }
-      return false;
-    });
+    const suitable = [
+      ...new Map(
+        discovered
+          .filter((job) => {
+            const assessment = evaluateSuitability(env, job);
+            if (assessment.suitable) return true;
+            for (const reason of assessment.reasons) {
+              rejectionCounts.set(reason, (rejectionCounts.get(reason) ?? 0) + 1);
+            }
+            return false;
+          })
+          .map((job) => [`${job.provider}:${job.externalId}`, job] as const),
+      ).values(),
+    ];
     console.info("StudentConsulting discovery evaluated", {
       runId,
       discoveredCount: discovered.length,
