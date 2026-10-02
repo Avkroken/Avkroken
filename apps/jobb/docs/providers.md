@@ -17,7 +17,7 @@ Implemented flow:
 9. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
 10. Stop if any visible required application field is unresolved.
 11. Submit only when `STUDENTCONSULTING_AUTOSUBMIT=true` and there is exactly one recognized application submit control.
-12. Verify the application through the authenticated `Ansökningar` navigation before it can be treated as confirmed. Verification accepts only one trusted exact-origin profile destination (including placeholder/data-navigation or a single semantic click) and requires the exact Jobb-ID either in the applications view text or in a trusted StudentConsulting job-detail URL; no new submit is performed during reconciliation.
+12. Verify the application through the authenticated `Ansökningar` navigation before it can be treated as confirmed. Navigation must resolve to one trusted exact-origin profile destination (including placeholder/data-navigation or a semantic click); after opening that destination, redirects to a different profile path are rejected. An applications view rendered in place after a semantic click is also accepted, but only while the browser remains in the trusted profile area and the exact job reference was absent before the click and appears afterward. Verification requires the exact Jobb-ID either in the applications view text or in a trusted StudentConsulting job-detail URL; no new submit is performed during reconciliation.
 
 Runtime secrets/configuration:
 
