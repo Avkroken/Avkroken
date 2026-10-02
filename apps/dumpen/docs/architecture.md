@@ -66,6 +66,8 @@ För kontrollerad tema-v2-produktion finns dessutom en smal capability-upload. A
 
 Bildformat renderas i admin-galleriet; klienten läser bildens naturliga pixelmått och visar storlek, dimensioner och format under kortet. App Launcher-filer under `apps/<app>/` normaliseras dessutom till appkategori, numeriskt tema och variant: `<app>-<tema>.png` är den verifierade 1254×1254-källan, följd av `<app>-<tema>-256.png` och `<app>-<tema>-512.png`. Galleriet erbjuder separata filter för appkategori, pixelstorlek och tema. `hotlink-ok/apps/...` är en lagringsspegel och `staging/...` är ofärdig produktionsdata; båda döljs ur den logiska inventoryn. Äldre `<app>-256.png` klassas som legacy och blir inte ett extra tema. Direktlänken för en logisk asset är R2-custom-domainens canonical `apps/...`-URL. `r2.dev` är avstängt och bucketens custom domain är den enda avsedda publika objektvägen.
 
+Filtren kombineras med AND och gäller galleriets bildkort; separata filrader påverkas inte. Filteralternativen härleds från listade bilder med appkategori och tema, så storleksvarianter blir valbara först när de finns i inventoryn. Äldre `<app>-256.png`-filer döljs helt ur listningen tillsammans med app-speglarna; andra objekt under `hotlink-ok/` behålls. Appbilder sorteras efter appnamn, numeriskt tema och storlek med originalet först.
+
 ### Privilegierad API-yta
 
 `/admin` och `/admin/api/*` kräver en giltig lokal session som skapas efter GitHub OAuth via Krösa-Maja. OAuth-flödet använder state + PKCE, tillåter endast versionsstyrda numeriska GitHub-ID:n och återkontrollerar allowlisten för varje session. GitHubs kortlivade provider-token används endast för `/user`-uppslag och revokeras efter callback; den lagras inte som Dumpen-session.

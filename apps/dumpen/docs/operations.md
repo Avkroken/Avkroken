@@ -73,6 +73,8 @@ Verifiera efter varje fil genom att läsa tillbaka exakt staging-nyckel från R2
 
 `scripts/sync-app-assets.mjs` äger den reproducerbara one-way-syncen för de versionsstyrda app-/temakombinationerna. Den läser numrerade original från `apps/<app>/<app>-<tema>.png`, genererar exakt 256×256 och 512×512 med Sharp och kan skriva både canonical-objektet och motsvarande `hotlink-ok/`-spegel. Syncen raderar inte objekt och använder inte äldre `<app>-256.png` som källa eller tema.
 
+Kör kommandona från `apps/dumpen` med installerade beroenden. App-/temalistan finns i `APP_ASSET_APPS` i `scripts/app-assets-sync.mjs` och omfattar 31 original över 8 appar. `DUMPEN_ASSET_WORK` anger arbetskatalogen; standardvärdet är `.asset-work`, relativt aktuell katalog och ignorerat av Git. Original lagras som `source/<app>-<tema>.png` och genererade varianter som `generated/apps/<app>/<app>-<tema>-<storlek>.png` under arbetskatalogen. Utan `--fetch` måste samtliga original redan finnas där.
+
 Lokal generering från befintlig arbetskopia:
 
 ```bash
@@ -90,6 +92,8 @@ Efter explicit R2-skrivbehörighet kan samma verifierade pipeline även synka ob
 ```bash
 npm run assets:sync -- --fetch --upload
 ```
+
+`--upload` kräver `--fetch`; lokala original får inte vara källa för en live-upload. Hela batchens original måste vara exakt 1254×1254 och samtliga genererade dimensioner valideras före första PUT. Upload skriver sedan varje canonical-variant följd av dess hotlink-spegel, seriellt, med `image/png`. En full körning skriver 62 canonical-varianter och 62 speglar. Körningen avbryts vid första fel; om felet inträffar under upload kan tidigare PUT redan ha lyckats och ingen rollback görs.
 
 Live-verifiering 2026-10-02: Wrangler-profilen `avkroken` har fungerande object PUT mot `avkroken-assets`. Den verifierade resize-synken skrev 62 storleksvarianter till canonical-paths och 62 motsvarande `hotlink-ok`-speglar; representativa objekt hämtades tillbaka och matchade lokala filer med SHA-256. Bucketens aggregerade object-count kan eftersläpa.
 
