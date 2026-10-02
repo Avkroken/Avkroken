@@ -233,33 +233,15 @@ export async function executeAutomation(
   }
 
   const reportableCount = await countVerifiedApplications(env.DB, reportMonth);
-  if (reportableCount < MONTHLY_APPLICATION_TARGET) {
-    const message =
-      `Föregående månad ${reportMonth} har bara ${reportableCount}/${MONTHLY_APPLICATION_TARGET} verifierade ansökningar. ` +
-      "Ansökningar som görs nu kan inte bakdateras till föregående månad.";
-    await setReportStatus(env.DB, reportMonth, "failed", message);
-    await updateRun(env.DB, runId, {
-      status: "completed",
-      verifiedCount,
-      lastError: null,
-      completedAt: new Date().toISOString(),
-    });
-    return {
-      runId,
-      status: "completed",
-      applicationMonth,
-      reportMonth,
-      verifiedCount,
-      message:
-        `Månadsmålet ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} är uppnått. ` +
-        `Aktivitetsrapporten för ${reportMonth} saknar historiskt underlag och påverkar inte ansökningskörningens status.`,
-    };
-  }
+  const reportCoverageNote =
+    reportableCount < MONTHLY_APPLICATION_TARGET
+      ? `Föregående månad ${reportMonth} har ${reportableCount}/${MONTHLY_APPLICATION_TARGET} verifierade ansökningar i Jobb. Rapporten skickas med de aktiviteter som faktiskt kan styrkas; inga ansökningar bakdateras.`
+      : null;
 
-  await setReportStatus(env.DB, reportMonth, "ready");
+  await setReportStatus(env.DB, reportMonth, "ready", reportCoverageNote);
 
   const handoff = await startArbetsformedlingenHandoff(env.BROWSER);
-  await setReportStatus(env.DB, reportMonth, "needs_user_auth");
+  await setReportStatus(env.DB, reportMonth, "needs_user_auth", reportCoverageNote);
   await updateRun(env.DB, runId, {
     status: "needs_user_auth",
     verifiedCount,
@@ -288,7 +270,8 @@ export async function executeAutomation(
     reportMonth,
     verifiedCount,
     message:
-      "BankID authentication is required before the activity report can continue.",
+      (reportCoverageNote ? reportCoverageNote + " " : "") +
+      "BankID krävs innan aktivitetsrapporten kan skickas in.",
   };
 }
 

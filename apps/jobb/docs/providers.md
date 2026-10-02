@@ -56,7 +56,7 @@ After BankID succeeds:
 
 1. A fail-closed integration probe navigates to the authenticated activity report and captures a sanitized form schema.
 2. The probe records structure such as headings, control names/types, list options and sanitized link paths; it does not read or persist entered input values.
-3. The report adapter loads exactly ten verified applications from the previous report month.
+3. The report adapter loads every locally verified application that actually belongs to the previous report month. A missing historical local record does not block submitting the report; the adapter submits only activities it can substantiate and never invents or backdates applications.
 4. Application dates are validated in `Europe/Stockholm` and cannot be moved into another report month.
 5. Employer text includes the exact StudentConsulting Jobb-ID.
 6. Occupations are resolved through JobTech Taxonomy and fail closed on ambiguous matches.

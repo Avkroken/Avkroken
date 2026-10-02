@@ -127,7 +127,7 @@ Aktivitetsrapportering använder en separat autentiserad Browser Run-session:
 2. användaren genomför BankID/e-identifikation,
 3. systemet verifierar autentiserat state,
 4. en sanitiserad form-probe verifierar den faktiska UI-strukturen,
-5. exakt tio verifierade ansökningar från föregående månad laddas,
+5. verifierade ansökningar som faktiskt hör till föregående månad laddas; saknad historik blockerar inte rapportsubmission och inga aktiviteter fabriceras eller bakdateras,
 6. occupation löses fail-closed via JobTech Taxonomy,
 7. aktiviteter sparas idempotent,
 8. slutlig rapportsubmission verifieras före `submitted`.
