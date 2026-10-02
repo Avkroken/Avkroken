@@ -38,7 +38,7 @@ Worker-koden innehåller idag:
 - schedulerad watchdog-kontroll;
 - central route-modul i `src/portal-routes.mjs`;
 - path-baserad klientnavigation i `public/shell.js`;
-- server-side shell fallback för kända Portal-dokumentroutes; fallbacken hämtar asset-roten `/` internt i stället för `/index.html` så Cloudflares HTML-canonicalisering inte kan läcka ut som redirect från en deep link;
+- server-side shell fallback för kända Portal-dokumentroutes; fallbacken hämtar asset-roten `/` internt i stället för `/index.html` så Cloudflares HTML-canonicalisering inte kan läcka ut som redirect från en deep link; Workers Static Assets använder selektiv `run_worker_first` för Portalens dokumentroutes och dynamiska Worker-routes så browser-refresh (`Sec-Fetch-Mode: navigate`) inte kan fånga en giltig route i assetlagrets `404-page`-hantering;
 - stabila dokumentations-URL:er;
 - Portal v2 design tokens för semantic/interactive colors, typography, spacing, form, elevation, focus, motion och responsive reference values samt shell-CSS;
 - informationsarkitektur utan GitHub-begrepp som huvudnavigation;
