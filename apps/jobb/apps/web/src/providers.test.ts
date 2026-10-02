@@ -92,6 +92,7 @@ function fakeLocator(
     dataHref?: string;
     dataUrl?: string;
     onclick?: string;
+    onClick?: () => void;
   }> = [],
   index = 0,
 ): BrowserLocator {
@@ -109,7 +110,9 @@ function fakeLocator(
       return Boolean(items[index]);
     },
     async fill() {},
-    async click() {},
+    async click() {
+      items[index]?.onClick?.();
+    },
     async dispatchEvent() {},
     async getAttribute(name: string) {
       if (name === "href") return items[index]?.href ?? null;
@@ -150,6 +153,7 @@ function matchedProfilePage(
     matchedProfileRoute?: string;
     matchedNavHref?: string | null;
     matchedNavLabel?: string;
+    matchedNavControl?: "anchor" | "button";
     authOnMatchedVisit?: number;
     jobLinkAttribute?: "href" | "data-href" | "data-url" | "onclick";
     jobLinkValue?: string;
@@ -177,13 +181,35 @@ function matchedProfilePage(
     },
     locator(selector: string) {
       const current = new URL(currentUrl);
-      if (current.pathname === "/sv/" && selector === "a") {
+      if (
+        current.pathname === "/sv/" &&
+        selector === "a" &&
+        (options.matchedNavControl ?? "anchor") === "anchor"
+      ) {
         const href =
           options.matchedNavHref === undefined
             ? matchedProfileRoute
             : (options.matchedNavHref ?? undefined);
         return fakeLocator([
           { text: options.matchedNavLabel ?? "Matcha jobb", href },
+        ]);
+      }
+      if (
+        current.pathname === "/sv/" &&
+        selector ===
+          'button,[role="link"],[data-href],[data-url],[onclick]' &&
+        options.matchedNavControl === "button"
+      ) {
+        return fakeLocator([
+          {
+            text: options.matchedNavLabel ?? "Mina jobbmatchningar",
+            onClick: () => {
+              currentUrl = new URL(
+                matchedProfileRoute,
+                "https://www.studentconsulting.com",
+              ).toString();
+            },
+          },
         ]);
       }
       if (
@@ -326,6 +352,33 @@ describe("StudentConsulting authenticated discovery", () => {
       credentials: {
         async getStudentConsultingCredentials() {
           return { username: "user@example.test", password: ["test", "placeholder"].join("-") };
+        },
+      },
+      maxPagesPerSource: 1,
+      fetcher: countryIndexFetcher,
+    });
+
+    await expect(provider.discover()).resolves.toEqual([
+      expect.objectContaining({
+        externalId: "87178",
+        discoverySource: "studentconsulting_matcha_jobb",
+      }),
+    ]);
+  });
+
+  it("follows a semantic button control to the matched profile route", async () => {
+    const provider = new StudentConsultingProvider({
+      page: matchedProfilePage({
+        matchedProfileRoute: "/sv/min-profil/mina-jobbmatchningar/",
+        matchedNavLabel: "Mina jobbmatchningar",
+        matchedNavControl: "button",
+      }),
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
         },
       },
       maxPagesPerSource: 1,

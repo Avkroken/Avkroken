@@ -620,6 +620,47 @@ async function findMatchedJobsNavigation(
   }
 
   if (matchingLabels === 0) {
+    const controls = page.locator(
+      'button,[role="link"],[data-href],[data-url],[onclick]',
+    );
+    const controlCount = await controls.count();
+    const matchingControls: BrowserLocator[] = [];
+
+    for (let index = 0; index < controlCount; index += 1) {
+      const control = controls.nth(index);
+      if (!(await control.isVisible())) continue;
+      const label = await safeInnerText(control);
+      if (!isStudentConsultingMatchedJobsLabel(label)) continue;
+      matchingControls.push(control);
+    }
+
+    if (matchingControls.length > 1) {
+      return { status: "invalid", reason: "ambiguous" };
+    }
+
+    if (matchingControls.length === 1) {
+      try {
+        await matchingControls[0].click({ timeout: 10_000 });
+        await page.waitForTimeout(400);
+      } catch {
+        return { status: "invalid", reason: "missing_href" };
+      }
+
+      const clickedUrl = normalizeStudentConsultingVisibleMatchedJobsUrl(
+        page.url(),
+      );
+      if (clickedUrl) {
+        return { status: "found", url: clickedUrl };
+      }
+
+      const safeCurrent = normalizeStudentConsultingMainOriginUrl(page.url());
+      return {
+        status: "invalid",
+        reason: "untrusted_href",
+        path: safeCurrent ? new URL(safeCurrent).pathname : undefined,
+      };
+    }
+
     return {
       status: "absent",
       profilePaths: [...profilePaths].sort().slice(0, 20),
