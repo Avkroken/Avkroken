@@ -14,6 +14,7 @@ import {
   normalizeStudentConsultingMatchedJobsUrl,
   normalizeStudentConsultingUrl,
   parseStudentConsultingJobText,
+  buildStudentConsultingPitch,
   StudentConsultingProvider,
 } from "../../../packages/studentconsulting/src/provider";
 
@@ -99,6 +100,11 @@ function fakeLocator(
     dataUrl?: string;
     onclick?: string;
     onClick?: () => void;
+    onFill?: (value: string) => void;
+    value?: string;
+    name?: string;
+    type?: string;
+    checked?: boolean;
     visible?: boolean;
   }> = [],
   index = 0,
@@ -116,7 +122,10 @@ function fakeLocator(
     async isVisible() {
       return Boolean(items[index]) && items[index]?.visible !== false;
     },
-    async fill() {},
+    async fill(value: string) {
+      if (items[index]) items[index].value = value;
+      items[index]?.onFill?.(value);
+    },
     async click() {
       items[index]?.onClick?.();
     },
@@ -126,16 +135,18 @@ function fakeLocator(
       if (name === "data-href") return items[index]?.dataHref ?? null;
       if (name === "data-url") return items[index]?.dataUrl ?? null;
       if (name === "onclick") return items[index]?.onclick ?? null;
+      if (name === "name") return items[index]?.name ?? null;
+      if (name === "type") return items[index]?.type ?? null;
       return null;
     },
     async innerText() {
       return items[index]?.text ?? "";
     },
     async inputValue() {
-      return "";
+      return items[index]?.value ?? "";
     },
     async isChecked() {
-      return false;
+      return items[index]?.checked ?? false;
     },
   };
 }
@@ -477,6 +488,87 @@ function applicationsVerificationPage(
   };
 }
 
+function pitchApplicationPage(initialPitch = ""): {
+  page: BrowserPage;
+  pitchValue: () => string;
+  submitClicks: () => number;
+} {
+  let currentUrl = "https://www.studentconsulting.com/sv/profil/";
+  let pitchValue = initialPitch;
+  let submitted = false;
+  let submitClicks = 0;
+  const pitch = {
+    value: initialPitch,
+    name: "Pitch",
+    onFill(value: string) {
+      pitchValue = value;
+      pitch.value = value;
+    },
+  };
+  const submit = {
+    text: "Ansök",
+    onClick() {
+      submitClicks += 1;
+      submitted = true;
+    },
+  };
+
+  return {
+    page: {
+      async goto(url: string) {
+        currentUrl =
+          new URL(url).pathname === "/signin"
+            ? "https://www.studentconsulting.com/sv/profil/"
+            : url;
+      },
+      url() {
+        return currentUrl;
+      },
+      locator(selector: string) {
+        const pathname = new URL(currentUrl).pathname;
+        if (/\/sv\/lediga-jobb\//.test(pathname) && selector === "body") {
+          return fakeLocator([
+            {
+              text: submitted
+                ? "Tack för din ansökan"
+                : "Fakta om jobbet\nJobb-ID 87570",
+            },
+          ]);
+        }
+        if (
+          /\/sv\/lediga-jobb\//.test(pathname) &&
+          selector === 'textarea#Pitch, textarea[name="Pitch"]'
+        ) {
+          return fakeLocator([pitch]);
+        }
+        if (
+          /\/sv\/lediga-jobb\//.test(pathname) &&
+          selector.includes("data-val-required")
+        ) {
+          return fakeLocator([pitch]);
+        }
+        if (
+          /\/sv\/lediga-jobb\//.test(pathname) &&
+          selector === 'button, input[type="submit"]'
+        ) {
+          return fakeLocator([submit]);
+        }
+        return fakeLocator();
+      },
+      async waitForLoadState() {},
+      async waitForTimeout() {},
+      async evaluate<T, A>(
+        _pageFunction: (arg: A) => T | Promise<T>,
+        _arg: A,
+      ): Promise<T> {
+        return { found: true, applied: submitted } as T;
+      },
+    },
+    pitchValue: () => pitchValue,
+    submitClicks: () => submitClicks,
+  };
+}
+
 function dynamicRequiredApplicationPage(): BrowserPage {
   let currentUrl = "https://www.studentconsulting.com/sv/profil/";
 
@@ -683,6 +775,55 @@ describe("StudentConsulting application verification", () => {
 });
 
 describe("StudentConsulting application submission guard", () => {
+  it("fills the known required Pitch field with a factual generic motivation", async () => {
+    const harness = pitchApplicationPage();
+    const job = { ...verificationJob, location: "Stockholm" };
+    const provider = new StudentConsultingProvider({
+      page: harness.page,
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      autoSubmit: true,
+    });
+
+    await expect(provider.apply(job)).resolves.toEqual(
+      expect.objectContaining({
+        status: "submitted",
+        submissionAttempted: true,
+      }),
+    );
+    expect(harness.pitchValue()).toBe(buildStudentConsultingPitch(job));
+    expect(harness.pitchValue()).toContain("Testjobb i Stockholm");
+    expect(harness.submitClicks()).toBe(1);
+  });
+
+  it("does not overwrite an existing Pitch value", async () => {
+    const harness = pitchApplicationPage("Min redan sparade motivation.");
+    const provider = new StudentConsultingProvider({
+      page: harness.page,
+      credentials: {
+        async getStudentConsultingCredentials() {
+          return {
+            username: "user@example.test",
+            password: ["test", "placeholder"].join("-"),
+          };
+        },
+      },
+      autoSubmit: true,
+    });
+
+    await expect(provider.apply(verificationJob)).resolves.toEqual(
+      expect.objectContaining({ status: "submitted" }),
+    );
+    expect(harness.pitchValue()).toBe("Min redan sparade motivation.");
+    expect(harness.submitClicks()).toBe(1);
+  });
+
   it("stops before submit when StudentConsulting uses data-val-required", async () => {
     const provider = new StudentConsultingProvider({
       page: dynamicRequiredApplicationPage(),

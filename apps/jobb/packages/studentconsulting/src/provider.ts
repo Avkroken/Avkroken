@@ -357,6 +357,8 @@ export class StudentConsultingProvider implements JobProvider {
         };
       }
 
+      await fillKnownSafeRequiredControls(this.page, job);
+
       const requiredState = await validateRequiredControls(this.page);
       if (!requiredState.ok) {
         return {
@@ -1147,6 +1149,28 @@ async function firstVisible(
     }
   }
   return null;
+}
+
+export function buildStudentConsultingPitch(job: JobCandidate): string {
+  const role = job.title.trim();
+  const location = job.location?.trim();
+  const where = location ? ` i ${location}` : "";
+  return `Jag är intresserad av tjänsten ${role}${where} och vill gärna veta mer om rollen och arbetsuppgifterna. Jag berättar gärna mer om min motivation i nästa steg.`;
+}
+
+async function fillKnownSafeRequiredControls(
+  page: BrowserPage,
+  job: JobCandidate,
+): Promise<void> {
+  const pitchFields = page.locator('textarea#Pitch, textarea[name="Pitch"]');
+  const count = Math.min(await pitchFields.count(), 2);
+  if (count !== 1) return;
+
+  const pitch = pitchFields.first();
+  if (!(await pitch.isVisible())) return;
+  if ((await pitch.inputValue()).trim() !== "") return;
+
+  await pitch.fill(buildStudentConsultingPitch(job));
 }
 
 async function validateRequiredControls(
