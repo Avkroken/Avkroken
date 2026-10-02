@@ -3,6 +3,19 @@ import type { JobCandidate } from "../../../packages/core/src/types";
 export type RunMode = "manual" | "scheduled";
 export type RunStatus = "running" | "needs_user_auth" | "completed" | "failed";
 
+const NOT_APPLIED_RECONCILIATION_GRACE_MS = 5 * 60 * 1_000;
+
+export function shouldDelayNotAppliedReclassification(
+  appliedAt: string | null,
+  nowMs = Date.now(),
+): boolean {
+  const appliedAtMs = appliedAt ? Date.parse(appliedAt) : Number.NaN;
+  return (
+    !Number.isFinite(appliedAtMs) ||
+    nowMs - appliedAtMs < NOT_APPLIED_RECONCILIATION_GRACE_MS
+  );
+}
+
 export interface AutomationRunRow {
   id: string;
   mode: RunMode;
@@ -345,6 +358,34 @@ export async function requeueFailedPreSubmitApplication(
          AND verified_at IS NULL`,
     )
     .bind(input.reportMonth, input.id, input.runId)
+    .run();
+
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+export async function verifyApplicationFromAttention(
+  db: D1Database,
+  applicationId: string,
+  verifiedAt: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE applications
+       SET status = 'verified',
+           verified_at = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?
+         AND status = 'needs_user_action'
+         AND applied_at IS NOT NULL
+         AND verified_at IS NULL
+         AND EXISTS (
+           SELECT 1
+           FROM monthly_application_slots s
+           WHERE s.application_id = applications.id
+             AND s.state = 'uncertain'
+         )`,
+    )
+    .bind(verifiedAt, applicationId)
     .run();
 
   return Number(result.meta.changes ?? 0) === 1;

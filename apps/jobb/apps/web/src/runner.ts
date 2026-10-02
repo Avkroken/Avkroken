@@ -30,10 +30,12 @@ import {
   reclassifyApplicationNotSubmitted,
   requeueFailedPreSubmitApplication,
   scheduledRunId,
+  shouldDelayNotAppliedReclassification,
   setApplicationStatus,
   setReportStatus,
   startAttempt,
   updateRun,
+  verifyApplicationFromAttention,
   type RunMode,
 } from "./storage";
 import {
@@ -43,8 +45,6 @@ import {
   isScheduledSafetyWindow,
   previousMonthKey,
 } from "./time";
-
-const NOT_APPLIED_RECONCILIATION_GRACE_MS = 5 * 60 * 1_000;
 
 export interface AutomationEnv
   extends ProviderEnv,
@@ -339,11 +339,12 @@ async function fillMonthlyApplicationTarget(
       applicationMonth,
     );
     if (occupiedBefore >= MONTHLY_APPLICATION_TARGET) {
+      const safetyHolds = Math.max(0, occupiedBefore - verifiedCount);
       return {
         verifiedCount,
         error:
-          `All ${MONTHLY_APPLICATION_TARGET} monthly application slots are occupied, but only ${verifiedCount} are verified. ` +
-          "Submitted/uncertain applications were rechecked and remain unresolved; no additional application will be sent.",
+          `${safetyHolds} ansökningar väntar fortfarande på säker verifiering och bara ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} är godkända. ` +
+          "De osäkra ansökningarna räknas inte som godkända platser, men nya skick stoppas tills de har verifierats eller markerats som inte inskickade.",
       };
     }
 
@@ -636,7 +637,7 @@ async function fillMonthlyApplicationTarget(
       error:
         verifiedCount < MONTHLY_APPLICATION_TARGET
           ? occupied >= MONTHLY_APPLICATION_TARGET
-            ? `${occupied}/${MONTHLY_APPLICATION_TARGET} monthly slots are occupied, but only ${verifiedCount} are verified. Existing uncertain submissions will be rechecked; no additional applications will be sent meanwhile.`
+            ? `${Math.max(0, occupied - verifiedCount)} ansökningar väntar på säker verifiering och bara ${verifiedCount}/${MONTHLY_APPLICATION_TARGET} är godkända. De räknas inte som godkända platser, men nya skick stoppas tills de verifierats eller markerats som inte inskickade.`
             : discovered.length === 0
               ? "STUDENTCONSULTING_MATCHED_PROFILE_EMPTY: Matcha jobb innehöll inga upptäckbara jobblänkar."
               : suitable.length === 0
@@ -653,6 +654,228 @@ function summarizeRejections(rejectionCounts: Map<string, number>): string {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .map(([reason, count]) => `${count}× ${reason}`)
     .join("; ");
+}
+
+export interface ApplicationAttentionResult {
+  applicationId: string;
+  providerState: "applied" | "not_applied" | "unknown" | "user_confirmed_not_applied";
+  status: string;
+  changed: boolean;
+  message: string;
+}
+
+interface AttentionApplicationRow {
+  id: string;
+  status: string;
+  applied_at: string | null;
+  verified_at: string | null;
+  automation_run_id: string | null;
+  report_month: string;
+  raw_json: string | null;
+}
+
+async function getAttentionApplication(
+  db: D1Database,
+  applicationId: string,
+): Promise<AttentionApplicationRow | null> {
+  return db
+    .prepare(
+      `SELECT a.id, a.status, a.applied_at, a.verified_at,
+              a.automation_run_id, a.report_month, j.raw_json
+       FROM applications a
+       JOIN jobs j ON j.id = a.job_id
+       WHERE a.id = ?
+       LIMIT 1`,
+    )
+    .bind(applicationId)
+    .first<AttentionApplicationRow>();
+}
+
+export async function recheckApplicationAttention(
+  env: AutomationEnv,
+  applicationId: string,
+): Promise<ApplicationAttentionResult | null> {
+  const row = await getAttentionApplication(env.DB, applicationId);
+  if (!row) return null;
+  if (row.status !== "needs_user_action") {
+    return {
+      applicationId,
+      providerState: "unknown",
+      status: row.status,
+      changed: false,
+      message: "Ansökan behöver inte längre användaråtgärd.",
+    };
+  }
+
+  let job: JobCandidate;
+  try {
+    job = JSON.parse(row.raw_json ?? "") as JobCandidate;
+  } catch {
+    await recordApplicationDiagnostic(
+      env.DB,
+      applicationId,
+      "RECHECK_DATA_INVALID",
+      "Stored job payload could not be parsed for user-attention recheck.",
+    );
+    return {
+      applicationId,
+      providerState: "unknown",
+      status: "needs_user_action",
+      changed: false,
+      message: "Jobbdatan kunde inte läsas för en ny kontroll.",
+    };
+  }
+
+  if (job.provider !== "studentconsulting") {
+    return {
+      applicationId,
+      providerState: "unknown",
+      status: "needs_user_action",
+      changed: false,
+      message: "Automatisk omkontroll stöds bara för StudentConsulting.",
+    };
+  }
+
+  return withStudentConsultingProvider(env, async (provider) => {
+    const auth = await provider.authenticate();
+    if (auth.status !== "authenticated") {
+      return {
+        applicationId,
+        providerState: "unknown",
+        status: "needs_user_action",
+        changed: false,
+        message:
+          auth.status === "failed"
+            ? `${auth.code}: ${auth.message}`
+            : "StudentConsulting kunde inte autentiseras för omkontroll.",
+      };
+    }
+
+    const providerState = await provider.inspectApplicationStatus(job);
+    if (providerState === "not_applied") {
+      if (shouldDelayNotAppliedReclassification(row.applied_at)) {
+        return {
+          applicationId,
+          providerState,
+          status: "needs_user_action",
+          changed: false,
+          message:
+            "StudentConsulting visar ännu inte ansökan som skickad. Vänta några minuter och kontrollera igen innan säkerhetsspärren släpps.",
+        };
+      }
+
+      const changed = await reclassifyApplicationNotSubmitted(env.DB, applicationId);
+      if (changed) {
+        await recordApplicationDiagnostic(
+          env.DB,
+          applicationId,
+          "APPLICATION_NOT_APPLIED",
+          "Authenticated StudentConsulting status confirmed that the exact Jobb-ID is not applied; the safety hold was released.",
+        );
+      }
+      return {
+        applicationId,
+        providerState,
+        status: changed ? "failed" : "needs_user_action",
+        changed,
+        message: changed
+          ? "StudentConsulting bekräftade att ansökan inte skickades. Den räknas inte och spärren är släppt."
+          : "Ansökans status ändrades samtidigt; ladda om och kontrollera igen.",
+      };
+    }
+
+    if (providerState !== "applied") {
+      return {
+        applicationId,
+        providerState: "unknown",
+        status: "needs_user_action",
+        changed: false,
+        message:
+          "StudentConsulting kunde fortfarande inte bekräfta Jobb-ID:t i Ansökningar. Ingen slot räknas som godkänd.",
+      };
+    }
+
+    const verifiedAt = new Date().toISOString();
+    const changed = await verifyApplicationFromAttention(
+      env.DB,
+      applicationId,
+      verifiedAt,
+    );
+    if (!changed) {
+      return {
+        applicationId,
+        providerState,
+        status: "needs_user_action",
+        changed: false,
+        message: "Ansökans status ändrades samtidigt; ladda om och kontrollera igen.",
+      };
+    }
+
+    const attemptNo = await nextAttemptNumber(env.DB, applicationId);
+    const attemptId = await startAttempt(env.DB, applicationId, attemptNo);
+    await finishAttempt(env.DB, attemptId, "verified");
+    await reconcileMonthlyApplicationSlotState(env.DB, applicationId, "verified");
+
+    if (row.automation_run_id) {
+      const verifiedCount = await countVerifiedApplications(env.DB, row.report_month);
+      await updateRun(env.DB, row.automation_run_id, { verifiedCount });
+    }
+
+    await persistVerificationEvidence(
+      env,
+      row.automation_run_id ?? "attention-recheck",
+      applicationId,
+      row.report_month,
+      job,
+      row.applied_at ?? verifiedAt,
+      verifiedAt,
+    );
+
+    return {
+      applicationId,
+      providerState,
+      status: "verified",
+      changed: true,
+      message: "StudentConsulting bekräftade Jobb-ID:t. Ansökan är nu verifierad och räknas.",
+    };
+  });
+}
+
+export async function confirmApplicationNotSubmitted(
+  env: AutomationEnv,
+  applicationId: string,
+): Promise<ApplicationAttentionResult | null> {
+  const row = await getAttentionApplication(env.DB, applicationId);
+  if (!row) return null;
+  if (row.status !== "needs_user_action") {
+    return {
+      applicationId,
+      providerState: "user_confirmed_not_applied",
+      status: row.status,
+      changed: false,
+      message: "Ansökan behöver inte längre användaråtgärd.",
+    };
+  }
+
+  const changed = await reclassifyApplicationNotSubmitted(env.DB, applicationId);
+  if (changed) {
+    await recordApplicationDiagnostic(
+      env.DB,
+      applicationId,
+      "USER_CONFIRMED_NOT_APPLIED",
+      "The authenticated dashboard user confirmed that this uncertain StudentConsulting application was not submitted; the safety hold was released.",
+    );
+  }
+
+  return {
+    applicationId,
+    providerState: "user_confirmed_not_applied",
+    status: changed ? "failed" : "needs_user_action",
+    changed,
+    message: changed
+      ? "Markerad som inte inskickad. Den räknas inte och spärren är släppt."
+      : "Ansökans status kunde inte ändras. Ladda om och kontrollera aktuell status.",
+  };
 }
 
 async function reconcilePendingApplications(
@@ -693,11 +916,7 @@ async function reconcilePendingApplications(
 
     const applicationState = await provider.inspectApplicationStatus(job);
     if (applicationState === "not_applied") {
-      const appliedAtMs = row.applied_at ? Date.parse(row.applied_at) : Number.NaN;
-      if (
-        !Number.isFinite(appliedAtMs) ||
-        Date.now() - appliedAtMs < NOT_APPLIED_RECONCILIATION_GRACE_MS
-      ) {
+      if (shouldDelayNotAppliedReclassification(row.applied_at)) {
         continue;
       }
 

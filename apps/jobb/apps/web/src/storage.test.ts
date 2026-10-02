@@ -7,6 +7,8 @@ import {
   isRetryablePreSubmitFailure,
   reclassifyApplicationNotSubmitted,
   requeueFailedPreSubmitApplication,
+  shouldDelayNotAppliedReclassification,
+  verifyApplicationFromAttention,
   type ApplicationForJobRow,
   type AutomationRunRow,
 } from "./storage";
@@ -159,6 +161,69 @@ describe("application retry state", () => {
         runId: "manual:new",
         reportMonth: "2026-10",
       }),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("uncertain application reconciliation", () => {
+  const now = Date.parse("2026-10-02T13:10:00.000Z");
+
+  it("keeps a possible submission blocked during the five-minute provider grace period", () => {
+    expect(
+      shouldDelayNotAppliedReclassification(
+        "2026-10-02T13:06:00.000Z",
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("allows a definite not-applied result to release after the grace period", () => {
+    expect(
+      shouldDelayNotAppliedReclassification(
+        "2026-10-02T13:04:59.000Z",
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("fails closed when the applied timestamp is missing or invalid", () => {
+    expect(shouldDelayNotAppliedReclassification(null, now)).toBe(true);
+    expect(shouldDelayNotAppliedReclassification("invalid", now)).toBe(true);
+  });
+});
+
+describe("user-attention verification", () => {
+  it("promotes only an applied unresolved application to verified", async () => {
+    const fake = claimDb(1);
+
+    await expect(
+      verifyApplicationFromAttention(
+        fake.db,
+        "application:studentconsulting:87570",
+        "2026-10-02T15:30:00.000Z",
+      ),
+    ).resolves.toBe(true);
+
+    expect(fake.sql).toHaveLength(1);
+    expect(fake.sql[0]).toContain("SET status = 'verified'");
+    expect(fake.sql[0]).toContain("status = 'needs_user_action'");
+    expect(fake.sql[0]).toContain("applied_at IS NOT NULL");
+    expect(fake.sql[0]).toContain("verified_at IS NULL");
+    expect(fake.sql[0]).toContain("s.state = 'uncertain'");
+    expect(fake.binds[0]).toEqual([
+      "2026-10-02T15:30:00.000Z",
+      "application:studentconsulting:87570",
+    ]);
+  });
+
+  it("rejects a lost attention-resolution race", async () => {
+    const fake = claimDb(0);
+    await expect(
+      verifyApplicationFromAttention(
+        fake.db,
+        "application:studentconsulting:87570",
+        "2026-10-02T15:30:00.000Z",
+      ),
     ).resolves.toBe(false);
   });
 });
