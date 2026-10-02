@@ -131,6 +131,15 @@ export class StudentConsultingProvider implements JobProvider {
         };
       }
 
+      if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+        return {
+          status: "failed",
+          code: "STUDENTCONSULTING_LOGIN_FAILED",
+          message:
+            "StudentConsulting remained on a visible login form after authentication.",
+        };
+      }
+
       return { status: "authenticated" };
     } catch (error) {
       return {
@@ -142,9 +151,19 @@ export class StudentConsultingProvider implements JobProvider {
   }
 
   async discover(): Promise<JobCandidate[]> {
-    const matchedJobsUrl = normalizeStudentConsultingMatchedJobsUrl(
-      MATCHED_JOBS_URL,
-    );
+    await this.page.goto(`${DEFAULT_BASE_URL}/sv/`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
+    if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+      throw new Error(
+        "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: profilsessionen är inte autentiserad.",
+      );
+    }
+
+    const matchedJobsUrl =
+      (await findMatchedJobsUrl(this.page)) ??
+      normalizeStudentConsultingMatchedJobsUrl(MATCHED_JOBS_URL);
     if (!matchedJobsUrl) {
       throw new Error(
         "STUDENTCONSULTING_MATCHED_PROFILE_ROUTE_INVALID: Matcha jobb-routen kunde inte valideras.",
@@ -158,6 +177,11 @@ export class StudentConsultingProvider implements JobProvider {
     if (!isSameMatchedJobsRoute(this.page.url(), matchedJobsUrl)) {
       throw new Error(
         "STUDENTCONSULTING_MATCHED_PROFILE_REDIRECTED: Matcha jobb omdirigerades utanför den verifierade profilvyn.",
+      );
+    }
+    if (await hasVisibleStudentConsultingLoginControls(this.page)) {
+      throw new Error(
+        "STUDENTCONSULTING_PROFILE_AUTH_REQUIRED: Matcha jobb kräver en autentiserad profilsession.",
       );
     }
 
@@ -462,10 +486,50 @@ export function normalizeStudentConsultingMatchedJobsUrl(
   if (!safe) return null;
 
   const pathname = new URL(safe).pathname;
-  if (!/^\/sv\/min-profil\/matcha-jobb\/?$/i.test(pathname)) {
+  if (
+    !/^\/sv\/min-profil\/(?:matcha|matchade|matchande)-jobb\/?$/i.test(
+      pathname,
+    )
+  ) {
     return null;
   }
   return safe;
+}
+
+async function findMatchedJobsUrl(page: BrowserPage): Promise<string | null> {
+  const anchors = page.locator("a[href]");
+  const count = await anchors.count();
+
+  for (let index = 0; index < count; index += 1) {
+    const anchor = anchors.nth(index);
+    if (!(await anchor.isVisible())) continue;
+    const label = await safeInnerText(anchor);
+    if (!isStudentConsultingMatchedJobsLabel(label)) continue;
+
+    const href = await anchor.getAttribute("href");
+    if (!href) continue;
+    const safeUrl = normalizeStudentConsultingMatchedJobsUrl(href);
+    if (safeUrl) return safeUrl;
+  }
+  return null;
+}
+
+async function hasVisibleStudentConsultingLoginControls(
+  page: BrowserPage,
+): Promise<boolean> {
+  const password = await firstVisible(page, [
+    'input[type="password"]',
+    'input[autocomplete="current-password"]',
+  ]);
+  if (!password) return false;
+
+  const username = await firstVisible(page, [
+    'input[type="email"]',
+    'input[autocomplete="username"]',
+    'input[name="Email"]',
+    'input[name="email"]',
+  ]);
+  return Boolean(username);
 }
 
 export async function loadStudentConsultingCountryIndex(

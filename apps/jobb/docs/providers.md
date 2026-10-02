@@ -9,14 +9,15 @@ Implemented flow:
 1. Open StudentConsulting's `/signin` entry point.
 2. Follow the OIDC redirect to `id.studentconsulting.com`.
 3. Fill the configured email/password credentials and submit the login form.
-4. Navigate only to the canonical authenticated `/sv/min-profil/matcha-jobb/` route and discover candidates from that matched list.
-5. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority, and redirects or untrusted URL shapes fail closed.
-6. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
-7. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
-8. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
-9. Stop if any visible required application field is unresolved.
-10. Submit only when `STUDENTCONSULTING_AUTOSUBMIT=true` and there is exactly one recognized application submit control.
-11. Verify the application through the authenticated `Ansökningar` navigation before it can be treated as confirmed.
+4. After login, revisit the authenticated Swedish profile landing page and use a visible trusted **Matcha jobb** navigation link when one is exposed. Accepted profile routes are restricted to `/sv/min-profil/matcha-jobb/`, `/sv/min-profil/matchade-jobb/` or `/sv/min-profil/matchande-jobb/`; the canonical `matcha-jobb` route remains a fallback when navigation is not rendered.
+5. Reject visible login controls after authentication or on the matched-profile page, and fail closed on redirects or profile routes outside the trusted allowlist.
+6. Accept only strictly normalized StudentConsulting job-detail URLs exposed by that verified page through `href`, `data-href`, `data-url` or inline navigation such as `onclick`; absolute URLs retain and validate their original authority.
+7. Read Jobb-ID, location, occupational category and country from each job page; if country cannot be resolved to a supported country code, the candidate is not eligible for autosubmit.
+8. Treat optional include/exclude/location/country rules as additional filters on top of the provider match.
+9. Reserve one of exactly ten monthly D1 quota slots before any submit side effect.
+10. Stop if any visible required application field is unresolved.
+11. Submit only when `STUDENTCONSULTING_AUTOSUBMIT=true` and there is exactly one recognized application submit control.
+12. Verify the application through the authenticated `Ansökningar` navigation before it can be treated as confirmed.
 
 Runtime secrets/configuration:
 
