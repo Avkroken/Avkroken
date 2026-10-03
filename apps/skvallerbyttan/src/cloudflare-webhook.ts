@@ -1,12 +1,11 @@
 import type { Env } from "./env";
-import { recordCloudflareEvent, type CloudflareEventRecord } from "./cloudflare-events";
 import {
-  activityFromCloudflareWebhook,
-  recordObservedActivity,
-} from "./activity";
+  recordCloudflareWebhookObservation,
+  type CloudflareEventRecord,
+} from "./cloudflare-events";
+import { activityFromCloudflareWebhook } from "./activity";
 import {
   invalidateSourceCache,
-  recordWebhookDelivery,
   sourceCacheConfigured,
 } from "./source-cache";
 
@@ -133,6 +132,18 @@ function notificationExplicitDeliveryId(payload: Record<string, unknown>): strin
   return correlation && event ? [correlation, event, timestamp].filter(Boolean).join(":") : null;
 }
 
+function isGenericWebhookTestPayload(payload: Record<string, unknown>): boolean {
+  const keys = Object.keys(payload);
+  return keys.length === 1 && keys[0] === "text" && Boolean(text(payload.text));
+}
+
+function hasIssueIdentity(payload: Record<string, unknown>): boolean {
+  return Boolean(
+    clipped(payload.alert_correlation_id, 160)
+    && clipped(payload.alert_event, 160),
+  );
+}
+
 export async function handleCloudflareNotificationsWebhook(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") {
     const result = response({ error: "method not allowed" }, 405);
@@ -158,17 +169,19 @@ export async function handleCloudflareNotificationsWebhook(request: Request, env
 
   const id = await deliveryId("cloudflare-notifications", notificationExplicitDeliveryId(payload), body);
   const event = notificationEventFromPayload(payload, id);
-  const isNew = await recordWebhookDelivery(env, id, `cloudflare:${event.source}:${event.eventType}`, null);
-  if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
 
-  await recordCloudflareEvent(env, event);
-  await recordObservedActivity(env, activityFromCloudflareWebhook(event));
   await invalidateSourceCache(
     env,
     ["cloudflare:notifications:history"],
     `cloudflare:notifications:${event.eventType}`,
   );
 
+  if (!isNew) return response({ ok: true, duplicate: true }, 202);
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }
 
@@ -198,13 +211,22 @@ export async function handleCloudflareIssuesWebhook(request: Request, env: Env):
     return response({ error: "invalid webhook payload" }, 400);
   }
 
+  if (isGenericWebhookTestPayload(payload)) {
+    return response({ ok: true, ignored: true, reason: "generic_webhook_test" }, 202);
+  }
+  if (!hasIssueIdentity(payload)) {
+    return response({ error: "invalid issue webhook payload" }, 400);
+  }
+
   const id = await deliveryId("cloudflare-issues", notificationExplicitDeliveryId(payload), body);
   const event = issuesEventFromPayload(payload, id);
-  const isNew = await recordWebhookDelivery(env, id, `cloudflare:${event.source}:${event.eventType}`, null);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
 
-  await recordCloudflareEvent(env, event);
-  await recordObservedActivity(env, activityFromCloudflareWebhook(event));
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }
 
@@ -233,10 +255,12 @@ export async function handleCloudflareCasbWebhook(request: Request, env: Env): P
 
   const id = await deliveryId("cloudflare-casb", clipped(payload.id, 160), body);
   const event = casbEventFromPayload(payload, id);
-  const isNew = await recordWebhookDelivery(env, id, `cloudflare:${event.source}:${event.eventType}`, null);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
 
-  await recordCloudflareEvent(env, event);
-  await recordObservedActivity(env, activityFromCloudflareWebhook(event));
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }

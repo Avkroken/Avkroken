@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Env } from "../src/env";
+import { recordCloudflareWebhookObservation } from "../src/cloudflare-events";
 import {
   casbEventFromPayload,
   handleCloudflareIssuesWebhook,
@@ -99,6 +100,109 @@ test("Workers Issues webhook rejects unauthenticated requests before parsing dia
   assert.equal(response.status, 401);
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(await response.json(), { error: "invalid webhook authentication" });
+});
+
+test("Workers Issues webhook acknowledges Cloudflare generic destination tests without recording activity", async () => {
+  const response = await handleCloudflareIssuesWebhook(
+    new Request("https://skvallerbyttan.denied.se/webhooks/cloudflare/issues", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "cf-webhook-auth": "expected-secret",
+      },
+      body: JSON.stringify({ text: "Cloudflare webhook test" }),
+    }),
+    {
+      CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET: "expected-secret",
+      STATS_DB: {} as D1Database,
+    } as Env,
+  );
+
+  assert.equal(response.status, 202);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    ignored: true,
+    reason: "generic_webhook_test",
+  });
+});
+
+test("Workers Issues webhook rejects authenticated non-test payloads without issue identity", async () => {
+  const response = await handleCloudflareIssuesWebhook(
+    new Request("https://skvallerbyttan.denied.se/webhooks/cloudflare/issues", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "cf-webhook-auth": "expected-secret",
+      },
+      body: JSON.stringify({ alert_type: "workers_issue" }),
+    }),
+    {
+      CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET: "expected-secret",
+      STATS_DB: {} as D1Database,
+    } as Env,
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid issue webhook payload" });
+});
+
+test("Cloudflare webhook deduplication and canonical event writes share one D1 batch", async () => {
+  class Statement {
+    params: unknown[] = [];
+    constructor(readonly sql: string) {}
+    bind(...params: unknown[]) {
+      this.params = params;
+      return this;
+    }
+  }
+
+  const batches: Statement[][] = [];
+  const db = {
+    prepare(sql: string) {
+      return new Statement(sql);
+    },
+    async batch(statements: Statement[]) {
+      batches.push(statements);
+      return statements.map(() => ({ meta: { changes: 1 } }));
+    },
+  } as unknown as D1Database;
+
+  const event = {
+    deliveryId: "delivery",
+    source: "issues" as const,
+    eventType: "workers_issue",
+    eventId: "issue",
+    state: "ALERT_STATE_EVENT_START",
+    accountId: "account",
+    policyId: "policy",
+    summary: null,
+    occurredAt: "2026-10-03T16:00:00.000Z",
+    receivedAt: "2026-10-03T16:00:01.000Z",
+  };
+  const activity = {
+    eventKey: "cloudflare:delivery:cloudflare.avkroken.workers",
+    provider: "cloudflare" as const,
+    capability: "cloudflare.avkroken.workers",
+    source: "webhook" as const,
+    coverage: "since_first_observation" as const,
+    event: "workers_issue",
+    action: "ALERT_STATE_EVENT_START",
+    resourceType: "issues",
+    resourceId: "issue",
+    repository: null,
+    occurredAt: event.occurredAt,
+    receivedAt: event.receivedAt,
+  };
+
+  assert.equal(
+    await recordCloudflareWebhookObservation({ STATS_DB: db } as Env, event, activity),
+    true,
+  );
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].length, 3);
+  assert.ok(/webhook_deliveries/.test(batches[0][0].sql));
+  assert.ok(/cloudflare_events/.test(batches[0][1].sql));
+  assert.ok(/observation_events/.test(batches[0][2].sql));
 });
 
 test("normalizes CASB findings to top-level identifiers only", () => {

@@ -1,3 +1,4 @@
+import type { ObservedActivityEvent } from "./activity";
 import type { Env } from "./env";
 
 export type CloudflareEventSource = "notifications" | "casb" | "issues";
@@ -54,6 +55,63 @@ export async function recordCloudflareEvent(env: Env, event: CloudflareEventReco
     event.occurredAt,
     event.receivedAt,
   ).run();
+}
+
+export async function recordCloudflareWebhookObservation(
+  env: Env,
+  event: CloudflareEventRecord,
+  activity: ObservedActivityEvent,
+): Promise<boolean> {
+  if (!env.STATS_DB) return true;
+
+  const results = await env.STATS_DB.batch([
+    env.STATS_DB.prepare(
+      `INSERT OR IGNORE INTO webhook_deliveries (delivery_id, event, repo, received_at)
+       VALUES (?, ?, NULL, ?)`,
+    ).bind(
+      event.deliveryId,
+      `cloudflare:${event.source}:${event.eventType}`,
+      event.receivedAt,
+    ),
+    env.STATS_DB.prepare(
+      `INSERT OR IGNORE INTO cloudflare_events (
+         delivery_id, source, event_type, event_id, state, account_id, policy_id,
+         summary, occurred_at, received_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      event.deliveryId,
+      event.source,
+      event.eventType,
+      event.eventId,
+      event.state,
+      event.accountId,
+      event.policyId,
+      event.summary,
+      event.occurredAt,
+      event.receivedAt,
+    ),
+    env.STATS_DB.prepare(
+      `INSERT OR IGNORE INTO observation_events (
+         event_key, provider, capability, source, coverage, event, action,
+         resource_type, resource_id, repository, occurred_at, received_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      activity.eventKey,
+      activity.provider,
+      activity.capability,
+      activity.source,
+      activity.coverage,
+      activity.event,
+      activity.action,
+      activity.resourceType,
+      activity.resourceId,
+      activity.repository,
+      activity.occurredAt,
+      activity.receivedAt,
+    ),
+  ]);
+
+  return results.some((result) => Number(result.meta.changes ?? 0) > 0);
 }
 
 export async function pruneCloudflareEvents(env: Env, olderThanIso: string): Promise<void> {
