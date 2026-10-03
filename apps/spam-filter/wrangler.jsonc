@@ -14,6 +14,14 @@
     "BLOCKED_DOMAINS": "",
     "REJECT_MESSAGE": "Sender is blocked"
   },
+  "previews": {
+    "vars": {
+      "MAIL_DOMAIN": "preview.invalid",
+      "BLOCKED_SENDERS": "",
+      "BLOCKED_DOMAINS": "",
+      "REJECT_MESSAGE": "Preview sender is blocked"
+    }
+  },
   "observability": {
     "enabled": true,
     "redact_query_string": true,

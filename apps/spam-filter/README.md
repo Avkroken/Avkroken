@@ -22,3 +22,13 @@ npm run check
 ```
 
 Production deployment is intended to run through Cloudflare Workers Builds after repository integration. The deploy script refuses to run outside Workers Builds.
+
+Workers Builds contract:
+
+- root directory: `/apps/spam-filter/`
+- production branch: `main`
+- deploy command: `npx wrangler deploy`
+- preview command: `npx wrangler preview`
+- build watch include path: `apps/spam-filter/*`
+
+Worker Previews use the explicit `previews.vars` block in `wrangler.jsonc`. Preview state must remain non-production: no forwarding secret, Email Routing address, service binding, or production mail domain is added to the Preview configuration.
