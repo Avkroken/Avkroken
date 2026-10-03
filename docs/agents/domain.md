@@ -10,7 +10,7 @@ This repository is a **multi-context monorepo**. Domain and technical context mu
 4. Read relevant application-local architecture, security, operations, and ADR documentation.
 5. Use `docs/organization/` only for concerns that genuinely span multiple applications.
 
-Current application contexts include `apps/portal`, `apps/skvallerbyttan`, `apps/jobb`, and `apps/dumpen`.
+Current application contexts include `apps/portal`, `apps/skvallerbyttan`, `apps/spam-filter`, `apps/jobb`, and `apps/dumpen`.
 
 ## CONTEXT convention
 

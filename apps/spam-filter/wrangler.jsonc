@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "spam-filter",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-03",
+  "workers_dev": false,
+  "preview_urls": false,
+  "addresses": [
+    "*@denied.se"
+  ],
+  "vars": {
+    "MAIL_DOMAIN": "denied.se",
+    "BLOCKED_SENDERS": "",
+    "BLOCKED_DOMAINS": "",
+    "REJECT_MESSAGE": "Sender is blocked"
+  },
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01,
+      "persist": true
+    },
+    "issues": {
+      "enabled": true
+    }
+  }
+}

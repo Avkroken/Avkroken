@@ -1,0 +1,22 @@
+{
+  "name": "avkroken-spam-filter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "npm test && npm run typecheck && npm run validate:worker",
+    "deploy": "wrangler deploy",
+    "deploy:workers-builds": "node scripts/workers-build-production.mjs",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "validate:worker": "wrangler deploy --dry-run --config wrangler.jsonc"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260926.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "wrangler": "4.145.0"
+  },
+  "overrides": {
+    "undici@<7.29.1": "7.29.1"
+  }
+}

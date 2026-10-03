@@ -74,6 +74,7 @@ För Avkroken/Avkroken kräver releaseprocessen push-verifiering av:
 
 - Portal;
 - Skvallerbyttan;
+- Spam filter;
 - Krosa-Maja retirement guard;
 - Jobb;
 - Dumpen.

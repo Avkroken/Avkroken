@@ -6,6 +6,7 @@ Avkrokens samlade applikationsrepository.
 
 - `apps/portal` — avkroken.denied.se
 - `apps/skvallerbyttan` — observationslager och dashboard
+- `apps/spam-filter` — inkommande e-postfilter för denied.se
 - `apps/jobb` — Jobb-applikationen
 - `apps/dumpen` — Dumpen Worker och R2-baserad lagring
 

@@ -23,3 +23,8 @@ dumpen:
   - changed-files:
       - any-glob-to-any-file:
           - "apps/dumpen/**"
+
+spam-filter:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "apps/spam-filter/**"
