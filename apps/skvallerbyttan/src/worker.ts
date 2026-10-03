@@ -12,6 +12,7 @@ import { CloudflareApiError } from "./cloudflare";
 import { pruneCloudflareEvents } from "./cloudflare-events";
 import {
   handleCloudflareCasbWebhook,
+  handleCloudflareIssuesWebhook,
   handleCloudflareNotificationsWebhook,
 } from "./cloudflare-webhook";
 import {
@@ -136,6 +137,17 @@ export default {
         return await handleCloudflareNotificationsWebhook(request, env);
       } catch (error) {
         console.error("cloudflare notifications webhook failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return json({ error: "webhook processing failed" }, 500, { "Cache-Control": "no-store" });
+      }
+    }
+
+    if (url.pathname === "/webhooks/cloudflare/issues") {
+      try {
+        return await handleCloudflareIssuesWebhook(request, env);
+      } catch (error) {
+        console.error("cloudflare issues webhook failed", {
           error: error instanceof Error ? error.message : String(error),
         });
         return json({ error: "webhook processing failed" }, 500, { "Cache-Control": "no-store" });

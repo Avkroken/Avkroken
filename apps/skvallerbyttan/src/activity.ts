@@ -133,7 +133,7 @@ export function activityFromGitHubWebhook(
 
 export function activityFromCloudflareWebhook(input: {
   deliveryId: string;
-  source: "notifications" | "casb";
+  source: "notifications" | "casb" | "issues";
   eventType: string;
   eventId: string | null;
   state: string | null;
@@ -142,7 +142,9 @@ export function activityFromCloudflareWebhook(input: {
 }): ObservedActivityEvent {
   const capability = input.source === "notifications"
     ? "cloudflare.avkroken.notifications"
-    : "cloudflare.avkroken.zero_trust";
+    : input.source === "issues"
+      ? "cloudflare.avkroken.workers"
+      : "cloudflare.avkroken.zero_trust";
   return {
     eventKey: `cloudflare:${input.deliveryId}:${capability}`,
     provider: "cloudflare",

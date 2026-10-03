@@ -1,12 +1,11 @@
 import type { Env } from "./env";
-import { recordCloudflareEvent, type CloudflareEventRecord } from "./cloudflare-events";
 import {
-  activityFromCloudflareWebhook,
-  recordObservedActivity,
-} from "./activity";
+  recordCloudflareWebhookObservation,
+  type CloudflareEventRecord,
+} from "./cloudflare-events";
+import { activityFromCloudflareWebhook } from "./activity";
 import {
   invalidateSourceCache,
-  recordWebhookDelivery,
   sourceCacheConfigured,
 } from "./source-cache";
 
@@ -88,6 +87,25 @@ export function notificationEventFromPayload(
   };
 }
 
+export function issuesEventFromPayload(
+  payload: Record<string, unknown>,
+  deliveryIdValue: string,
+  receivedAt = new Date().toISOString(),
+): CloudflareEventRecord {
+  return {
+    deliveryId: deliveryIdValue,
+    source: "issues",
+    eventType: clipped(payload.alert_type, 160) || "workers_issue",
+    eventId: clipped(payload.alert_correlation_id, 160),
+    state: clipped(payload.alert_event, 160),
+    accountId: clipped(payload.account_id, 80),
+    policyId: clipped(payload.policy_id, 80),
+    summary: null,
+    occurredAt: isoFromUnixSeconds(payload.ts),
+    receivedAt,
+  };
+}
+
 export function casbEventFromPayload(
   payload: Record<string, unknown>,
   deliveryIdValue: string,
@@ -112,6 +130,18 @@ function notificationExplicitDeliveryId(payload: Record<string, unknown>): strin
   const event = clipped(payload.alert_event, 160);
   const timestamp = typeof payload.ts === "number" && Number.isFinite(payload.ts) ? String(payload.ts) : null;
   return correlation && event ? [correlation, event, timestamp].filter(Boolean).join(":") : null;
+}
+
+function isGenericWebhookTestPayload(payload: Record<string, unknown>): boolean {
+  const keys = Object.keys(payload);
+  return keys.length === 1 && keys[0] === "text" && Boolean(text(payload.text));
+}
+
+function hasIssueIdentity(payload: Record<string, unknown>): boolean {
+  return Boolean(
+    clipped(payload.alert_correlation_id, 160)
+    && clipped(payload.alert_event, 160),
+  );
 }
 
 export async function handleCloudflareNotificationsWebhook(request: Request, env: Env): Promise<Response> {
@@ -139,16 +169,63 @@ export async function handleCloudflareNotificationsWebhook(request: Request, env
 
   const id = await deliveryId("cloudflare-notifications", notificationExplicitDeliveryId(payload), body);
   const event = notificationEventFromPayload(payload, id);
-  const isNew = await recordWebhookDelivery(env, id, `cloudflare:${event.source}:${event.eventType}`, null);
-  if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
 
-  await recordCloudflareEvent(env, event);
-  await recordObservedActivity(env, activityFromCloudflareWebhook(event));
   await invalidateSourceCache(
     env,
     ["cloudflare:notifications:history"],
     `cloudflare:notifications:${event.eventType}`,
   );
+
+  if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
+}
+
+export async function handleCloudflareIssuesWebhook(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    const result = response({ error: "method not allowed" }, 405);
+    result.headers.set("Allow", "POST");
+    return result;
+  }
+
+  const secret = env.CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET?.trim() || "";
+  if (!secret || !sourceCacheConfigured(env)) return response({ error: "webhook not configured" }, 503);
+  if (!secureEqual(request.headers.get("cf-webhook-auth"), secret)) {
+    return response({ error: "invalid webhook authentication" }, 401);
+  }
+
+  // Issue automations can contain diagnostic context (error text, stack traces,
+  // request metadata, logs, and application context). Read it only after auth,
+  // then persist only the explicit top-level allowlist normalized below.
+  const body = await request.text();
+  let payload: Record<string, unknown>;
+  try {
+    const parsed = record(JSON.parse(body));
+    if (!parsed) return response({ error: "invalid webhook payload" }, 400);
+    payload = parsed;
+  } catch {
+    return response({ error: "invalid webhook payload" }, 400);
+  }
+
+  if (isGenericWebhookTestPayload(payload)) {
+    return response({ ok: true, ignored: true, reason: "generic_webhook_test" }, 202);
+  }
+  if (!hasIssueIdentity(payload)) {
+    return response({ error: "invalid issue webhook payload" }, 400);
+  }
+
+  const id = await deliveryId("cloudflare-issues", notificationExplicitDeliveryId(payload), body);
+  const event = issuesEventFromPayload(payload, id);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
+  if (!isNew) return response({ ok: true, duplicate: true }, 202);
 
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }
@@ -178,10 +255,12 @@ export async function handleCloudflareCasbWebhook(request: Request, env: Env): P
 
   const id = await deliveryId("cloudflare-casb", clipped(payload.id, 160), body);
   const event = casbEventFromPayload(payload, id);
-  const isNew = await recordWebhookDelivery(env, id, `cloudflare:${event.source}:${event.eventType}`, null);
+  const isNew = await recordCloudflareWebhookObservation(
+    env,
+    event,
+    activityFromCloudflareWebhook(event),
+  );
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
 
-  await recordCloudflareEvent(env, event);
-  await recordObservedActivity(env, activityFromCloudflareWebhook(event));
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }

@@ -174,4 +174,20 @@ test("repository Preview config uses isolated D1 while production provider state
     item => item.binding === "GITHUB_OAUTH_CLIENT_SECRET"
   );
   assert.equal(oauthSecret?.secret_name, "KROSA_MAJA_CLIENT_SECRET");
+
+  const previewMigrationRaw = await import("node:fs/promises").then(({ readFile }) =>
+    readFile(new URL("../wrangler.preview-migrations.jsonc", import.meta.url), "utf8")
+  );
+  const previewMigration = JSON.parse(previewMigrationRaw);
+  assert.equal(previewMigration.account_id, value.account_id);
+  assert.deepEqual(previewMigration.d1_databases, [{
+    binding: "PREVIEW_DB",
+    database_name: value.previews.d1_databases[0].database_name,
+    database_id: value.previews.d1_databases[0].database_id,
+    migrations_dir: "migrations"
+  }]);
+  assert.equal("secrets" in previewMigration, false);
+  assert.equal("secrets_store_secrets" in previewMigration, false);
+  assert.equal("services" in previewMigration, false);
+  assert.equal("vars" in previewMigration, false);
 });

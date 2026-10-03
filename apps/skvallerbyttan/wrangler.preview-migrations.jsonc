@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "skvallerbyttan-stats-preview-eu",
+      "database_id": "0c227e9f-de64-4ffd-ad21-43710deebdce",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

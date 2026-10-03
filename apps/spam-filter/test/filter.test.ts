@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { isBlocked, parseList, senderDomain } from "../src/filter";
 
@@ -42,4 +43,21 @@ test("allows sender when no rule matches", () => {
     }),
     false,
   );
+});
+
+test("Worker Previews use isolated non-production mail configuration", async () => {
+  const raw = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  const config = JSON.parse(raw);
+  const preview = config.previews;
+
+  assert.deepEqual(preview?.vars, {
+    MAIL_DOMAIN: "preview.invalid",
+    BLOCKED_SENDERS: "",
+    BLOCKED_DOMAINS: "",
+    REJECT_MESSAGE: "Preview sender is blocked",
+  });
+  assert.equal("addresses" in (preview ?? {}), false);
+  assert.equal("secrets" in (preview ?? {}), false);
+  assert.equal("services" in (preview ?? {}), false);
+  assert.equal(JSON.stringify(preview).includes("denied.se"), false);
 });

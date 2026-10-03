@@ -82,6 +82,19 @@ test("provider health does not claim unobserved credentials are live", () => {
   assert.equal(state.providers.github.reconciliation.status, "unknown");
 });
 
+test("Cloudflare Workers Issues ingress readiness is internal boolean state only", () => {
+  const env = {
+    ...configuredEnv(),
+    CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET: "configured",
+    STATS_DB: {} as D1Database,
+  } as Env;
+  const state = getProviderHealth(env) as any;
+
+  assert.equal(state.providers.cloudflare.webhooks.issuesIngressConfigured, true);
+  assert.equal("webhookSecret" in state.providers.cloudflare.webhooks, false);
+  assert.equal("endpoint" in state.providers.cloudflare.webhooks, false);
+});
+
 test("GitHub provider health uses persisted readiness instead of an unrelated capability response", () => {
   const state = getProviderHealth(configuredEnv(), [observedGitHub()]) as any;
 
