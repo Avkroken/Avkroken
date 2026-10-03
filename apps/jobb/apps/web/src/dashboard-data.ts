@@ -107,6 +107,8 @@ export async function getDashboardData(
     applications,
     notifications,
     reportActivities,
+    submissionReportItems,
+    submissionReportActivities,
     failedNotifications,
     ambiguousReportItems,
     calendarApplications,
@@ -213,7 +215,8 @@ export async function getDashboardData(
         `SELECT rai.application_id, rai.external_id, rai.state, rai.last_error, rai.updated_at,
                 a.applied_at, a.verified_at,
                 j.title, j.employer, j.location, j.country_code,
-                j.is_international, j.source_url
+                j.is_international, j.source_url,
+                json_extract(j.raw_json, '$.scope') AS scope
          FROM report_activity_items rai
          JOIN applications a ON a.id = rai.application_id
          JOIN jobs j ON j.id = a.job_id
@@ -221,6 +224,31 @@ export async function getDashboardData(
          ORDER BY COALESCE(a.applied_at, a.created_at), rai.application_id`,
       )
       .bind(reportMonth)
+      .all(),
+    db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN state = 'saved' THEN 1 ELSE 0 END) AS saved,
+           COUNT(*) AS total
+         FROM report_activity_items
+         WHERE report_month = ?`,
+      )
+      .bind(submissionReportMonth)
+      .first<{ saved: number | null; total: number }>(),
+    db
+      .prepare(
+        `SELECT rai.application_id, rai.external_id, rai.state, rai.last_error, rai.updated_at,
+                a.applied_at, a.verified_at,
+                j.title, j.employer, j.location, j.country_code,
+                j.is_international, j.source_url,
+                json_extract(j.raw_json, '$.scope') AS scope
+         FROM report_activity_items rai
+         JOIN applications a ON a.id = rai.application_id
+         JOIN jobs j ON j.id = a.job_id
+         WHERE rai.report_month = ?
+         ORDER BY COALESCE(a.applied_at, a.created_at), rai.application_id`,
+      )
+      .bind(submissionReportMonth)
       .all(),
     db
       .prepare(
@@ -325,6 +353,9 @@ export async function getDashboardData(
     reportSaved: Number(reportItems?.saved ?? 0),
     reportItems: Number(reportItems?.total ?? 0),
     reportActivities: reportActivities.results,
+    submissionReportSaved: Number(submissionReportItems?.saved ?? 0),
+    submissionReportItems: Number(submissionReportItems?.total ?? 0),
+    submissionReportActivities: submissionReportActivities.results,
     activityCalendar: calendarApplications.results,
     activityExports: activityExports.results,
     runs: dashboardRuns,

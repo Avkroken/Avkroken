@@ -222,6 +222,10 @@ describe("dashboard rendering", () => {
     expect(jsText).toContain("Öppna aktivitetsrapporten");
     expect(jsText).toContain("/for-arbetssokande/mina-sidor/aktivitetsrapportera");
     expect(jsText).toContain("Nästa sökta jobb");
+    expect(jsText).toContain("Historisk backfill");
+    expect(jsText).toContain("Nästa redan sökta jobb");
+    expect(jsText).toContain("Det här är inte en ny jobbansökan.");
+    expect(jsText).toContain("markHistoricalReportItemSaved");
     expect(jsText).toContain("Föregående rapport är inskickad");
     expect(jsText).toContain("/report/manual-submitted");
     expect(jsText).toContain("/api/reports/");
