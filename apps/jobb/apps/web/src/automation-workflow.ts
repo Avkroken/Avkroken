@@ -4,6 +4,7 @@ import {
   type WorkflowStep,
 } from "cloudflare:workers";
 import { executeAutomation, type AutomationEnv } from "./runner";
+import { withStudentConsultingProvider } from "./providers";
 import {
   resolveRuntimeConfiguration,
   type RuntimeConfigEnv,
@@ -16,6 +17,7 @@ export interface AutomationWorkflowParams {
   mode?: "manual" | "scheduled";
   runId?: string;
   triggeredAt?: string;
+  probeStudentConsultingHistory?: boolean;
 }
 
 export class JobAutomationWorkflow extends WorkflowEntrypoint<
@@ -30,7 +32,43 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       mode: event.payload?.mode ?? "scheduled",
       runId: event.payload?.runId,
       triggeredAt: event.payload?.triggeredAt ?? event.timestamp.toISOString(),
+      probeStudentConsultingHistory:
+        event.payload?.probeStudentConsultingHistory === true,
     }));
+
+    if (trigger.probeStudentConsultingHistory) {
+      return step.do(
+        "probe StudentConsulting application history",
+        { retries: { limit: 0, delay: "1 second" }, timeout: "10 minutes" },
+        async () => {
+          const runtime = await resolveRuntimeConfiguration(this.env);
+          const reference = await this.env.DB
+            .prepare(
+              `SELECT j.external_id
+               FROM applications a
+               JOIN jobs j ON j.id = a.job_id
+               WHERE a.status = 'verified' AND j.provider = 'studentconsulting'
+               ORDER BY COALESCE(a.verified_at, a.applied_at, a.created_at) DESC
+               LIMIT 1`,
+            )
+            .first<{ external_id: string }>();
+          if (!reference?.external_id) {
+            throw new Error("STUDENTCONSULTING_HISTORY_REFERENCE_MISSING");
+          }
+          return withStudentConsultingProvider(runtime.env, async (provider) => {
+            const auth = await provider.authenticate();
+            if (auth.status !== "authenticated") {
+              throw new Error(
+                `STUDENTCONSULTING_HISTORY_AUTH_FAILED: ${
+                  "message" in auth && auth.message ? auth.message : auth.status
+                }`,
+              );
+            }
+            return provider.probeApplicationHistory(reference.external_id);
+          });
+        },
+      );
+    }
 
     let result: Awaited<ReturnType<typeof executeAutomation>>;
     try {

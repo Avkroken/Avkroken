@@ -48,6 +48,19 @@ export interface ParsedStudentConsultingJob {
   isInternational: boolean;
 }
 
+export interface StudentConsultingApplicationHistoryEntry {
+  externalId: string;
+  sourceUrl: string;
+  linkText: string;
+  dateHints: string[];
+}
+
+export interface StudentConsultingApplicationHistoryProbe {
+  applicationsUrl: string;
+  entries: StudentConsultingApplicationHistoryEntry[];
+  apiResourcePaths: string[];
+}
+
 export class StudentConsultingProvider implements JobProvider {
   readonly id = "studentconsulting" as const;
 
@@ -484,6 +497,143 @@ export class StudentConsultingProvider implements JobProvider {
 
   async verify(job: JobCandidate): Promise<boolean> {
     return (await this.inspectApplicationStatus(job)) === "applied";
+  }
+
+  async probeApplicationHistory(
+    referenceExternalId: string,
+  ): Promise<StudentConsultingApplicationHistoryProbe> {
+    await this.page.goto(PROFILE_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
+    if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+      throw new Error("STUDENTCONSULTING_PROFILE_NOT_REACHED");
+    }
+
+    const navigation = await findApplicationsNavigation(
+      this.page,
+      referenceExternalId,
+    );
+    if (!navigation) {
+      throw new Error("STUDENTCONSULTING_APPLICATIONS_NAV_NOT_FOUND");
+    }
+    if (navigation.status === "found") {
+      await this.page.goto(navigation.url, {
+        waitUntil: "domcontentloaded",
+        timeout: 30_000,
+      });
+    }
+    await this.page.waitForTimeout(750);
+
+    if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+      throw new Error("STUDENTCONSULTING_APPLICATIONS_LEFT_PROFILE_AREA");
+    }
+    if (!this.page.evaluate) {
+      throw new Error("STUDENTCONSULTING_HISTORY_EVALUATE_UNAVAILABLE");
+    }
+
+    const raw = await this.page.evaluate(
+      (_unused) => {
+        const browser = globalThis as unknown as {
+          document: { querySelectorAll(selector: string): ArrayLike<unknown> };
+          performance: { getEntriesByType(type: string): Array<{ name: string }> };
+          location: { href: string; origin: string };
+        };
+        const datePatterns = [
+          /\b\d{4}-\d{2}-\d{2}\b/g,
+          /\b\d{1,2}[.\/-]\d{1,2}[.\/-]\d{2,4}\b/g,
+          /\b\d{1,2}\s+(?:jan(?:uari)?|feb(?:ruari)?|mar(?:s)?|apr(?:il)?|maj|jun(?:i)?|jul(?:i)?|aug(?:usti)?|sep(?:tember)?|okt(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{4}\b/gi,
+        ];
+        const rows = Array.from(browser.document.querySelectorAll("a[href]"))
+          .map((value) => {
+            const anchor = value as {
+              href?: string;
+              textContent?: string | null;
+              parentElement?: { textContent?: string | null } | null;
+              closest?(selector: string): { textContent?: string | null } | null;
+            };
+            const href = anchor.href || "";
+            const match = href.match(/\/(\d+)\/?(?:[?#].*)?$/);
+            if (!match) return null;
+            const container =
+              anchor.closest?.("article,li,tr,[class*='card'],[class*='application'],[class*='job']") ??
+              anchor.parentElement;
+            const context = (container?.textContent ?? anchor.textContent ?? "")
+              .replace(/\s+/g, " ")
+              .trim()
+              .slice(0, 1600);
+            const dateHints = Array.from(
+              new Set(
+                datePatterns.flatMap((pattern) => context.match(pattern) ?? []),
+              ),
+            ).slice(0, 8);
+            return {
+              externalId: match[1],
+              href,
+              linkText: (anchor.textContent ?? "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 300),
+              dateHints,
+            };
+          })
+          .filter((row) => Boolean(row)) as Array<{
+            externalId: string;
+            href: string;
+            linkText: string;
+            dateHints: string[];
+          }>;
+
+        const resources = browser.performance
+          .getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter((name) => {
+            try {
+              const url = new URL(name, browser.location.href);
+              return (
+                url.origin === browser.location.origin &&
+                /\/api\//i.test(url.pathname)
+              );
+            } catch {
+              return false;
+            }
+          })
+          .map((name) => {
+            try {
+              return new URL(name, browser.location.href).pathname;
+            } catch {
+              return "";
+            }
+          })
+          .filter(Boolean);
+
+        return { rows, resources };
+      },
+      null,
+    );
+
+    const deduped = new Map<string, StudentConsultingApplicationHistoryEntry>();
+    for (const row of raw.rows) {
+      const safeUrl = normalizeStudentConsultingJobUrl(row.href);
+      if (!safeUrl) continue;
+      const externalId = safeUrl.match(/\/(\d+)\/?(?:\?.*)?$/)?.[1];
+      if (!externalId || externalId !== row.externalId) continue;
+      const current = deduped.get(externalId);
+      if (!current || current.dateHints.length < row.dateHints.length) {
+        deduped.set(externalId, {
+          externalId,
+          sourceUrl: safeUrl,
+          linkText: row.linkText,
+          dateHints: row.dateHints,
+        });
+      }
+    }
+
+    return {
+      applicationsUrl: this.page.url(),
+      entries: [...deduped.values()],
+      apiResourcePaths: [...new Set(raw.resources)].slice(0, 50),
+    };
   }
 
   private async readJob(
