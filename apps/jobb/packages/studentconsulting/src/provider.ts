@@ -59,6 +59,8 @@ export interface StudentConsultingApplicationHistoryProbe {
   applicationsUrl: string;
   entries: StudentConsultingApplicationHistoryEntry[];
   apiResourcePaths: string[];
+  jobIdSnippets: string[];
+  bodyLength: number;
 }
 
 export class StudentConsultingProvider implements JobProvider {
@@ -523,7 +525,7 @@ export class StudentConsultingProvider implements JobProvider {
         timeout: 30_000,
       });
     }
-    await this.page.waitForTimeout(750);
+    await this.page.waitForTimeout(5_000);
 
     if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
       throw new Error("STUDENTCONSULTING_APPLICATIONS_LEFT_PROFILE_AREA");
@@ -535,7 +537,10 @@ export class StudentConsultingProvider implements JobProvider {
     const raw = await this.page.evaluate(
       (_unused) => {
         const browser = globalThis as unknown as {
-          document: { querySelectorAll(selector: string): ArrayLike<unknown> };
+          document: {
+            querySelectorAll(selector: string): ArrayLike<unknown>;
+            body?: { innerText?: string | null } | null;
+          };
           performance: { getEntriesByType(type: string): Array<{ name: string }> };
           location: { href: string; origin: string };
         };
@@ -590,24 +595,43 @@ export class StudentConsultingProvider implements JobProvider {
           .filter((name) => {
             try {
               const url = new URL(name, browser.location.href);
-              return (
-                url.origin === browser.location.origin &&
-                /\/api\//i.test(url.pathname)
-              );
+              return /(^|\.)studentconsulting\.com$/i.test(url.hostname);
             } catch {
               return false;
             }
           })
           .map((name) => {
             try {
-              return new URL(name, browser.location.href).pathname;
+              const url = new URL(name, browser.location.href);
+              return `${url.origin}${url.pathname}`;
             } catch {
               return "";
             }
           })
           .filter(Boolean);
 
-        return { rows, resources };
+        const bodyText = (browser.document.body?.innerText ?? "")
+          .replace(/\r/g, "")
+          .slice(0, 200_000);
+        const snippets: string[] = [];
+        const seen = new Set<string>();
+        for (const match of bodyText.matchAll(/\b\d{5}\b/g)) {
+          const start = Math.max(0, (match.index ?? 0) - 140);
+          const end = Math.min(bodyText.length, (match.index ?? 0) + 260);
+          const snippet = bodyText.slice(start, end).replace(/\s+/g, " ").trim();
+          if (snippet && !seen.has(snippet)) {
+            seen.add(snippet);
+            snippets.push(snippet);
+          }
+          if (snippets.length >= 40) break;
+        }
+
+        return {
+          rows,
+          resources,
+          snippets,
+          bodyLength: bodyText.length,
+        };
       },
       null,
     );
@@ -632,7 +656,9 @@ export class StudentConsultingProvider implements JobProvider {
     return {
       applicationsUrl: this.page.url(),
       entries: [...deduped.values()],
-      apiResourcePaths: [...new Set(raw.resources)].slice(0, 50),
+      apiResourcePaths: [...new Set(raw.resources)].slice(0, 100),
+      jobIdSnippets: raw.snippets,
+      bodyLength: raw.bodyLength,
     };
   }
 
