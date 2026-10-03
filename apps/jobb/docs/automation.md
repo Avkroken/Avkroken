@@ -139,6 +139,8 @@ After Arbetsförmedlingen itself shows that the **previous month's** report is s
 
 Legacy Browser Run probe/submission code remains isolated for compatibility but is not used by the dashboard's report workflow.
 
+For historical repair, an operator-only Workflow path can read the authenticated StudentConsulting **Ansökningar** history through StudentConsulting's own `v1/user/application` API, enrich each matching application from `v1/jobopening/:id`, and backfill only source-observed applications for an explicitly named month. The repair path never submits new applications. If the user has separately confirmed that the already-sent Arbetsförmedlingen report is submitted, the same repair can reconcile Jobb's stale `needs_user_auth` report/run state without changing anything at Arbetsförmedlingen.
+
 ## D1 migrations
 
 Apply migrations in order:

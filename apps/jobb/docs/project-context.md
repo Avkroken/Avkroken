@@ -131,6 +131,7 @@ Aktivitetsrapportering använder användarens egen webbläsare:
 5. Jobb fabricerar eller bakdaterar inga aktiviteter; kända fält visas i en styrd kö och okända fält lämnas för uttrycklig kontroll,
 6. efter att Arbetsförmedlingen visar att en aktivitet är sparad bekräftar användaren detta per jobb i Jobb; när föregående månads slutliga rapport visas som inskickad bekräftas även den separat,
 7. Jobb lagrar föregående slutrapport som `submitted` med en spårbar markör för användarbekräftad lokal webbläsarsubmission.
+8. Historiska luckor får repareras read-only från StudentConsultings autentiserade `Ansökningar`-historik. Endast poster som StudentConsulting själv returnerar för den uttryckligen valda månaden får backfillas; reparationsflödet får aldrig skicka en ny ansökan eller bakdatera en ny ansökan.
 
 Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens ifyllda inputvärden.
 
