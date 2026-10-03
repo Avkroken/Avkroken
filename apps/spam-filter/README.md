@@ -12,7 +12,7 @@ The Worker receives the domain catch-all, rejects configured senders/domains, an
 - `BLOCKED_DOMAINS` — optional comma/newline-separated domains; subdomains are included.
 - `REJECT_MESSAGE` — SMTP rejection text.
 
-The Email Routing trigger is declared in `wrangler.jsonc` as `*@denied.se`. Cloudflare requires this trigger to be a literal address pattern; Wrangler does not interpolate variables in `addresses`.
+The Email Routing trigger `*@denied.se` is provider-managed state in Cloudflare and is intentionally **not** declared through Wrangler. Omitting top-level `addresses` prevents `wrangler deploy` from modifying Email Routing rules, so Workers Builds can deploy code without requiring Email Routing write access or trying to take over the existing catch-all rule.
 
 ## Validate
 
@@ -31,4 +31,4 @@ Workers Builds contract:
 - preview command: `npx wrangler preview`
 - build watch include path: `apps/spam-filter/*`
 
-Worker Previews use the explicit `previews.vars` block in `wrangler.jsonc`. Preview state must remain non-production: no forwarding secret, Email Routing address, service binding, or production mail domain is added to the Preview configuration.
+Worker Previews use the explicit `previews.vars` block in `wrangler.jsonc`. Preview state must remain non-production: no forwarding secret, Email Routing address, service binding, or production mail domain is added to the Preview configuration. Production Email Routing must be verified separately from live Cloudflare provider state after deploys because the trigger is no longer owned by Wrangler.

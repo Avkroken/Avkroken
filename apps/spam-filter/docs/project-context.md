@@ -1,6 +1,6 @@
 # Project context
 
-`spam-filter` tar emot catch-all-post för `*@denied.se` via Cloudflare Email Routing.
+`spam-filter` tar emot catch-all-post för `*@denied.se` via Cloudflare Email Routing. Själva catch-all-regeln är provider-managed state i Cloudflare och deklareras inte i `wrangler.jsonc`; Workers Builds ska deploya Worker-kod utan att reconcila Email Routing-regler.
 
 ## Ansvar
 

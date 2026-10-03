@@ -50,6 +50,7 @@ test("Worker Previews use isolated non-production mail configuration", async () 
   const config = JSON.parse(raw);
   const preview = config.previews;
 
+  assert.equal("addresses" in config, false);
   assert.deepEqual(preview?.vars, {
     MAIL_DOMAIN: "preview.invalid",
     BLOCKED_SENDERS: "",
