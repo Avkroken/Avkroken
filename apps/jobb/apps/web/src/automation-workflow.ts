@@ -5,6 +5,7 @@ import {
 } from "cloudflare:workers";
 import { executeAutomation, type AutomationEnv } from "./runner";
 import { withStudentConsultingProvider } from "./providers";
+import { backfillStudentConsultingMonth } from "./historical-backfill";
 import {
   resolveRuntimeConfiguration,
   type RuntimeConfigEnv,
@@ -18,6 +19,8 @@ export interface AutomationWorkflowParams {
   runId?: string;
   triggeredAt?: string;
   probeStudentConsultingHistory?: boolean;
+  backfillStudentConsultingMonth?: string;
+  confirmBackfilledReportSubmitted?: boolean;
 }
 
 export class JobAutomationWorkflow extends WorkflowEntrypoint<
@@ -34,7 +37,28 @@ export class JobAutomationWorkflow extends WorkflowEntrypoint<
       triggeredAt: event.payload?.triggeredAt ?? event.timestamp.toISOString(),
       probeStudentConsultingHistory:
         event.payload?.probeStudentConsultingHistory === true,
+      backfillStudentConsultingMonth: event.payload?.backfillStudentConsultingMonth,
+      confirmBackfilledReportSubmitted:
+        event.payload?.confirmBackfilledReportSubmitted === true,
     }));
+
+    if (trigger.backfillStudentConsultingMonth) {
+      return step.do(
+        "backfill StudentConsulting application history",
+        { retries: { limit: 0, delay: "1 second" }, timeout: "15 minutes" },
+        async () => {
+          const runtime = await resolveRuntimeConfiguration(this.env);
+          return backfillStudentConsultingMonth(
+            runtime.env,
+            trigger.backfillStudentConsultingMonth!,
+            {
+              confirmReportSubmitted:
+                trigger.confirmBackfilledReportSubmitted,
+            },
+          );
+        },
+      );
+    }
 
     if (trigger.probeStudentConsultingHistory) {
       return step.do(

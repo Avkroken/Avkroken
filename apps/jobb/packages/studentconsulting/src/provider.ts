@@ -63,6 +63,19 @@ export interface StudentConsultingApplicationHistoryProbe {
   bodyLength: number;
 }
 
+export interface StudentConsultingHistoricalApplication {
+  externalId: string;
+  title: string;
+  applicationTime: string;
+  status: string;
+  isPublished: boolean;
+  location?: string;
+  country?: string;
+  countryCode?: string;
+  scope?: string;
+  occupation?: string;
+}
+
 export class StudentConsultingProvider implements JobProvider {
   readonly id = "studentconsulting" as const;
 
@@ -660,6 +673,137 @@ export class StudentConsultingProvider implements JobProvider {
       jobIdSnippets: raw.snippets,
       bodyLength: raw.bodyLength,
     };
+  }
+
+  async loadApplicationHistory(
+    month: string,
+  ): Promise<StudentConsultingHistoricalApplication[]> {
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      throw new Error("STUDENTCONSULTING_HISTORY_MONTH_INVALID");
+    }
+
+    await this.page.goto(`${PROFILE_URL}#!/applications`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30_000,
+    });
+    await this.page.waitForTimeout(5_000);
+    if (!normalizeStudentConsultingProfileAreaUrl(this.page.url())) {
+      throw new Error("STUDENTCONSULTING_APPLICATIONS_LEFT_PROFILE_AREA");
+    }
+    if (!this.page.evaluate) {
+      throw new Error("STUDENTCONSULTING_HISTORY_EVALUATE_UNAVAILABLE");
+    }
+
+    return this.page.evaluate(
+      async (input) => {
+        const browser = globalThis as unknown as {
+          document: { body: unknown };
+          fetch: typeof fetch;
+          angular?: {
+            element(value: unknown): {
+              injector(): {
+                get(name: string): unknown;
+              };
+            };
+          };
+        };
+        const angular = browser.angular;
+        if (!angular) throw new Error("ANGULAR_NOT_AVAILABLE");
+        const injector = angular.element(browser.document.body).injector();
+        const config = injector.get("configSettings") as {
+          apiUrl?: string;
+          accessToken?: string;
+          language?: string;
+        };
+        const apiUrl = String(config.apiUrl ?? "");
+        const accessToken = String(config.accessToken ?? "");
+        if (!apiUrl || !accessToken) throw new Error("PROFILE_API_CONFIG_MISSING");
+        const headers = {
+          accept: "application/json",
+          "accept-language": String(config.language ?? "sv-SE"),
+          authorization: `Bearer ${accessToken}`,
+          "cache-control": "no-cache",
+          pragma: "no-cache",
+        };
+        const response = await browser.fetch(`${apiUrl}user/application`, {
+          method: "GET",
+          headers,
+        });
+        if (!response.ok) {
+          throw new Error(`APPLICATION_HISTORY_HTTP_${response.status}`);
+        }
+        const payload = (await response.json()) as {
+          data?: Array<{
+            id?: number | string;
+            title?: string;
+            applicationTime?: string;
+            status?: string;
+            isPublished?: boolean;
+          }>;
+        };
+        const applications = Array.isArray(payload.data) ? payload.data : [];
+        const selected = applications
+          .map((application) => ({
+            externalId: String(application.id ?? "").trim(),
+            title: String(application.title ?? "").trim(),
+            applicationTime: String(application.applicationTime ?? "").trim(),
+            status: String(application.status ?? "").trim(),
+            isPublished: application.isPublished === true,
+          }))
+          .filter((application) => {
+            if (!/^\d+$/.test(application.externalId)) return false;
+            if (!application.title || !application.applicationTime) return false;
+            if (application.applicationTime.startsWith(input.month)) return true;
+            const parsed = new Date(application.applicationTime);
+            if (Number.isNaN(parsed.valueOf())) return false;
+            return (
+              `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}` ===
+              input.month
+            );
+          });
+
+        const detailed = await Promise.all(
+          selected.slice(0, 50).map(async (application) => {
+            type JobDetails = {
+              location?: {
+                city?: { name?: string };
+                country?: { name?: string; code?: string };
+              };
+              schema?: string;
+              type?: { name?: string };
+              profession?: { freeText?: string; name?: string };
+            };
+            let job: JobDetails | null = null;
+            try {
+              const jobResponse = await browser.fetch(
+                `${apiUrl}jobopening/${encodeURIComponent(application.externalId)}`,
+                { method: "GET", headers },
+              );
+              if (jobResponse.ok) {
+                const jobPayload = (await jobResponse.json()) as { data?: JobDetails | null };
+                job = jobPayload.data ?? null;
+              }
+            } catch {
+              job = null;
+            }
+            const schema = String(job?.schema ?? "").trim();
+            const type = String(job?.type?.name ?? "").trim();
+            return {
+              ...application,
+              location: String(job?.location?.city?.name ?? "").trim() || undefined,
+              country: String(job?.location?.country?.name ?? "").trim() || undefined,
+              countryCode: String(job?.location?.country?.code ?? "").trim() || undefined,
+              scope: schema || type || undefined,
+              occupation:
+                String(job?.profession?.freeText ?? job?.profession?.name ?? "").trim() ||
+                undefined,
+            };
+          }),
+        );
+        return detailed;
+      },
+      { month },
+    );
   }
 
   private async readJob(
