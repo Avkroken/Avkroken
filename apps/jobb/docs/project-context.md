@@ -132,6 +132,7 @@ Aktivitetsrapportering använder användarens egen webbläsare:
 6. efter att Arbetsförmedlingen visar att en aktivitet är sparad bekräftar användaren detta per jobb i Jobb; när föregående månads slutliga rapport visas som inskickad bekräftas även den separat,
 7. Jobb lagrar föregående slutrapport som `submitted` med en spårbar markör för användarbekräftad lokal webbläsarsubmission.
 8. Historiska luckor får repareras read-only från StudentConsultings autentiserade `Ansökningar`-historik. Endast poster som StudentConsulting själv returnerar för den uttryckligen valda månaden får backfillas; reparationsflödet får aldrig skicka en ny ansökan eller bakdatera en ny ansökan.
+9. Databas-backfill och efterregistrering på Arbetsförmedlingens sida är separata state. En redan inskickad månadsrapport kan fortfarande ha `report_activity_items` i `pending` tills användaren faktiskt har lagt in de redan sökta jobben på sidan. Den historiska kön använder de ursprungliga `applied_at`-datumen och får inte ändra rapportstatus från `submitted`.
 
 Probe-lagring får beskriva formulärstruktur men ska inte lagra användarens ifyllda inputvärden.
 

@@ -137,6 +137,8 @@ As soon as the month reaches ten verified applications, Jobb snapshots a monthly
 
 After Arbetsförmedlingen itself shows that the **previous month's** report is submitted, the user selects **Föregående rapport är inskickad** in Jobb. That mutation is authenticated, same-origin protected, and requires an explicit confirmation payload. Jobb then marks that previous report `submitted` with external reference `manual:user-confirmed-local-browser` and completes the waiting run.
 
+A submitted previous report does **not** close the item-level historical queue. If genuine applications are later backfilled from StudentConsulting, Jobb keeps those `report_activity_items` independently pending and exposes them as **Historisk backfill**. The user can add each already-made application to Arbetsförmedlingen with its original application date and confirm it item by item. Marking all historical items saved never downgrades an already `submitted` report back to `ready`.
+
 Legacy Browser Run probe/submission code remains isolated for compatibility but is not used by the dashboard's report workflow.
 
 For historical repair, an operator-only Workflow path can read the authenticated StudentConsulting **Ansökningar** history through StudentConsulting's own `v1/user/application` API, enrich each matching application from `v1/jobopening/:id`, and backfill only source-observed applications for an explicitly named month. The repair path never submits new applications. If the user has separately confirmed that the already-sent Arbetsförmedlingen report is submitted, the same repair can reconcile Jobb's stale `needs_user_auth` report/run state without changing anything at Arbetsförmedlingen.

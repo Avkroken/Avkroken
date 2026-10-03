@@ -462,11 +462,12 @@ export default {
           { status: 400 },
         );
       }
-      if (reportMonth !== currentMonthKey(new Date())) {
+      const currentMonth = currentMonthKey(new Date());
+      if (reportMonth > currentMonth) {
         return Response.json(
           {
             error:
-              "Endast den aktuella månadens aktivitetskö kan markeras som sparad här.",
+              "Framtida aktivitetsmånader kan inte markeras som sparade.",
           },
           { status: 409 },
         );
@@ -499,7 +500,13 @@ export default {
       const saved = Number(progress?.saved ?? 0);
       const total = Number(progress?.total ?? 0);
       if (total >= MONTHLY_APPLICATION_TARGET && saved >= MONTHLY_APPLICATION_TARGET) {
-        await setReportStatus(env.DB, reportMonth, "ready");
+        const reportState = await env.DB
+          .prepare("SELECT status FROM reports WHERE report_month = ?")
+          .bind(reportMonth)
+          .first<{ status: string }>();
+        if (reportState?.status !== "submitted") {
+          await setReportStatus(env.DB, reportMonth, "ready");
+        }
       }
 
       return Response.json({
