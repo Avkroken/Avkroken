@@ -70,7 +70,7 @@ Cloudflare-mutationer för deployment utförs av Workers Builds med Cloudflare-�
 
 Skvallerbyttans Preview har separat Analytics Engine-dataset och separat D1 `skvallerbyttan-stats-preview-eu`, skapad med EU-jurisdiction och bunden endast under `previews`. Production-D1 `skvallerbyttan-stats-eu` återanvänds inte.
 
-Preview-D1 provisionerades 2026-10-01 med befintliga `CLOUDFLARE_API_TOKEN_W1` i Cloudflare Secrets Store utan att exportera secretvärdet. Migrationerna `0001`–`0006` applicerades med Wranglers ordinarie migrationsmotor och idempotenskontrollen gav `No migrations to apply`.
+Preview-D1 provisionerades 2026-10-01 med befintliga `CLOUDFLARE_API_TOKEN_W1` i Cloudflare Secrets Store utan att exportera secretvärdet. Migrationerna `0001`–`0007` är applicerade. Preview-migrationer körs reproducerbart via `wrangler.preview-migrations.jsonc`, som endast innehåller account-/D1-identitet och `migrations_dir`; inga credentials, providerbindings eller service bindings finns i filen.
 
 Preview binder fortsatt inte production Service Bindings, Secrets Store-tokenklasser, GitHub App private key, webhooksecrets, machine read token eller Cloudflare account-tokenklasser. Framtida D1-migrationer ska appliceras på både production och preview innan Preview betraktas som aktuell. Se `../../docs/organization/preview-state-standard.md`.
 
@@ -91,7 +91,7 @@ R1/R2/R3 och GitHub OAuth client secret läses direkt från Cloudflare Secrets S
 
 `SKVALLERBYTTAN_WEBHOOK_SECRET` är fortsatt ett kopplat provider-/runtimevärde. Rotation ska göras samordnat mellan GitHub-webhooken och Cloudflare-runtime och verifieras med en signerad leverans som returnerar HTTP 202.
 
-Runtimekoden verifierar signerade GitHub provider-webhookpayloads och accepterar endast events vars owner matchar current owner-konfigurationen när owner finns i payloaden. Cloudflare Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`.
+Runtimekoden verifierar signerade GitHub provider-webhookpayloads och accepterar endast events vars owner matchar current owner-konfigurationen när owner finns i payloaden. Cloudflare Notifications och Workers Issues använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` via `cf-webhook-auth`; CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET`. Workers Issues-body läses först efter godkänd auth och endast reducerad top-level metadata persisteras. Om `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` saknas returnerar Issues-ingressen `503` innan request-body läses; extern Generic Webhook-destination får därför inte aktiveras förrän runtime-secreten och provider-destinationens secret är synkroniserade.
 
 ### Återställning vid GitHub-webhookstorm
 
@@ -126,6 +126,7 @@ Provider-ingress som runtimekoden stödjer:
 
 - GitHub: `POST /webhooks/github`
 - Cloudflare Notifications: `POST /webhooks/cloudflare/notifications`
+- Cloudflare Workers Issues: `POST /webhooks/cloudflare/issues`
 - Cloudflare CASB: `POST /webhooks/cloudflare/casb`
 
 Provider-webhooks ska inte dupliceras i front-Workern enbart för att driva cacheinvalidation. Skvallerbyttan verifierar providerhändelsen först och skickar därefter en minimal intern signal till berörd konsument.
@@ -162,7 +163,7 @@ RPC:n:
 
 Eftersom Portalens Worker-konfiguration refererar till en named entrypoint måste en produktionsutrullning ske i beroendeordning: deploya först den mergade Skvallerbyttan-versionen som exporterar `PortalObservationsService`, verifiera dess Worker-deploy, och deploya därefter Portal-versionen som binder till entrypointen. Skvallerbyttan-versionen med `getPublicRepositories`, `getPublicDocumentationIndex`, `getPublicRepositoryReleases`, `getPublicRepositoryCi`, `getPublicActivity` och `getPublicReleaseDeployments` måste vara deployad innan Portal förlitar sig på dessa RPC-metoder. Portalens repository/docs/release-läsningar har snäva credential-fria GitHub-fallbacks under rollout/degraded state; CI/Activity och release-deployment-korrelation har ingen sådan providerfallback. Releaser kan visas även när deploymentkorrelationen är `unavailable`.
 
-Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/CASB.
+Cloudflare Audit Logs och den schemalagda reconciliation-körningen fortsätter vara safety net för händelser som inte levereras via Notifications/Workers Issues/CASB.
 
 ### Portal Activity RPC
 

@@ -63,6 +63,23 @@ test("Cloudflare webhook activity keeps observed count semantics explicit", () =
 });
 
 
+test("Workers Issues webhook activity maps to the Workers capability", () => {
+  const event = activityFromCloudflareWebhook({
+    deliveryId: "cf-issue-1",
+    source: "issues",
+    eventType: "workers_issue",
+    eventId: "issue-1",
+    state: "ALERT_STATE_EVENT_START",
+    occurredAt: "2026-10-03T16:00:00.000Z",
+    receivedAt: "2026-10-03T16:00:01.000Z",
+  });
+
+  assert.equal(event.capability, "cloudflare.avkroken.workers");
+  assert.equal(event.resourceType, "issues");
+  assert.equal(event.resourceId, "issue-1");
+  assert.equal(event.source, "webhook");
+});
+
 test("Cloudflare audit activity is classified without raw audit payloads", () => {
   const event = activityFromCloudflareAudit({
     id: "audit-42",

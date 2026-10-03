@@ -17,7 +17,7 @@ D1/R2 blir isolerade först när Preview binds mot andra resurser än production
 | --- | --- | --- | --- | --- |
 | Jobb | `DB` | `jobb-preview-eu` | EU | provisionerad, migration `0001`–`0006` applicerad |
 | Jobb | `EVIDENCE` | `jobb-evidence-preview` | EU | provisionerad |
-| Skvallerbyttan | `STATS_DB` | `skvallerbyttan-stats-preview-eu` | EU | provisionerad, migration `0001`–`0006` applicerad |
+| Skvallerbyttan | `STATS_DB` | `skvallerbyttan-stats-preview-eu` | EU | provisionerad, migration `0001`–`0007` applicerad |
 | Skvallerbyttan | `OBSERVABILITY` | `skvallerbyttan_preview` | providerdataset | konfigurerad |
 
 Dessa namn ska inte återanvändas av production.
@@ -43,8 +43,8 @@ zone edge-preview fick Secrets Store-bindingen och exponerade endast hårdkodade
 de tre beslutade resursnamnen. Den temporära Workern och lokala filer togs bort direkt efteråt.
 
 Båda D1-databaserna skapades med `jurisdiction=eu`; R2-bucketen skapades med EU-jurisdiction. Jobbs migrationer
-`0001`–`0006` och Skvallerbyttans `0001`–`0006` applicerades därefter med Wranglers ordinarie
-migrationsmotor. En separat temporär edge-preview proxy tillät endast D1 `POST .../query` mot exakt de två
+`0001`–`0006` och Skvallerbyttans `0001`–`0007` är applicerade med Wranglers ordinarie
+migrationsmotor. Skvallerbyttan använder `apps/skvallerbyttan/wrangler.preview-migrations.jsonc` för att rikta migrationskommandot explicit mot samma separata Preview-D1 som `previews.d1_databases`; filen innehåller inga secrets. En separat temporär edge-preview proxy tillät endast D1 `POST .../query` mot exakt de två
 preview-UUID:erna och injicerade W1 inne i Cloudflare. Efter applicering gav båda databaserna
 `No migrations to apply` vid idempotenskontroll.
 

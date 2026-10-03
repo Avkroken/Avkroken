@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 
-export type CloudflareEventSource = "notifications" | "casb";
+export type CloudflareEventSource = "notifications" | "casb" | "issues";
 
 export type CloudflareEventRecord = {
   deliveryId: string;

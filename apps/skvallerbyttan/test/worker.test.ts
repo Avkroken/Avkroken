@@ -28,7 +28,11 @@ test("legacy webhook endpoint is gone instead of redirecting to login", async ()
 
 
 test("Cloudflare webhook endpoints stay outside dashboard login but fail closed when unconfigured", async () => {
-  for (const path of ["/webhooks/cloudflare/notifications", "/webhooks/cloudflare/casb"]) {
+  for (const path of [
+    "/webhooks/cloudflare/notifications",
+    "/webhooks/cloudflare/issues",
+    "/webhooks/cloudflare/casb",
+  ]) {
     const response = await worker.fetch(
       new Request(`https://skvallerbyttan.denied.se${path}`, { method: "POST" }),
       {} as Env,

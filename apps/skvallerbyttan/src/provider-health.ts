@@ -219,6 +219,9 @@ export function getProviderHealth(
           notificationsConfigured: Boolean(
             env.CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET?.trim() && env.STATS_DB,
           ),
+          issuesIngressConfigured: Boolean(
+            env.CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET?.trim() && env.STATS_DB,
+          ),
           casbConfigured: Boolean(
             env.CLOUDFLARE_CASB_WEBHOOK_SECRET?.trim() && env.STATS_DB,
           ),

@@ -79,7 +79,7 @@ Runtime binder `CLOUDFLARE_API_TOKEN_R1`, `CLOUDFLARE_API_TOKEN_R2` och `CLOUDFL
 
 Produktionsdeployment utförs av Cloudflare Workers Builds med Cloudflare-ägd buildidentitet. GitHub Actions bär ingen Cloudflare deploycredential och synkar inte runtime-secrets till Workern.
 
-Cloudflare-account-ID är versionerad icke-hemlig config. GitHub- och Cloudflare-webhooks använder var sitt canonical secret; Notifications och CASB delar Cloudflare-webhooksecretet. Runtime implementerar push-ingress för Cloudflare Notifications/CASB samt read-paths för Audit Logs och reconciliation. Faktisk Cloudflare webhookkonfiguration är extern providerstate. Observationskoden använder inga provider-write-operationer.
+Cloudflare-account-ID är versionerad icke-hemlig config. GitHub- och Cloudflare-webhooks använder var sitt canonical secret. Cloudflare Notifications och Workers Issues använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` via `cf-webhook-auth`; CASB använder sitt befintliga separata secret. Runtime implementerar push-ingress för Cloudflare Notifications, Workers Issues och CASB samt read-paths för Audit Logs och reconciliation. Workers Issues-ingressen läser request-body först efter godkänd webhook-auth och persisterar endast en explicit top-level allowlist; `text`, `data`, stack traces, loggar och request-/application-context lagras inte. Faktisk Cloudflare webhookkonfiguration är extern providerstate. Observationskoden använder inga provider-write-operationer.
 
 ## Interna event-signaler
 
@@ -117,7 +117,7 @@ För operativ drift gäller dessutom:
 
 Produktionsbindingen `STATS_DB` ska peka på en D1-databas skapad med Cloudflare-jurisdiction `eu`. Jurisdiction är providerstate som sätts vid databasskapande och ska verifieras live vid replacement/cutover.
 
-D1 används för persistent state, cache, detailed events och reconciliation state. `0004_cloudflare_events.sql` innehåller Cloudflare-eventledgern, `0005_observations.sql` introducerar capability observations och generic Activity ledger, och `0006_capability_scope_observations.sql` lägger till repository-scopeade capability observations, scope coverage samt provider-accepterad permissionmetadata. Produktionsdeploy ska applicera samtliga väntande versionerade D1-migrationer via Wrangler före Worker-deploy.
+D1 används för persistent state, cache, detailed events och reconciliation state. `0004_cloudflare_events.sql` introducerar Cloudflare-eventledgern, `0005_observations.sql` introducerar capability observations och generic Activity ledger, `0006_capability_scope_observations.sql` lägger till repository-scopeade capability observations, scope coverage samt provider-accepterad permissionmetadata och `0007_cloudflare_issue_events.sql` utökar den reducerade Cloudflare-eventkällan med `issues` utan att lägga till rå diagnostik. Produktionsdeploy ska applicera samtliga väntande versionerade D1-migrationer via Wrangler före Worker-deploy.
 
 Workers Analytics Engine dataset `skvallerbyttan_observability` tar read telemetry med consumer-attribution.
 

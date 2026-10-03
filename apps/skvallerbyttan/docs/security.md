@@ -93,7 +93,7 @@ Audit Log-normalisering har regressionstest för dessa gränser.
 
 ### Cloudflare
 
-`/webhooks/cloudflare/notifications` och `/webhooks/cloudflare/casb` är runtime-endpoints för Cloudflare-händelser från dessa mekanismer; faktisk providerkonfiguration är extern state. Befintliga Worker secrets återanvänds: Notifications använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och verifierar `cf-webhook-auth`; CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET` och verifierar den statiska headern `x-skvallerbyttan-casb-auth`.
+`/webhooks/cloudflare/notifications`, `/webhooks/cloudflare/issues` och `/webhooks/cloudflare/casb` är runtime-endpoints för Cloudflare-händelser från dessa mekanismer; faktisk providerkonfiguration är extern state. Befintliga Worker secrets återanvänds: Notifications och Workers Issues använder `CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET` och verifierar `cf-webhook-auth`; CASB använder `CLOUDFLARE_CASB_WEBHOOK_SECRET` och verifierar den statiska headern `x-skvallerbyttan-casb-auth`. Workers Issues-endpointen failar stängt: body läses inte före verifierad auth, och efter verifiering normaliseras endast `alert_type`, `alert_correlation_id`, `alert_event`, `account_id`, `policy_id` och `ts`. `text`, `data`, `name`, `policy_name`, stack traces, loggar, request-metadata och application context sparas eller återges aldrig.
 
 Godtyckliga webhookpayloads lagras inte. Endast explicit normaliserad metadata går till D1.
 

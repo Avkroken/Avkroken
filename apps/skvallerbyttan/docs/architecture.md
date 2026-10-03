@@ -17,6 +17,7 @@ GitHub org webhook ────────┤
                      Skvallerbyttan
 Cloudflare APIs ───────────┤
 CF Notifications webhook ──┤
+CF Workers Issues webhook ──┤
 CF CASB webhook ────────────┤
 CF Audit Logs ──────────────┘
                            │
@@ -58,7 +59,7 @@ När ett signerat GitHub-event ändrar `README.md` eller `docs/**` på repositor
 
 Repository-events signalerar också portalens dokumentationskatalog, inklusive tidigare repositorynamn vid rename. Service-signalen sker före webhook-dedupliceringen så en manuell GitHub-redelivery kan reparera en tidigare misslyckad portalinvalidering utan att dubbellagra Activity-eventet.
 
-Koden har ingressvägar för Cloudflare Notifications/CASB och read-paths för Audit Logs/reconciliation. Vilka externa providerintegrationer som faktiskt är aktiva är Cloudflare-state och fastställs inte av repositoryt.
+Koden har ingressvägar för Cloudflare Notifications, Workers Issues och CASB samt read-paths för Audit Logs/reconciliation. Workers Issues-ingressen använder samma Cloudflare `cf-webhook-auth`-secret som Notifications men en separat endpoint och separat normaliserad event source. Diagnostisk issue-context tillåts inte passera ingressens allowlist till D1 eller Activity. Vilka externa providerintegrationer som faktiskt är aktiva är Cloudflare-state och fastställs inte av repositoryt.
 
 Operativ liveness följer motsatt riktning mot klassiska health-checks: Skvallerbyttan skickar heartbeat var 15:e minut genom `AVKROKEN_OPERATIONS` till `avkroken`/`OperationalHeartbeatService`. Receiver-state ligger i portalens Durable Object och är därmed inte beroende av Skvallerbyttans egen D1 eller HTTP-route. Utebliven leverans efter 35 minuter genererar notifiering från mottagarsidan.
 
@@ -170,7 +171,7 @@ Cloudflare-klienten använder ett account-scopat API-token med endast read-permi
 - R2 bucket inventory
 - Access applications och begränsad policymetadata
 - Tunnels
-- Notifications/CASB
+- Notifications/Workers Issues/CASB
 - Audit Logs
 
 D1 queries, KV values och R2 object content läses inte för inventory-funktionerna. Worker secret binding values returneras inte.
@@ -204,7 +205,7 @@ Source-prioritet:
 3. snapshot diff
 4. reconciliation
 
-Den generella ledgern kan normalisera GitHub-webhookevent, Cloudflare Notifications/CASB och Cloudflare Audit Logs. Coverage anges explicit. Webhookdata är normalt `since_first_observation`; Audit Log-ingest markeras `partial`. Downstream-signaler till andra Avkroken-tjänster är effekter av redan verifierade events och är inte en ny provider-källa.
+Den generella ledgern kan normalisera GitHub-webhookevent, Cloudflare Notifications/Workers Issues/CASB och Cloudflare Audit Logs. Coverage anges explicit. Webhookdata är normalt `since_first_observation`; Audit Log-ingest markeras `partial`. Downstream-signaler till andra Avkroken-tjänster är effekter av redan verifierade events och är inte en ny provider-källa.
 
 ## Reads
 
