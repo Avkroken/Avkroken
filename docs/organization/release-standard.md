@@ -51,8 +51,8 @@ PR
   -> merge till main
   -> samma main-SHA verifieras av push-CI
   -> semantic release beräknar högsta nödvändiga SemVer-bump
-  -> immutable SemVer-tagg
-  -> GitHub Release
+  -> GitHub Release skapas som draft
+  -> draften publiceras och låser immutable SemVer-taggen
 ```
 
 En merge utan releasevärdig förändring skapar ingen release.
@@ -64,7 +64,9 @@ Releasejobbet:
 - kräver de checks som listas i `.github/release-required-checks`;
 - publicerar aldrig innan dessa checks observerats och passerat på release-target SHA;
 - vägrar avancera från en SemVer-tagg som saknar motsvarande GitHub Release;
-- använder full Git-historik och endast releaseankare som är nåbara från release-target.
+- använder full Git-historik och endast releaseankare som är nåbara från release-target;
+- skapar alltid den nya GitHub Release som draft och publicerar först därefter, så att immutable release-låsningen sker atomiskt vid publicering;
+- återanvänder aldrig ett taggnamn som GitHub markerar som permanent förbrukat av en tidigare immutable release. Om ett normalt patch/minor/major- eller RC-taggnamn är tombstonat avancerar releasern inom samma versionsklass och försöker nästa namn; promotion av en aktiv RC failar däremot stängt eftersom den inte får byta versionskärna.
 
 För första release i ett repository utan tidigare SemVer-tagg används `.github/release-baseline` som explicit historikgräns.
 

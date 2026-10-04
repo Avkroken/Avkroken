@@ -8,6 +8,8 @@ on:
       - ".github/workflows/copilot-release-notes.yml"
       - ".github/release-notes-instructions.md"
       - ".github/scripts/semantic_release.py"
+      - ".github/scripts/publish_release.py"
+      - ".github/scripts/test_publish_release.py"
       - ".github/scripts/wait_for_checks.py"
       - ".github/scripts/test_wait_for_checks.py"
       - ".github/release-baseline"
@@ -56,8 +58,11 @@ jobs:
           test -s .github/release-notes-instructions.md
           python3 -m py_compile \
             .github/scripts/semantic_release.py \
+            .github/scripts/publish_release.py \
+            .github/scripts/test_publish_release.py \
             .github/scripts/wait_for_checks.py \
             .github/scripts/test_wait_for_checks.py
+          python3 .github/scripts/test_publish_release.py
           python3 .github/scripts/test_wait_for_checks.py
           python3 .github/scripts/semantic_release.py \
             --forced-bump auto \
@@ -172,30 +177,25 @@ jobs:
             --required-checks-file ".github/release-required-checks"
 
       - name: Create GitHub release
+        id: publish
         if: ${{ steps.release.outputs.release == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
           TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+          BUMP: ${{ steps.release.outputs.bump }}
           PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
           set -euo pipefail
-          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "Release ${TAG} already exists; nothing to do."
-            exit 0
-          fi
-          args=(
-            "${TAG}"
-            --repo "${GITHUB_REPOSITORY}"
-            --target "${TARGET_SHA}"
-            --title "${TAG}"
-            --notes-file "${RUNNER_TEMP}/release-notes.md"
-          )
-          if [[ "${PRERELEASE}" == "true" ]]; then
-            args+=(--prerelease)
-          fi
-          gh release create "${args[@]}"
+          python3 .github/scripts/publish_release.py \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${TAG}" \
+            --target-sha "${TARGET_SHA}" \
+            --notes "${RUNNER_TEMP}/release-notes.md" \
+            --bump "${BUMP}" \
+            --prerelease "${PRERELEASE}" \
+            --output "${GITHUB_OUTPUT}"
 
       - name: Prepare Copilot release metadata
         continue-on-error: true
