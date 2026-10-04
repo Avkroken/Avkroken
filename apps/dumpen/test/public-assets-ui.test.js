@@ -4,39 +4,56 @@ import test from "node:test";
 import {
   bindAssetFilterChanges,
   filterAssetCards,
+  filterAssetRecords,
   publicAssetsScript,
+  resolveAssetFilter,
 } from "../src/public-assets-ui.js";
 
 function card(app, size, theme) {
   return { dataset: { app, size, theme }, hidden: false };
 }
 
-test("asset filters combine app, pixel size and theme and report visible count", () => {
+test("asset filters browse apps by default and use 1254 when only app or theme is selected", () => {
   const cards = [
-    card("plex", "256", "1"),
+    card("plex", "1254", "1"),
     card("plex", "512", "1"),
     card("plex", "256", "2"),
-    card("sonarr", "256", "1"),
+    card("sonarr", "1254", "1"),
   ];
 
-  let result = filterAssetCards(cards, { app: "plex" });
-  assert.equal(result.visible, 3);
-  assert.equal(result.message, "3 bilder matchar filtret.");
-  assert.deepEqual(cards.map((item) => item.hidden), [false, false, false, true]);
+  let result = filterAssetCards(cards);
+  assert.equal(result.browseApps, true);
+  assert.equal(result.visible, 0);
+  assert.equal(result.message, "");
+  assert.deepEqual(cards.map((item) => item.hidden), [true, true, true, true]);
 
-  result = filterAssetCards(cards, { app: "plex", size: "256" });
+  result = filterAssetCards(cards, { app: "plex" });
+  assert.equal(result.effectiveSize, "1254");
+  assert.equal(result.visible, 1);
+  assert.equal(result.message, "1 bild visas.");
+  assert.deepEqual(cards.map((item) => item.hidden), [false, true, true, true]);
+
+  result = filterAssetCards(cards, { theme: "1" });
   assert.equal(result.visible, 2);
-  assert.deepEqual(cards.map((item) => item.hidden), [false, true, false, true]);
+  assert.deepEqual(cards.map((item) => item.hidden), [false, true, true, false]);
 
   result = filterAssetCards(cards, { app: "plex", size: "256", theme: "2" });
   assert.equal(result.visible, 1);
-  assert.equal(result.message, "1 bild matchar filtret.");
   assert.deepEqual(cards.map((item) => item.hidden), [true, true, false, true]);
+});
 
-  result = filterAssetCards(cards);
-  assert.equal(result.visible, 4);
-  assert.equal(result.message, "");
-  assert.deepEqual(cards.map((item) => item.hidden), [false, false, false, false]);
+test("explicit alla storlekar removes the implicit 1254 restriction", () => {
+  const assets = [
+    { appCategory: "plex", pixelSize: 1254, theme: "1" },
+    { appCategory: "plex", pixelSize: 512, theme: "1" },
+    { appCategory: "plex", pixelSize: 256, theme: "1" },
+  ];
+
+  assert.deepEqual(resolveAssetFilter({ app: "plex" }), {
+    app: "plex", size: "", theme: "", browseApps: false, effectiveSize: "1254",
+  });
+  assert.equal(filterAssetRecords(assets, { app: "plex" }).length, 1);
+  assert.equal(filterAssetRecords(assets, { app: "plex", size: "all" }).length, 3);
 });
 
 test("each asset filter select binds the change handler used by the browser script", () => {
@@ -56,7 +73,9 @@ test("each asset filter select binds the change handler used by the browser scri
   assert.equal(applied, 3);
 
   const script = publicAssetsScript();
-  assert.match(script, /filterAssetCards\(document\.querySelectorAll/);
+  assert.match(script, /filterAssetRecords/);
   assert.match(script, /bindAssetFilterChanges\(/);
-  assert.match(script, /asset\.themeLabel/);
+  assert.match(script, /findPreview/);
+  assert.match(script, /pixelSize===256/);
+  assert.match(script, /replace-app-assets/);
 });

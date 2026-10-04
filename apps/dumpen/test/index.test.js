@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { claimTicket } from "../src/index.js";
 import { handleGitHubCallback, startGitHubLogin } from "../src/github-auth.js";
-import { listPublicAssets, safeAssetName } from "../src/public-assets.js";
+import { classifyAppAssetUploadName, listPublicAssets, pngDimensions, safeAssetName } from "../src/public-assets.js";
 
 const TOKEN = "test-token";
 const GITHUB_USER_ID = 123;
@@ -171,6 +171,62 @@ async function mintAssetTicket(e, targetKey, adminCookie = ADMIN_COOKIE) {
 
 const PNG_BODY = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
 
+const TEST_PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let value = 0; value < table.length; value += 1) {
+    let crc = value;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+    }
+    table[value] = crc >>> 0;
+  }
+  return table;
+})();
+
+function testPngCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = TEST_PNG_CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data = new Uint8Array()) {
+  const typeBytes = new TextEncoder().encode(type);
+  const bytes = new Uint8Array(12 + data.byteLength);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, data.byteLength, false);
+  bytes.set(typeBytes, 4);
+  bytes.set(data, 8);
+  view.setUint32(8 + data.byteLength, testPngCrc32(bytes.slice(4, 8 + data.byteLength)), false);
+  return bytes;
+}
+
+function pngBody(width, height) {
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, width, false);
+  headerView.setUint32(4, height, false);
+  header.set([8, 6, 0, 0, 0], 8);
+
+  const chunks = [
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01])),
+    pngChunk("IEND"),
+  ];
+  const total = signature.byteLength + chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  bytes.set(signature, offset);
+  offset += signature.byteLength;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
 const versions = [
   { key: "regelverk/1000.zip", uploaded: new Date(1000), body: "old" },
   { key: "regelverk/3000.zip", uploaded: new Date(3000), body: "new" },
@@ -184,7 +240,7 @@ test("root visar privat dashboard och engångsticket-flöde", async () => {
   assert.match(html, /dumpen\.denied\.se/);
   assert.match(html, /Privat kontrollpanel/);
   assert.match(html, /engångsticket/i);
-  assert.match(html, /publika direktlänkade assets/);
+  assert.match(html, /publika assets/);
   assert.match(html, /--bg:#04070e/);
   assert.match(html, /value="legacy">Legacy/);
   assert.match(html, /20 MB per fil/);
@@ -615,6 +671,7 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(listed.assets.length, 2);
   const plex = listed.assets.find((item) => item.key === "apps/plex/plex-1-256.png");
   assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-1-256.png");
+  assert.match(plex.previewUrl, /^https:\/\/logos\.denied\.se\/apps\/plex\/plex-1-256\.png\?v=/);
   assert.equal(plex.image, true);
   assert.equal(plex.contentType, "image/png");
   assert.equal(plex.appCategory, "plex");
@@ -623,6 +680,111 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(plex.themeLabel, "Neon Glass");
   assert.equal(plex.pixelSize, 256);
   assert.equal(plex.pixelLabel, "256×256");
+});
+
+test("appbildsnamn normaliseras till canonical nyckel och förväntad storlek", () => {
+  assert.deepEqual(classifyAppAssetUploadName("qbittorrent-t4-1254x1254.png"), {
+    app: "qbittorrent",
+    appLabel: "qBittorrent",
+    theme: "4",
+    themeLabel: "Illustrated Scene",
+    pixelSize: 1254,
+    pixelLabel: "1254×1254",
+    canonicalName: "qbittorrent-4.png",
+    key: "apps/qbittorrent/qbittorrent-4.png",
+    mirrorKey: "hotlink-ok/apps/qbittorrent/qbittorrent-4.png",
+  });
+  assert.equal(classifyAppAssetUploadName("plex-2-512.png")?.key, "apps/plex/plex-2-512.png");
+  assert.equal(classifyAppAssetUploadName("unknown-t1-1254x1254.png"), null);
+});
+
+test("PNG-validering kräver komplett chunkstruktur och korrekta CRC", () => {
+  const valid = pngBody(1254, 512);
+  assert.deepEqual(pngDimensions(valid), { width: 1254, height: 512 });
+  assert.equal(pngDimensions(new Uint8Array([1, 2, 3])), null);
+  assert.equal(pngDimensions(valid.slice(0, -1)), null);
+
+  const corrupt = valid.slice();
+  corrupt[corrupt.length - 1] ^= 0xff;
+  assert.equal(pngDimensions(corrupt), null);
+});
+
+test("adminupload kategoriserar känd appbild till canonical och mirror", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.categorized, true);
+  assert.equal(result.replaced, false);
+  assert.equal(result.asset.key, "apps/plex/plex-2.png");
+  assert.equal(result.asset.theme, "2");
+  assert.equal(result.asset.pixelSize, 1254);
+  assert.equal(result.mirrorKey, "hotlink-ok/apps/plex/plex-2.png");
+  assert.equal(assets.has("apps/plex/plex-2.png"), true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), true);
+});
+
+test("kategoriserad appupload rullar tillbaka ny spegel om canonical write misslyckas", async () => {
+  const assets = fakeR2();
+  const originalPut = assets.put.bind(assets);
+  assets.put = async (key, body, options = {}) => {
+    if (key === "apps/plex/plex-2.png") throw new Error("simulated canonical put failure");
+    return originalPut(key, body, options);
+  };
+
+  await assert.rejects(
+    () => worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+      method: "PUT",
+      body: pngBody(1254, 1254),
+      headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+    }), env(fakeR2(), assets)),
+    /simulated canonical put failure/,
+  );
+  assert.equal(assets.has("apps/plex/plex-2.png"), false);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), false);
+});
+
+test("kategoriserad appupload nekar fel pixelmått", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/upload/plex-t2-512x512.png", {
+    method: "PUT",
+    body: pngBody(256, 256),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 422);
+  assert.equal(assets.keys().length, 0);
+});
+
+test("kategoriserad appupload kräver explicit ersättning för befintlig canonical", async () => {
+  const assets = fakeR2([{
+    key: "apps/plex/plex-2.png",
+    uploaded: new Date("2026-10-04T00:00:00Z"),
+    body: pngBody(1254, 1254),
+    httpMetadata: { contentType: "image/png" },
+  }]);
+
+  const denied = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+  assert.equal(denied.status, 409);
+
+  const replaced = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png?replace=1", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+  assert.equal(replaced.status, 201);
+  const result = await replaced.json();
+  assert.equal(result.replaced, true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), true);
 });
 
 test("objektlista kräver admininloggning", async () => {
@@ -695,22 +857,25 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
-  assert.match(adminHtml, /Publika filer och bilder/);
-  assert.match(adminHtml, /Cloudflare App Launcher/);
-  assert.match(adminHtml, /Kopiera länk/);
+  assert.match(adminHtml, />Bilder </);
+  assert.match(adminHtml, /id="asset-app-grid"/);
+  assert.match(adminHtml, /id="asset-other-files"/);
+  assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);
-  assert.match(adminHtml, /Appkategori/);
-  assert.match(adminHtml, /Pixelstorlek/);
-  assert.match(adminHtml, /Alla teman/);
+  assert.match(adminHtml, />App\s*</);
+  assert.match(adminHtml, />Tema\s*</);
+  assert.match(adminHtml, />Storlek\s*</);
+  assert.match(adminHtml, /Original 1254/);
+  assert.match(adminHtml, /id="replace-app-assets"/);
+  assert.match(adminHtml, /findPreview/);
+  assert.match(adminHtml, /pixelSize===256/);
   assert.match(adminHtml, /asset\.appCategory/);
   assert.match(adminHtml, /asset\.theme/);
   assert.match(adminHtml, /asset\.pixelSize/);
-  assert.match(adminHtml, /naturalWidth/);
-  assert.match(adminHtml, / px · /);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
-  assert.match(adminHtml, /await loadObjects\(\);\s*\$\('#asset-status'\)\.textContent=done\+/);
+  assert.match(adminHtml, /appbilder kategoriserade/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });
