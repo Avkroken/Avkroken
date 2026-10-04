@@ -36,5 +36,20 @@ test("Dumpen main pages use Legacy fallback and expose the selector", () => {
     assert.match(html, /id="theme-select"/);
     assert.match(html, /value="legacy">Legacy/);
     assert.match(html, /value="blackout">Blackout/);
+    assert.match(html, /Avkroken \/ Dumpen/);
+    assert.match(html, /class="gradient-text">DUMPEN/);
+    assert.match(html, /R2 · Transferer · Assets/);
   }
+});
+
+test("Dumpen front page follows the shared Avkroken landing-page structure", () => {
+  const html = publicPage();
+
+  assert.match(html, /class="brand-mini"/);
+  assert.match(html, /class="brand-dot"/);
+  assert.match(html, /class="hero"/);
+  assert.match(html, /class="manifesto"/);
+  assert.match(html, /class="access-card"/);
+  assert.match(html, /class="info-grid"/);
+  assert.match(html, /class="button-link" href="\/admin"/);
 });
