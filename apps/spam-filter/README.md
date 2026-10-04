@@ -8,13 +8,9 @@ The Worker receives the domain catch-all, rejects configured senders/domains, an
 
 - `MAIL_FORWARD_TO` — required Worker secret containing the verified forwarding destination.
 - `MAIL_DOMAIN` — receiving domain.
-- `BLOCKED_SENDERS` — optional Worker secret containing comma/newline-separated exact sender addresses.
-- `BLOCKED_DOMAINS` — optional Worker secret containing comma/newline-separated domains; subdomains are included.
+- `BLOCKED_SENDERS` — optional comma/newline-separated exact sender addresses.
+- `BLOCKED_DOMAINS` — optional comma/newline-separated domains; subdomains are included.
 - `REJECT_MESSAGE` — SMTP rejection text.
-
-Standards-compliant delivery failure notifications use a null SMTP reverse-path (`MAIL FROM:<>`). The Worker rejects null reverse-path messages before forwarding, so normal bounce traffic does not need sender-specific blocklist entries.
-
-Private blocklists are runtime state and must not be committed to `wrangler.jsonc`. Configure non-empty blocklists as Worker secrets; Wrangler preserves existing secret bindings across code deployments when they are not replaced by tracked plaintext vars.
 
 The Email Routing trigger `*@denied.se` is provider-managed state in Cloudflare and is intentionally **not** declared through Wrangler. Omitting top-level `addresses` prevents `wrangler deploy` from modifying Email Routing rules, so Workers Builds can deploy code without requiring Email Routing write access or trying to take over the existing catch-all rule.
 
