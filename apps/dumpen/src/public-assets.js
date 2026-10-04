@@ -150,20 +150,116 @@ export function classifyAppAssetUploadName(value) {
   };
 }
 
+const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+const PNG_CRITICAL_CHUNKS = new Set(["IHDR", "PLTE", "IDAT", "IEND"]);
+const PNG_BIT_DEPTHS = new Map([
+  [0, new Set([1, 2, 4, 8, 16])],
+  [2, new Set([8, 16])],
+  [3, new Set([1, 2, 4, 8])],
+  [4, new Set([8, 16])],
+  [6, new Set([8, 16])],
+]);
+
+const PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let value = 0; value < table.length; value += 1) {
+    let crc = value;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+    }
+    table[value] = crc >>> 0;
+  }
+  return table;
+})();
+
+function pngCrc32(bytes, start, end) {
+  let crc = 0xffffffff;
+  for (let index = start; index < end; index += 1) {
+    crc = PNG_CRC_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
 export function pngDimensions(body) {
   const bytes = body instanceof Uint8Array ? body : new Uint8Array(body);
-  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
-  if (bytes.byteLength < 24 || !signature.every((value, index) => bytes[index] === value)) {
+  if (bytes.byteLength < 45
+      || !PNG_SIGNATURE.every((value, index) => bytes[index] === value)) {
     return null;
   }
-  if (bytes[12] !== 73 || bytes[13] !== 72 || bytes[14] !== 68 || bytes[15] !== 82) {
-    return null;
-  }
+
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {
-    width: view.getUint32(16, false),
-    height: view.getUint32(20, false),
-  };
+  let offset = PNG_SIGNATURE.length;
+  let width = 0;
+  let height = 0;
+  let colorType = null;
+  let seenHeader = false;
+  let seenPalette = false;
+  let seenImageData = false;
+  let imageDataEnded = false;
+  let seenEnd = false;
+
+  while (offset + 12 <= bytes.byteLength) {
+    const length = view.getUint32(offset, false);
+    const typeOffset = offset + 4;
+    const dataOffset = offset + 8;
+    const crcOffset = dataOffset + length;
+    const nextOffset = crcOffset + 4;
+    if (nextOffset > bytes.byteLength) return null;
+
+    const type = String.fromCharCode(
+      bytes[typeOffset],
+      bytes[typeOffset + 1],
+      bytes[typeOffset + 2],
+      bytes[typeOffset + 3],
+    );
+    if (pngCrc32(bytes, typeOffset, crcOffset) !== view.getUint32(crcOffset, false)) {
+      return null;
+    }
+
+    const critical = (bytes[typeOffset] & 0x20) === 0;
+    if (critical && !PNG_CRITICAL_CHUNKS.has(type)) return null;
+
+    if (!seenHeader) {
+      if (type !== "IHDR" || length !== 13) return null;
+      width = view.getUint32(dataOffset, false);
+      height = view.getUint32(dataOffset + 4, false);
+      const bitDepth = bytes[dataOffset + 8];
+      colorType = bytes[dataOffset + 9];
+      const compression = bytes[dataOffset + 10];
+      const filter = bytes[dataOffset + 11];
+      const interlace = bytes[dataOffset + 12];
+      if (!width || !height
+          || !PNG_BIT_DEPTHS.get(colorType)?.has(bitDepth)
+          || compression !== 0
+          || filter !== 0
+          || (interlace !== 0 && interlace !== 1)) {
+        return null;
+      }
+      seenHeader = true;
+    } else if (type === "IHDR") {
+      return null;
+    } else if (type === "PLTE") {
+      if (seenPalette || seenImageData || length === 0 || length % 3 !== 0 || length > 768) {
+        return null;
+      }
+      seenPalette = true;
+    } else if (type === "IDAT") {
+      if (imageDataEnded || (colorType === 3 && !seenPalette)) return null;
+      seenImageData = true;
+    } else if (seenImageData && type !== "IEND") {
+      imageDataEnded = true;
+    }
+
+    offset = nextOffset;
+    if (type === "IEND") {
+      if (length !== 0 || !seenImageData) return null;
+      seenEnd = true;
+      break;
+    }
+  }
+
+  if (!seenHeader || !seenImageData || !seenEnd || offset !== bytes.byteLength) return null;
+  return { width, height };
 }
 
 function appAssetMetadata(key) {
@@ -371,7 +467,13 @@ export async function uploadPublicAsset(
       };
     }
 
-    const canonicalResult = await bucket.put(target.key, body, conditional);
+    let canonicalResult;
+    try {
+      canonicalResult = await bucket.put(target.key, body, conditional);
+    } catch (error) {
+      if (!overwriteAppAsset) await bucket.delete(target.mirrorKey);
+      throw error;
+    }
     if (canonicalResult === null) {
       if (!overwriteAppAsset) await bucket.delete(target.mirrorKey);
       return {

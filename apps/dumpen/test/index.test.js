@@ -171,13 +171,59 @@ async function mintAssetTicket(e, targetKey, adminCookie = ADMIN_COOKIE) {
 
 const PNG_BODY = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
 
-function pngBody(width, height) {
-  const bytes = new Uint8Array(24);
-  bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
-  bytes.set([73, 72, 68, 82], 12);
+const TEST_PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let value = 0; value < table.length; value += 1) {
+    let crc = value;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+    }
+    table[value] = crc >>> 0;
+  }
+  return table;
+})();
+
+function testPngCrc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc = TEST_PNG_CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data = new Uint8Array()) {
+  const typeBytes = new TextEncoder().encode(type);
+  const bytes = new Uint8Array(12 + data.byteLength);
   const view = new DataView(bytes.buffer);
-  view.setUint32(16, width, false);
-  view.setUint32(20, height, false);
+  view.setUint32(0, data.byteLength, false);
+  bytes.set(typeBytes, 4);
+  bytes.set(data, 8);
+  view.setUint32(8 + data.byteLength, testPngCrc32(bytes.slice(4, 8 + data.byteLength)), false);
+  return bytes;
+}
+
+function pngBody(width, height) {
+  const signature = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, width, false);
+  headerView.setUint32(4, height, false);
+  header.set([8, 6, 0, 0, 0], 8);
+
+  const chunks = [
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", new Uint8Array([0x78, 0x9c, 0x03, 0x00, 0x00, 0x00, 0x00, 0x01])),
+    pngChunk("IEND"),
+  ];
+  const total = signature.byteLength + chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  bytes.set(signature, offset);
+  offset += signature.byteLength;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
   return bytes;
 }
 
@@ -652,9 +698,15 @@ test("appbildsnamn normaliseras till canonical nyckel och förväntad storlek", 
   assert.equal(classifyAppAssetUploadName("unknown-t1-1254x1254.png"), null);
 });
 
-test("PNG-dimensioner läses från IHDR", () => {
-  assert.deepEqual(pngDimensions(pngBody(1254, 512)), { width: 1254, height: 512 });
+test("PNG-validering kräver komplett chunkstruktur och korrekta CRC", () => {
+  const valid = pngBody(1254, 512);
+  assert.deepEqual(pngDimensions(valid), { width: 1254, height: 512 });
   assert.equal(pngDimensions(new Uint8Array([1, 2, 3])), null);
+  assert.equal(pngDimensions(valid.slice(0, -1)), null);
+
+  const corrupt = valid.slice();
+  corrupt[corrupt.length - 1] ^= 0xff;
+  assert.equal(pngDimensions(corrupt), null);
 });
 
 test("adminupload kategoriserar känd appbild till canonical och mirror", async () => {
@@ -675,6 +727,26 @@ test("adminupload kategoriserar känd appbild till canonical och mirror", async 
   assert.equal(result.mirrorKey, "hotlink-ok/apps/plex/plex-2.png");
   assert.equal(assets.has("apps/plex/plex-2.png"), true);
   assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), true);
+});
+
+test("kategoriserad appupload rullar tillbaka ny spegel om canonical write misslyckas", async () => {
+  const assets = fakeR2();
+  const originalPut = assets.put.bind(assets);
+  assets.put = async (key, body, options = {}) => {
+    if (key === "apps/plex/plex-2.png") throw new Error("simulated canonical put failure");
+    return originalPut(key, body, options);
+  };
+
+  await assert.rejects(
+    () => worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+      method: "PUT",
+      body: pngBody(1254, 1254),
+      headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+    }), env(fakeR2(), assets)),
+    /simulated canonical put failure/,
+  );
+  assert.equal(assets.has("apps/plex/plex-2.png"), false);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), false);
 });
 
 test("kategoriserad appupload nekar fel pixelmått", async () => {
@@ -787,6 +859,8 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /GitHub Auth verifierad/);
   assert.match(adminHtml, />Bilder </);
   assert.match(adminHtml, /id="asset-app-grid"/);
+  assert.match(adminHtml, /id="asset-other-files"/);
+  assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);

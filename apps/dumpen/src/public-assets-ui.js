@@ -101,7 +101,7 @@ export function publicAssetsMarkup() {
         <div id="asset-empty" class="asset-empty" hidden>Inga bilder matchar filtret.</div>
         <div id="asset-app-grid" class="asset-app-grid" aria-label="Applikationer"></div>
         <div id="asset-gallery" class="gallery" hidden aria-label="Bilder"></div>
-        <div id="asset-files" class="asset-files" hidden>
+        <div id="asset-other-files" class="asset-files" hidden>
           <details><summary id="asset-file-summary">Övriga filer</summary><div id="asset-file-list" class="asset-file-list"></div></details>
         </div>
       </div>
@@ -240,7 +240,7 @@ function renderGallery(assets,filters){
   return matches.length;
 }
 function renderOtherFiles(assets){
-  const wrap=$('#asset-files'),list=$('#asset-file-list'),summary=$('#asset-file-summary');list.replaceChildren();
+  const wrap=$('#asset-other-files'),list=$('#asset-file-list'),summary=$('#asset-file-summary');list.replaceChildren();
   const other=assets.filter((asset)=>!(asset.image&&asset.appCategory&&asset.theme&&asset.pixelSize));
   wrap.hidden=other.length===0;summary.textContent='Övriga filer · '+other.length;
   for(const asset of other){
