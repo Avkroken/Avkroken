@@ -463,9 +463,16 @@ export default {
       const result = await uploadPublicAsset(req, env.ASSETS, segments[3], {
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxBucketBytes: MAX_BUCKET_BYTES,
+      }, {
+        overwriteAppAsset: url.searchParams.get("replace") === "1",
       });
       if (result.response) return result.response;
-      return Response.json({ asset: result.asset }, {
+      return Response.json({
+        asset: result.asset,
+        categorized: result.categorized,
+        replaced: result.replaced,
+        mirrorKey: result.mirrorKey || null,
+      }, {
         status: 201,
         headers: { "cache-control": "no-store" },
       });

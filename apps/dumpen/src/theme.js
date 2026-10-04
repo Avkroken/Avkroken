@@ -4,18 +4,20 @@ export function themeCss() {
   return `:root{
     color-scheme:dark;
     --bg:#04070e;--bg-deep:#03060c;--panel:#09101e;--panel-2:#0d182c;
-    --line:rgba(137,167,207,.22);--text:#f5f3ee;--muted:#91a8c6;--subtle:#dce7f8;
-    --accent:#6ee71e;--accent-2:#42b80f;--secondary:#a66cff;--danger:#ff6b6b;
+    --line:rgba(137,167,207,.18);--line-strong:rgba(137,167,207,.34);--text:#f5f3ee;--muted:#91a8c6;--subtle:#dce7f8;
+    --control-bg:#dce7f8;--control-text:#08111c;--accent:#6ee71e;--accent-2:#42b80f;--secondary:#a66cff;--danger:#ff6b6b;
     --green:var(--accent);--green2:var(--accent-2);--purple:var(--secondary);
     --glow:#0d182c
   }
   :root[data-theme="forest"]{
     --bg:#080b09;--bg-deep:#050806;--panel:#111713;--panel-2:#171f19;
-    --line:#263129;--text:#f3f5f1;--muted:#a6b1aa;--subtle:#dce2dd;--glow:#171f19
+    --line:#263129;--line-strong:#3b493e;--text:#f3f5f1;--muted:#a6b1aa;--subtle:#dce2dd;
+    --control-bg:#dce2dd;--control-text:#101612;--glow:#171f19
   }
   :root[data-theme="blackout"]{
     --bg:#000;--bg-deep:#030303;--panel:#070707;--panel-2:#0d0d0d;
-    --line:#1a1a1a;--text:#f6f6f3;--muted:#b5b5b5;--subtle:#dedede;--glow:#0d0d0d
+    --line:#1a1a1a;--line-strong:#333;--text:#f6f6f3;--muted:#b5b5b5;--subtle:#dedede;
+    --control-bg:#dedede;--control-text:#090909;--glow:#0d0d0d
   }
   :root[data-theme="legacy"] body{
     background:

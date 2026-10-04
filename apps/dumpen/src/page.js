@@ -19,13 +19,50 @@ export function homePage(stats, limits) {
     .panel{margin-top:26px;background:linear-gradient(180deg,var(--panel),var(--bg-deep));border:1px solid var(--line);border-radius:9px;overflow:hidden}.panel-head{display:flex;align-items:center;gap:12px;padding:18px 20px}.stats{display:grid;grid-template-columns:repeat(4,1fr);padding:4px 20px 20px}.stat{min-width:0;padding:13px 20px;border-right:1px solid var(--line)}.stat:first-child{padding-left:6px}.stat:last-child{border-right:0}.stat small{color:var(--muted);display:block;margin-bottom:4px}.stat strong{display:block;color:var(--green);font-size:25px;line-height:1.35;font-weight:500}.stat em{display:block;color:var(--muted);font-style:normal;margin-top:5px;font-size:13px}.bar{height:7px;background:var(--panel-2);border-radius:99px;overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--green2));border-radius:inherit}.limits{border-top:1px solid var(--line);color:var(--muted);padding:13px 20px;text-align:center;font-size:13px}
     .admin{padding:0 20px 20px}.admin p{color:var(--muted);margin-bottom:13px}button{font:inherit;border-radius:6px;min-height:43px;cursor:pointer;padding:0 16px;color:var(--green);background:var(--bg-deep);border:1px solid var(--green2)}button:hover{background:var(--panel-2)}.logout{color:#c29aff;border-color:#6e48a1;min-height:34px}.auth-state{margin-top:14px;padding:14px 16px;border:1px solid #31501f;background:#080b07;border-radius:7px;color:#b6dca1}.error{color:var(--danger)!important;min-height:23px;margin:8px 0 0}.objects{margin-top:14px;border:1px solid var(--line);border-radius:7px;overflow:hidden}.objects-head{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}.badge{display:inline-block;margin-left:7px;color:var(--green);background:#13210c;border-radius:999px;padding:1px 8px;font-size:12px}.ticket{margin-top:14px;padding:16px;border:1px solid #31501f;border-radius:7px;background:#080b07}.ticket-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ticket .code{margin-top:12px}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:720px}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{color:var(--muted);background:var(--panel-2);font-weight:500}td{color:var(--text)}tr:last-child td{border-bottom:0}.dl{color:var(--green);text-decoration:none;font-size:18px;background:none;border:0;min-height:0;padding:0}.dl:hover{color:#97ff4c}footer{padding-top:34px;text-align:center;color:var(--muted);font-size:12px}
     @media(max-width:760px){main{padding-top:34px}.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.stat:nth-child(2){border-right:0}.stat:nth-child(3){border-top:1px solid var(--line);padding-left:6px}.stat:nth-child(4){border-top:1px solid var(--line)}}
+
+    /* Delat Avkroken-formspråk med Dumpens gröna produktaccent. */
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55;background:radial-gradient(circle at top,var(--panel) 0,var(--bg) 34rem)}
+    main.shell{width:min(1240px,calc(100% - 32px));padding:36px 0 72px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:32px}
+    .topbar-actions{display:flex;align-items:center;gap:12px}
+    .eyebrow{margin:0 0 6px;text-transform:uppercase;letter-spacing:.13em;font-weight:700;font-size:.72rem;color:var(--green)}
+    .topbar h1{margin:0 0 6px;font-size:clamp(2rem,6vw,3.5rem);line-height:1;letter-spacing:-.045em;font-weight:760}
+    .topbar .lead{margin:0;max-width:760px}
+    .section{padding-top:28px}
+    .title{margin-bottom:14px}
+    .panel{margin-top:28px;border-radius:16px;background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 18px 50px rgba(0,0,0,.2)}
+    .panel-head{padding:18px 20px;border-bottom:1px solid var(--line)}
+    .stats{padding:14px 20px 20px}
+    .stat strong{font-weight:760;letter-spacing:-.035em}
+    .notice,.ticket,.auth-state,.objects,.code{border-radius:12px}
+    button{border:1px solid var(--line-strong);background:var(--control-bg);color:var(--control-text);border-radius:10px;padding:9px 13px;font-family:inherit;font-weight:700}
+    button:hover{filter:brightness(1.06);background:var(--control-bg)}
+    .logout{background:transparent;color:var(--text);border-color:var(--line-strong)}
+    .badge{border:1px solid var(--line-strong);background:transparent;color:var(--text);font-weight:650}
+    .theme-control select{border-color:var(--line-strong)!important;border-radius:9px!important}
+    .objects-head{background:var(--panel);border-color:var(--line)}
+    th{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:uppercase;letter-spacing:.05em}
+    code,.code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+    @media(max-width:680px){
+      main.shell{width:min(100% - 20px,1240px);padding-top:22px}
+      .topbar{align-items:flex-start;flex-direction:column;gap:14px}
+      .topbar-actions{width:100%;justify-content:flex-end}
+      .panel{margin-inline:-2px}
+      .panel-head,.admin{padding-inline:14px}
+      .stats{padding-inline:8px}
+      .stat{padding-inline:10px}
+    }
   </style>
 </head>
-<body><main>
-  <div class="theme-row">${themeControl()}</div>
-  <header>
-    <h1>dumpen.<span>denied</span>.se</h1>
-    <p class="lead">Privat kontrollpanel ovanpå R2, med både tillfälliga transferer och publika direktlänkade assets.<br>AI-klienter kan fortsatt ladda upp privata ZIP-filer med en kortlivad <span class="accent">engångsticket</span>.</p>
+<body><main class="shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Avkroken</p>
+      <h1>Dumpen</h1>
+      <p class="lead">Privat kontrollpanel för transferer och publika assets på <span class="accent">denied.se</span>.</p>
+    </div>
+    <div class="topbar-actions">${themeControl()}</div>
   </header>
 
   <section class="section">

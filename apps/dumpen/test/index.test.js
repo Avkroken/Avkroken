@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, { claimTicket } from "../src/index.js";
 import { handleGitHubCallback, startGitHubLogin } from "../src/github-auth.js";
-import { listPublicAssets, safeAssetName } from "../src/public-assets.js";
+import { classifyAppAssetUploadName, listPublicAssets, pngDimensions, safeAssetName } from "../src/public-assets.js";
 
 const TOKEN = "test-token";
 const GITHUB_USER_ID = 123;
@@ -171,6 +171,16 @@ async function mintAssetTicket(e, targetKey, adminCookie = ADMIN_COOKIE) {
 
 const PNG_BODY = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 1, 2, 3]);
 
+function pngBody(width, height) {
+  const bytes = new Uint8Array(24);
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  bytes.set([73, 72, 68, 82], 12);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width, false);
+  view.setUint32(20, height, false);
+  return bytes;
+}
+
 const versions = [
   { key: "regelverk/1000.zip", uploaded: new Date(1000), body: "old" },
   { key: "regelverk/3000.zip", uploaded: new Date(3000), body: "new" },
@@ -184,7 +194,7 @@ test("root visar privat dashboard och engångsticket-flöde", async () => {
   assert.match(html, /dumpen\.denied\.se/);
   assert.match(html, /Privat kontrollpanel/);
   assert.match(html, /engångsticket/i);
-  assert.match(html, /publika direktlänkade assets/);
+  assert.match(html, /publika assets/);
   assert.match(html, /--bg:#04070e/);
   assert.match(html, /value="legacy">Legacy/);
   assert.match(html, /20 MB per fil/);
@@ -615,6 +625,7 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(listed.assets.length, 2);
   const plex = listed.assets.find((item) => item.key === "apps/plex/plex-1-256.png");
   assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-1-256.png");
+  assert.match(plex.previewUrl, /^https:\/\/logos\.denied\.se\/apps\/plex\/plex-1-256\.png\?v=/);
   assert.equal(plex.image, true);
   assert.equal(plex.contentType, "image/png");
   assert.equal(plex.appCategory, "plex");
@@ -623,6 +634,85 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(plex.themeLabel, "Neon Glass");
   assert.equal(plex.pixelSize, 256);
   assert.equal(plex.pixelLabel, "256×256");
+});
+
+test("appbildsnamn normaliseras till canonical nyckel och förväntad storlek", () => {
+  assert.deepEqual(classifyAppAssetUploadName("qbittorrent-t4-1254x1254.png"), {
+    app: "qbittorrent",
+    appLabel: "qBittorrent",
+    theme: "4",
+    themeLabel: "Illustrated Scene",
+    pixelSize: 1254,
+    pixelLabel: "1254×1254",
+    canonicalName: "qbittorrent-4.png",
+    key: "apps/qbittorrent/qbittorrent-4.png",
+    mirrorKey: "hotlink-ok/apps/qbittorrent/qbittorrent-4.png",
+  });
+  assert.equal(classifyAppAssetUploadName("plex-2-512.png")?.key, "apps/plex/plex-2-512.png");
+  assert.equal(classifyAppAssetUploadName("unknown-t1-1254x1254.png"), null);
+});
+
+test("PNG-dimensioner läses från IHDR", () => {
+  assert.deepEqual(pngDimensions(pngBody(1254, 512)), { width: 1254, height: 512 });
+  assert.equal(pngDimensions(new Uint8Array([1, 2, 3])), null);
+});
+
+test("adminupload kategoriserar känd appbild till canonical och mirror", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.categorized, true);
+  assert.equal(result.replaced, false);
+  assert.equal(result.asset.key, "apps/plex/plex-2.png");
+  assert.equal(result.asset.theme, "2");
+  assert.equal(result.asset.pixelSize, 1254);
+  assert.equal(result.mirrorKey, "hotlink-ok/apps/plex/plex-2.png");
+  assert.equal(assets.has("apps/plex/plex-2.png"), true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), true);
+});
+
+test("kategoriserad appupload nekar fel pixelmått", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/upload/plex-t2-512x512.png", {
+    method: "PUT",
+    body: pngBody(256, 256),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 422);
+  assert.equal(assets.keys().length, 0);
+});
+
+test("kategoriserad appupload kräver explicit ersättning för befintlig canonical", async () => {
+  const assets = fakeR2([{
+    key: "apps/plex/plex-2.png",
+    uploaded: new Date("2026-10-04T00:00:00Z"),
+    body: pngBody(1254, 1254),
+    httpMetadata: { contentType: "image/png" },
+  }]);
+
+  const denied = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+  assert.equal(denied.status, 409);
+
+  const replaced = await worker.fetch(request("/api/assets/upload/plex-t2-1254x1254.png?replace=1", {
+    method: "PUT",
+    body: pngBody(1254, 1254),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+  assert.equal(replaced.status, 201);
+  const result = await replaced.json();
+  assert.equal(result.replaced, true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-2.png"), true);
 });
 
 test("objektlista kräver admininloggning", async () => {
@@ -695,22 +785,23 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
-  assert.match(adminHtml, /Publika filer och bilder/);
-  assert.match(adminHtml, /Cloudflare App Launcher/);
-  assert.match(adminHtml, /Kopiera länk/);
+  assert.match(adminHtml, />Bilder </);
+  assert.match(adminHtml, /id="asset-app-grid"/);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);
-  assert.match(adminHtml, /Appkategori/);
-  assert.match(adminHtml, /Pixelstorlek/);
-  assert.match(adminHtml, /Alla teman/);
+  assert.match(adminHtml, />App\s*</);
+  assert.match(adminHtml, />Tema\s*</);
+  assert.match(adminHtml, />Storlek\s*</);
+  assert.match(adminHtml, /Original 1254/);
+  assert.match(adminHtml, /id="replace-app-assets"/);
+  assert.match(adminHtml, /findPreview/);
+  assert.match(adminHtml, /pixelSize===256/);
   assert.match(adminHtml, /asset\.appCategory/);
   assert.match(adminHtml, /asset\.theme/);
   assert.match(adminHtml, /asset\.pixelSize/);
-  assert.match(adminHtml, /naturalWidth/);
-  assert.match(adminHtml, / px · /);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
-  assert.match(adminHtml, /await loadObjects\(\);\s*\$\('#asset-status'\)\.textContent=done\+/);
+  assert.match(adminHtml, /appbilder kategoriserade/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });
