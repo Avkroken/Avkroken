@@ -7,15 +7,11 @@
   "preview_urls": false,
   "vars": {
     "MAIL_DOMAIN": "denied.se",
-    "BLOCKED_SENDERS": "",
-    "BLOCKED_DOMAINS": "",
     "REJECT_MESSAGE": "Sender is blocked"
   },
   "previews": {
     "vars": {
       "MAIL_DOMAIN": "preview.invalid",
-      "BLOCKED_SENDERS": "",
-      "BLOCKED_DOMAINS": "",
       "REJECT_MESSAGE": "Preview sender is blocked"
     }
   },

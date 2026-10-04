@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { isBlocked, parseList, senderDomain } from "../src/filter";
+import { isBlocked, isNullReversePath, parseList, senderDomain } from "../src/filter";
 
 test("parseList normalizes comma and newline separated values", () => {
   assert.deepEqual(
@@ -12,6 +12,13 @@ test("parseList normalizes comma and newline separated values", () => {
 
 test("senderDomain extracts and normalizes domain", () => {
   assert.equal(senderDomain("User@Sub.Example.COM"), "sub.example.com");
+});
+
+test("detects null reverse-path senders", () => {
+  assert.equal(isNullReversePath(""), true);
+  assert.equal(isNullReversePath("<>"), true);
+  assert.equal(isNullReversePath("  <>  "), true);
+  assert.equal(isNullReversePath("mailer-daemon@example.com"), false);
 });
 
 test("blocks exact senders", () => {
@@ -53,11 +60,11 @@ test("Worker Previews use isolated non-production mail configuration", async () 
   assert.equal("addresses" in config, false);
   assert.deepEqual(preview?.vars, {
     MAIL_DOMAIN: "preview.invalid",
-    BLOCKED_SENDERS: "",
-    BLOCKED_DOMAINS: "",
     REJECT_MESSAGE: "Preview sender is blocked",
   });
   assert.equal("addresses" in (preview ?? {}), false);
+  assert.equal("BLOCKED_SENDERS" in (preview?.vars ?? {}), false);
+  assert.equal("BLOCKED_DOMAINS" in (preview?.vars ?? {}), false);
   assert.equal("secrets" in (preview ?? {}), false);
   assert.equal("services" in (preview ?? {}), false);
   assert.equal(JSON.stringify(preview).includes("denied.se"), false);

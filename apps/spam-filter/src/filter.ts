@@ -18,6 +18,11 @@ export function senderDomain(sender: string): string {
   return at >= 0 ? normalized.slice(at + 1) : "";
 }
 
+export function isNullReversePath(sender: string): boolean {
+  const normalized = sender.trim();
+  return normalized === "" || normalized === "<>";
+}
+
 export function isBlocked(sender: string, config: FilterConfig): boolean {
   const normalizedSender = sender.trim().toLowerCase();
   if (config.blockedSenders.has(normalizedSender)) {
