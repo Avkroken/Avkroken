@@ -615,16 +615,22 @@ test("assetfel degraderar separat utan att blockera privata transferer", async (
     throw new Error("asset provider unavailable");
   };
 
-  const response = await worker.fetch(
+  const transferResponse = await worker.fetch(
     request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }),
     env(transfers, assets),
   );
-  assert.equal(response.status, 200);
-  const data = await response.json();
-  assert.equal(data.objects.length, 1);
-  assert.equal(data.objects[0].name, "backup");
-  assert.deepEqual(data.assets, []);
-  assert.equal(data.assetState, "unavailable");
+  assert.equal(transferResponse.status, 200);
+  const transfersData = await transferResponse.json();
+  assert.equal(transfersData.objects.length, 1);
+  assert.equal(transfersData.objects[0].name, "backup");
+  assert.equal("assets" in transfersData, false);
+
+  const assetResponse = await worker.fetch(
+    request("/api/assets", { headers: { cookie: ADMIN_COOKIE } }),
+    env(transfers, assets),
+  );
+  assert.equal(assetResponse.status, 200);
+  assert.deepEqual(await assetResponse.json(), { assets: [], assetState: "unavailable" });
 });
 
 test("publik asset-upload kräver admininloggning", async () => {
@@ -663,11 +669,10 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(assets.keys().includes(asset.key), true);
   assert.equal(transfers.keys().length, 0);
 
-  const listing = await worker.fetch(request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }), e);
+  const listing = await worker.fetch(request("/api/assets", { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(listing.status, 200);
   const listed = await listing.json();
   assert.equal(listed.assetState, "available");
-  assert.equal(listed.objects.length, 0);
   assert.equal(listed.assets.length, 2);
   const plex = listed.assets.find((item) => item.key === "apps/plex/plex-1-256.png");
   assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-1-256.png");
@@ -857,25 +862,24 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
-  assert.match(adminHtml, />Bilder </);
+  assert.match(adminHtml, />Media Library </);
+  assert.match(adminHtml, /id="asset-drop"/);
+  assert.match(adminHtml, /id="asset-queue"/);
   assert.match(adminHtml, /id="asset-app-grid"/);
   assert.match(adminHtml, /id="asset-other-files"/);
+  assert.match(adminHtml, /id="asset-dialog"/);
   assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
+  assert.match(adminHtml, /id="asset-search"/);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);
-  assert.match(adminHtml, />App\s*</);
-  assert.match(adminHtml, />Tema\s*</);
-  assert.match(adminHtml, />Storlek\s*</);
-  assert.match(adminHtml, /Original 1254/);
+  assert.match(adminHtml, /id="asset-sort"/);
   assert.match(adminHtml, /id="replace-app-assets"/);
-  assert.match(adminHtml, /findPreview/);
-  assert.match(adminHtml, /pixelSize===256/);
-  assert.match(adminHtml, /asset\.appCategory/);
-  assert.match(adminHtml, /asset\.theme/);
-  assert.match(adminHtml, /asset\.pixelSize/);
+  assert.match(adminHtml, /XMLHttpRequest/);
+  assert.match(adminHtml, /navigator\.clipboard\.read/);
+  assert.match(adminHtml, /\/admin\/api\/assets\/uploads/);
+  assert.match(adminHtml, /\/admin\/api\/assets\/item/);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
-  assert.match(adminHtml, /appbilder kategoriserade/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });
