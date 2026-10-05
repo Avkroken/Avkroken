@@ -121,6 +121,19 @@ export async function downloadAsset(bucket, key) {
   return { response: new Response(object.body, { status: 200, headers }) };
 }
 
+async function bucketBytesExcluding(bucket, excludedKey) {
+  let total = 0;
+  let cursor;
+  do {
+    const page = await bucket.list({ cursor });
+    for (const object of page.objects) {
+      if (object.key !== excludedKey) total += Number(object.size) || 0;
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  return total;
+}
+
 export async function replaceAsset(request, bucket, key, limits) {
   const mutation = mutableAssetKey(key);
   if (!mutation) return { response: Response.json({ error: "asset_not_found" }, { status: 404 }) };
@@ -147,6 +160,9 @@ export async function replaceAsset(request, bucket, key, limits) {
   }
   if (body.byteLength > limits.maxUploadBytes) {
     return { response: new Response("too large\n", { status: 413 }) };
+  }
+  if (await bucketBytesExcluding(bucket, mutation.key) + body.byteLength > limits.maxBucketBytes) {
+    return { response: new Response("asset storage full\n", { status: 507 }) };
   }
 
   const name = safeAssetName(current.customMetadata?.originalName || mutation.key.split("/").pop()) || "asset";
