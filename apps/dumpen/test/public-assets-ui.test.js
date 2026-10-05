@@ -89,6 +89,7 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.equal(applied, 4);
 
   const script = publicAssetsScript();
+  assert.doesNotThrow(() => new Function(script));
   assert.match(script, /XMLHttpRequest/);
   assert.match(script, /xhr\.upload\.onprogress/);
   assert.match(script, /navigator\.clipboard\.read/);
