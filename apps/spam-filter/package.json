@@ -18,5 +18,8 @@
   },
   "overrides": {
     "undici@<7.29.1": "7.29.1"
+  },
+  "dependencies": {
+    "postal-mime": "^4.0.4"
   }
 }
