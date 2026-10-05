@@ -1,18 +1,24 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-const wizard = await readFile(
-  new URL("../scripts/setup-provider-credentials.sh", import.meta.url),
-  "utf8",
-);
+const wizardUrl = new URL("../scripts/setup-provider-credentials.sh", import.meta.url);
+const wizardPath = fileURLToPath(wizardUrl);
+const wizard = await readFile(wizardUrl, "utf8");
+
+test("credential wizard has valid bash syntax", () => {
+  const result = spawnSync("bash", ["-n", wizardPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+});
 
 test("credential wizard is read-only and does not provision secrets or tokens", () => {
-  assert.doesNotMatch(wizard, /\\bgh\\s+secret\\s+set\\b/);
-  assert.doesNotMatch(wizard, /\\bgh\\s+variable\\s+set\\b/);
-  assert.doesNotMatch(wizard, /\\bwrangler\\s+secret\\s+(?:put|bulk|delete)\\b/);
-  assert.doesNotMatch(wizard, /\\bwrangler\\s+deploy\\b/);
-  assert.doesNotMatch(wizard, /\\bwrangler\\s+d1\\s+migrations\\s+apply\\b/);
+  assert.doesNotMatch(wizard, /\bgh\s+secret\s+set\b/);
+  assert.doesNotMatch(wizard, /\bgh\s+variable\s+set\b/);
+  assert.doesNotMatch(wizard, /\bwrangler\s+secret\s+(?:put|bulk|delete)\b/);
+  assert.doesNotMatch(wizard, /\bwrangler\s+deploy\b/);
+  assert.doesNotMatch(wizard, /\bwrangler\s+d1\s+migrations\s+apply\b/);
 });
 
 test("credential wizard covers the canonical runtime credential contract", () => {
@@ -35,8 +41,8 @@ test("credential wizard covers the canonical runtime credential contract", () =>
 });
 
 test("credential wizard preserves the Workers Builds deployment boundary", () => {
-  assert.match(wizard, /Avkroken\\/Avkroken/);
-  assert.match(wizard, /apps\\/skvallerbyttan/);
+  assert.match(wizard, /Avkroken\/Avkroken/);
+  assert.match(wizard, /apps\/skvallerbyttan/);
   assert.match(wizard, /npm run deploy:workers-builds/);
   assert.match(wizard, /GitHub Actions ska inte synka dessa värden/);
 });
