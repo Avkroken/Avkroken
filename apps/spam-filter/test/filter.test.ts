@@ -59,7 +59,25 @@ test("Worker Previews use isolated non-production mail configuration", async () 
     SPAM_SUSPICIOUS_SCORE: "4",
     SPAM_REJECT_SCORE: "8",
     MAX_ANALYSIS_BYTES: "5242880",
+    AI_MIN_SCORE: "2",
+    AI_MAX_INPUT_CHARS: "8000",
+    SPAM_FEEDBACK_LOCALPART: "spam",
+    LEGITIMATE_FEEDBACK_LOCALPART: "notspam",
   });
+  assert.deepEqual(preview?.d1_databases, [
+    {
+      binding: "REPUTATION_DB",
+      database_name: "spam-filter-reputation-preview-eu",
+      database_id: "6d74e6db-2da3-40c7-8dc6-eac95d96b755",
+      migrations_dir: "migrations",
+    },
+  ]);
+  assert.equal(config.ai?.binding, "AI");
+  assert.equal(config.d1_databases?.[0]?.binding, "REPUTATION_DB");
+  assert.notEqual(
+    config.d1_databases?.[0]?.database_id,
+    preview?.d1_databases?.[0]?.database_id,
+  );
   assert.equal("addresses" in (preview ?? {}), false);
   assert.equal("secrets" in (preview ?? {}), false);
   assert.equal("services" in (preview ?? {}), false);
