@@ -16,15 +16,34 @@ export interface AiClassification {
 
 const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
+function htmlToText(value: string): string {
+  let output = "";
+  let insideTag = false;
+
+  for (const character of value) {
+    if (character === "<") {
+      insideTag = true;
+      output += " ";
+      continue;
+    }
+
+    if (character === ">") {
+      insideTag = false;
+      continue;
+    }
+
+    if (!insideTag) {
+      output += character;
+    }
+  }
+
+  return output.replace(/\s+/g, " ").trim();
+}
+
 function plainText(email: EmailView, maxChars: number): string {
   const text =
     email.text?.trim() ||
-    (email.html ?? "")
-      .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ")
-      .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    htmlToText(email.html ?? "");
 
   return text.slice(0, Math.max(0, maxChars));
 }
