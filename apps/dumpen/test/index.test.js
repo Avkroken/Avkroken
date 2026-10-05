@@ -687,6 +687,72 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(plex.pixelLabel, "256×256");
 });
 
+test("nya media-API:t kräver adminsession", async () => {
+  const listing = await worker.fetch(request("/api/assets"), env());
+  assert.equal(listing.status, 401);
+
+  const upload = await worker.fetch(request("/api/assets/uploads?name=photo.png", {
+    method: "POST",
+    body: new Uint8Array([1]),
+    headers: { "content-type": "image/png" },
+  }), env());
+  assert.equal(upload.status, 401);
+});
+
+test("explicit appmetadata skapar canonical asset utan filnamnskrav", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request(
+    "/api/assets/uploads?name=my-picture.png&app=plex&theme=4&size=512",
+    {
+      method: "POST",
+      body: pngBody(512, 512),
+      headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+    },
+  ), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.explicitTarget, true);
+  assert.equal(result.asset.key, "apps/plex/plex-4-512.png");
+  assert.equal(result.asset.theme, "4");
+  assert.equal(result.asset.pixelSize, 512);
+  assert.equal(assets.has("apps/plex/plex-4-512.png"), true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-4-512.png"), true);
+});
+
+test("asset item delete tar canonical appbild och mirror atomärt ur biblioteket", async () => {
+  const assets = fakeR2([
+    {
+      key: "apps/plex/plex-1.png",
+      uploaded: new Date("2026-10-05T12:00:00Z"),
+      body: pngBody(1254, 1254),
+      httpMetadata: { contentType: "image/png" },
+    },
+    {
+      key: "hotlink-ok/apps/plex/plex-1.png",
+      uploaded: new Date("2026-10-05T12:00:00Z"),
+      body: pngBody(1254, 1254),
+      httpMetadata: { contentType: "image/png" },
+    },
+  ]);
+  const e = env(fakeR2(), assets);
+
+  const metadata = await worker.fetch(request(
+    "/api/assets/item?key=apps%2Fplex%2Fplex-1.png",
+    { headers: { cookie: ADMIN_COOKIE } },
+  ), e);
+  assert.equal(metadata.status, 200);
+  assert.equal((await metadata.json()).asset.key, "apps/plex/plex-1.png");
+
+  const removed = await worker.fetch(request(
+    "/api/assets/item?key=apps%2Fplex%2Fplex-1.png",
+    { method: "DELETE", headers: { cookie: ADMIN_COOKIE } },
+  ), e);
+  assert.equal(removed.status, 204);
+  assert.equal(assets.has("apps/plex/plex-1.png"), false);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-1.png"), false);
+});
+
 test("appbildsnamn normaliseras till canonical nyckel och förväntad storlek", () => {
   assert.deepEqual(classifyAppAssetUploadName("qbittorrent-t4-1254x1254.png"), {
     app: "qbittorrent",
