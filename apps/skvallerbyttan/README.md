@@ -17,7 +17,7 @@ Credential-/providerförutsättningar kan gås igenom utan att exportera eller s
 
 ```bash
 cd apps/skvallerbyttan
-./scripts/setup-provider-credentials.sh
+bash scripts/setup-provider-credentials.sh
 ```
 
 Wizarden verifierar befintlig GitHub App-, Cloudflare R1/R2/R3-, Secrets Store-, runtime-, webhook- och Workers Builds-state. Den skapar inga tokens, synkar inga runtime-secrets och skriver inga GitHub Actions-secrets.
