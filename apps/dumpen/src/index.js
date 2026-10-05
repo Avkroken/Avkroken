@@ -6,7 +6,6 @@ import {
   isThemeStagingKey,
 } from "./asset-upload-ticket.js";
 import {
-  listPublicAssets,
   uploadPublicAsset,
 } from "./public-assets.js";
 import {
@@ -440,19 +439,8 @@ export default {
       const denied = await adminDenied(req, env);
       if (denied) return denied;
       const allObjects = await listAll(env.DUMPEN);
-      let assets = [];
-      let assetState = env.ASSETS ? "available" : "not_configured";
-      if (env.ASSETS) {
-        try {
-          assets = await listPublicAssets(env.ASSETS);
-        } catch {
-          assetState = "unavailable";
-        }
-      }
       return Response.json({
         objects: groupedObjects(allObjects),
-        assets,
-        assetState,
       }, {
         headers: { "cache-control": "no-store" },
       });
