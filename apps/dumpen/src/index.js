@@ -10,6 +10,14 @@ import {
   uploadPublicAsset,
 } from "./public-assets.js";
 import {
+  assetMetadata,
+  deleteAsset,
+  downloadAsset,
+  listAssetLibrary,
+  replaceAsset,
+  resolveAssetUploadTarget,
+} from "./asset-library.js";
+import {
   authenticatedGitHubUserId,
   githubAuthConfigurationState,
   handleGitHubCallback,
@@ -446,6 +454,111 @@ export default {
         assets,
         assetState,
       }, {
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments.length === 2) {
+      if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) {
+        return Response.json({ assets: [], assetState: "not_configured" }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      try {
+        return Response.json({
+          assets: await listAssetLibrary(env.ASSETS),
+          assetState: "available",
+        }, {
+          headers: { "cache-control": "no-store" },
+        });
+      } catch {
+        return Response.json({ assets: [], assetState: "unavailable" }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "item") {
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+      const key = url.searchParams.get("key") || "";
+
+      if (req.method === "GET" && url.searchParams.get("download") === "1") {
+        return (await downloadAsset(env.ASSETS, key)).response;
+      }
+      if (req.method === "GET") {
+        const asset = await assetMetadata(env.ASSETS, key);
+        if (!asset) return Response.json({ error: "asset_not_found" }, {
+          status: 404,
+          headers: { "cache-control": "no-store" },
+        });
+        return Response.json({ asset }, { headers: { "cache-control": "no-store" } });
+      }
+      if (req.method === "PUT") {
+        const result = await replaceAsset(req, env.ASSETS, key, {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        });
+        if (result.response) return result.response;
+        return Response.json({
+          asset: result.asset,
+          categorized: result.categorized,
+          replaced: result.replaced,
+          mirrorKey: result.mirrorKey || null,
+        }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      if (req.method === "DELETE") {
+        const result = await deleteAsset(env.ASSETS, key);
+        if (result.status === 204) {
+          return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+        }
+        return Response.json({ error: result.error }, {
+          status: result.status,
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      return new Response("method\n", { status: 405 });
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "uploads") {
+      if (req.method !== "POST") return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+
+      const resolved = resolveAssetUploadTarget(url.searchParams.get("name") || "", {
+        app: url.searchParams.get("app"),
+        theme: url.searchParams.get("theme"),
+        size: url.searchParams.get("size"),
+      });
+      if (resolved.error) {
+        return Response.json({ error: resolved.error }, {
+          status: 400,
+          headers: { "cache-control": "no-store" },
+        });
+      }
+
+      const result = await uploadPublicAsset(req, env.ASSETS, resolved.name, {
+        maxUploadBytes: MAX_UPLOAD_BYTES,
+        maxBucketBytes: MAX_BUCKET_BYTES,
+      }, {
+        overwriteAppAsset: url.searchParams.get("replace") === "1",
+      });
+      if (result.response) return result.response;
+      return Response.json({
+        asset: result.asset,
+        categorized: result.categorized,
+        replaced: result.replaced,
+        mirrorKey: result.mirrorKey || null,
+        explicitTarget: resolved.explicit,
+      }, {
+        status: 201,
         headers: { "cache-control": "no-store" },
       });
     }
