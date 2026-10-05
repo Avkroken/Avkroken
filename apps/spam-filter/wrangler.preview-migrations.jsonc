@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "d1_databases": [
+    {
+      "binding": "REPUTATION_DB",
+      "database_name": "spam-filter-reputation-preview-eu",
+      "database_id": "6d74e6db-2da3-40c7-8dc6-eac95d96b755",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

@@ -12,7 +12,11 @@
     "REJECT_MESSAGE": "Message rejected by spam filter",
     "SPAM_SUSPICIOUS_SCORE": "4",
     "SPAM_REJECT_SCORE": "8",
-    "MAX_ANALYSIS_BYTES": "5242880"
+    "MAX_ANALYSIS_BYTES": "5242880",
+    "AI_MIN_SCORE": "2",
+    "AI_MAX_INPUT_CHARS": "8000",
+    "SPAM_FEEDBACK_LOCALPART": "spam",
+    "LEGITIMATE_FEEDBACK_LOCALPART": "notspam"
   },
   "previews": {
     "vars": {
@@ -22,8 +26,20 @@
       "REJECT_MESSAGE": "Preview message rejected by spam filter",
       "SPAM_SUSPICIOUS_SCORE": "4",
       "SPAM_REJECT_SCORE": "8",
-      "MAX_ANALYSIS_BYTES": "5242880"
-    }
+      "MAX_ANALYSIS_BYTES": "5242880",
+      "AI_MIN_SCORE": "2",
+      "AI_MAX_INPUT_CHARS": "8000",
+      "SPAM_FEEDBACK_LOCALPART": "spam",
+      "LEGITIMATE_FEEDBACK_LOCALPART": "notspam"
+    },
+    "d1_databases": [
+      {
+        "binding": "REPUTATION_DB",
+        "database_name": "spam-filter-reputation-preview-eu",
+        "database_id": "6d74e6db-2da3-40c7-8dc6-eac95d96b755",
+        "migrations_dir": "migrations"
+      }
+    ]
   },
   "observability": {
     "enabled": true,
@@ -42,5 +58,17 @@
     "issues": {
       "enabled": true
     }
-  }
+  },
+  "account_id": "b74f8c0c6a92f3006483840cf27372fd",
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "REPUTATION_DB",
+      "database_name": "spam-filter-reputation-eu",
+      "database_id": "8094f51f-6d89-4407-8c64-9bce33e8c551",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

@@ -25,4 +25,5 @@ if (process.env.WORKERS_CI_BRANCH !== "main") {
 }
 
 run("npm", ["run", "check"]);
+run("npm", ["run", "migrate:production"]);
 run("npm", ["run", "deploy"]);

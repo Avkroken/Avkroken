@@ -8,7 +8,9 @@
     "deploy:workers-builds": "node scripts/workers-build-production.mjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "validate:worker": "wrangler deploy --dry-run --config wrangler.jsonc"
+    "validate:worker": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "migrate:production": "wrangler d1 migrations apply REPUTATION_DB --remote",
+    "migrate:preview": "wrangler d1 migrations apply REPUTATION_DB --remote --config wrangler.preview-migrations.jsonc"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260926.1",
