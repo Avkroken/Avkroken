@@ -22,10 +22,14 @@ test("credential launcher and generated wizard have valid bash syntax", () => {
   }
 });
 
-test("launcher degrades optional terminal styling without editing the curated helper", () => {
-  assert.match(launcher, /tput dim/);
-  assert.match(launcher, /export TERM=dumb/);
+test("launcher makes optional terminal capabilities non-fatal without editing the curated helper", () => {
+  assert.match(launcher, /tput\(\)/);
+  assert.match(launcher, /bold\|dim\|sgr0\|setaf/);
+  assert.match(launcher, /clear\)/);
+  assert.match(launcher, /printf '\\033\[2J\\033\[3J\\033\[H'/);
+  assert.match(launcher, /export -f tput/);
   assert.match(launcher, /exec bash "\$WIZARD"/);
+  assert.doesNotMatch(launcher, /export TERM=dumb/);
   assert.doesNotMatch(launcher, /\bgh\s+(?:secret|variable)\s+set\b/);
   assert.doesNotMatch(launcher, /\bwrangler\b/);
 });
@@ -44,6 +48,26 @@ test("GitHub webhook stage distinguishes retired App ingress from processed prov
   assert.match(stages, /ignored: retired github app webhook/);
   assert.match(stages, /processat svar/);
   assert.match(stages, /Activity\/cache/);
+});
+
+test("Cloudflare webhook stages verify route, auth header, and processed delivery", () => {
+  assert.match(stages, /\/webhooks\/cloudflare\/notifications/);
+  assert.match(stages, /\/webhooks\/cloudflare\/issues/);
+  assert.match(stages, /\/webhooks\/cloudflare\/casb/);
+  assert.match(stages, /cf-webhook-auth/);
+  assert.match(stages, /x-skvallerbyttan-casb-auth/);
+  assert.match(stages, /HTTP 202/);
+  assert.match(stages, /generic_webhook_test/);
+  assert.match(stages, /Aktivitet\/Insyn/);
+});
+
+test("Workers Builds stage requires successful current main deployment evidence", () => {
+  assert.match(stages, /senaste production-builden från main/);
+  assert.match(stages, /npm run check/);
+  assert.match(stages, /remote D1 migrations/);
+  assert.match(stages, /Worker deploy/);
+  assert.match(stages, /verify:production/);
+  assert.match(stages, /lyckad main production-build/);
 });
 
 test("credential wizard covers the canonical runtime credential contract", () => {
