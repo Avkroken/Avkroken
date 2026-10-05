@@ -80,13 +80,17 @@ export function resolveAssetUploadTarget(rawName, options = {}) {
 }
 
 export async function listAssetLibrary(bucket) {
-  return listPublicAssets(bucket);
+  const assets = await listPublicAssets(bucket);
+  return assets.map((asset) => ({
+    ...asset,
+    mutable: Boolean(mutableAssetKey(asset.key)),
+  }));
 }
 
 export async function assetMetadata(bucket, key) {
   const mutation = mutableAssetKey(key);
   if (!mutation) return null;
-  const assets = await listPublicAssets(bucket);
+  const assets = await listAssetLibrary(bucket);
   return assets.find((asset) => asset.key === mutation.key) || null;
 }
 
