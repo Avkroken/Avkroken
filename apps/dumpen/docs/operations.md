@@ -29,10 +29,26 @@ Efter ändringar i `src/access.js`, verifiera minst:
 - legacy privilegierade `/api/*` canonicaliseras;
 - `/admin` kräver GitHub-session och oautentiserade browserrequests går via `/login` → Krösa-Maja;
 - `/admin/api/*` kräver samma signerade GitHub-session och når rätt intern applikationsroute;
-- `/admin/api/assets/*` kan lista indirekt via objekt-API:t och skapa nya assets men är aldrig publik;
+- `/admin/api/objects` listar endast privata transferer; `/admin/api/assets` är separat sessionsskyddat media-inventory;
+- `/admin/api/assets/uploads` kan skapa nya assets och `/admin/api/assets/item` kan läsa metadata, ersätta, ladda ned eller radera endast tillåtna canonical/managed assets;
 - asset-direktlänkar går mot den separat verifierade custom domainen `logos.denied.se`; Dumpen exponerar ingen publik asset-listning;
 - icke-publika ytor får avsedda `X-Robots-Tag`-headers;
 - känsliga redirects/svar inte får publik cachepolicy.
+
+## Media Library-verifiering
+
+Efter ändringar i galleri eller asset-API, verifiera minst:
+
+- transferlistan fungerar även om `ASSETS.list()` fallerar;
+- drag/drop, clipboard och filväljare hamnar i samma uploadkö;
+- kön fortsätter efter en fil som misslyckas och kör högst tre uploads parallellt;
+- explicit app/tema/storlek ger rätt canonical key även när lokalt filnamn är godtyckligt;
+- legacy filnamnsdetektering fungerar när explicit metadata saknas;
+- appreplace behåller canonical URL och uppdaterar mirror;
+- appdelete tar både canonical och mirror;
+- generisk replace behåller `uploads/<id>/...`-nyckeln och respekterar total storage-gräns;
+- `staging/...` och `hotlink-ok/...` inte kan adresseras av item-mutationer;
+- sökning, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport.
 
 ## R2
 
