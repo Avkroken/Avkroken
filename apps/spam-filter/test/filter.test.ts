@@ -55,7 +55,10 @@ test("Worker Previews use isolated non-production mail configuration", async () 
     MAIL_DOMAIN: "preview.invalid",
     BLOCKED_SENDERS: "",
     BLOCKED_DOMAINS: "",
-    REJECT_MESSAGE: "Preview sender is blocked",
+    REJECT_MESSAGE: "Preview message rejected by spam filter",
+    SPAM_SUSPICIOUS_SCORE: "4",
+    SPAM_REJECT_SCORE: "8",
+    MAX_ANALYSIS_BYTES: "5242880",
   });
   assert.equal("addresses" in (preview ?? {}), false);
   assert.equal("secrets" in (preview ?? {}), false);
