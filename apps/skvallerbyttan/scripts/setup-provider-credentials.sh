@@ -9,21 +9,28 @@ if [[ ! -f "$WIZARD" ]]; then
   exit 1
 fi
 
-# The curated wizard template treats "8 colors" as sufficient evidence that
-# all styling capabilities exist. Some valid terminfo entries (for example
-# xterm-color) lack optional capabilities such as dim; under set -e that would
-# abort the generated wizard before it renders. Degrade styling only when a
-# capability probe proves the current terminal is incomplete.
-if [[ -t 1 ]] && command -v tput >/dev/null 2>&1; then
-  colors="$(tput colors 2>/dev/null || printf '0')"
-  if [[ "$colors" =~ ^[0-9]+$ ]] && (( colors >= 8 )); then
-    if ! tput bold >/dev/null 2>&1 ||
-       ! tput dim >/dev/null 2>&1 ||
-       ! tput sgr0 >/dev/null 2>&1 ||
-       ! tput setaf 1 >/dev/null 2>&1; then
-      export TERM=dumb
-    fi
-  fi
-fi
+# Keep the curated wizard helper byte-for-byte unchanged, but harden tput at
+# the process boundary. Optional styling capabilities may legitimately be
+# absent even when the terminal advertises colors; clear may also fail for
+# incomplete terminfo entries. Exported Bash functions survive into the child
+# Bash that executes the curated wizard.
+tput() {
+  local capability="${1:-}"
+  case "$capability" in
+    colors)
+      command tput "$@" 2>/dev/null || printf '0'
+      ;;
+    bold|dim|sgr0|setaf)
+      command tput "$@" 2>/dev/null || return 0
+      ;;
+    clear)
+      command tput "$@" 2>/dev/null || printf '\033[2J\033[3J\033[H'
+      ;;
+    *)
+      command tput "$@"
+      ;;
+  esac
+}
+export -f tput
 
 exec bash "$WIZARD"
