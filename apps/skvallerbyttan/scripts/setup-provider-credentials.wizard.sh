@@ -248,11 +248,13 @@ step "Verifiera att den aktiva hooken inte är Gamnackens GitHub App/integration
 step "Öppna en säker Recent delivery/Test delivery och verifiera HTTP 202 med ett processat svar; svaret får inte vara ignored: retired github app webhook."
 step "Verifiera därefter i Skvallerbyttans Activity/cache att en relevant owner-matchande leverans faktiskt observerades eller invaliderade avsedd cache."
 open_url "https://dash.cloudflare.com/"
-step "För Notifications/Workers Issues: verifiera kopplingen till CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET."
-step "För CASB: verifiera kopplingen till CLOUDFLARE_CASB_WEBHOOK_SECRET om CASB-ingress används."
+step "För aktiv Notifications-ingress: verifiera destination https://skvallerbyttan.denied.se/webhooks/cloudflare/notifications, header cf-webhook-auth och en autentiserad test/real delivery som ger HTTP 202 med ok=true."
+step "För aktiv Workers Issues-ingress: verifiera destination https://skvallerbyttan.denied.se/webhooks/cloudflare/issues och header cf-webhook-auth. Cloudflares generiska text-only test får ge HTTP 202 med reason generic_webhook_test; verifiera dessutom en riktig issue-leverans om integrationen används operativt."
+step "För aktiv CASB-ingress: verifiera destination https://skvallerbyttan.denied.se/webhooks/cloudflare/casb, header x-skvallerbyttan-casb-auth och en autentiserad delivery som ger HTTP 202 med ok=true."
+step "Verifiera i Aktivitet/Insyn att respektive aktiva Cloudflare-ingress faktiskt observerats efter leveransen; presence av runtime-secret ensam räcker inte."
 step "Visa, logga eller klistra inte in secretvärden i wizarden. Rotation görs endast vid faktisk mismatch och samordnat på båda sidor."
-if ! confirm "Är aktiva webhookkopplingar synkroniserade och GitHub-leveransen processad som icke-retired ingress?"; then
-  warn "Lämna berörd ingress avstängd/oklar tills provider och runtime är synkroniserade."
+if ! confirm "Är alla aktiva webhookrutter, authheaders och processade leveranser verifierade?"; then
+  warn "Lämna berörd ingress avstängd/oklar tills destination, auth och processad leverans är verifierade."
   exit 2
 fi
 
@@ -262,9 +264,11 @@ open_url "https://dash.cloudflare.com/"
 step "Öppna Workers & Pages → skvallerbyttan → Builds/Settings."
 step "Verifiera repository Avkroken/Avkroken, branch main och root directory apps/skvallerbyttan."
 step "Verifiera production command: npm run deploy:workers-builds."
+step "Öppna senaste production-builden från main som körts efter senaste relevanta credential-/permissionändring. Den måste vara Success och visa att npm run check, remote D1 migrations, Worker deploy och verify:production kunde köras med Cloudflare Builds-identiteten."
+step "Om ingen sådan lyckad main-build finns efter credentialändringen är deployidentiteten inte verifierad. Starta inte en produktiondeploy enbart från denna wizard; hantera verifieringen i ordinarie deploymentflöde."
 step "GitHub Actions ska endast köra repository-CI; lägg inte till Cloudflare deploycredential där."
-if ! confirm "Matchar Workers Builds repositoryts deploykontrakt?"; then
-  warn "Ändra inte deployment i denna wizard; dokumentera avvikelsen och hantera den separat."
+if ! confirm "Finns aktuell lyckad main production-build som bevisar att Workers Builds-identiteten kan köra hela deploykedjan?"; then
+  warn "Behandla deployidentiteten som overifierad tills en ordinarie main-build har lyckats."
   exit 2
 fi
 
