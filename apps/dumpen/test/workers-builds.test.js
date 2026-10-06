@@ -33,26 +33,22 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const branchGuard = script.indexOf('WORKERS_CI_BRANCH !== "main"');
-  const branchExit = script.indexOf("process.exit(0)");
-  const check = script.indexOf('run("npm", ["run", "check"])');
-  const deploy = script.indexOf('run("npm", ["run", "deploy"])');
+  const branchExit = script.indexOf("return;");
+  const check = script.indexOf('run("npm", ["run", "check"]');
+  const deploy = script.indexOf('run("npm", ["run", "deploy"]');
+  const providerStatus = script.indexOf('"deployments", "status", "--json"');
   assert.ok(branchGuard >= 0 && branchExit > branchGuard && check > branchExit);
-  assert.ok(deploy > check);
+  assert.ok(deploy > check && providerStatus > deploy);
+  assert.match(script, /WRANGLER_OUTPUT_FILE_PATH/);
+  assert.match(script, /deploymentIsActive/);
   assert.doesNotMatch(script, /verify:production/);
+  assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
   assert.match(productionCheck, /data-media-library-version="2"/);
   assert.match(productionCheck, /does not serve Media Library v2/);
-
-  const runtimeWorkflow = await readFile(
-    new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url),
-    "utf8",
+  assert.equal(
+    existsSync(new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url)),
+    false,
   );
-  assert.match(runtimeWorkflow, /push:/);
-  assert.match(runtimeWorkflow, /branches: \[main\]/);
-  assert.match(runtimeWorkflow, /google-chrome/);
-  assert.match(runtimeWorkflow, /--headless=new/);
-  assert.match(runtimeWorkflow, /data-media-library-version="2"/);
-  assert.doesNotMatch(runtimeWorkflow, /node scripts\/verify-production\.mjs/);
-  assert.doesNotMatch(runtimeWorkflow, /CLOUDFLARE_API_TOKEN|secrets\./);
 });
