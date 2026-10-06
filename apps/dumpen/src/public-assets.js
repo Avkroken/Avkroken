@@ -486,7 +486,7 @@ export async function uploadPublicAsset(
 
     const object = await bucket.head(target.key);
     const asset = object
-      ? assetRecord(object)
+      ? publicAssetRecord(object)
       : {
           key: target.key,
           ...appAssetMetadata(target.key),
