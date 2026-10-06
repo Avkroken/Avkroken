@@ -745,6 +745,23 @@ test("querybaserade assetfilnamn avkodas exakt en gång", async () => {
   assert.match(result.asset.key, /^uploads\/[0-9a-f]{32}\/100%\.png$/);
 });
 
+test("lyckad assetmutation behåller success om lock-release misslyckas", async () => {
+  const transfers = fakeR2();
+  transfers.get = async () => {
+    throw new Error("simulated lock cleanup failure");
+  };
+  const assets = fakeR2();
+
+  const response = await worker.fetch(request("/api/assets/uploads?name=committed.txt", {
+    method: "POST",
+    body: "committed",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), env(transfers, assets));
+
+  assert.equal(response.status, 201);
+  assert.equal(assets.keys().some((key) => key.endsWith("/committed.txt")), true);
+});
+
 test("utgånget asset-mutationslås återtas atomiskt via etag", async () => {
   const transfers = fakeR2([{
     key: "_system/asset-mutation-lock.json",
