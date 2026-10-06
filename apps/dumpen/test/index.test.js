@@ -798,6 +798,49 @@ test("samtidiga assetmutationer väntar på låset utan att kräva klientomskick
   assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
 });
 
+test("theme staging och adminupload delar samma asset-kvotlås", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const e = env(transfers, assets);
+  const ticket = await mintAssetTicket(e, "staging/themes-v2/apps/plex/plex-2.png");
+
+  const originalList = assets.list.bind(assets);
+  let releaseFirst;
+  let firstList = true;
+  assets.list = async (options = {}) => {
+    if (firstList) {
+      firstList = false;
+      await new Promise((resolve) => { releaseFirst = resolve; });
+    }
+    return originalList(options);
+  };
+
+  const adminPromise = worker.fetch(request("/api/assets/uploads?name=first.txt", {
+    method: "POST",
+    body: "first",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+
+  while (!transfers.has("_system/asset-mutation-lock.json")) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const stagingPromise = worker.fetch(request(new URL(ticket.uploadUrl).pathname, {
+    method: "PUT",
+    body: PNG_BODY,
+    headers: { "content-type": "image/png" },
+  }), e);
+
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  releaseFirst();
+
+  const [admin, staging] = await Promise.all([adminPromise, stagingPromise]);
+  assert.equal(admin.status, 201);
+  assert.equal(staging.status, 201);
+  assert.equal(assets.has("staging/themes-v2/apps/plex/plex-2.png"), true);
+  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+});
+
 test("asset item delete tar canonical appbild och mirror atomärt ur biblioteket", async () => {
   const assets = fakeR2([
     {
