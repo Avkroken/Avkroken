@@ -82,7 +82,7 @@ export function homePage(stats, limits) {
     <aside class="hero-card" aria-label="Åtkomstmodell">
       <small>Åtkomstmodell</small>
       <strong>Privat kontrollplan.<br>Publika assets.</strong>
-      <p>Transferer hålls privata. Appbilder och andra publika assets levereras via exakta <span class="accent">logos.denied.se</span>-länkar utan publik bucket-listning.</p>
+      <p>Transferer hålls privata. Launcher-loggor, temabilder och andra publika assets levereras via exakta <span class="accent">logos.denied.se</span>-länkar utan publik bucket-listning.</p>
     </aside>
   </section>
 
