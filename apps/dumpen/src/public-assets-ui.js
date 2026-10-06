@@ -17,7 +17,7 @@ export function publicAssetsCss() {
     ".asset-dropzone{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:18px;border:1px dashed var(--line-strong);border-radius:14px;background:var(--bg-deep);transition:border-color .15s,background .15s}.asset-dropzone[data-drag=true]{border-color:var(--green);background:color-mix(in srgb,var(--green) 7%,var(--bg-deep))}.asset-dropzone strong{display:block;font-size:14px}.asset-dropzone p{margin:3px 0 0;color:var(--muted);font-size:11px}.asset-dropzone input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}",
     ".asset-upload-config{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:10px}.asset-upload-config label,.asset-filter{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.asset-upload-config select,.asset-filter select,.asset-search input{width:100%;min-height:40px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:9px;background:var(--bg-deep);color:var(--text);font:inherit;text-transform:none;letter-spacing:normal}.asset-upload-options{display:flex!important;grid-auto-flow:column;justify-content:start;align-items:center;gap:7px!important;text-transform:none!important;letter-spacing:normal!important}.asset-upload-options input{width:17px;height:17px;accent-color:var(--green)}",
     ".asset-queue{display:grid;gap:7px;margin-top:10px}.asset-queue[hidden]{display:none}.asset-queue-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-deep)}.asset-queue-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#050805}.asset-queue-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700}.asset-queue-meta{margin-top:2px;color:var(--muted);font-size:9px}.asset-progress{height:4px;margin-top:5px;border-radius:99px;background:var(--panel-2);overflow:hidden}.asset-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--purple))}.asset-queue-actions{display:flex;gap:4px}.asset-queue-actions button{min-height:28px;padding:3px 6px;font-size:9px}",
-    ".asset-toolbar{display:grid;grid-template-columns:minmax(180px,1.5fr) repeat(4,minmax(110px,1fr));gap:8px;margin:16px 0 8px}.asset-search{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}",
+    ".asset-toolbar{display:grid;grid-template-columns:minmax(180px,1.5fr) repeat(5,minmax(105px,1fr));gap:8px;margin:16px 0 8px}.asset-search{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}",
     ".asset-nav{display:flex;align-items:center;gap:7px;min-height:34px;margin:8px 0;color:var(--muted);font-size:11px;overflow-x:auto;white-space:nowrap}.asset-nav button{min-height:30px;padding:4px 8px;background:transparent;color:var(--text);border-color:var(--line);font-size:11px}.asset-nav-sep{color:var(--muted)}.asset-status{min-height:22px;margin:5px 0;color:var(--muted);font-size:11px}",
     ".asset-app-grid,.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;width:100%;margin-top:10px}.asset-app{position:relative;min-width:0;aspect-ratio:1/1;padding:0;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--bg-deep);color:var(--text);text-align:left}.asset-app:hover,.asset-app:focus-visible{border-color:var(--line-strong);filter:none}.asset-app img{width:100%;height:100%;display:block;object-fit:cover}.asset-app-shade{position:absolute;inset:auto 0 0;padding:34px 9px 9px;background:linear-gradient(transparent,rgba(0,0,0,.88));pointer-events:none}.asset-app-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:760}.asset-app-count{display:block;margin-top:2px;color:#dce7f8;font-size:9px}",
     ".asset-card{min-width:0;border:1px solid var(--line);border-radius:13px;background:var(--bg-deep);overflow:hidden}.asset-preview{position:relative;aspect-ratio:1/1;display:block;width:100%;padding:0;border:0;border-radius:0;background:#050805;overflow:hidden}.asset-preview img{display:block;width:100%;height:100%;object-fit:cover}.asset-card-caption{padding:8px;min-width:0}.asset-card-title{display:flex;align-items:center;justify-content:space-between;gap:5px}.asset-card-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.asset-size{flex:0 0 auto;color:var(--muted);font-size:9px}.asset-card-sub{margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9px}.asset-card-actions{display:flex;gap:5px;margin-top:7px}.asset-card-actions button,.asset-card-actions a{flex:1;min-width:0;min-height:28px;padding:3px 5px;border-radius:7px;font-size:9px;text-align:center}.asset-card-actions a{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-strong);color:var(--text);text-decoration:none}",
@@ -50,6 +50,7 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-filter\">App<select id=\"asset-filter-app\"><option value=\"\">Alla appar</option></select></label>",
     "<label class=\"asset-filter\">Tema<select id=\"asset-filter-theme\"><option value=\"\">Alla teman</option></select></label>",
     "<label class=\"asset-filter\">Storlek<select id=\"asset-filter-size\"><option value=\"\">Original 1254</option><option value=\"512\">512</option><option value=\"256\">256</option><option value=\"all\">Alla</option></select></label>",
+    "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"app\">Appbilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
     "<label class=\"asset-filter\">Sortera<select id=\"asset-sort\"><option value=\"app\">App / tema</option><option value=\"newest\">Nyast</option><option value=\"oldest\">Äldst</option><option value=\"name\">Namn</option></select></label>",
     "</div>",
     "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><span id=\"asset-nav-current\">Apps</span></nav>",
@@ -68,11 +69,12 @@ export function resolveAssetFilter(options) {
   const app = value.app || "";
   const size = value.size || "";
   const theme = value.theme || "";
+  const type = value.type || "";
   const search = String(value.search || "").trim().toLocaleLowerCase("sv");
-  const browseApps = !app && !size && !theme && !search;
+  const browseApps = !app && !size && !theme && !type && !search;
   const implicitOriginal = !search && !size && (app || theme);
   const effectiveSize = size === "all" ? "" : (size || (implicitOriginal ? "1254" : ""));
-  return { app: app, size: size, theme: theme, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
+  return { app: app, size: size, theme: theme, type: type, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
 }
 
 export function filterAssetRecords(assets, filters) {
@@ -80,6 +82,8 @@ export function filterAssetRecords(assets, filters) {
   if (resolved.browseApps) return [];
   return assets.filter(function(asset) {
     const pixel = asset.pixelSize ? String(asset.pixelSize) : "";
+    const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
+    const kind = appImage ? "app" : (asset.image ? "image" : "file");
     const haystack = [
       asset.name, asset.key, asset.appLabel, asset.appCategory,
       asset.themeLabel, asset.theme, asset.pixelLabel, asset.contentType,
@@ -87,6 +91,7 @@ export function filterAssetRecords(assets, filters) {
     return (!resolved.app || asset.appCategory === resolved.app)
       && (!resolved.theme || asset.theme === resolved.theme)
       && (!resolved.effectiveSize || pixel === resolved.effectiveSize)
+      && (!resolved.type || kind === resolved.type)
       && (!resolved.search || haystack.includes(resolved.search));
   });
 }
@@ -112,7 +117,8 @@ export function filterAssetCards(cards, filters) {
     const show = !resolved.browseApps
       && (!resolved.app || card.dataset.app === resolved.app)
       && (!resolved.theme || card.dataset.theme === resolved.theme)
-      && (!resolved.effectiveSize || card.dataset.size === resolved.effectiveSize);
+      && (!resolved.effectiveSize || card.dataset.size === resolved.effectiveSize)
+      && (!resolved.type || resolved.type === "app");
     card.hidden = !show;
     if (show) visible += 1;
   }
