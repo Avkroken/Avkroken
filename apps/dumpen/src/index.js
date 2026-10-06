@@ -567,11 +567,11 @@ export default {
       try {
         payload = await req.json();
       } catch {}
-      const feature = String(payload?.feature || "admin-client").slice(0, 80);
-      const message = String(payload?.message || "unknown client error").slice(0, 240);
+      const feature = String(payload?.feature || "admin-client").replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 80);
+      const name = String(payload?.name || "Error").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
       console.error("Dumpen admin client error", {
         feature,
-        message,
+        name,
         userAgent: String(req.headers.get("user-agent") || "").slice(0, 180),
       });
       return new Response(null, {
