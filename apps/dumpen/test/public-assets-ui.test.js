@@ -94,6 +94,20 @@ test("media library markup exposes the production runtime marker", () => {
   assert.match(publicAssetsMarkup(), /data-deployment-contract="provider-version"/);
 });
 
+test("media library uses native iOS-compatible file inputs", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-photo-files" type="file" multiple accept="image\/\*"/);
+  assert.match(markup, /id="asset-files" type="file" multiple/);
+  assert.match(markup, /Bildbibliotek \/ Kamera/);
+  assert.match(markup, /Filer \/ iCloud Drive/);
+  assert.doesNotMatch(markup, /id="choose-assets"/);
+
+  const script = publicAssetsScript();
+  assert.doesNotMatch(script, /asset-files"\)\.click\(\)/);
+  assert.doesNotMatch(script, /asset-replace-file"\)\.click\(\)/);
+  assert.match(script, /#asset-photo-files/);
+});
+
 test("media library script contains queue, progress, clipboard and item mutations", () => {
   const handlers = [];
   const selects = Array.from({ length: 5 }, () => ({
