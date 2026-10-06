@@ -130,7 +130,7 @@ Efter en **avsedd** deployment:
 npm run verify:production
 ```
 
-Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke och kan blockeras av Dumpens edge-/bot-skydd. Den automatiska canonical runtime-verifieringen körs därför separat i GitHub Actions med headless Chrome och kräver `data-media-library-version="2"` i den renderade production-DOM:en. En grön PR-/preview-build räknas inte som productionbevis.
+Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke och kan blockeras av Dumpens edge-/bot-skydd. Canonical automatiserad deployment-verifiering sker därför provider-side i Cloudflare Workers Builds: deploykommandots strukturerade `version_id` måste efteråt finnas i `wrangler deployments status --json` med 100 % produktionstrafik. En grön PR-/preview-build räknas inte som productionbevis.
 
 Produktionsverifieringen kompletterar lokala tester; den ersätter dem inte.
 
@@ -157,7 +157,7 @@ Wrangler-konfigurationen har persistent logs/traces med sampling och query-strin
 
 `Avkroken/Avkroken/.github/workflows/ci.yml` äger PR-/merge-group-checken `Dumpen` och kör `npm ci --ignore-scripts --no-audit --no-fund` följt av `npm run check` i `apps/dumpen`.
 
-Repositoryts produktionsmodell är Cloudflare Workers Builds. Workern ska skapas/importeras från repository `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med deploy command `npm run deploy:workers-builds`. Scriptet kör appgaten och `wrangler deploy --strict` endast från `main`; när Cloudflare startar samma build command för en PR-/feature-branch avslutas den explicit utan deployment. Scriptet skapar inga tokens eller runtime-secrets. GitHub Actions-workflowen `Dumpen production runtime` är credential-fri och **deployar inte**; den verifierar endast den publika runtime-DOM:en med headless Chrome efter main-push.
+Repositoryts produktionsmodell är Cloudflare Workers Builds. Workern ska skapas/importeras från repository `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med deploy command `npm run deploy:workers-builds`. Scriptet kör appgaten och `wrangler deploy --strict` endast från `main`, fångar Wranglers strukturerade deploy-output via `WRANGLER_OUTPUT_FILE_PATH` och verifierar därefter att samma `version_id` är aktiv på minst 99,99 % av produktionstrafiken via `wrangler deployments status --json`. När Cloudflare startar samma build command för en PR-/feature-branch avslutas den explicit utan deployment. Scriptet skapar inga tokens eller runtime-secrets.
 
 Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkonfigurationen är tom och ärver därför inte production-R2, Secrets Store eller authvars. Previewbuilden får inte använda production-data som genväg.
 
@@ -177,3 +177,8 @@ Live-verifiering 2026-10-02 visar att `dumpen` och `avkroken-assets` finns i det
 - Session: signerad `__Host-dumpen_session`, HttpOnly, Secure, SameSite=Lax, 12 h max.
 - OAuth access token används endast för identitetsuppslag och revokeras efter callback.
 - `GITHUB_OAUTH_CLIENT_SECRET` hämtas från Cloudflare Secrets Store och får inte kopieras till GitHub Actions eller repositoryt.
+
+
+### Automatiserad edge-verifiering
+
+Verifiering 2026-10-06 från GitHub-hostad runner visade att vanlig Node `fetch()` mot `https://dumpen.denied.se/` konsekvent får HTTP 403 och att headless Chrome inte får appens DOM. Extern CI ska därför inte användas som canonical bevis på Dumpens renderade production-UI utan en uttryckligen provisionerad machine-access-väg. Provider-state för aktiv Worker-version är den automatiserade deploymentkällan; visuell browserverifiering ska beskrivas separat när den faktiskt har observerats.
