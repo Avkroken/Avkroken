@@ -37,6 +37,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
+      - name: Verify sharp security floor
+        run: node scripts/check-sharp-security-floor.mjs portal
       - name: Validate portal Worker
         working-directory: apps/portal
         run: |
@@ -57,6 +59,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
+      - name: Verify sharp security floor
+        run: node scripts/check-sharp-security-floor.mjs skvallerbyttan
       - name: Validate Skvallerbyttan
         working-directory: apps/skvallerbyttan
         run: |
@@ -95,6 +99,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
+      - name: Verify sharp security floor
+        run: node scripts/check-sharp-security-floor.mjs jobb
       - name: Validate Jobb
         working-directory: apps/jobb
         run: |
@@ -115,6 +121,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
+      - name: Verify sharp security floor
+        run: node scripts/check-sharp-security-floor.mjs dumpen
       - name: Validate Dumpen
         working-directory: apps/dumpen
         run: |
@@ -131,6 +139,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "24"
+      - name: Verify sharp security floor
+        run: node scripts/check-sharp-security-floor.mjs spam-filter
       - name: Validate spam filter Worker
         working-directory: apps/spam-filter
         run: |
