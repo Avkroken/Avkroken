@@ -1062,6 +1062,23 @@ test("dubbla snedstreck kan inte kringgå Access-routens sökväg", async () => 
 });
 
 
+test("admin client errors are session protected and accepted without payload echo", async () => {
+  const denied = await worker.fetch(request("/api/client-error", {
+    method: "POST",
+    body: JSON.stringify({ feature: "media-library-bootstrap", name: "TypeError" }),
+    headers: { "content-type": "application/json" },
+  }), env());
+  assert.equal(denied.status, 401);
+
+  const accepted = await worker.fetch(request("/api/client-error", {
+    method: "POST",
+    body: JSON.stringify({ feature: "media-library-bootstrap", name: "TypeError" }),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "application/json" },
+  }), env());
+  assert.equal(accepted.status, 204);
+  assert.equal(await accepted.text(), "");
+});
+
 test("publik startsida leder till GitHub Auth före privata kontrollpanelen", async () => {
   const publicPage = await worker.fetch(request("/"), env());
   const publicHtml = await publicPage.text();
@@ -1104,4 +1121,9 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /loadAssets/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
+  assert.match(adminHtml, /<form[^>]+action="\/auth\/logout"[^>]+method="post"/);
+  assert.match(adminHtml, /id="asset-apps"/);
+  assert.match(adminHtml, /Laddar mediebibliotek/);
+  assert.match(adminHtml, /\.badge:empty\{display:none\}/);
+  assert.match(adminHtml, /dumpenClientError/);
 });

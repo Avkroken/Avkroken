@@ -559,6 +559,27 @@ export default {
       });
     }
 
+    if (segments[0] === "api" && segments[1] === "client-error") {
+      if (req.method !== "POST") return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      let payload = {};
+      try {
+        payload = await req.json();
+      } catch {}
+      const feature = String(payload?.feature || "admin-client").replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 80);
+      const name = String(payload?.name || "Error").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+      console.error("Dumpen admin client error", {
+        feature,
+        name,
+        userAgent: String(req.headers.get("user-agent") || "").slice(0, 180),
+      });
+      return new Response(null, {
+        status: 204,
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
     if (segments[0] === "api" && segments[1] === "assets" && segments.length === 2) {
       if (req.method !== "GET") return new Response("method\n", { status: 405 });
       const denied = await adminDenied(req, env);

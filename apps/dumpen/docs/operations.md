@@ -157,7 +157,7 @@ Kontrollera binding, key och operationstyp innan applikationslogik ändras. Undv
 
 ### Observability
 
-Wrangler-konfigurationen har persistent logs/traces med sampling och query-string-redaction. Behåll redaction vid felsökning; öka inte datainsamlingen permanent bara för att lösa ett enskilt fel.
+Wrangler-konfigurationen har persistent logs/traces med sampling och query-string-redaction. Behåll redaction vid felsökning; öka inte datainsamlingen permanent bara för att lösa ett enskilt fel. Admin-klienten rapporterar sanerade bootstrap/runtimefel till sessionsskyddade `POST /admin/api/client-error`; loggen innehåller endast en kontrollerad `feature`-kod, Error-typ och User-Agent från requesten — aldrig browserns fria feltext, filnamn, assetinnehåll eller credentialvärden. Om `/admin` returnerar 200 men inga `/admin/api/assets`- eller `/admin/api/objects`-requests följer, kontrollera `Dumpen admin client error` innan R2 felsöks. Logout ska fungera via native POST-form även om JavaScript är trasigt.
 
 ## CI och Workers Builds
 

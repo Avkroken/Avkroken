@@ -41,8 +41,8 @@ export function homePage(stats, limits) {
     .status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.stat{min-width:0;padding:15px;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:var(--shadow-sm)}.stat small{color:var(--muted);display:block;margin-bottom:8px;font-size:.76rem}.stat strong{display:block;color:var(--text);font-size:1.55rem;line-height:1.2;font-weight:780;letter-spacing:-.04em;overflow-wrap:anywhere}.stat:first-child strong{color:var(--green)}.stat em{display:block;color:var(--muted);font-style:normal;margin-top:6px;font-size:.72rem}.bar{height:5px;background:var(--panel-2);border-radius:99px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--secondary));border-radius:inherit}.limits{margin-top:10px;color:var(--muted);font-size:.74rem;text-align:left}
 
     .panel{margin-top:28px;border:0;border-radius:0;overflow:visible;background:transparent;box-shadow:none}.panel-head{display:flex;align-items:center;gap:11px;padding:0 0 14px;border-bottom:1px solid var(--line)}.icon{width:22px;height:22px;color:var(--green);flex:0 0 auto}.admin{padding:16px 0 0}.admin>p{max-width:880px;color:var(--muted);margin-bottom:12px}
-    button,.button-link{font:inherit;border:1px solid var(--line-strong);background:var(--control-bg);color:var(--control-text);border-radius:11px;min-height:42px;padding:9px 13px;font-weight:750;cursor:pointer}.button-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.logout{background:transparent;color:var(--text);border-color:var(--line);min-height:40px}.auth-state{margin-top:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--green) 28%,var(--line));background:color-mix(in srgb,var(--green) 6%,var(--surface));border-radius:12px;color:var(--subtle);font-size:.82rem}.error{color:var(--danger)!important;min-height:22px;margin:8px 0 0}
-    .objects{margin-top:18px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm)}.objects-head{min-height:54px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;background:var(--surface-raised);border-bottom:1px solid var(--line)}.badge{display:inline-block;margin-left:7px;border:1px solid var(--line-strong);border-radius:999px;padding:2px 8px;color:var(--text);background:transparent;font-size:11px;font-weight:700}
+    button,.button-link{font:inherit;border:1px solid var(--line-strong);background:var(--control-bg);color:var(--control-text);border-radius:11px;min-height:42px;padding:9px 13px;font-weight:750;cursor:pointer}.button-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.logout-form{margin:0}.logout{background:transparent;color:var(--text);border-color:var(--line);min-height:40px}.auth-state{margin-top:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--green) 28%,var(--line));background:color-mix(in srgb,var(--green) 6%,var(--surface));border-radius:12px;color:var(--subtle);font-size:.82rem}.error{color:var(--danger)!important;min-height:22px;margin:8px 0 0}
+    .objects{margin-top:18px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm)}.objects-head{min-height:54px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;background:var(--surface-raised);border-bottom:1px solid var(--line)}.badge{display:inline-block;margin-left:7px;border:1px solid var(--line-strong);border-radius:999px;padding:2px 8px;color:var(--text);background:transparent;font-size:11px;font-weight:700}.badge:empty{display:none}
     .ticket{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:var(--shadow-sm)}.ticket-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ticket .code{margin-top:12px}
     .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}table{border-collapse:collapse;width:100%;min-width:720px}th,td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left;font-size:12px}th{color:var(--muted);background:var(--surface-raised);font-size:.69rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}td{color:var(--text)}tr:last-child td{border-bottom:0}.dl{color:var(--green);text-decoration:none;font-size:18px;background:none;border:0;min-height:40px;min-width:40px;padding:0}.theme-control select{border-color:var(--line)!important}.admin footer,footer{padding-top:42px;text-align:center;color:var(--muted);font-size:11px}
     a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--green);outline-offset:2px}
@@ -125,7 +125,7 @@ export function homePage(stats, limits) {
         <div class="ticket-actions"><button id="create-ticket" type="button">Skapa upload-ticket</button><span id="ticket-status" style="color:var(--muted)"></span></div>
         <pre id="ticket-output" class="code" hidden></pre>
       </div>
-      <div id="objects" class="objects"><div class="objects-head"><span>Privata transferer <span id="badge" class="badge"></span></span><button id="logout" class="logout" type="button">Logga ut</button></div><div class="table-wrap"><table><thead><tr><th>Namn</th><th>Storlek</th><th>Versioner</th><th>Äldsta version</th><th>Senast uppdaterad</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+      <div id="objects" class="objects"><div class="objects-head"><span>Privata transferer <span id="badge" class="badge"></span></span><form class="logout-form" action="/auth/logout" method="post"><button id="logout" class="logout" type="submit">Logga ut</button></form></div><div class="table-wrap"><table><thead><tr><th>Namn</th><th>Storlek</th><th>Versioner</th><th>Äldsta version</th><th>Senast uppdaterad</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
     </div>
   </section>
   <footer>Dumpen administrerar privata transferer i <code>dumpen</code> och publika assets i <code>avkroken-assets</code>. Asset-objekt kan läsas via sin exakta <code>logos.denied.se</code>-URL, men inventoryt är inte publikt.<br>Inget garanteras. Använd på egen risk.</footer>
@@ -134,15 +134,39 @@ ${themeScript()}
 <script>
 const cfg=${data},stats=cfg.stats,limits=cfg.limits;
 const $=s=>document.querySelector(s);
+window.dumpenClientError=(error,feature="admin-bootstrap")=>{
+  const message=error instanceof Error?error.message:String(error||"Okänt klientfel");
+  const name=error instanceof Error?error.name:"Error";
+  console.error("Dumpen client error",feature,error);
+  const err=$("#err"); if(err&&!err.textContent) err.textContent="Klientfelet hindrade en del av kontrollpanelen: "+message;
+  try{
+    fetch("/admin/api/client-error",{
+      method:"POST",
+      credentials:"same-origin",
+      cache:"no-store",
+      keepalive:true,
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({feature:String(feature).slice(0,80),name:String(name).slice(0,40)})
+    }).catch(()=>{});
+  }catch{}
+};
+window.addEventListener("error",event=>window.dumpenClientError(event.error||event.message,"window-error"));
+window.addEventListener("unhandledrejection",event=>window.dumpenClientError(event.reason,"unhandled-rejection"));
 const bytes=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(n<10240?1:0)+' KB':(n/1048576).toFixed(n<10485760?1:0)+' MB';
 const age=iso=>{const m=Math.max(0,Math.floor((Date.now()-new Date(iso))/60000));if(m<2)return'nyss';if(m<60)return m+' minuter sedan';const h=Math.floor(m/60);if(h<24)return h+(h===1?' timme sedan':' timmar sedan');const d=Math.floor(h/24);return d+(d===1?' dag sedan':' dagar sedan')};
 const safe=n=>{try{return decodeURIComponent(n)}catch{return n}};
 $('#storage').textContent=bytes(stats.totalBytes);const pct=Math.min(100,Math.round(stats.totalBytes/limits.maxBucketBytes*100));$('#storage-sub').textContent='av 500 MB ('+pct+'%)';$('#storage-bar').style.width=pct+'%';$('#count').textContent=stats.objectCount;$('#oldest').textContent=stats.oldestDays==null?'–':stats.oldestDays+(stats.oldestDays===1?' dag':' dagar');
 async function loadObjects(){const r=await fetch('/admin/api/objects',{cache:'no-store',credentials:'same-origin'});if(r.status===401){location.assign('/login?return_to=%2Fadmin');return}if(r.status===503)throw new Error('GitHub-inloggningen är inte konfigurerad.');if(!r.ok)throw new Error('Kunde inte läsa objektlistan.');const data=await r.json();$('#rows').replaceChildren();for(const item of data.objects){const tr=document.createElement('tr');for(const value of [safe(item.name),bytes(item.latestSize),String(item.versions),age(item.oldestUploaded),age(item.latestUploaded)]){const td=document.createElement('td');td.textContent=value;tr.append(td)}const td=document.createElement('td'),button=document.createElement('button');button.className='dl';button.type='button';button.title='Hämta senaste';button.textContent='↓';button.addEventListener('click',()=>download(item.name));td.append(button);tr.append(td);$('#rows').append(tr)}$('#badge').textContent=data.objects.length+' namn'}
 async function download(name){try{const r=await fetch('/admin/api/download/'+encodeURIComponent(name),{cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error('Kunde inte hämta filen.');const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safe(name)+'.zip';document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url)}catch(err){$('#err').textContent=err.message||'Nedladdningen misslyckades.'}}
-${publicAssetsScript()}
-if(limits.adminPage)Promise.all([loadObjects(),loadAssets()]).catch(err=>{$('#err').textContent=err.message||'Kunde inte läsa kontrollpanelen.'});
+try{${publicAssetsScript()}}catch(error){window.dumpenClientError(error,"media-library-bootstrap")}
+if(limits.adminPage){
+  const assets=typeof window.loadAssets==="function"
+    ? window.loadAssets()
+    : Promise.reject(new Error("Mediebibliotekets klient kunde inte starta."));
+  Promise.all([loadObjects(),assets]).catch(err=>{
+    const target=$("#err"); if(target&&!target.textContent) target.textContent=err.message||"Kunde inte läsa kontrollpanelen.";
+  });
+}
 $('#create-ticket')?.addEventListener('click',async()=>{$('#ticket-status').textContent='Skapar…';$('#ticket-output').hidden=true;try{const r=await fetch('/admin/api/tickets',{method:'POST',cache:'no-store',credentials:'same-origin'});if(!r.ok)throw new Error('Kunde inte skapa ticket.');const data=await r.json();$('#ticket-output').textContent=data.uploadUrl;$('#ticket-output').hidden=false;$('#ticket-status').textContent='Gäller till '+new Date(data.expiresAt).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'})}catch(err){$('#ticket-status').textContent=err.message||'Ticket kunde inte skapas.'}});
-$('#logout')?.addEventListener('click',async()=>{await fetch('/auth/logout',{method:'POST',credentials:'same-origin',cache:'no-store'});location.assign('/')});
 </script></body></html>\n`;
 }

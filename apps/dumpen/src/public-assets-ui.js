@@ -58,9 +58,9 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"launcher\">Launcher-loggor</option><option value=\"app\">Temabilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
     "<label class=\"asset-filter\">Sortera<select id=\"asset-sort\"><option value=\"app\">App / tema</option><option value=\"newest\">Nyast</option><option value=\"oldest\">Äldst</option><option value=\"name\">Namn</option></select></label>",
     "</div>",
-    "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><span id=\"asset-nav-current\">Apps</span></nav>",
-    "<div id=\"asset-status\" class=\"asset-status\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\"></div>",
-    "<div id=\"asset-empty\" class=\"asset-empty\" hidden>Inga assets matchar filtret.</div>",
+    "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><button id=\"asset-apps\" type=\"button\">Appar</button><span id=\"asset-nav-current\" class=\"asset-nav-current\" hidden></span></nav>",
+    "<div id=\"asset-status\" class=\"asset-status\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">Laddar mediebibliotek…</div>",
+    "<div id=\"asset-empty\" class=\"asset-empty\">Laddar mediebibliotek…</div>",
     "<div id=\"asset-app-grid\" class=\"asset-app-grid\" aria-label=\"Applikationer\"></div>",
     "<div id=\"asset-gallery\" class=\"gallery\" hidden aria-label=\"Bilder\"></div>",
     "<div id=\"asset-other-files\" class=\"asset-files\" hidden><details><summary id=\"asset-file-summary\">Övriga filer</summary><div id=\"asset-file-list\" class=\"asset-file-list\"></div></details></div>",
@@ -395,7 +395,9 @@ function assetClient() {
       if (option) parts.push(option.textContent);
     }
     if (filters.search) parts.push("Sök: " + filters.search);
-    q("#asset-nav-current").textContent = parts.length ? parts.join(" › ") : "Apps";
+    const current = q("#asset-nav-current");
+    current.textContent = parts.length ? "› " + parts.join(" › ") : "";
+    current.hidden = parts.length === 0;
   }
 
   function applyFilters(scroll) {
@@ -438,14 +440,28 @@ function assetClient() {
   }
 
   async function loadAssets() {
-    const response = await fetch("/admin/api/assets", { cache:"no-store", credentials:"same-origin" });
-    if (response.status === 401) {
-      location.assign("/login?return_to=%2Fadmin");
-      return;
+    const status = q("#asset-status");
+    if (status) status.textContent = "Laddar mediebibliotek…";
+    try {
+      const response = await fetch("/admin/api/assets", { cache:"no-store", credentials:"same-origin" });
+      if (response.status === 401) {
+        location.assign("/login?return_to=%2Fadmin");
+        return;
+      }
+      if (!response.ok) throw new Error("Kunde inte läsa mediebiblioteket.");
+      const data = await response.json();
+      renderAssets(data.assets || [], data.assetState || "available");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Kunde inte läsa mediebiblioteket.";
+      const empty = q("#asset-empty");
+      if (status) status.textContent = message;
+      if (empty) {
+        empty.textContent = message;
+        empty.hidden = false;
+      }
+      if (typeof window.dumpenClientError === "function") window.dumpenClientError(error, "media-library-load");
+      throw error;
     }
-    if (!response.ok) throw new Error("Kunde inte läsa mediebiblioteket.");
-    const data = await response.json();
-    renderAssets(data.assets || [], data.assetState || "available");
   }
 
   function fact(label, value) {
@@ -812,62 +828,88 @@ function assetClient() {
     }
   }
 
-  bindAssetFilterChanges(["#asset-filter-app","#asset-filter-size","#asset-filter-theme","#asset-filter-type","#asset-sort"].map(q), function() { applyFilters(false); });
-  q("#asset-search").addEventListener("input", function() { applyFilters(false); });
-  q("#asset-home").addEventListener("click", function() {
-    q("#asset-filter-app").value = "";
-    q("#asset-filter-theme").value = "";
-    q("#asset-filter-size").value = "";
-    q("#asset-filter-type").value = "";
-    q("#asset-search").value = "";
-    applyFilters(false);
-  });
+  window.loadAssets=loadAssets;
+  window.renderAssets=renderAssets;
 
-  function syncUploadMode() {
-    q("#asset-theme-config").hidden = q("#asset-upload-kind").value !== "app";
+  function reportBootstrap(error) {
+    if (typeof window.dumpenClientError === "function") window.dumpenClientError(error, "media-library-bootstrap");
   }
-  q("#asset-upload-kind").addEventListener("change", syncUploadMode);
-  syncUploadMode();
+  function on(selector, type, handler) {
+    const element = q(selector);
+    if (!element) {
+      reportBootstrap(new Error("Saknat admin-element: " + selector));
+      return null;
+    }
+    element.addEventListener(type, handler);
+    return element;
+  }
+  function resetLibrary() {
+    const app = q("#asset-filter-app"), theme = q("#asset-filter-theme"), size = q("#asset-filter-size");
+    const type = q("#asset-filter-type"), search = q("#asset-search");
+    if (app) app.value = "";
+    if (theme) theme.value = "";
+    if (size) size.value = "";
+    if (type) type.value = "";
+    if (search) search.value = "";
+    applyFilters(false);
+  }
 
-  const fileInput = q("#asset-files");
-  fileInput.addEventListener("change", function() {
-    addFiles(fileInput.files);
-    fileInput.value = "";
-  });
-  q("#asset-upload-button").addEventListener("click", startSelectedUpload);
-  q("#asset-clear-button").addEventListener("click", function() {
-    if (queueRunning) return;
-    queue.forEach(function(item) { if (item.preview) URL.revokeObjectURL(item.preview); });
-    queue = [];
-    renderQueue();
-  });
-  const dropzone = q("#asset-dropzone");
-  ["dragenter","dragover"].forEach(function(type) {
-    dropzone.addEventListener(type, function(event) { event.preventDefault(); dropzone.dataset.drag = "true"; });
-  });
-  ["dragleave","drop"].forEach(function(type) {
-    dropzone.addEventListener(type, function(event) { event.preventDefault(); dropzone.dataset.drag = "false"; });
-  });
-  dropzone.addEventListener("drop", function(event) { addFiles(event.dataTransfer.files); });
-  document.addEventListener("paste", function(event) {
-    const files = Array.from(event.clipboardData && event.clipboardData.files || []);
-    if (files.length) addFiles(files);
-  });
+  try {
+    bindAssetFilterChanges(["#asset-filter-app","#asset-filter-size","#asset-filter-theme","#asset-filter-type","#asset-sort"].map(q), function() { applyFilters(false); });
+    on("#asset-search", "input", function() { applyFilters(false); });
+    on("#asset-home", "click", resetLibrary);
+    on("#asset-apps", "click", resetLibrary);
 
-  q("#asset-dialog-close").addEventListener("click", function() { q("#asset-dialog").close(); });
-  q("#asset-dialog").addEventListener("click", function(event) { if (event.target === q("#asset-dialog")) q("#asset-dialog").close(); });
-  q("#asset-dialog-copy").addEventListener("click", async function() { if (detailAsset) { await copyText(detailAsset.directUrl); q("#asset-status").textContent = "Direktlänken är kopierad."; } });
-  q("#asset-dialog-open").addEventListener("click", function() { if (detailAsset) window.open(detailAsset.directUrl, "_blank", "noopener"); });
-  q("#asset-dialog-download").addEventListener("click", function() { downloadDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
-  q("#asset-dialog-delete").addEventListener("click", function() { deleteDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
-  q("#asset-replace-file").addEventListener("change", function() {
-    const file = q("#asset-replace-file").files[0];
-    q("#asset-replace-file").value = "";
-    replaceDetail(file).catch(function(error) { q("#asset-status").textContent = error.message; });
-  });
+    function syncUploadMode() {
+      const config = q("#asset-theme-config"), kind = q("#asset-upload-kind");
+      if (config && kind) config.hidden = kind.value !== "app";
+    }
+    on("#asset-upload-kind", "change", syncUploadMode);
+    syncUploadMode();
 
-  window.loadAssets = loadAssets;
-  window.renderAssets = renderAssets;
+    const fileInput = on("#asset-files", "change", function() {
+      addFiles(fileInput.files);
+      fileInput.value = "";
+    });
+    on("#asset-upload-button", "click", startSelectedUpload);
+    on("#asset-clear-button", "click", function() {
+      if (queueRunning) return;
+      queue.forEach(function(item) { if (item.preview) URL.revokeObjectURL(item.preview); });
+      queue = [];
+      renderQueue();
+    });
+    const dropzone = q("#asset-dropzone");
+    if (dropzone) {
+      ["dragenter","dragover"].forEach(function(type) {
+        dropzone.addEventListener(type, function(event) { event.preventDefault(); dropzone.dataset.drag = "true"; });
+      });
+      ["dragleave","drop"].forEach(function(type) {
+        dropzone.addEventListener(type, function(event) { event.preventDefault(); dropzone.dataset.drag = "false"; });
+      });
+      dropzone.addEventListener("drop", function(event) { addFiles(event.dataTransfer.files); });
+    } else {
+      reportBootstrap(new Error("Saknat admin-element: #asset-dropzone"));
+    }
+    document.addEventListener("paste", function(event) {
+      const files = Array.from(event.clipboardData && event.clipboardData.files || []);
+      if (files.length) addFiles(files);
+    });
+
+    on("#asset-dialog-close", "click", function() { const dialog=q("#asset-dialog"); if (dialog) dialog.close(); });
+    on("#asset-dialog", "click", function(event) { const dialog=q("#asset-dialog"); if (dialog && event.target === dialog) dialog.close(); });
+    on("#asset-dialog-copy", "click", async function() { if (detailAsset) { await copyText(detailAsset.directUrl); q("#asset-status").textContent = "Direktlänken är kopierad."; } });
+    on("#asset-dialog-open", "click", function() { if (detailAsset) window.open(detailAsset.directUrl, "_blank", "noopener"); });
+    on("#asset-dialog-download", "click", function() { downloadDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
+    on("#asset-dialog-delete", "click", function() { deleteDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
+    on("#asset-replace-file", "change", function() {
+      const input = q("#asset-replace-file");
+      const file = input && input.files ? input.files[0] : null;
+      if (input) input.value = "";
+      replaceDetail(file).catch(function(error) { q("#asset-status").textContent = error.message; });
+    });
+  } catch (error) {
+    reportBootstrap(error);
+  }
 }
 
 export function publicAssetsScript() {
