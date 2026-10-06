@@ -1,6 +1,6 @@
 # Projektkontext
 
-**Senast verifierad:** 2026-10-02
+**Senast verifierad:** 2026-10-06
 
 ## Ansvar
 
@@ -70,7 +70,9 @@ Temavalet använder `localStorage["avkroken.theme"]` och, på denied.se, present
 
 R2-bucketen `dumpen` är durable storage för privata transferer och privat capability-state. Den befintliga `avkroken-assets`-bucketen är separat assetlager och binds som `ASSETS`. Dumpens logiska App Launcher-inventory använder canonical `apps/...`-objekt, döljer `hotlink-ok/apps/...`-speglar och ofärdiga `staging/...`-objekt och behandlar äldre `<app>-256.png` som legacy så de inte skapar falska teman. Andra objekt under `hotlink-ok/` behålls i inventoryn.
 
-Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`. Temabilder använder `<app>-<tema>.png` som original och `<app>-<tema>-256.png` respektive `<app>-<tema>-512.png` som normaliserade storleksvarianter; UI:t härleder appkategori, tema och pixelstorlek från detta kontrakt och kan filtrera på alla tre. Nya generiska admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL.
+Direktlänkar härleds från object key och den verifierade custom domainen `https://logos.denied.se`. Temabilder använder `<app>-<tema>.png` som original och `<app>-<tema>-256.png` respektive `<app>-<tema>-512.png` som normaliserade storleksvarianter. Media Library kan söka, filtrera på typ/app/tema/storlek och sortera inventoryt och använder ett separat `/admin/api/assets`-flöde från privata transferer. Nya generiska admin-uppladdningar lagras under `uploads/<random-id>/<filename>` för att undvika namnkonflikter och får motsvarande stabila URL.
+
+Appuploads kan ange app, tema och storlek explicit; servern härleder då canonical key oberoende av det lokala filnamnet. Äldre namnkonventioner fortsätter fungera som fallback. Replace behåller canonical URL, och delete är begränsad till servergenererade uploads eller canonical appassets; en canonical app-delete tar också dess dolda hotlink-spegel. Media Library-klienten använder drag/drop/clipboard, individuell uploadprogress och högst tre aktiva uploads. För att behålla 500 MB-appgränsen serialiseras quota-check + R2-write för både adminuploads och theme-v2 staging med ett kortlivat privat lock i `DUMPEN`; admin-klienten retry:ar lock-konflikter automatiskt. Mutable assets använder kort cache-TTL eftersom replace behåller samma publika URL.
 
 Tema-v2-produktion använder en separat engångscapability: en adminsession eller det lokala driftkommandot mintar en 15-minuters ticket i privata `DUMPEN`; den publika capability-URL:n `/api/asset-upload/<token>` får därefter göra exakt en PNG-write till en förutbestämd nyckel under `staging/themes-v2/apps/<app>/<app>-<1..7>.png`. Capabilityn accepterar inte canonical `apps/...`-nycklar, andra appar eller andra teman, skriver inte över befintlig staging-fil och försvinner efter lyckad användning. Dumpen exponerar ingen publik inventory-route; endast R2-custom-domainens exakta object-URL:er är publika.
 

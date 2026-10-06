@@ -308,7 +308,7 @@ function appAssetMetadata(key) {
   };
 }
 
-function assetRecord(object) {
+export function publicAssetRecord(object) {
   const key = String(object.key || "");
   if (!key) return null;
   const fallbackName = key.split("/").pop() || key;
@@ -354,7 +354,7 @@ async function listAll(bucket, options = {}) {
 export async function listPublicAssets(bucket) {
   const objects = await listAll(bucket);
   return objects
-    .map(assetRecord)
+    .map(publicAssetRecord)
     .filter((asset) => asset && !asset.mirror && !asset.legacy && !asset.key.startsWith("staging/"))
     .sort((a, b) => {
       if (a.app && b.app) {
@@ -486,7 +486,7 @@ export async function uploadPublicAsset(
 
     const object = await bucket.head(target.key);
     const asset = object
-      ? assetRecord(object)
+      ? publicAssetRecord(object)
       : {
           key: target.key,
           ...appAssetMetadata(target.key),
@@ -518,7 +518,7 @@ export async function uploadPublicAsset(
   await bucket.put(key, body, {
     httpMetadata: {
       contentType,
-      cacheControl: "max-age=31536000",
+      cacheControl: "public, max-age=300",
     },
     customMetadata: {
       originalName: name,
