@@ -130,6 +130,8 @@ Efter en **avsedd** deployment:
 npm run verify:production
 ```
 
+Production-verifieringen är versionsbunden: den kräver HTTP 200 **och** `data-media-library-version="2"` i den serverade HTML:n. En grön PR-/preview-build räknas därför inte som bevis på att Media Library v2 ligger live; först production-responsen är canonical.
+
 Produktionsverifieringen kompletterar lokala tester; den ersätter dem inte.
 
 ## Felsökning
