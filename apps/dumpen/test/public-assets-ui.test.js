@@ -169,7 +169,9 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.match(script, /\/admin\/api\/assets\/item/);
   assert.match(script, /asset_upload_busy/);
   assert.match(script, /setTimeout\(runQueue, 0\)/);
-  assert.match(script, /Explicit Temabild-läge använder en canonical slot åt gången/);
+  assert.match(script, /Manuell temabild kräver exakt en vald fil/);
+  assert.match(script, /state === "staged"/);
+  assert.match(script, /uploadConfig/);
   assert.match(script, /#asset-filter-type/);
   assert.match(script, /asset\.mutable === true/);
   assert.match(script, /showModal/);
