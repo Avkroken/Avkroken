@@ -38,6 +38,11 @@ function normalizedContentType(value, name) {
   return String(value || "").split(";", 1)[0].trim().toLowerCase() || contentTypeFromName(name);
 }
 
+function encodeRfc5987Value(value) {
+  return encodeURIComponent(String(value))
+    .replace(/['()*]/g, (character) => "%" + character.charCodeAt(0).toString(16).toUpperCase());
+}
+
 function appTargetForKey(key) {
   const match = String(key || "").match(/^apps\/([^/]+)\/([^/]+)$/);
   if (!match) return null;
@@ -119,7 +124,7 @@ export async function downloadAsset(bucket, key) {
   const headers = new Headers({
     "cache-control": "private, no-store",
     "content-type": normalizedContentType(object.httpMetadata?.contentType, filename),
-    "content-disposition": `attachment; filename="asset"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    "content-disposition": `attachment; filename="asset"; filename*=UTF-8''${encodeRfc5987Value(filename)}`,
     "x-content-type-options": "nosniff",
   });
   return { response: new Response(object.body, { status: 200, headers }) };
@@ -175,7 +180,7 @@ export async function replaceAsset(request, bucket, key, limits) {
   await bucket.put(mutation.key, body, {
     httpMetadata: {
       contentType,
-      cacheControl: "max-age=31536000",
+      cacheControl: "public, max-age=300",
     },
     customMetadata: {
       ...current.customMetadata,
