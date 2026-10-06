@@ -1062,6 +1062,23 @@ test("dubbla snedstreck kan inte kringgå Access-routens sökväg", async () => 
 });
 
 
+test("admin client errors are session protected and accepted without payload echo", async () => {
+  const denied = await worker.fetch(request("/api/client-error", {
+    method: "POST",
+    body: JSON.stringify({ feature: "media-library-bootstrap", message: "boom" }),
+    headers: { "content-type": "application/json" },
+  }), env());
+  assert.equal(denied.status, 401);
+
+  const accepted = await worker.fetch(request("/api/client-error", {
+    method: "POST",
+    body: JSON.stringify({ feature: "media-library-bootstrap", message: "boom" }),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "application/json" },
+  }), env());
+  assert.equal(accepted.status, 204);
+  assert.equal(await accepted.text(), "");
+});
+
 test("publik startsida leder till GitHub Auth före privata kontrollpanelen", async () => {
   const publicPage = await worker.fetch(request("/"), env());
   const publicHtml = await publicPage.text();
