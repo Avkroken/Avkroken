@@ -87,7 +87,7 @@ npm ci --ignore-scripts --no-audit --no-fund
 npm run check
 ```
 
-Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. På `main` kör scriptet `npm run check`, deployar och avslutar med `npm run verify:production`. Om Cloudflare anropar samma entrypoint för en annan branch avslutas körningen framgångsrikt utan deployment; feature-/PR-branches får alltså aldrig producera en Dumpen-produktionsdeploy. Denna GitHub-import är den avsedda mekanismen för att återskapa Workern.
+Root-CI kör samma appgate som checken `Dumpen`. Cloudflare Workers Builds ska kopplas till `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med `npm run deploy:workers-builds` som produktionsentrypoint. På `main` kör scriptet `npm run check` och deployar med Wrangler; post-deploy HTTP-verifiering ligger inte i Cloudflare-builden eftersom Dumpens edge-/bot-skydd svarar 403 till maskinella fetch-klienter. I stället verifierar credential-fria GitHub-checken `Dumpen production runtime` den publika sidan med headless Chrome och kräver Media Library v2-markören i renderad DOM. Om Cloudflare anropar samma entrypoint för en annan branch avslutas körningen framgångsrikt utan deployment; feature-/PR-branches får alltså aldrig producera en Dumpen-produktionsdeploy.
 
 `wrangler.jsonc` har dessutom ett explicit tomt `previews`-block. Det gör branch-previews fail-closed: production-R2, Secrets Store och authvars är inte bundna i previewmiljön. En preview får därför verifiera build/runtime-skal men får inte läsa eller skriva Dumpens production-data.
 
