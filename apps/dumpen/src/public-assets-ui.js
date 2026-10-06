@@ -60,7 +60,7 @@ export function publicAssetsMarkup() {
     "</div>",
     "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><button id=\"asset-apps\" type=\"button\">Appar</button><span id=\"asset-nav-current\" class=\"asset-nav-current\" hidden></span></nav>",
     "<div id=\"asset-status\" class=\"asset-status\" role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">Laddar mediebibliotek…</div>",
-    "<div id=\"asset-empty\" class=\"asset-empty\" hidden>Inga assets matchar filtret.</div>",
+    "<div id=\"asset-empty\" class=\"asset-empty\">Laddar mediebibliotek…</div>",
     "<div id=\"asset-app-grid\" class=\"asset-app-grid\" aria-label=\"Applikationer\"></div>",
     "<div id=\"asset-gallery\" class=\"gallery\" hidden aria-label=\"Bilder\"></div>",
     "<div id=\"asset-other-files\" class=\"asset-files\" hidden><details><summary id=\"asset-file-summary\">Övriga filer</summary><div id=\"asset-file-list\" class=\"asset-file-list\"></div></details></div>",
