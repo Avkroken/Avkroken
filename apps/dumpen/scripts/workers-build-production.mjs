@@ -69,9 +69,11 @@ export function activeDeploymentVersions(status) {
   }));
 }
 
+const MIN_PRODUCTION_TRAFFIC_PERCENT = 99.99;
+
 export function deploymentIsActive(status, versionId) {
   return activeDeploymentVersions(status).some(
-    (version) => version.versionId === versionId && version.percentage >= 99.99,
+    (version) => version.versionId === versionId && version.percentage >= MIN_PRODUCTION_TRAFFIC_PERCENT,
   );
 }
 
@@ -100,7 +102,7 @@ export function main(env = process.env) {
       capture: true,
     });
     if (!deploymentIsActive(status, versionId)) {
-      throw new Error(`Dumpen deployed version ${versionId} is not active at 100% production traffic`);
+      throw new Error(`Dumpen deployed version ${versionId} is not active with at least ${MIN_PRODUCTION_TRAFFIC_PERCENT}% of production traffic`);
     }
     console.log(`dumpen: verified active production version ${versionId}`);
   } finally {
