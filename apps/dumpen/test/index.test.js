@@ -1104,4 +1104,9 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(adminHtml, /loadAssets/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
+  assert.match(adminHtml, /<form[^>]+action="\/auth\/logout"[^>]+method="post"/);
+  assert.match(adminHtml, /id="asset-apps"/);
+  assert.match(adminHtml, /Laddar mediebibliotek/);
+  assert.match(adminHtml, /\.badge:empty\{display:none\}/);
+  assert.match(adminHtml, /dumpenClientError/);
 });
