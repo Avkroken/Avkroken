@@ -2,6 +2,16 @@
 
 Jobb är en Cloudflare-baserad applikation för jobbsökning och ansökningsautomation med D1, R2, Browser Run och Cloudflare Workflows. Systemet håller auditerbar state för körningar, ansökningar, fel och evidence.
 
+## Operator-wizard
+
+Provider-/credentialförutsättningar verifieras utan att exportera eller skriva secretvärden:
+
+```bash
+bash scripts/setup-provider-credentials.sh
+```
+
+Wizarden är human-only och verifierar befintlig provider-state; den skapar eller roterar inga credentials.
+
 ## Snabb verifiering
 
 ```bash

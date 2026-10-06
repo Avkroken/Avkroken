@@ -4,6 +4,16 @@ Incoming Email Routing Worker for `denied.se`.
 
 The Worker receives the domain catch-all, performs deterministic MIME/header/content analysis for every incoming message, selectively escalates uncertain/risky messages to Workers AI, applies user-feedback reputation, rejects high-confidence spam, and forwards the rest to a verified Email Routing destination.
 
+## Operator-wizard
+
+Provider-/credentialförutsättningar verifieras utan att exportera eller skriva secretvärden:
+
+```bash
+bash scripts/setup-provider-credentials.sh
+```
+
+Wizarden är human-only och verifierar befintlig provider-state; den skapar eller roterar inga credentials.
+
 ## Filtering pipeline
 
 1. Reject exact matches from `BLOCKED_SENDERS` or domain/subdomain matches from `BLOCKED_DOMAINS`.
