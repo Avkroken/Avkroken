@@ -32,6 +32,8 @@ const TICKET_TTL_MS = 15 * 60 * 1000;
 const INTERNAL_PREFIX = "_system/";
 const TICKET_PREFIX = `${INTERNAL_PREFIX}tickets/`;
 const CLAIM_PREFIX = `${INTERNAL_PREFIX}claims/`;
+const ASSET_MUTATION_LOCK_KEY = `${INTERNAL_PREFIX}asset-mutation-lock.json`;
+const ASSET_MUTATION_LOCK_TTL_MS = 5 * 60 * 1000;
 
 async function listAll(bucket, options = {}) {
   const objects = [];
@@ -146,6 +148,70 @@ async function r2Text(object) {
   if (object.body instanceof ArrayBuffer) return new TextDecoder().decode(object.body);
   if (ArrayBuffer.isView(object.body)) return new TextDecoder().decode(object.body);
   return String(object.body ?? "");
+}
+
+async function acquireAssetMutationLock(env) {
+  const token = randomHex(16);
+  const payload = JSON.stringify({
+    token,
+    expiresAt: Date.now() + ASSET_MUTATION_LOCK_TTL_MS,
+  });
+  const options = {
+    onlyIf: new Headers({ "if-none-match": "*" }),
+    httpMetadata: { contentType: "application/json" },
+  };
+
+  let result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, options);
+  if (result !== null) return token;
+
+  const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
+  if (existing) {
+    try {
+      const state = JSON.parse(await r2Text(existing));
+      if (Number(state.expiresAt) <= Date.now()) {
+        await env.DUMPEN.delete(ASSET_MUTATION_LOCK_KEY);
+        result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, options);
+        if (result !== null) return token;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function releaseAssetMutationLock(env, token) {
+  const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
+  if (!existing) return;
+  try {
+    const state = JSON.parse(await r2Text(existing));
+    if (state.token === token) await env.DUMPEN.delete(ASSET_MUTATION_LOCK_KEY);
+  } catch {
+    // Keep an unreadable lock fail-closed until its operator-visible cleanup.
+  }
+}
+
+async function serializedAssetMutation(env, operation) {
+  const token = await acquireAssetMutationLock(env);
+  if (!token) return { busy: true };
+  try {
+    return { busy: false, value: await operation() };
+  } finally {
+    await releaseAssetMutationLock(env, token);
+  }
+}
+
+function assetMutationBusyResponse() {
+  return Response.json({
+    error: "asset_upload_busy",
+    retryAfterMs: 250,
+  }, {
+    status: 409,
+    headers: {
+      "cache-control": "no-store",
+      "retry-after": "1",
+    },
+  });
 }
 
 async function createUploadTicket(req, env) {
@@ -487,10 +553,12 @@ export default {
         return Response.json({ asset }, { headers: { "cache-control": "no-store" } });
       }
       if (req.method === "PUT") {
-        const result = await replaceAsset(req, env.ASSETS, key, {
+        const mutation = await serializedAssetMutation(env, () => replaceAsset(req, env.ASSETS, key, {
           maxUploadBytes: MAX_UPLOAD_BYTES,
           maxBucketBytes: MAX_BUCKET_BYTES,
-        });
+        }));
+        if (mutation.busy) return assetMutationBusyResponse();
+        const result = mutation.value;
         if (result.response) return result.response;
         return Response.json({
           asset: result.asset,
@@ -532,12 +600,20 @@ export default {
         });
       }
 
-      const result = await uploadPublicAsset(req, env.ASSETS, encodeURIComponent(resolved.name), {
-        maxUploadBytes: MAX_UPLOAD_BYTES,
-        maxBucketBytes: MAX_BUCKET_BYTES,
-      }, {
-        overwriteAppAsset: url.searchParams.get("replace") === "1",
-      });
+      const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
+        req,
+        env.ASSETS,
+        encodeURIComponent(resolved.name),
+        {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        },
+        {
+          overwriteAppAsset: url.searchParams.get("replace") === "1",
+        },
+      ));
+      if (mutation.busy) return assetMutationBusyResponse();
+      const result = mutation.value;
       if (result.response) return result.response;
       return Response.json({
         asset: result.asset,
@@ -561,12 +637,20 @@ export default {
       const denied = await adminDenied(req, env);
       if (denied) return denied;
       if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
-      const result = await uploadPublicAsset(req, env.ASSETS, segments[3], {
-        maxUploadBytes: MAX_UPLOAD_BYTES,
-        maxBucketBytes: MAX_BUCKET_BYTES,
-      }, {
-        overwriteAppAsset: url.searchParams.get("replace") === "1",
-      });
+      const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
+        req,
+        env.ASSETS,
+        segments[3],
+        {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        },
+        {
+          overwriteAppAsset: url.searchParams.get("replace") === "1",
+        },
+      ));
+      if (mutation.busy) return assetMutationBusyResponse();
+      const result = mutation.value;
       if (result.response) return result.response;
       return Response.json({
         asset: result.asset,
