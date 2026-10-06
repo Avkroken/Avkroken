@@ -1065,14 +1065,14 @@ test("dubbla snedstreck kan inte kringgå Access-routens sökväg", async () => 
 test("admin client errors are session protected and accepted without payload echo", async () => {
   const denied = await worker.fetch(request("/api/client-error", {
     method: "POST",
-    body: JSON.stringify({ feature: "media-library-bootstrap", message: "boom" }),
+    body: JSON.stringify({ feature: "media-library-bootstrap", name: "TypeError" }),
     headers: { "content-type": "application/json" },
   }), env());
   assert.equal(denied.status, 401);
 
   const accepted = await worker.fetch(request("/api/client-error", {
     method: "POST",
-    body: JSON.stringify({ feature: "media-library-bootstrap", message: "boom" }),
+    body: JSON.stringify({ feature: "media-library-bootstrap", name: "TypeError" }),
     headers: { cookie: ADMIN_COOKIE, "content-type": "application/json" },
   }), env());
   assert.equal(accepted.status, 204);
