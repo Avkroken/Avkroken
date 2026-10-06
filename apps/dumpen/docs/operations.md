@@ -47,9 +47,9 @@ Efter ändringar i galleri eller asset-API, verifiera minst:
 - appreplace behåller canonical URL och uppdaterar mirror;
 - appdelete tar både canonical och mirror;
 - generisk replace behåller `uploads/<id>/...`-nyckeln, använder kort cache-TTL och respekterar total storage-gräns;
-- samtidiga uploadrequests kan inte godkänna samma gamla bucket-snapshot; lock-konflikt svarar `asset_upload_busy` och klienten retry:ar;
+- samtidiga uploadrequests, inklusive theme-v2 staging och adminuploads, kan inte godkänna samma gamla bucket-snapshot; lock-konflikt svarar `asset_upload_busy` och admin-klienten retry:ar;
 - `staging/...` och `hotlink-ok/...` inte kan adresseras av item-mutationer;
-- sökning, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport.
+- sökning, typ/app/tema/storleksfilter, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport.
 
 ## R2
 
