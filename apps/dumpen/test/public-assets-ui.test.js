@@ -108,20 +108,19 @@ test("media library markup exposes the production runtime marker", () => {
   assert.match(publicAssetsMarkup(), /data-deployment-contract="provider-version"/);
 });
 
-test("media library uses native iOS-compatible file inputs", () => {
+test("media library uses one native iOS-compatible file input", () => {
   const markup = publicAssetsMarkup();
-  assert.match(markup, /id="asset-photo-files" type="file" multiple accept="image\/\*"/);
   assert.match(markup, /id="asset-files" type="file" multiple/);
-  assert.match(markup, /Bildbibliotek \/ Kamera/);
-  assert.match(markup, /Filer \/ iCloud Drive/);
+  assert.match(markup, /Bilder, kamera och iCloud Drive/);
   assert.match(markup, /Launcher-loggor/);
   assert.match(markup, /Temabilder/);
+  assert.doesNotMatch(markup, /id="asset-photo-files"/);
   assert.doesNotMatch(markup, /id="choose-assets"/);
 
   const script = publicAssetsScript();
   assert.doesNotMatch(script, /asset-files"\)\.click\(\)/);
   assert.doesNotMatch(script, /asset-replace-file"\)\.click\(\)/);
-  assert.match(script, /#asset-photo-files/);
+  assert.doesNotMatch(script, /#asset-photo-files/);
 });
 
 test("file selection stages visibly behind an explicit upload action", () => {
