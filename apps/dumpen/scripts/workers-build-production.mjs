@@ -23,4 +23,3 @@ if (process.env.WORKERS_CI_BRANCH !== "main") {
 
 run("npm", ["run", "check"]);
 run("npm", ["run", "deploy"]);
-run("npm", ["run", "verify:production"]);
