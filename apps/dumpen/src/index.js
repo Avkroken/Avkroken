@@ -416,47 +416,52 @@ async function assetCapabilityUpload(req, env, token) {
   if (body.byteLength > maxBytes) return new Response("too large\n", { status: 413 });
   if (!isPngBytes(body)) return new Response("png required\n", { status: 415 });
 
-  if (await env.ASSETS.head(ticket.targetKey)) {
-    await env.DUMPEN.delete(ticketKey);
-    return new Response("asset already exists\n", { status: 409 });
-  }
+  const mutation = await serializedAssetMutation(env, async () => {
+    if (await env.ASSETS.head(ticket.targetKey)) {
+      await env.DUMPEN.delete(ticketKey);
+      return new Response("asset already exists\n", { status: 409 });
+    }
 
-  const existing = await listAll(env.ASSETS);
-  const usedBytes = existing.reduce((sum, object) => sum + (Number(object.size) || 0), 0);
-  if (usedBytes + body.byteLength > MAX_BUCKET_BYTES) {
-    return new Response("asset storage full\n", { status: 507 });
-  }
+    const existing = await listAll(env.ASSETS);
+    const usedBytes = existing.reduce((sum, object) => sum + (Number(object.size) || 0), 0);
+    if (usedBytes + body.byteLength > MAX_BUCKET_BYTES) {
+      return new Response("asset storage full\n", { status: 507 });
+    }
 
-  if (!(await claimAssetTicket(env.DUMPEN, digest))) {
-    return new Response("asset upload ticket already used\n", { status: 409 });
-  }
+    if (!(await claimAssetTicket(env.DUMPEN, digest))) {
+      return new Response("asset upload ticket already used\n", { status: 409 });
+    }
 
-  const onlyIf = new Headers({ "if-none-match": "*" });
-  let result;
-  try {
-    result = await env.ASSETS.put(ticket.targetKey, body, {
-      onlyIf,
-      httpMetadata: {
-        contentType: "image/png",
-        cacheControl: "max-age=31536000",
-      },
-      customMetadata: {
-        kind: "theme-v2-staging",
-        source: "one-time-asset-capability",
-      },
+    const onlyIf = new Headers({ "if-none-match": "*" });
+    let result;
+    try {
+      result = await env.ASSETS.put(ticket.targetKey, body, {
+        onlyIf,
+        httpMetadata: {
+          contentType: "image/png",
+          cacheControl: "max-age=31536000",
+        },
+        customMetadata: {
+          kind: "theme-v2-staging",
+          source: "one-time-asset-capability",
+        },
+      });
+    } finally {
+      await env.DUMPEN.delete(ticketKey);
+    }
+
+    if (result === null) return new Response("asset already exists\n", { status: 409 });
+    return Response.json({
+      key: ticket.targetKey,
+      size: body.byteLength,
+    }, {
+      status: 201,
+      headers: { "cache-control": "no-store" },
     });
-  } finally {
-    await env.DUMPEN.delete(ticketKey);
-  }
-
-  if (result === null) return new Response("asset already exists\n", { status: 409 });
-  return Response.json({
-    key: ticket.targetKey,
-    size: body.byteLength,
-  }, {
-    status: 201,
-    headers: { "cache-control": "no-store" },
   });
+
+  if (mutation.busy) return assetMutationBusyResponse();
+  return mutation.value;
 }
 
 async function downloadByName(req, env, name, url) {
