@@ -7,6 +7,7 @@ import {
   filterAssetRecords,
   publicAssetsMarkup,
   publicAssetsScript,
+  resolveAppDrilldown,
   resolveAssetFilter,
   sortAssetRecords,
 } from "../src/public-assets-ui.js";
@@ -65,6 +66,30 @@ test("type facet separates app images, generic images and files", () => {
   assert.deepEqual(filterAssetRecords(assets, { type: "app" }).map((asset) => asset.name), ["plex-1.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "image" }).map((asset) => asset.name), ["photo.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
+});
+
+test("app drill-down opens the launcher shown on the app card and falls back to original themes", () => {
+  const assets = [
+    { name: "plex-256.png", image: true, appCategory: "plex", pixelSize: 256, assetRole: "launcher" },
+    { name: "plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1", assetRole: "theme" },
+    { name: "sonarr-1.png", image: true, appCategory: "sonarr", pixelSize: 1254, theme: "1", assetRole: "theme" },
+  ];
+
+  assert.deepEqual(resolveAppDrilldown("plex", assets), {
+    app: "plex", type: "launcher", size: "all", theme: "", search: "",
+  });
+  assert.deepEqual(
+    filterAssetRecords(assets, resolveAppDrilldown("plex", assets)).map((asset) => asset.name),
+    ["plex-256.png"],
+  );
+
+  assert.deepEqual(resolveAppDrilldown("sonarr", assets), {
+    app: "sonarr", type: "app", size: "", theme: "", search: "",
+  });
+  assert.deepEqual(
+    filterAssetRecords(assets, resolveAppDrilldown("sonarr", assets)).map((asset) => asset.name),
+    ["sonarr-1.png"],
+  );
 });
 
 test("launcher filter does not inherit original 1254 size", () => {

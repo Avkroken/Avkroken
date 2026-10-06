@@ -82,6 +82,19 @@ export function resolveAssetFilter(options) {
   return { app: app, size: size, theme: theme, type: type, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
 }
 
+export function resolveAppDrilldown(app, assets) {
+  const hasLauncher = (assets || []).some(function(asset) {
+    return asset.image && asset.appCategory === app && asset.assetRole === "launcher";
+  });
+  return {
+    app: app || "",
+    type: hasLauncher ? "launcher" : "app",
+    size: hasLauncher ? "all" : "",
+    theme: "",
+    search: "",
+  };
+}
+
 export function filterAssetRecords(assets, filters) {
   const resolved = resolveAssetFilter(filters || {});
   if (resolved.browseApps) return [];
@@ -201,7 +214,8 @@ function assetClient() {
 
   function rebuildFilters(assets) {
     const structured = appAssets(assets);
-    const apps = Array.from(new Map(structured.map(function(asset) { return [asset.appCategory, asset.appLabel || asset.appCategory]; })).entries())
+    const appMedia = appMediaAssets(assets);
+    const apps = Array.from(new Map(appMedia.map(function(asset) { return [asset.appCategory, asset.appLabel || asset.appCategory]; })).entries())
       .sort(function(a,b) { return a[1].localeCompare(b[1], "sv"); })
       .map(function(entry) { return { value: entry[0], label: entry[1] }; });
     const themes = Array.from(new Map(structured.map(function(asset) { return [asset.theme, asset.themeLabel || ("Tema " + asset.theme)]; })).entries())
@@ -295,7 +309,12 @@ function assetClient() {
       shade.append(name, count);
       button.append(img, shade);
       button.addEventListener("click", function() {
-        q("#asset-filter-app").value = app;
+        const drilldown = resolveAppDrilldown(app, items);
+        q("#asset-filter-app").value = drilldown.app;
+        q("#asset-filter-theme").value = drilldown.theme;
+        q("#asset-filter-size").value = drilldown.size;
+        q("#asset-filter-type").value = drilldown.type;
+        q("#asset-search").value = drilldown.search;
         applyFilters(true);
       });
       grid.append(button);
@@ -916,6 +935,7 @@ export function publicAssetsScript() {
   return [
     "const __name=(target)=>target;",
     "const resolveAssetFilter=", resolveAssetFilter.toString(), ";",
+    "const resolveAppDrilldown=", resolveAppDrilldown.toString(), ";",
     "const filterAssetRecords=", filterAssetRecords.toString(), ";",
     "const sortAssetRecords=", sortAssetRecords.toString(), ";",
     "const bindAssetFilterChanges=", bindAssetFilterChanges.toString(), ";",

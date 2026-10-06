@@ -51,7 +51,7 @@ Efter ändringar i galleri eller asset-API, verifiera minst:
 - generisk replace behåller `uploads/<id>/...`-nyckeln, använder kort cache-TTL och respekterar total storage-gräns;
 - samtidiga uploadrequests, inklusive theme-v2 staging och adminuploads, kan inte godkänna samma gamla bucket-snapshot; lock-konflikt svarar `asset_upload_busy` och admin-klienten retry:ar;
 - `staging/...` och `hotlink-ok/...` inte kan adresseras av item-mutationer;
-- sökning, typ/app/tema/storleksfilter, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport;
+- sökning, typ/app/tema/storleksfilter, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport; klick på ett appkort med launcher-kandidat ska öppna samma launcher-bild med typ `Launcher-loggor` och storlek `Alla`, medan appar utan launcher faller tillbaka till original-temabilder;
 - i mobilviewport använder kontroller minst 44 px tryckyta, formulärfält 16 px text för att undvika Safari-zoom, safe-area-padding och en kompakt admin-workspace utan den fulla publika hero-/snabbflödesytan.
 
 ## R2
