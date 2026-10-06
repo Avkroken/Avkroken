@@ -61,11 +61,17 @@ async function checkJobb() {
   assert.doesNotMatch(lock, /sharp@0\.35\.4/, "jobb: vulnerable sharp 0.35.4 remains in lockfile");
   assert.doesNotMatch(lock, /@img\/sharp-[^\n]*@0\.35\.4/, "jobb: vulnerable @img/sharp 0.35.4 remains");
   assert.doesNotMatch(lock, /@img\/sharp-libvips-[^\n]*@1\.3\.3/, "jobb: stale libvips 1.3.3 remains");
-  assert.match(
-    lock,
-    /miniflare@5\.20261001\.0-alpha:[\s\S]{0,500}?sharp: 0\.35\.5/,
-    "jobb: Miniflare snapshot does not resolve patched sharp 0.35.5",
-  );
+  const miniflareSharpVersions = [
+    ...lock.matchAll(/^  miniflare@[^\n]+:\n(?: {4}.*\n)*? {6}sharp: ([0-9]+\.[0-9]+\.[0-9]+)/gm),
+  ].map((match) => match[1]);
+
+  assert.ok(miniflareSharpVersions.length > 0, "jobb: no Miniflare snapshot with a sharp dependency found");
+  for (const version of miniflareSharpVersions) {
+    assert.ok(
+      versionAtLeast(version, "0.35.5"),
+      `jobb: Miniflare resolves sharp below 0.35.5 (${version})`,
+    );
+  }
 }
 
 for (const app of apps) {
