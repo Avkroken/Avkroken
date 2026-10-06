@@ -518,7 +518,7 @@ export async function uploadPublicAsset(
   await bucket.put(key, body, {
     httpMetadata: {
       contentType,
-      cacheControl: "max-age=31536000",
+      cacheControl: "public, max-age=300",
     },
     customMetadata: {
       originalName: name,
