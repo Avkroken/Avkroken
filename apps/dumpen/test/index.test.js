@@ -720,6 +720,59 @@ test("explicit appmetadata skapar canonical asset utan filnamnskrav", async () =
   assert.equal(assets.has("hotlink-ok/apps/plex/plex-4-512.png"), true);
 });
 
+test("querybaserade assetfilnamn avkodas exakt en gång", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/uploads?name=100%25.png", {
+    method: "POST",
+    body: new Uint8Array([1, 2, 3]),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.asset.name, "100%.png");
+  assert.match(result.asset.key, /^uploads\/[0-9a-f]{32}\/100%\.png$/);
+});
+
+test("assetmutationer serialiseras före kvotkontroll och R2-write", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const originalList = assets.list.bind(assets);
+  let releaseFirst;
+  let firstList = true;
+  assets.list = async (options = {}) => {
+    if (firstList) {
+      firstList = false;
+      await new Promise((resolve) => { releaseFirst = resolve; });
+    }
+    return originalList(options);
+  };
+  const e = env(transfers, assets);
+
+  const firstPromise = worker.fetch(request("/api/assets/uploads?name=first.txt", {
+    method: "POST",
+    body: "first",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+
+  while (!transfers.has("_system/asset-mutation-lock.json")) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const second = await worker.fetch(request("/api/assets/uploads?name=second.txt", {
+    method: "POST",
+    body: "second",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+  assert.equal(second.status, 409);
+  assert.deepEqual(await second.json(), { error: "asset_upload_busy", retryAfterMs: 250 });
+
+  releaseFirst();
+  const first = await firstPromise;
+  assert.equal(first.status, 201);
+  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+});
+
 test("asset item delete tar canonical appbild och mirror atomärt ur biblioteket", async () => {
   const assets = fakeR2([
     {
