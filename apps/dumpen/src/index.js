@@ -6,9 +6,16 @@ import {
   isThemeStagingKey,
 } from "./asset-upload-ticket.js";
 import {
-  listPublicAssets,
   uploadPublicAsset,
 } from "./public-assets.js";
+import {
+  assetMetadata,
+  deleteAsset,
+  downloadAsset,
+  listAssetLibrary,
+  replaceAsset,
+  resolveAssetUploadTarget,
+} from "./asset-library.js";
 import {
   authenticatedGitHubUserId,
   githubAuthConfigurationState,
@@ -25,6 +32,8 @@ const TICKET_TTL_MS = 15 * 60 * 1000;
 const INTERNAL_PREFIX = "_system/";
 const TICKET_PREFIX = `${INTERNAL_PREFIX}tickets/`;
 const CLAIM_PREFIX = `${INTERNAL_PREFIX}claims/`;
+const ASSET_MUTATION_LOCK_KEY = `${INTERNAL_PREFIX}asset-mutation-lock.json`;
+const ASSET_MUTATION_LOCK_TTL_MS = 2 * 60 * 1000;
 
 async function listAll(bucket, options = {}) {
   const objects = [];
@@ -139,6 +148,112 @@ async function r2Text(object) {
   if (object.body instanceof ArrayBuffer) return new TextDecoder().decode(object.body);
   if (ArrayBuffer.isView(object.body)) return new TextDecoder().decode(object.body);
   return String(object.body ?? "");
+}
+
+async function acquireAssetMutationLock(env) {
+  const token = randomHex(16);
+  const payload = JSON.stringify({
+    token,
+    expiresAt: Date.now() + ASSET_MUTATION_LOCK_TTL_MS,
+  });
+  const options = {
+    onlyIf: new Headers({ "if-none-match": "*" }),
+    httpMetadata: { contentType: "application/json" },
+  };
+
+  let result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, options);
+  if (result !== null) return token;
+
+  const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
+  if (existing) {
+    try {
+      const state = JSON.parse(await r2Text(existing));
+      if (Number(state.expiresAt) <= Date.now() && existing.etag) {
+        result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, {
+          ...options,
+          onlyIf: { etagMatches: existing.etag },
+        });
+        if (result !== null) return token;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function releaseAssetMutationLock(env, token) {
+  try {
+    const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
+    if (!existing?.etag) return;
+    const state = JSON.parse(await r2Text(existing));
+    if (state.token !== token) return;
+    await env.DUMPEN.put(
+      ASSET_MUTATION_LOCK_KEY,
+      JSON.stringify({ token: null, expiresAt: 0 }),
+      {
+        onlyIf: { etagMatches: existing.etag },
+        httpMetadata: { contentType: "application/json" },
+      },
+    );
+  } catch (error) {
+    console.error("Dumpen asset mutation lock release failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // The committed mutation remains authoritative; the lock TTL recovers cleanup failures.
+  }
+}
+
+async function serializedAssetMutation(env, operation) {
+  let token = null;
+  for (let attempt = 0; attempt < 40 && !token; attempt += 1) {
+    token = await acquireAssetMutationLock(env);
+    if (!token) await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  if (!token) return { busy: true };
+  let value;
+  try {
+    value = await operation();
+  } catch (error) {
+    await releaseAssetMutationLock(env, token);
+    throw error;
+  }
+  await releaseAssetMutationLock(env, token);
+  return { busy: false, value };
+}
+
+async function bufferAssetMutationRequest(req) {
+  const declaredLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES) {
+    return { response: new Response("too large\n", { status: 413 }) };
+  }
+  const body = await req.arrayBuffer();
+  if (!body.byteLength) {
+    return { response: Response.json({ error: "Tom fil kan inte laddas upp." }, { status: 400 }) };
+  }
+  if (body.byteLength > MAX_UPLOAD_BYTES) {
+    return { response: new Response("too large\n", { status: 413 }) };
+  }
+  return {
+    request: new Request(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body,
+    }),
+  };
+}
+
+function assetMutationBusyResponse() {
+  return Response.json({
+    error: "asset_upload_busy",
+    retryAfterMs: 250,
+  }, {
+    status: 409,
+    headers: {
+      "cache-control": "no-store",
+      "retry-after": "1",
+    },
+  });
 }
 
 async function createUploadTicket(req, env) {
@@ -316,47 +431,52 @@ async function assetCapabilityUpload(req, env, token) {
   if (body.byteLength > maxBytes) return new Response("too large\n", { status: 413 });
   if (!isPngBytes(body)) return new Response("png required\n", { status: 415 });
 
-  if (await env.ASSETS.head(ticket.targetKey)) {
-    await env.DUMPEN.delete(ticketKey);
-    return new Response("asset already exists\n", { status: 409 });
-  }
+  const mutation = await serializedAssetMutation(env, async () => {
+    if (await env.ASSETS.head(ticket.targetKey)) {
+      await env.DUMPEN.delete(ticketKey);
+      return new Response("asset already exists\n", { status: 409 });
+    }
 
-  const existing = await listAll(env.ASSETS);
-  const usedBytes = existing.reduce((sum, object) => sum + (Number(object.size) || 0), 0);
-  if (usedBytes + body.byteLength > MAX_BUCKET_BYTES) {
-    return new Response("asset storage full\n", { status: 507 });
-  }
+    const existing = await listAll(env.ASSETS);
+    const usedBytes = existing.reduce((sum, object) => sum + (Number(object.size) || 0), 0);
+    if (usedBytes + body.byteLength > MAX_BUCKET_BYTES) {
+      return new Response("asset storage full\n", { status: 507 });
+    }
 
-  if (!(await claimAssetTicket(env.DUMPEN, digest))) {
-    return new Response("asset upload ticket already used\n", { status: 409 });
-  }
+    if (!(await claimAssetTicket(env.DUMPEN, digest))) {
+      return new Response("asset upload ticket already used\n", { status: 409 });
+    }
 
-  const onlyIf = new Headers({ "if-none-match": "*" });
-  let result;
-  try {
-    result = await env.ASSETS.put(ticket.targetKey, body, {
-      onlyIf,
-      httpMetadata: {
-        contentType: "image/png",
-        cacheControl: "max-age=31536000",
-      },
-      customMetadata: {
-        kind: "theme-v2-staging",
-        source: "one-time-asset-capability",
-      },
+    const onlyIf = new Headers({ "if-none-match": "*" });
+    let result;
+    try {
+      result = await env.ASSETS.put(ticket.targetKey, body, {
+        onlyIf,
+        httpMetadata: {
+          contentType: "image/png",
+          cacheControl: "max-age=31536000",
+        },
+        customMetadata: {
+          kind: "theme-v2-staging",
+          source: "one-time-asset-capability",
+        },
+      });
+    } finally {
+      await env.DUMPEN.delete(ticketKey);
+    }
+
+    if (result === null) return new Response("asset already exists\n", { status: 409 });
+    return Response.json({
+      key: ticket.targetKey,
+      size: body.byteLength,
+    }, {
+      status: 201,
+      headers: { "cache-control": "no-store" },
     });
-  } finally {
-    await env.DUMPEN.delete(ticketKey);
-  }
-
-  if (result === null) return new Response("asset already exists\n", { status: 409 });
-  return Response.json({
-    key: ticket.targetKey,
-    size: body.byteLength,
-  }, {
-    status: 201,
-    headers: { "cache-control": "no-store" },
   });
+
+  if (mutation.busy) return assetMutationBusyResponse();
+  return mutation.value;
 }
 
 async function downloadByName(req, env, name, url) {
@@ -432,20 +552,130 @@ export default {
       const denied = await adminDenied(req, env);
       if (denied) return denied;
       const allObjects = await listAll(env.DUMPEN);
-      let assets = [];
-      let assetState = env.ASSETS ? "available" : "not_configured";
-      if (env.ASSETS) {
-        try {
-          assets = await listPublicAssets(env.ASSETS);
-        } catch {
-          assetState = "unavailable";
-        }
-      }
       return Response.json({
         objects: groupedObjects(allObjects),
-        assets,
-        assetState,
       }, {
+        headers: { "cache-control": "no-store" },
+      });
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments.length === 2) {
+      if (req.method !== "GET") return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) {
+        return Response.json({ assets: [], assetState: "not_configured" }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      try {
+        return Response.json({
+          assets: await listAssetLibrary(env.ASSETS),
+          assetState: "available",
+        }, {
+          headers: { "cache-control": "no-store" },
+        });
+      } catch {
+        return Response.json({ assets: [], assetState: "unavailable" }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "item") {
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+      const key = url.searchParams.get("key") || "";
+
+      if (req.method === "GET" && url.searchParams.get("download") === "1") {
+        return (await downloadAsset(env.ASSETS, key)).response;
+      }
+      if (req.method === "GET") {
+        const asset = await assetMetadata(env.ASSETS, key);
+        if (!asset) return Response.json({ error: "asset_not_found" }, {
+          status: 404,
+          headers: { "cache-control": "no-store" },
+        });
+        return Response.json({ asset }, { headers: { "cache-control": "no-store" } });
+      }
+      if (req.method === "PUT") {
+        const buffered = await bufferAssetMutationRequest(req);
+        if (buffered.response) return buffered.response;
+        const mutation = await serializedAssetMutation(env, () => replaceAsset(buffered.request, env.ASSETS, key, {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        }));
+        if (mutation.busy) return assetMutationBusyResponse();
+        const result = mutation.value;
+        if (result.response) return result.response;
+        return Response.json({
+          asset: result.asset,
+          categorized: result.categorized,
+          replaced: result.replaced,
+          mirrorKey: result.mirrorKey || null,
+        }, {
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      if (req.method === "DELETE") {
+        const mutation = await serializedAssetMutation(env, () => deleteAsset(env.ASSETS, key));
+        if (mutation.busy) return assetMutationBusyResponse();
+        const result = mutation.value;
+        if (result.status === 204) {
+          return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+        }
+        return Response.json({ error: result.error }, {
+          status: result.status,
+          headers: { "cache-control": "no-store" },
+        });
+      }
+      return new Response("method\n", { status: 405 });
+    }
+
+    if (segments[0] === "api" && segments[1] === "assets" && segments[2] === "uploads") {
+      if (req.method !== "POST") return new Response("method\n", { status: 405 });
+      const denied = await adminDenied(req, env);
+      if (denied) return denied;
+      if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+
+      const resolved = resolveAssetUploadTarget(url.searchParams.get("name") || "", {
+        app: url.searchParams.get("app"),
+        theme: url.searchParams.get("theme"),
+        size: url.searchParams.get("size"),
+      });
+      if (resolved.error) {
+        return Response.json({ error: resolved.error }, {
+          status: 400,
+          headers: { "cache-control": "no-store" },
+        });
+      }
+
+      const buffered = await bufferAssetMutationRequest(req);
+      if (buffered.response) return buffered.response;
+      const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
+        buffered.request,
+        env.ASSETS,
+        encodeURIComponent(resolved.name),
+        {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        },
+        {
+          overwriteAppAsset: url.searchParams.get("replace") === "1",
+        },
+      ));
+      if (mutation.busy) return assetMutationBusyResponse();
+      const result = mutation.value;
+      if (result.response) return result.response;
+      return Response.json({
+        asset: result.asset,
+        categorized: result.categorized,
+        replaced: result.replaced,
+        mirrorKey: result.mirrorKey || null,
+        explicitTarget: resolved.explicit,
+      }, {
+        status: 201,
         headers: { "cache-control": "no-store" },
       });
     }
@@ -460,12 +690,22 @@ export default {
       const denied = await adminDenied(req, env);
       if (denied) return denied;
       if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
-      const result = await uploadPublicAsset(req, env.ASSETS, segments[3], {
-        maxUploadBytes: MAX_UPLOAD_BYTES,
-        maxBucketBytes: MAX_BUCKET_BYTES,
-      }, {
-        overwriteAppAsset: url.searchParams.get("replace") === "1",
-      });
+      const buffered = await bufferAssetMutationRequest(req);
+      if (buffered.response) return buffered.response;
+      const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
+        buffered.request,
+        env.ASSETS,
+        segments[3],
+        {
+          maxUploadBytes: MAX_UPLOAD_BYTES,
+          maxBucketBytes: MAX_BUCKET_BYTES,
+        },
+        {
+          overwriteAppAsset: url.searchParams.get("replace") === "1",
+        },
+      ));
+      if (mutation.busy) return assetMutationBusyResponse();
+      const result = mutation.value;
       if (result.response) return result.response;
       return Response.json({
         asset: result.asset,

@@ -24,7 +24,11 @@ function fakeR2(seed = []) {
     async put(key, body, options = {}) {
       const onlyIf = options.onlyIf;
       const ifNoneMatch = onlyIf instanceof Headers ? onlyIf.get("if-none-match") : null;
+      const ifMatch = onlyIf instanceof Headers ? onlyIf.get("if-match") : null;
+      const etagMatches = onlyIf && !(onlyIf instanceof Headers) ? onlyIf.etagMatches : null;
       if (ifNoneMatch === "*" && objects.has(key)) return null;
+      if (ifMatch && objects.get(key)?.etag !== ifMatch) return null;
+      if (etagMatches && objects.get(key)?.etag !== etagMatches) return null;
       this.puts.push({ key, body, options });
       const timestamp = Number(key.match(/\/(\d+)\.zip$/)?.[1] || Date.now());
       const entry = {
@@ -90,6 +94,12 @@ function fakeR2(seed = []) {
     has(key) { return objects.has(key); },
     keys() { return [...objects.keys()]; },
   };
+}
+
+async function assertReleasedAssetLock(bucket) {
+  const object = await bucket.get("_system/asset-mutation-lock.json");
+  assert.ok(object);
+  assert.deepEqual(JSON.parse(await object.text()), { token: null, expiresAt: 0 });
 }
 
 function request(path, { method = "GET", token, body, headers = {} } = {}) {
@@ -615,16 +625,22 @@ test("assetfel degraderar separat utan att blockera privata transferer", async (
     throw new Error("asset provider unavailable");
   };
 
-  const response = await worker.fetch(
+  const transferResponse = await worker.fetch(
     request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }),
     env(transfers, assets),
   );
-  assert.equal(response.status, 200);
-  const data = await response.json();
-  assert.equal(data.objects.length, 1);
-  assert.equal(data.objects[0].name, "backup");
-  assert.deepEqual(data.assets, []);
-  assert.equal(data.assetState, "unavailable");
+  assert.equal(transferResponse.status, 200);
+  const transfersData = await transferResponse.json();
+  assert.equal(transfersData.objects.length, 1);
+  assert.equal(transfersData.objects[0].name, "backup");
+  assert.equal("assets" in transfersData, false);
+
+  const assetResponse = await worker.fetch(
+    request("/api/assets", { headers: { cookie: ADMIN_COOKIE } }),
+    env(transfers, assets),
+  );
+  assert.equal(assetResponse.status, 200);
+  assert.deepEqual(await assetResponse.json(), { assets: [], assetState: "unavailable" });
 });
 
 test("publik asset-upload kräver admininloggning", async () => {
@@ -661,13 +677,13 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.match(asset.key, /^uploads\/[0-9a-f]{32}\/app-icon\.png$/);
   assert.match(asset.directUrl, /^https:\/\/logos\.denied\.se\/uploads\/[0-9a-f]{32}\/app-icon\.png$/);
   assert.equal(assets.keys().includes(asset.key), true);
-  assert.equal(transfers.keys().length, 0);
+  assert.deepEqual(transfers.keys(), ["_system/asset-mutation-lock.json"]);
+  await assertReleasedAssetLock(transfers);
 
-  const listing = await worker.fetch(request("/api/objects", { headers: { cookie: ADMIN_COOKIE } }), e);
+  const listing = await worker.fetch(request("/api/assets", { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(listing.status, 200);
   const listed = await listing.json();
   assert.equal(listed.assetState, "available");
-  assert.equal(listed.objects.length, 0);
   assert.equal(listed.assets.length, 2);
   const plex = listed.assets.find((item) => item.key === "apps/plex/plex-1-256.png");
   assert.equal(plex.directUrl, "https://logos.denied.se/apps/plex/plex-1-256.png");
@@ -680,6 +696,206 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.equal(plex.themeLabel, "Neon Glass");
   assert.equal(plex.pixelSize, 256);
   assert.equal(plex.pixelLabel, "256×256");
+});
+
+test("nya media-API:t kräver adminsession", async () => {
+  const listing = await worker.fetch(request("/api/assets"), env());
+  assert.equal(listing.status, 401);
+
+  const upload = await worker.fetch(request("/api/assets/uploads?name=photo.png", {
+    method: "POST",
+    body: new Uint8Array([1]),
+    headers: { "content-type": "image/png" },
+  }), env());
+  assert.equal(upload.status, 401);
+});
+
+test("explicit appmetadata skapar canonical asset utan filnamnskrav", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request(
+    "/api/assets/uploads?name=my-picture.png&app=plex&theme=4&size=512",
+    {
+      method: "POST",
+      body: pngBody(512, 512),
+      headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+    },
+  ), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.explicitTarget, true);
+  assert.equal(result.asset.key, "apps/plex/plex-4-512.png");
+  assert.equal(result.asset.theme, "4");
+  assert.equal(result.asset.pixelSize, 512);
+  assert.equal(assets.has("apps/plex/plex-4-512.png"), true);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-4-512.png"), true);
+});
+
+test("querybaserade assetfilnamn avkodas exakt en gång", async () => {
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/uploads?name=100%25.png", {
+    method: "POST",
+    body: new Uint8Array([1, 2, 3]),
+    headers: { cookie: ADMIN_COOKIE, "content-type": "image/png" },
+  }), env(fakeR2(), assets));
+
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.asset.name, "100%.png");
+  assert.match(result.asset.key, /^uploads\/[0-9a-f]{32}\/100%\.png$/);
+});
+
+test("lyckad assetmutation behåller success om lock-release misslyckas", async () => {
+  const transfers = fakeR2();
+  transfers.get = async () => {
+    throw new Error("simulated lock cleanup failure");
+  };
+  const assets = fakeR2();
+
+  const response = await worker.fetch(request("/api/assets/uploads?name=committed.txt", {
+    method: "POST",
+    body: "committed",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), env(transfers, assets));
+
+  assert.equal(response.status, 201);
+  assert.equal(assets.keys().some((key) => key.endsWith("/committed.txt")), true);
+});
+
+test("utgånget asset-mutationslås återtas atomiskt via etag", async () => {
+  const transfers = fakeR2([{
+    key: "_system/asset-mutation-lock.json",
+    body: JSON.stringify({ token: "stale", expiresAt: Date.now() - 1 }),
+    httpMetadata: { contentType: "application/json" },
+  }]);
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/uploads?name=recovered.txt", {
+    method: "POST",
+    body: "recovered",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), env(transfers, assets));
+
+  assert.equal(response.status, 201);
+  await assertReleasedAssetLock(transfers);
+  assert.equal(assets.keys().some((key) => key.endsWith("/recovered.txt")), true);
+});
+
+test("samtidiga assetmutationer väntar på låset utan att kräva klientomskick", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const originalList = assets.list.bind(assets);
+  let releaseFirst;
+  let firstList = true;
+  assets.list = async (options = {}) => {
+    if (firstList) {
+      firstList = false;
+      await new Promise((resolve) => { releaseFirst = resolve; });
+    }
+    return originalList(options);
+  };
+  const e = env(transfers, assets);
+
+  const firstPromise = worker.fetch(request("/api/assets/uploads?name=first.txt", {
+    method: "POST",
+    body: "first",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+
+  while (!transfers.has("_system/asset-mutation-lock.json")) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const secondPromise = worker.fetch(request("/api/assets/uploads?name=second.txt", {
+    method: "POST",
+    body: "second",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  releaseFirst();
+
+  const [first, second] = await Promise.all([firstPromise, secondPromise]);
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+  assert.equal(assets.keys().some((key) => key.endsWith("/first.txt")), true);
+  assert.equal(assets.keys().some((key) => key.endsWith("/second.txt")), true);
+  await assertReleasedAssetLock(transfers);
+});
+
+test("theme staging och adminupload delar samma asset-kvotlås", async () => {
+  const transfers = fakeR2();
+  const assets = fakeR2();
+  const e = env(transfers, assets);
+  const ticket = await mintAssetTicket(e, "staging/themes-v2/apps/plex/plex-2.png");
+
+  const originalList = assets.list.bind(assets);
+  let releaseFirst;
+  let firstList = true;
+  assets.list = async (options = {}) => {
+    if (firstList) {
+      firstList = false;
+      await new Promise((resolve) => { releaseFirst = resolve; });
+    }
+    return originalList(options);
+  };
+
+  const adminPromise = worker.fetch(request("/api/assets/uploads?name=first.txt", {
+    method: "POST",
+    body: "first",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), e);
+
+  while (!transfers.has("_system/asset-mutation-lock.json")) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  const stagingPromise = worker.fetch(request(new URL(ticket.uploadUrl).pathname, {
+    method: "PUT",
+    body: PNG_BODY,
+    headers: { "content-type": "image/png" },
+  }), e);
+
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  releaseFirst();
+
+  const [admin, staging] = await Promise.all([adminPromise, stagingPromise]);
+  assert.equal(admin.status, 201);
+  assert.equal(staging.status, 201);
+  assert.equal(assets.has("staging/themes-v2/apps/plex/plex-2.png"), true);
+  await assertReleasedAssetLock(transfers);
+});
+
+test("asset item delete tar canonical appbild och mirror atomärt ur biblioteket", async () => {
+  const assets = fakeR2([
+    {
+      key: "apps/plex/plex-1.png",
+      uploaded: new Date("2026-10-05T12:00:00Z"),
+      body: pngBody(1254, 1254),
+      httpMetadata: { contentType: "image/png" },
+    },
+    {
+      key: "hotlink-ok/apps/plex/plex-1.png",
+      uploaded: new Date("2026-10-05T12:00:00Z"),
+      body: pngBody(1254, 1254),
+      httpMetadata: { contentType: "image/png" },
+    },
+  ]);
+  const e = env(fakeR2(), assets);
+
+  const metadata = await worker.fetch(request(
+    "/api/assets/item?key=apps%2Fplex%2Fplex-1.png",
+    { headers: { cookie: ADMIN_COOKIE } },
+  ), e);
+  assert.equal(metadata.status, 200);
+  assert.equal((await metadata.json()).asset.key, "apps/plex/plex-1.png");
+
+  const removed = await worker.fetch(request(
+    "/api/assets/item?key=apps%2Fplex%2Fplex-1.png",
+    { method: "DELETE", headers: { cookie: ADMIN_COOKIE } },
+  ), e);
+  assert.equal(removed.status, 204);
+  assert.equal(assets.has("apps/plex/plex-1.png"), false);
+  assert.equal(assets.has("hotlink-ok/apps/plex/plex-1.png"), false);
 });
 
 test("appbildsnamn normaliseras till canonical nyckel och förväntad storlek", () => {
@@ -857,25 +1073,26 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
-  assert.match(adminHtml, />Bilder </);
+  assert.match(adminHtml, />Mediebibliotek </);
+  assert.match(adminHtml, /id="asset-dropzone"/);
+  assert.match(adminHtml, /id="asset-queue"/);
   assert.match(adminHtml, /id="asset-app-grid"/);
   assert.match(adminHtml, /id="asset-other-files"/);
+  assert.match(adminHtml, /id="asset-dialog"/);
   assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
+  assert.match(adminHtml, /id="asset-search"/);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);
-  assert.match(adminHtml, />App\s*</);
-  assert.match(adminHtml, />Tema\s*</);
-  assert.match(adminHtml, />Storlek\s*</);
-  assert.match(adminHtml, /Original 1254/);
+  assert.match(adminHtml, /id="asset-filter-type"/);
+  assert.match(adminHtml, /id="asset-sort"/);
   assert.match(adminHtml, /id="replace-app-assets"/);
-  assert.match(adminHtml, /findPreview/);
-  assert.match(adminHtml, /pixelSize===256/);
-  assert.match(adminHtml, /asset\.appCategory/);
-  assert.match(adminHtml, /asset\.theme/);
-  assert.match(adminHtml, /asset\.pixelSize/);
+  assert.match(adminHtml, /XMLHttpRequest/);
+  assert.match(adminHtml, /clipboardData/);
+  assert.match(adminHtml, /\/admin\/api\/assets\/uploads/);
+  assert.match(adminHtml, /\/admin\/api\/assets\/item/);
+  assert.match(adminHtml, /asset_upload_busy/);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
-  assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
-  assert.match(adminHtml, /appbilder kategoriserade/);
+  assert.match(adminHtml, /loadAssets/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });
