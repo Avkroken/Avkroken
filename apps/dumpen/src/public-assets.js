@@ -284,7 +284,7 @@ function appAssetMetadata(key) {
       appLabel: APP_LABELS[app] || app,
       theme: sized[1], themeLabel: appThemeLabel(sized[1]),
       pixelSize, pixelLabel: pixelSize + "×" + pixelSize,
-      variant: "resized", legacy: false,
+      variant: "resized", legacy: false, assetRole: "theme",
     };
   }
   if (original && original[1] !== "256") {
@@ -294,7 +294,7 @@ function appAssetMetadata(key) {
       theme: original[1], themeLabel: appThemeLabel(original[1]),
       pixelSize: APP_SOURCE_PIXEL_SIZE,
       pixelLabel: APP_SOURCE_PIXEL_SIZE + "×" + APP_SOURCE_PIXEL_SIZE,
-      variant: "original", legacy: false,
+      variant: "original", legacy: false, assetRole: "theme",
     };
   }
   const legacy = original?.[1] === "256";
@@ -305,6 +305,7 @@ function appAssetMetadata(key) {
     pixelSize: legacy ? 256 : null,
     pixelLabel: legacy ? "256×256" : null,
     variant: legacy ? "legacy" : "unclassified", legacy,
+    assetRole: legacy ? "launcher" : null,
   };
 }
 
@@ -355,7 +356,7 @@ export async function listPublicAssets(bucket) {
   const objects = await listAll(bucket);
   return objects
     .map(publicAssetRecord)
-    .filter((asset) => asset && !asset.mirror && !asset.legacy && !asset.key.startsWith("staging/"))
+    .filter((asset) => asset && !asset.mirror && !asset.key.startsWith("staging/"))
     .sort((a, b) => {
       if (a.app && b.app) {
         const appOrder = a.appLabel.localeCompare(b.appLabel, "sv");
