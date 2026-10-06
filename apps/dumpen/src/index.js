@@ -183,9 +183,9 @@ async function acquireAssetMutationLock(env) {
 }
 
 async function releaseAssetMutationLock(env, token) {
-  const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
-  if (!existing?.etag) return;
   try {
+    const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
+    if (!existing?.etag) return;
     const state = JSON.parse(await r2Text(existing));
     if (state.token !== token) return;
     await env.DUMPEN.put(
@@ -196,8 +196,11 @@ async function releaseAssetMutationLock(env, token) {
         httpMetadata: { contentType: "application/json" },
       },
     );
-  } catch {
-    // Keep an unreadable lock fail-closed until its operator-visible cleanup.
+  } catch (error) {
+    console.error("Dumpen asset mutation lock release failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // The committed mutation remains authoritative; the lock TTL recovers cleanup failures.
   }
 }
 
@@ -208,11 +211,15 @@ async function serializedAssetMutation(env, operation) {
     if (!token) await new Promise((resolve) => setTimeout(resolve, 50));
   }
   if (!token) return { busy: true };
+  let value;
   try {
-    return { busy: false, value: await operation() };
-  } finally {
+    value = await operation();
+  } catch (error) {
     await releaseAssetMutationLock(env, token);
+    throw error;
   }
+  await releaseAssetMutationLock(env, token);
+  return { busy: false, value };
 }
 
 async function bufferAssetMutationRequest(req) {
