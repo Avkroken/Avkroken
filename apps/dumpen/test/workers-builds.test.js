@@ -33,7 +33,7 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const branchGuard = script.indexOf('WORKERS_CI_BRANCH !== "main"');
-  const branchExit = script.indexOf("return;");
+  const branchExit = script.indexOf("return;", branchGuard);
   const check = script.indexOf('run("npm", ["run", "check"]');
   const deploy = script.indexOf('run("npm", ["run", "deploy"]');
   const providerStatus = script.indexOf('"deployments", "status", "--json"');
