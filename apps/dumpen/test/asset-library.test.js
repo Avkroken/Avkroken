@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assetMetadata,
   deleteAsset,
   downloadAsset,
   mutableAssetKey,
@@ -93,6 +94,25 @@ test("asset item mutations are restricted to managed uploads and canonical app a
   assert.equal(mutableAssetKey("uploads/not-an-id/file.png"), null);
   assert.equal(mutableAssetKey("uploads/0123456789abcdef0123456789abcdef/file.png")?.kind, "managed");
   assert.equal(mutableAssetKey("apps/plex/plex-1.png")?.kind, "app");
+});
+
+test("single asset metadata uses head without listing the bucket", async () => {
+  const key = "uploads/0123456789abcdef0123456789abcdef/photo.png";
+  const bucket = fakeR2([{
+    key,
+    body: "png-data",
+    httpMetadata: { contentType: "image/png" },
+    customMetadata: { originalName: "photo.png", kind: "dumpen-upload" },
+  }]);
+  bucket.list = async () => {
+    throw new Error("inventory listing must not be used");
+  };
+
+  const asset = await assetMetadata(bucket, key);
+  assert.equal(asset.key, key);
+  assert.equal(asset.name, "photo.png");
+  assert.equal(asset.mutable, true);
+  assert.equal(asset.image, true);
 });
 
 test("deleting a canonical app image also deletes its hidden hotlink mirror", async () => {
