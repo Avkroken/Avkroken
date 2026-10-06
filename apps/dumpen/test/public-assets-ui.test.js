@@ -54,12 +54,14 @@ test("search turns app browser into filtered results and combines with facets", 
 
 test("type facet separates app images, generic images and files", () => {
   const assets = [
-    { name: "plex-1.png", key: "apps/plex/plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1" },
+    { name: "plex-256.png", key: "apps/plex/plex-256.png", image: true, appCategory: "plex", pixelSize: 256, assetRole: "launcher" },
+    { name: "plex-1.png", key: "apps/plex/plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1", assetRole: "theme" },
     { name: "photo.png", key: "uploads/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/photo.png", image: true },
     { name: "notes.txt", key: "uploads/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/notes.txt", image: false },
   ];
 
   assert.equal(resolveAssetFilter({ type: "image" }).browseApps, false);
+  assert.deepEqual(filterAssetRecords(assets, { type: "launcher" }).map((asset) => asset.name), ["plex-256.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "app" }).map((asset) => asset.name), ["plex-1.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "image" }).map((asset) => asset.name), ["photo.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
@@ -100,6 +102,8 @@ test("media library uses native iOS-compatible file inputs", () => {
   assert.match(markup, /id="asset-files" type="file" multiple/);
   assert.match(markup, /Bildbibliotek \/ Kamera/);
   assert.match(markup, /Filer \/ iCloud Drive/);
+  assert.match(markup, /Launcher-loggor/);
+  assert.match(markup, /Temabilder/);
   assert.doesNotMatch(markup, /id="choose-assets"/);
 
   const script = publicAssetsScript();
