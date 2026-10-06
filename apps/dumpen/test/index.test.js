@@ -677,7 +677,8 @@ test("admin listar befintliga App Launcher-assets och laddar upp till ASSETS-bin
   assert.match(asset.key, /^uploads\/[0-9a-f]{32}\/app-icon\.png$/);
   assert.match(asset.directUrl, /^https:\/\/logos\.denied\.se\/uploads\/[0-9a-f]{32}\/app-icon\.png$/);
   assert.equal(assets.keys().includes(asset.key), true);
-  assert.equal(transfers.keys().length, 0);
+  assert.deepEqual(transfers.keys(), ["_system/asset-mutation-lock.json"]);
+  await assertReleasedAssetLock(transfers);
 
   const listing = await worker.fetch(request("/api/assets", { headers: { cookie: ADMIN_COOKIE } }), e);
   assert.equal(listing.status, 200);
