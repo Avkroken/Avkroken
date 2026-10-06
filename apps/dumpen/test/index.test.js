@@ -1126,4 +1126,5 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /Laddar mediebibliotek/);
   assert.match(adminHtml, /\.badge:empty\{display:none\}/);
   assert.match(adminHtml, /dumpenClientError/);
+  assert.match(adminHtml, /const __name=\(target\)=>target;const resolveAssetFilter=/);
 });
