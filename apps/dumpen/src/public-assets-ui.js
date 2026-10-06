@@ -40,11 +40,11 @@ export function publicAssetsMarkup() {
     "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Launcher-loggor och temabilder visas som separata roller. Temabilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Dra & släpp på dator, klistra in från urklipp eller använd iPhones inbyggda väljare.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-photo-files\" type=\"file\" multiple accept=\"image/*\"><span>Välj bilder</span><small>Bildbibliotek / Kamera</small></label><label class=\"asset-picker\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Filer / iCloud Drive</small></label></div></div>",
     "<div class=\"asset-upload-config\">",
-    "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Appbild</option></select></label>",
+    "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Temabild</option></select></label>",
     "<label>App<select id=\"asset-upload-app\" disabled><option value=\"\">Välj app</option>" + appOptions + "</select></label>",
     "<label>Tema<select id=\"asset-upload-theme\" disabled><option value=\"\">Välj tema</option><option value=\"1\">1 · Neon Glass</option><option value=\"2\">2 · Cyan Blueprint</option><option value=\"3\">3 · Isometric Console</option><option value=\"4\">4 · Illustrated Scene</option><option value=\"5\">5 · Emerald Radar</option><option value=\"6\">6 · Emerald Core</option><option value=\"7\">7 · Azure Orbit</option></select></label>",
     "<label>Storlek<select id=\"asset-upload-size\" disabled><option value=\"auto\">Från bildmått</option><option value=\"1254\">1254</option><option value=\"512\">512</option><option value=\"256\">256</option></select></label>",
-    "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig appbild</label>",
+    "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig temabild</label>",
     "</div>",
     "<div id=\"asset-queue\" class=\"asset-queue\" hidden></div>",
     "<div class=\"asset-toolbar\">",
@@ -630,8 +630,8 @@ function assetClient() {
       const app = q("#asset-upload-app").value, theme = q("#asset-upload-theme").value;
       let size = q("#asset-upload-size").value;
       if (size === "auto") size = item.width === item.height && [1254,512,256].includes(item.width) ? String(item.width) : "";
-      if (!app || !theme || !size) throw new Error("App, tema och giltig storlek krävs för appbilder.");
-      if (item.file.type !== "image/png") throw new Error("Appbilder måste vara PNG.");
+      if (!app || !theme || !size) throw new Error("App, tema och giltig storlek krävs för temabilder.");
+      if (item.file.type !== "image/png") throw new Error("Temabilder måste vara PNG.");
       if (item.width && item.height && (String(item.width) !== size || String(item.height) !== size)) throw new Error("Bildmåttet matchar inte vald storlek.");
       params.set("app", app);
       params.set("theme", theme);
@@ -703,7 +703,7 @@ function assetClient() {
         if (appMode && pending.length > 1) {
           pending.slice(1).forEach(function(item) {
             item.state = "error";
-            item.error = "Explicit Appbild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
+            item.error = "Explicit Temabild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
           });
           renderQueue();
         }
