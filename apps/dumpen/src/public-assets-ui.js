@@ -331,11 +331,14 @@ function assetClient() {
     const wrap = q("#asset-other-files"), list = q("#asset-file-list"), summary = q("#asset-file-summary");
     list.replaceChildren();
     const resolved = resolveAssetFilter(filters);
-    let other = assets.filter(function(asset) { return !asset.image; });
+    let other = assets.filter(function(asset) {
+      const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
+      return !asset.image || (resolved.browseApps && !appImage);
+    });
     if (!resolved.browseApps) other = filterAssetRecords(other, filters);
     other = sortAssets(other, filters.sort);
     wrap.hidden = other.length === 0;
-    summary.textContent = "Övriga filer · " + other.length;
+    summary.textContent = (resolved.browseApps ? "Övrigt" : "Övriga filer") + " · " + other.length;
     other.forEach(function(asset) {
       const row = document.createElement("div");
       row.className = "asset-file";
