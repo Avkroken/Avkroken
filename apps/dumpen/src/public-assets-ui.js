@@ -36,7 +36,7 @@ export function publicAssetsMarkup() {
     return "<option value=\"" + entry[0] + "\">" + entry[1] + "</option>";
   }).join("");
   return [
-    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"2\" data-deployment-contract=\"provider-version\">",
+    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"3\" data-deployment-contract=\"provider-version\">",
     "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Appbilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Dra & släpp på dator, klistra in från urklipp eller använd iPhones inbyggda väljare.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-photo-files\" type=\"file\" multiple accept=\"image/*\"><span>Välj bilder</span><small>Bildbibliotek / Kamera</small></label><label class=\"asset-picker\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Filer / iCloud Drive</small></label></div></div>",
     "<div class=\"asset-upload-config\">",
