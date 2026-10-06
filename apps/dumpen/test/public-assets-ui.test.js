@@ -156,14 +156,16 @@ test("iOS file selection handles input and change without duplicate staging", ()
   assert.match(script, /input\.value = ""/);
 });
 
-test("staging happens before preview generation", () => {
+test("staging paints before deferred preview generation", () => {
   const script = publicAssetsScript();
   const addFilesStart = script.indexOf("function addFiles");
   const renderQueueIndex = script.indexOf("renderQueue();", addFilesStart);
+  const deferIndex = script.indexOf("setTimeout(function()", addFilesStart);
   const previewIndex = script.indexOf("URL.createObjectURL", addFilesStart);
   assert.ok(addFilesStart >= 0);
   assert.ok(renderQueueIndex > addFilesStart);
-  assert.ok(previewIndex > renderQueueIndex);
+  assert.ok(deferIndex > renderQueueIndex);
+  assert.ok(previewIndex > deferIndex);
 });
 
 test("file selection stages visibly behind an explicit upload action", () => {
