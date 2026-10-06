@@ -196,9 +196,9 @@ say "Verifiera dashboardens enda interaktiva login-provider med en färsk OAuth-
 open_url "https://dash.cloudflare.com/"
 step "Verifiera Secrets Store-binding GITHUB_OAUTH_CLIENT_SECRET → KROSA_MAJA_CLIENT_SECRET samt de icke-hemliga GITHUB_OAUTH_CLIENT_ID och JOBB_ALLOWED_GITHUB_IDS."
 step "Skapa inte en separat OAuth-secret för Jobb."
-open_url "https://jobb.denied.se/auth/logout"
-step "Logga ut aktuell session och öppna därefter https://jobb.denied.se/ i ett privat webbläsarfönster."
-step "Starta GitHub-login och slutför callbacken https://jobb.denied.se/auth/callback. En redan giltig session räcker inte efter rotation."
+open_url "https://jobb.denied.se/"
+step "Om du redan är inloggad: använd dashboardens 'Logga ut'-knapp. Den skickar den avsedda same-origin POST /auth/logout; öppna inte logout-routen som en GET."
+step "Öppna därefter https://jobb.denied.se/ i ett privat webbläsarfönster, starta GitHub-login och slutför callbacken https://jobb.denied.se/auth/callback. En redan giltig session räcker inte efter rotation."
 if ! confirm "Har en färsk komplett GitHub OAuth-runda lyckats?"; then
   warn "OAuth-credentialen är inte verifierad förrän token exchange och dashboard-session lyckas."
   exit 2
@@ -222,7 +222,7 @@ say "Verifiera att production-state är bundet och att preview fortsatt är isol
 open_url "https://dash.cloudflare.com/"
 step "Verifiera Jobb production bindings: D1 DB → jobb-eu, R2 EVIDENCE → jobb-evidence, Browser binding, Email binding och Workflow jobb-automation."
 step "Verifiera att preview använder jobb-preview-eu och jobb-evidence-preview och saknar production Secrets Store/Workflow/Email providerbindings."
-step "Kör GET https://jobb.denied.se/api/ready från en färsk autentiserad session och kräv ready/success för D1, authkonfiguration och migrationsstate."
+step "Kör GET https://jobb.denied.se/api/ready och kräv success för D1, användbar authkonfiguration och migrationsstate. Endpointen är readinessbevis; den ersätter inte den färska OAuth-rundan ovan."
 if ! confirm "Är production bindings/readiness gröna och preview fail-closed för provider-side effects?"; then
   warn "Behandla Jobb runtime som overifierad tills bindings och readiness är korrekta."
   exit 2
