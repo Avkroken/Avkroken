@@ -17,7 +17,7 @@ test("shared theme contract keeps Dumpen product accents", () => {
   assert.match(css, /--surface-raised:#121a16/);
   assert.match(css, /--shadow-lg:/);
   assert.match(css, /background-size:64px 64px/);
-  assert.match(control, /value="legacy">Legacy/);
+  assert.match(control, /value="legacy">Aurora/);
   assert.match(control, /value="forest">Avkroken/);
   assert.match(script, /avkroken\.theme/);
   assert.match(script, /avkroken_theme/);
@@ -34,7 +34,7 @@ test("Dumpen main pages use Aurora fallback and expose the selector", () => {
   for (const html of [dashboard, publicHtml]) {
     assert.match(html, /data-theme="legacy"/);
     assert.match(html, /id="theme-select"/);
-    assert.match(html, /value="legacy">Legacy/);
+    assert.match(html, /value="legacy">Aurora/);
     assert.match(html, /value="blackout">Blackout/);
     assert.match(html, /Avkroken \/ Dumpen/);
     assert.match(html, /class="gradient-text">DUMPEN/);
