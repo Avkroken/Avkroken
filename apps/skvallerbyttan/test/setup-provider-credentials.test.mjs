@@ -70,6 +70,32 @@ test("Workers Builds stage requires successful current main deployment evidence"
   assert.match(stages, /lyckad main production-build/);
 });
 
+test("OAuth verification requires a fresh complete login round trip", () => {
+  assert.match(stages, /\/auth\/logout/);
+  assert.match(stages, /\/login/);
+  assert.match(stages, /Logga in med GitHub/);
+  assert.match(stages, /hela OAuth-rundan/);
+  assert.match(stages, /KROSA_MAJA_CLIENT_SECRET\/GITHUB_OAUTH_CLIENT_SECRET/);
+  assert.match(stages, /login\?error=oauth\/config\/state/);
+});
+
+test("machine read token is verified end to end from the real consumer", () => {
+  assert.match(stages, /faktiska maskinkonsumenten/);
+  assert.match(stages, /GET https:\/\/skvallerbyttan\.denied\.se\/api\/v1\/capabilities/);
+  assert.match(stages, /Bearer-token/);
+  assert.match(stages, /HTTP 200/);
+  assert.match(stages, /consumer=chatgpt/);
+  assert.match(stages, /Presence av Worker-secret ensam räcker inte/);
+});
+
+test("capability verification requires fresh available provider reads", () => {
+  assert.match(stages, /färska status=available-resultat/);
+  assert.match(stages, /last success ska vara från den aktuella refreshen/);
+  assert.match(stages, /freshness ska vara fresh/);
+  assert.match(stages, /error, unknown, not_observed, stale, unavailable eller permission_denied/);
+  assert.match(stages, /not_supported/);
+});
+
 test("credential wizard covers the canonical runtime credential contract", () => {
   for (const name of [
     "GAMNACKEN_GITHUB_APP_CLIENT_ID",
