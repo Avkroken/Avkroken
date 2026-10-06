@@ -3,7 +3,7 @@ import { publicPage } from "./public-page.js";
 
 const ADMIN_API_PREFIX = "/admin/api/";
 const LEGACY_API_PREFIX = "/api/";
-const PRIVILEGED_API_ROOTS = new Set(["objects", "tickets", "download", "assets"]);
+const PRIVILEGED_API_ROOTS = new Set(["objects", "tickets", "download", "assets", "client-error"]);
 const ROBOTS_DIRECTIVE = "noindex, nofollow, noarchive";
 
 function privilegedSuffix(pathname, prefix) {
