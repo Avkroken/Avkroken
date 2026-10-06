@@ -141,6 +141,8 @@ Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke o
 Produktionsverifieringen kompletterar lokala tester; den ersätter dem inte.
 
 ## Felsökning
+Om Mobile Safari visar `Can't find variable: __name` har den serialiserade Media Library-klienten fått Wranglers/esbuilds interna funktionsnamn-helper i `Function.toString()`-texten. Browser-scriptet måste därför definiera sin lokala no-op `__name` före de serialiserade funktionerna; ta inte bort hjälpen utan att samtidigt ersätta `Function.toString()`-baserad klientgenerering.
+
 
 ### Fel publik sida eller fel route
 
