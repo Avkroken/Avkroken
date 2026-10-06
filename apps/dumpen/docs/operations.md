@@ -87,7 +87,10 @@ curl --fail-with-body \
 
 Verifiera efter varje fil genom att läsa tillbaka exakt staging-nyckel från R2 och jämföra dimension/hash med källan. Staging-objekt visas inte i Dumpens vanliga asset-inventory. Canonical `apps/...` och `hotlink-ok/apps/...` uppdateras först efter att hela 56-originalmatrisen har granskats.
 
-### App Launcher-varianter
+### Launcher-loggor och temavarianter
+
+Äldre `apps/<app>/<app>-256.png` behandlas som **launcher-kandidater** (`assetRole = launcher`) och visas read-only i Media Library. Temamatrisen `<app>-<tema>[-<storlek>].png` är **temabilder** (`assetRole = theme`). En launcher-kandidat är inte samma sak som live Cloudflare Access-konfiguration; verifiera provider-state innan någon URL beskrivs som aktiv launcher-logo.
+
 
 `scripts/sync-app-assets.mjs` äger den reproducerbara one-way-syncen för de versionsstyrda app-/temakombinationerna. Den läser numrerade original från `apps/<app>/<app>-<tema>.png`, genererar exakt 256×256 och 512×512 med Sharp och kan skriva både canonical-objektet och motsvarande `hotlink-ok/`-spegel. Syncen raderar inte objekt och använder inte äldre `<app>-256.png` som källa eller tema.
 
