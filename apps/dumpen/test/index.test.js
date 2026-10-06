@@ -928,8 +928,8 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   const adminHtml = await adminPage.text();
   assert.doesNotMatch(adminHtml, /<form id="login"/);
   assert.match(adminHtml, /GitHub Auth verifierad/);
-  assert.match(adminHtml, />Media Library </);
-  assert.match(adminHtml, /id="asset-drop"/);
+  assert.match(adminHtml, />Mediebibliotek </);
+  assert.match(adminHtml, /id="asset-dropzone"/);
   assert.match(adminHtml, /id="asset-queue"/);
   assert.match(adminHtml, /id="asset-app-grid"/);
   assert.match(adminHtml, /id="asset-other-files"/);
@@ -942,10 +942,11 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-sort"/);
   assert.match(adminHtml, /id="replace-app-assets"/);
   assert.match(adminHtml, /XMLHttpRequest/);
-  assert.match(adminHtml, /navigator\.clipboard\.read/);
+  assert.match(adminHtml, /clipboardData/);
   assert.match(adminHtml, /\/admin\/api\/assets\/uploads/);
   assert.match(adminHtml, /\/admin\/api\/assets\/item/);
+  assert.match(adminHtml, /asset_upload_busy/);
   assert.match(adminHtml, /id="asset-status" class="asset-status" role="status" aria-live="polite" aria-atomic="true"/);
-  assert.match(adminHtml, /renderAssets\(data\.assets\|\|\[\],data\.assetState\|\|'available'\)/);
+  assert.match(adminHtml, /loadAssets/);
   assert.match(adminHtml, /Assetlagret är tillfälligt otillgängligt/);
 });
