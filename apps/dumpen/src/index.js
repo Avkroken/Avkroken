@@ -33,7 +33,7 @@ const INTERNAL_PREFIX = "_system/";
 const TICKET_PREFIX = `${INTERNAL_PREFIX}tickets/`;
 const CLAIM_PREFIX = `${INTERNAL_PREFIX}claims/`;
 const ASSET_MUTATION_LOCK_KEY = `${INTERNAL_PREFIX}asset-mutation-lock.json`;
-const ASSET_MUTATION_LOCK_TTL_MS = 15 * 60 * 1000;
+const ASSET_MUTATION_LOCK_TTL_MS = 2 * 60 * 1000;
 
 async function listAll(bucket, options = {}) {
   const objects = [];
@@ -171,7 +171,7 @@ async function acquireAssetMutationLock(env) {
       if (Number(state.expiresAt) <= Date.now() && existing.etag) {
         result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, {
           ...options,
-          onlyIf: new Headers({ "if-match": existing.etag }),
+          onlyIf: { etagMatches: existing.etag },
         });
         if (result !== null) return token;
       }
@@ -194,13 +194,38 @@ async function releaseAssetMutationLock(env, token) {
 }
 
 async function serializedAssetMutation(env, operation) {
-  const token = await acquireAssetMutationLock(env);
+  let token = null;
+  for (let attempt = 0; attempt < 40 && !token; attempt += 1) {
+    token = await acquireAssetMutationLock(env);
+    if (!token) await new Promise((resolve) => setTimeout(resolve, 50));
+  }
   if (!token) return { busy: true };
   try {
     return { busy: false, value: await operation() };
   } finally {
     await releaseAssetMutationLock(env, token);
   }
+}
+
+async function bufferAssetMutationRequest(req) {
+  const declaredLength = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES) {
+    return { response: new Response("too large\n", { status: 413 }) };
+  }
+  const body = await req.arrayBuffer();
+  if (!body.byteLength) {
+    return { response: Response.json({ error: "Tom fil kan inte laddas upp." }, { status: 400 }) };
+  }
+  if (body.byteLength > MAX_UPLOAD_BYTES) {
+    return { response: new Response("too large\n", { status: 413 }) };
+  }
+  return {
+    request: new Request(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body,
+    }),
+  };
 }
 
 function assetMutationBusyResponse() {
@@ -555,7 +580,9 @@ export default {
         return Response.json({ asset }, { headers: { "cache-control": "no-store" } });
       }
       if (req.method === "PUT") {
-        const mutation = await serializedAssetMutation(env, () => replaceAsset(req, env.ASSETS, key, {
+        const buffered = await bufferAssetMutationRequest(req);
+        if (buffered.response) return buffered.response;
+        const mutation = await serializedAssetMutation(env, () => replaceAsset(buffered.request, env.ASSETS, key, {
           maxUploadBytes: MAX_UPLOAD_BYTES,
           maxBucketBytes: MAX_BUCKET_BYTES,
         }));
@@ -572,7 +599,9 @@ export default {
         });
       }
       if (req.method === "DELETE") {
-        const result = await deleteAsset(env.ASSETS, key);
+        const mutation = await serializedAssetMutation(env, () => deleteAsset(env.ASSETS, key));
+        if (mutation.busy) return assetMutationBusyResponse();
+        const result = mutation.value;
         if (result.status === 204) {
           return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
         }
@@ -602,8 +631,10 @@ export default {
         });
       }
 
+      const buffered = await bufferAssetMutationRequest(req);
+      if (buffered.response) return buffered.response;
       const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
-        req,
+        buffered.request,
         env.ASSETS,
         encodeURIComponent(resolved.name),
         {
@@ -639,8 +670,10 @@ export default {
       const denied = await adminDenied(req, env);
       if (denied) return denied;
       if (!env.ASSETS) return new Response("asset storage not configured\n", { status: 503 });
+      const buffered = await bufferAssetMutationRequest(req);
+      if (buffered.response) return buffered.response;
       const mutation = await serializedAssetMutation(env, () => uploadPublicAsset(
-        req,
+        buffered.request,
         env.ASSETS,
         segments[3],
         {
