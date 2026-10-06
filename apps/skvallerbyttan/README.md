@@ -11,6 +11,17 @@ npm run check
 
 `npm run check` kör tester, TypeScript typecheck och Worker dry-run.
 
+## Operator-wizard
+
+Credential-/providerförutsättningar kan gås igenom utan att exportera eller skriva secretvärden:
+
+```bash
+cd apps/skvallerbyttan
+bash scripts/setup-provider-credentials.sh
+```
+
+Wizarden verifierar befintlig GitHub App-, Cloudflare R1/R2/R3-, Secrets Store-, runtime-, webhook- och Workers Builds-state. Den skapar inga tokens, synkar inga runtime-secrets och skriver inga GitHub Actions-secrets.
+
 ## Dokumentation
 
 Börja i **[dokumentationsöversikten](docs/index.md)** eller den publika dokumentationssajten.
