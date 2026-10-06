@@ -97,6 +97,7 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.match(script, /\/admin\/api\/assets\/uploads/);
   assert.match(script, /\/admin\/api\/assets\/item/);
   assert.match(script, /asset_upload_busy/);
+  assert.match(script, /Explicit Appbild-läge använder en canonical slot åt gången/);
   assert.match(script, /asset\.mutable === true/);
   assert.match(script, /showModal/);
 });
