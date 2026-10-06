@@ -914,6 +914,7 @@ function assetClient() {
 
 export function publicAssetsScript() {
   return [
+    "const __name=(target)=>target;",
     "const resolveAssetFilter=", resolveAssetFilter.toString(), ";",
     "const filterAssetRecords=", filterAssetRecords.toString(), ";",
     "const sortAssetRecords=", sortAssetRecords.toString(), ";",
