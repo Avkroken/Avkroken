@@ -656,7 +656,16 @@ function assetClient() {
     queueRunning = true;
     try {
       while (queue.some(function(item) { return item.state === "pending"; })) {
-        const batch = queue.filter(function(item) { return item.state === "pending"; }).slice(0, maxConcurrent);
+        const pending = queue.filter(function(item) { return item.state === "pending"; });
+        const appMode = q("#asset-upload-kind").value === "app";
+        if (appMode && pending.length > 1) {
+          pending.slice(1).forEach(function(item) {
+            item.state = "error";
+            item.error = "Explicit Appbild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
+          });
+          renderQueue();
+        }
+        const batch = queue.filter(function(item) { return item.state === "pending"; }).slice(0, appMode ? 1 : maxConcurrent);
         await Promise.all(batch.map(uploadItem));
       }
       const completed = queue.filter(function(item) { return item.state === "done"; }).length;
