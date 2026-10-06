@@ -96,6 +96,12 @@ function fakeR2(seed = []) {
   };
 }
 
+async function assertReleasedAssetLock(bucket) {
+  const object = await bucket.get("_system/asset-mutation-lock.json");
+  assert.ok(object);
+  assert.deepEqual(JSON.parse(await object.text()), { token: null, expiresAt: 0 });
+}
+
 function request(path, { method = "GET", token, body, headers = {} } = {}) {
   const h = new Headers(headers);
   if (token !== undefined) h.set("authorization", `Bearer ${token}`);
@@ -752,7 +758,7 @@ test("utgånget asset-mutationslås återtas atomiskt via etag", async () => {
   }), env(transfers, assets));
 
   assert.equal(response.status, 201);
-  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+  await assertReleasedAssetLock(transfers);
   assert.equal(assets.keys().some((key) => key.endsWith("/recovered.txt")), true);
 });
 
@@ -795,7 +801,7 @@ test("samtidiga assetmutationer väntar på låset utan att kräva klientomskick
   assert.equal(second.status, 201);
   assert.equal(assets.keys().some((key) => key.endsWith("/first.txt")), true);
   assert.equal(assets.keys().some((key) => key.endsWith("/second.txt")), true);
-  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+  await assertReleasedAssetLock(transfers);
 });
 
 test("theme staging och adminupload delar samma asset-kvotlås", async () => {
@@ -838,7 +844,7 @@ test("theme staging och adminupload delar samma asset-kvotlås", async () => {
   assert.equal(admin.status, 201);
   assert.equal(staging.status, 201);
   assert.equal(assets.has("staging/themes-v2/apps/plex/plex-2.png"), true);
-  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+  await assertReleasedAssetLock(transfers);
 });
 
 test("asset item delete tar canonical appbild och mirror atomärt ur biblioteket", async () => {
