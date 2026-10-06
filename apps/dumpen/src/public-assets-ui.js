@@ -548,39 +548,72 @@ function assetClient() {
     });
   }
 
-  async function addFiles(files) {
+  function addFiles(files) {
+    const added = [];
     for (const file of Array.from(files || [])) {
-      const dims = await inspectImage(file);
       const item = {
         id: ++queueId,
         file:file,
-        width:dims.width,
-        height:dims.height,
-        state:"pending",
+        width:null,
+        height:null,
+        inspecting:String(file.type || "").startsWith("image/"),
+        state:"staged",
         progress:0,
         error:"",
         preview:String(file.type || "").startsWith("image/") ? URL.createObjectURL(file) : "",
+        uploadConfig:null,
       };
       queue.push(item);
+      added.push(item);
     }
     renderQueue();
-    runQueue();
+
+    added.forEach(function(item) {
+      if (!item.inspecting) return;
+      inspectImage(item.file).then(function(dims) {
+        if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
+        item.width = dims.width;
+        item.height = dims.height;
+        item.inspecting = false;
+        renderQueue();
+      });
+    });
   }
 
   function queueMeta(item) {
     const bits = [formatBytes(item.file.size)];
     if (item.width && item.height) bits.push(item.width + "×" + item.height);
+    if (item.state === "staged") bits.push(item.inspecting ? "vald · läser bildmått…" : "vald");
+    if (item.state === "pending") bits.push("redo för uppladdning");
     if (item.state === "uploading") bits.push(item.progress + "%");
     if (item.state === "waiting") bits.push("väntar på lagringslås");
-    if (item.state === "done") bits.push("klar");
+    if (item.state === "done") bits.push("uppladdad");
     if (item.state === "error") bits.push(item.error || "fel");
     return bits.join(" · ");
   }
 
+  function removeQueueItem(item) {
+    if (item.preview) URL.revokeObjectURL(item.preview);
+    queue = queue.filter(function(candidate) { return candidate.id !== item.id; });
+    renderQueue();
+  }
+
   function renderQueue() {
+    const panel = q("#asset-queue-panel");
     const wrap = q("#asset-queue");
-    wrap.hidden = queue.length === 0;
+    const count = q("#asset-queue-count");
+    const uploadButton = q("#asset-upload-button");
+    const clearButton = q("#asset-clear-button");
+    const staged = queue.filter(function(item) { return item.state === "staged"; }).length;
+    const active = queue.some(function(item) { return item.state === "pending" || item.state === "uploading" || item.state === "waiting"; });
+
+    panel.hidden = queue.length === 0;
+    count.textContent = queue.length ? (queue.length + " fil" + (queue.length === 1 ? "" : "er")) : "";
+    uploadButton.disabled = staged === 0 || queueRunning;
+    uploadButton.textContent = staged ? ("Ladda upp " + staged) : "Ladda upp";
+    clearButton.disabled = queue.length === 0 || active;
     wrap.replaceChildren();
+
     queue.forEach(function(item) {
       const row = document.createElement("div");
       row.className = "asset-queue-item";
@@ -606,19 +639,21 @@ function assetClient() {
       if (item.state === "error") {
         const retry = document.createElement("button");
         retry.type = "button";
-        retry.textContent = "Försök igen";
-        retry.addEventListener("click", function() { item.state = "pending"; item.error = ""; item.progress = 0; renderQueue(); runQueue(); });
+        retry.textContent = "Välj igen";
+        retry.addEventListener("click", function() {
+          item.state = "staged";
+          item.error = "";
+          item.progress = 0;
+          item.uploadConfig = null;
+          renderQueue();
+        });
         actions.append(retry);
       }
-      if (item.state === "pending" || item.state === "error" || item.state === "done") {
+      if (item.state === "staged" || item.state === "error" || item.state === "done") {
         const remove = document.createElement("button");
         remove.type = "button";
         remove.textContent = "Ta bort";
-        remove.addEventListener("click", function() {
-          if (item.preview) URL.revokeObjectURL(item.preview);
-          queue = queue.filter(function(candidate) { return candidate.id !== item.id; });
-          renderQueue();
-        });
+        remove.addEventListener("click", function() { removeQueueItem(item); });
         actions.append(remove);
       }
       row.append(thumb, meta, actions);
@@ -626,19 +661,76 @@ function assetClient() {
     });
   }
 
+  function currentUploadConfig() {
+    const kind = q("#asset-upload-kind").value;
+    if (kind !== "app") return { kind:"auto", replace:false };
+    return {
+      kind:"app",
+      app:q("#asset-upload-app").value,
+      theme:q("#asset-upload-theme").value,
+      size:q("#asset-upload-size").value,
+      replace:q("#replace-app-assets").checked === true,
+    };
+  }
+
+  function startSelectedUpload() {
+    const staged = queue.filter(function(item) { return item.state === "staged"; });
+    if (!staged.length || queueRunning) return;
+
+    const config = currentUploadConfig();
+    if (config.kind === "app") {
+      if (staged.length !== 1) {
+        q("#asset-status").textContent = "Manuell temabild kräver exakt en vald fil.";
+        return;
+      }
+      const item = staged[0];
+      let size = config.size;
+      if (!config.app || !config.theme) {
+        q("#asset-status").textContent = "Välj app och tema innan uppladdning.";
+        return;
+      }
+      if (size === "auto") {
+        if (item.inspecting) {
+          q("#asset-status").textContent = "Bildmåttet läses fortfarande. Vänta ett ögonblick eller välj storlek manuellt.";
+          return;
+        }
+        size = item.width === item.height && [1254,512,256].includes(item.width) ? String(item.width) : "";
+      }
+      if (!size) {
+        q("#asset-status").textContent = "Välj 1254, 512 eller 256 för temabilden.";
+        return;
+      }
+      if (item.file.type !== "image/png") {
+        q("#asset-status").textContent = "Temabilder måste vara PNG.";
+        return;
+      }
+      if (item.width && item.height && (String(item.width) !== size || String(item.height) !== size)) {
+        q("#asset-status").textContent = "Bildmåttet matchar inte vald storlek.";
+        return;
+      }
+      item.uploadConfig = { ...config, size:size };
+    } else {
+      staged.forEach(function(item) { item.uploadConfig = config; });
+    }
+
+    staged.forEach(function(item) {
+      item.state = "pending";
+      item.error = "";
+      item.progress = 0;
+    });
+    q("#asset-status").textContent = staged.length + " fil" + (staged.length === 1 ? "" : "er") + " köad" + (staged.length === 1 ? "" : "e") + " för uppladdning.";
+    renderQueue();
+    runQueue();
+  }
+
   function uploadUrl(item) {
+    const config = item.uploadConfig || { kind:"auto", replace:false };
     const params = new URLSearchParams({ name:item.file.name });
-    if (q("#replace-app-assets").checked) params.set("replace", "1");
-    if (q("#asset-upload-kind").value === "app") {
-      const app = q("#asset-upload-app").value, theme = q("#asset-upload-theme").value;
-      let size = q("#asset-upload-size").value;
-      if (size === "auto") size = item.width === item.height && [1254,512,256].includes(item.width) ? String(item.width) : "";
-      if (!app || !theme || !size) throw new Error("App, tema och giltig storlek krävs för temabilder.");
-      if (item.file.type !== "image/png") throw new Error("Temabilder måste vara PNG.");
-      if (item.width && item.height && (String(item.width) !== size || String(item.height) !== size)) throw new Error("Bildmåttet matchar inte vald storlek.");
-      params.set("app", app);
-      params.set("theme", theme);
-      params.set("size", size);
+    if (config.replace) params.set("replace", "1");
+    if (config.kind === "app") {
+      params.set("app", config.app);
+      params.set("theme", config.theme);
+      params.set("size", config.size);
     }
     return "/admin/api/assets/uploads?" + params.toString();
   }
@@ -699,18 +791,10 @@ function assetClient() {
   async function runQueue() {
     if (queueRunning) return;
     queueRunning = true;
+    renderQueue();
     try {
       while (queue.some(function(item) { return item.state === "pending"; })) {
-        const pending = queue.filter(function(item) { return item.state === "pending"; });
-        const appMode = q("#asset-upload-kind").value === "app";
-        if (appMode && pending.length > 1) {
-          pending.slice(1).forEach(function(item) {
-            item.state = "error";
-            item.error = "Explicit Temabild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
-          });
-          renderQueue();
-        }
-        const batch = queue.filter(function(item) { return item.state === "pending"; }).slice(0, appMode ? 1 : maxConcurrent);
+        const batch = queue.filter(function(item) { return item.state === "pending"; }).slice(0, maxConcurrent);
         await Promise.all(batch.map(uploadItem));
       }
       const completed = queue.filter(function(item) { return item.state === "done"; }).length;
@@ -721,6 +805,7 @@ function assetClient() {
       }
     } finally {
       queueRunning = false;
+      renderQueue();
       if (queue.some(function(item) { return item.state === "pending"; })) {
         setTimeout(runQueue, 0);
       }
@@ -738,19 +823,23 @@ function assetClient() {
     applyFilters(false);
   });
 
-  q("#asset-upload-kind").addEventListener("change", function() {
-    const appMode = q("#asset-upload-kind").value === "app";
-    q("#asset-upload-app").disabled = !appMode;
-    q("#asset-upload-theme").disabled = !appMode;
-    q("#asset-upload-size").disabled = !appMode;
-  });
+  function syncUploadMode() {
+    q("#asset-theme-config").hidden = q("#asset-upload-kind").value !== "app";
+  }
+  q("#asset-upload-kind").addEventListener("change", syncUploadMode);
+  syncUploadMode();
 
-  ["#asset-photo-files","#asset-files"].forEach(function(selector) {
-    const input = q(selector);
-    input.addEventListener("change", function() {
-      addFiles(input.files);
-      input.value = "";
-    });
+  const fileInput = q("#asset-files");
+  fileInput.addEventListener("change", function() {
+    addFiles(fileInput.files);
+    fileInput.value = "";
+  });
+  q("#asset-upload-button").addEventListener("click", startSelectedUpload);
+  q("#asset-clear-button").addEventListener("click", function() {
+    if (queueRunning) return;
+    queue.forEach(function(item) { if (item.preview) URL.revokeObjectURL(item.preview); });
+    queue = [];
+    renderQueue();
   });
   const dropzone = q("#asset-dropzone");
   ["dragenter","dragover"].forEach(function(type) {
