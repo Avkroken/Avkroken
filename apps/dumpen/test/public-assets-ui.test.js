@@ -124,6 +124,29 @@ test("media library uses native iOS-compatible file inputs", () => {
   assert.match(script, /#asset-photo-files/);
 });
 
+test("file selection stages visibly behind an explicit upload action", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-files" type="file" multiple/);
+  assert.doesNotMatch(markup, /id="asset-photo-files"/);
+  assert.match(markup, /id="asset-queue-panel"/);
+  assert.match(markup, /id="asset-upload-button"/);
+  assert.match(markup, /Valda filer/);
+  assert.match(markup, /Ladda upp/);
+
+  const script = publicAssetsScript();
+  assert.match(script, /state:"staged"/);
+  assert.match(script, /#asset-upload-button/);
+  assert.match(script, /startSelectedUpload/);
+});
+
+test("theme metadata is hidden in auto mode instead of rendered disabled", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-theme-config"[^>]*hidden/);
+  assert.doesNotMatch(markup, /id="asset-upload-app" disabled/);
+  assert.doesNotMatch(markup, /id="asset-upload-theme" disabled/);
+  assert.doesNotMatch(markup, /id="asset-upload-size" disabled/);
+});
+
 test("media library script contains queue, progress, clipboard and item mutations", () => {
   const handlers = [];
   const selects = Array.from({ length: 5 }, () => ({
