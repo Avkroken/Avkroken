@@ -92,9 +92,10 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.doesNotThrow(() => new Function(script));
   assert.match(script, /XMLHttpRequest/);
   assert.match(script, /xhr\.upload\.onprogress/);
-  assert.match(script, /navigator\.clipboard\.read/);
-  assert.match(script, /Promise\.all\(workers\)/);
+  assert.match(script, /clipboardData/);
+  assert.match(script, /Promise\.all\(batch\.map\(uploadItem\)\)/);
   assert.match(script, /\/admin\/api\/assets\/uploads/);
   assert.match(script, /\/admin\/api\/assets\/item/);
+  assert.match(script, /asset_upload_busy/);
   assert.match(script, /showModal/);
 });
