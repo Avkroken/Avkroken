@@ -68,9 +68,11 @@ export function resolveAssetFilter(options) {
   const app = value.app || "";
   const size = value.size || "";
   const theme = value.theme || "";
-  const browseApps = !app && !size && !theme;
-  const effectiveSize = size === "all" ? "" : (size || (browseApps ? "" : "1254"));
-  return { app: app, size: size, theme: theme, browseApps: browseApps, effectiveSize: effectiveSize };
+  const search = String(value.search || "").trim().toLocaleLowerCase("sv");
+  const browseApps = !app && !size && !theme && !search;
+  const implicitOriginal = !search && !size && (app || theme);
+  const effectiveSize = size === "all" ? "" : (size || (implicitOriginal ? "1254" : ""));
+  return { app: app, size: size, theme: theme, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
 }
 
 export function filterAssetRecords(assets, filters) {
@@ -78,9 +80,28 @@ export function filterAssetRecords(assets, filters) {
   if (resolved.browseApps) return [];
   return assets.filter(function(asset) {
     const pixel = asset.pixelSize ? String(asset.pixelSize) : "";
+    const haystack = [
+      asset.name, asset.key, asset.appLabel, asset.appCategory,
+      asset.themeLabel, asset.theme, asset.pixelLabel, asset.contentType,
+    ].filter(Boolean).join(" ").toLocaleLowerCase("sv");
     return (!resolved.app || asset.appCategory === resolved.app)
       && (!resolved.theme || asset.theme === resolved.theme)
-      && (!resolved.effectiveSize || pixel === resolved.effectiveSize);
+      && (!resolved.effectiveSize || pixel === resolved.effectiveSize)
+      && (!resolved.search || haystack.includes(resolved.search));
+  });
+}
+
+export function sortAssetRecords(assets, sort = "app") {
+  return assets.slice().sort(function(a, b) {
+    if (sort === "newest") return new Date(b.uploadedAt) - new Date(a.uploadedAt);
+    if (sort === "oldest") return new Date(a.uploadedAt) - new Date(b.uploadedAt);
+    if (sort === "name") return String(a.name || a.key || "").localeCompare(String(b.name || b.key || ""), "sv");
+    if (sort === "size") return Number(b.size || 0) - Number(a.size || 0);
+    const appOrder = String(a.appLabel || a.appCategory || "").localeCompare(String(b.appLabel || b.appCategory || ""), "sv");
+    if (appOrder) return appOrder;
+    const themeOrder = Number(a.theme || 0) - Number(b.theme || 0);
+    if (themeOrder) return themeOrder;
+    return Number(b.pixelSize || 0) - Number(a.pixelSize || 0);
   });
 }
 
@@ -181,18 +202,7 @@ function assetClient() {
     };
   }
 
-  function sortAssets(assets, sort) {
-    return assets.slice().sort(function(a,b) {
-      if (sort === "newest") return new Date(b.uploadedAt) - new Date(a.uploadedAt);
-      if (sort === "oldest") return new Date(a.uploadedAt) - new Date(b.uploadedAt);
-      if (sort === "name") return String(a.name || a.key).localeCompare(String(b.name || b.key), "sv");
-      const appOrder = String(a.appLabel || a.appCategory || "").localeCompare(String(b.appLabel || b.appCategory || ""), "sv");
-      if (appOrder) return appOrder;
-      const themeOrder = Number(a.theme || 0) - Number(b.theme || 0);
-      if (themeOrder) return themeOrder;
-      return Number(b.pixelSize || 0) - Number(a.pixelSize || 0);
-    });
-  }
+  function sortAssets(assets, sort) { return sortAssetRecords(assets, sort); }
 
   function searchedAssets(assets, search) {
     if (!search) return assets;
@@ -373,6 +383,8 @@ function assetClient() {
       const message = state === "not_configured" ? "Assetlagret är inte konfigurerat." : "Assetlagret är tillfälligt otillgängligt.";
       q("#asset-app-grid").replaceChildren();
       q("#asset-gallery").replaceChildren();
+      q("#asset-file-list").replaceChildren();
+      q("#asset-other-files").hidden = true;
       empty.textContent = message;
       empty.hidden = false;
       badge.textContent = state === "not_configured" ? "ej konfigurerat" : "otillgängligt";
@@ -695,6 +707,7 @@ export function publicAssetsScript() {
   return [
     "const resolveAssetFilter=", resolveAssetFilter.toString(), ";",
     "const filterAssetRecords=", filterAssetRecords.toString(), ";",
+    "const sortAssetRecords=", sortAssetRecords.toString(), ";",
     "const bindAssetFilterChanges=", bindAssetFilterChanges.toString(), ";",
     "(", assetClient.toString(), ")();"
   ].join("");
