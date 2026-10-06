@@ -24,7 +24,9 @@ function fakeR2(seed = []) {
     async put(key, body, options = {}) {
       const onlyIf = options.onlyIf;
       const ifNoneMatch = onlyIf instanceof Headers ? onlyIf.get("if-none-match") : null;
+      const ifMatch = onlyIf instanceof Headers ? onlyIf.get("if-match") : null;
       if (ifNoneMatch === "*" && objects.has(key)) return null;
+      if (ifMatch && objects.get(key)?.etag !== ifMatch) return null;
       this.puts.push({ key, body, options });
       const timestamp = Number(key.match(/\/(\d+)\.zip$/)?.[1] || Date.now());
       const entry = {
@@ -732,6 +734,24 @@ test("querybaserade assetfilnamn avkodas exakt en gång", async () => {
   const result = await response.json();
   assert.equal(result.asset.name, "100%.png");
   assert.match(result.asset.key, /^uploads\/[0-9a-f]{32}\/100%\.png$/);
+});
+
+test("utgånget asset-mutationslås återtas atomiskt via etag", async () => {
+  const transfers = fakeR2([{
+    key: "_system/asset-mutation-lock.json",
+    body: JSON.stringify({ token: "stale", expiresAt: Date.now() - 1 }),
+    httpMetadata: { contentType: "application/json" },
+  }]);
+  const assets = fakeR2();
+  const response = await worker.fetch(request("/api/assets/uploads?name=recovered.txt", {
+    method: "POST",
+    body: "recovered",
+    headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
+  }), env(transfers, assets));
+
+  assert.equal(response.status, 201);
+  assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
+  assert.equal(assets.keys().some((key) => key.endsWith("/recovered.txt")), true);
 });
 
 test("assetmutationer serialiseras före kvotkontroll och R2-write", async () => {
