@@ -532,7 +532,7 @@ export default {
         });
       }
 
-      const result = await uploadPublicAsset(req, env.ASSETS, resolved.name, {
+      const result = await uploadPublicAsset(req, env.ASSETS, encodeURIComponent(resolved.name), {
         maxUploadBytes: MAX_UPLOAD_BYTES,
         maxBucketBytes: MAX_BUCKET_BYTES,
       }, {
