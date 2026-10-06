@@ -136,7 +136,17 @@ GitHub public repositories
   -> Avkroken Projekt/Tjänster/Projektdetalj/Wiki-presentation
 ```
 
-### Dokumentationskällor
+### Operator-wizard
+
+Provider-/credentialförutsättningar verifieras utan att exportera eller skriva secretvärden:
+
+```bash
+bash scripts/setup-provider-credentials.sh
+```
+
+Wizarden är human-only och verifierar befintlig provider-state; den skapar eller roterar inga credentials.
+
+## Dokumentationskällor
 
 ```text
 GitHub repository / explicit opt-in app
