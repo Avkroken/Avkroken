@@ -39,4 +39,8 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const verify = script.indexOf('run("npm", ["run", "verify:production"])');
   assert.ok(branchGuard >= 0 && branchExit > branchGuard && check > branchExit);
   assert.ok(deploy > check && verify > deploy);
+
+  const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
+  assert.match(productionCheck, /data-media-library-version="2"/);
+  assert.match(productionCheck, /does not serve Media Library v2/);
 });
