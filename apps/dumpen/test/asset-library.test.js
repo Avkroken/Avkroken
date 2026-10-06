@@ -144,6 +144,24 @@ test("managed replace preserves stable key and enforces total storage limit", as
   assert.equal(replaced.asset.key, key);
   assert.equal(replaced.asset.name, "photo.jpg");
   assert.equal(bucket.value(key).size, 3);
+  assert.equal(bucket.value(key).httpMetadata.cacheControl, "public, max-age=300");
+});
+
+test("asset download uses RFC 5987 encoding for extended filenames", async () => {
+  const key = "uploads/0123456789abcdef0123456789abcdef/image.png";
+  const bucket = fakeR2([{
+    key,
+    body: "png-data",
+    httpMetadata: { contentType: "image/png" },
+    customMetadata: { originalName: "image (1)'s.png", kind: "dumpen-upload" },
+  }]);
+
+  const result = await downloadAsset(bucket, key);
+  assert.equal(result.response.status, 200);
+  assert.match(
+    result.response.headers.get("content-disposition"),
+    /filename\*=UTF-8''image%20%281%29%27s\.png/,
+  );
 });
 
 test("asset download is private/no-store and keeps the original filename", async () => {
