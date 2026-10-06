@@ -233,8 +233,10 @@ step "Öppna Workers & Pages → skvallerbyttan → Settings och kontrollera run
 step "Krävs: GAMNACKEN_GITHUB_APP_CLIENT_ID, GAMNACKEN_GITHUB_APP_PRIVATE_KEY, SKVALLERBYTTAN_SESSION_SECRET och SKVALLERBYTTAN_WEBHOOK_SECRET."
 step "Vid aktiverade integrationer: CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET och CLOUDFLARE_CASB_WEBHOOK_SECRET."
 step "SKVALLERBYTTAN_READ_API_TOKEN behövs endast om machine read API ska användas."
+step "Om machine read API är aktiverat: kör från den faktiska maskinkonsumenten ett autentiserat GET https://skvallerbyttan.denied.se/api/v1/capabilities med dess redan konfigurerade Bearer-token. Kräv HTTP 200."
+step "Verifiera därefter i Insyn/read telemetry att anropet attribuerats till consumer=chatgpt. Presence av Worker-secret ensam räcker inte som tokenverifiering."
 note "GitHub Actions ska inte synka dessa värden och ska inte bära Cloudflare deploycredential."
-if ! confirm "Är de runtime-secrets som faktiskt används konfigurerade?"; then
+if ! confirm "Är runtime-secrets konfigurerade och är eventuell machine token verifierad end-to-end från riktig konsument?"; then
   warn "Provisionering/rotation görs manuellt på provider-sidan; lägg aldrig värden i Git/repo/chatt."
   exit 2
 fi
@@ -273,14 +275,19 @@ if ! confirm "Finns aktuell lyckad main production-build som bevisar att Workers
 fi
 
 stage "Skvallerbyttan · capability verification"
-say "Slutkontrollen görs från Skvallerbyttans privata dashboard."
-open_url "https://skvallerbyttan.denied.se/"
-step "Logga in och öppna Insyn. Kör Uppdatera för en explicit read-only reconciliation."
-step "Verifiera GitHub App-proben samt Cloudflare R1, R2 och R3. Desired reads ska inte visa permission_denied."
-step "Organization-only GitHub capabilities får visa not_supported när owner fortfarande är en GitHub User."
-step "Kontrollera freshness/last success och att inga credentialvärden exponeras i dashboard/API."
-if ! confirm "Är önskade read-only capabilities tillgängliga eller korrekt markerade?"; then
-  warn "Använd capability-status för att hitta den specifika saknade read-permissionen; bredda inte tokenklasser generellt."
+say "Slutkontrollen måste bevisa både färsk OAuth och färska providerreads."
+open_url "https://skvallerbyttan.denied.se/auth/logout"
+step "Logga ut den befintliga Skvallerbyttan-sessionen. Om du inte kan säkerställa att en ny lokal session skapas, använd ett privat webbläsarfönster för nästa steg."
+open_url "https://skvallerbyttan.denied.se/login"
+step "Starta 'Logga in med GitHub' och slutför hela OAuth-rundan tillbaka till dashboarden. En lyckad callback måste landa i den privata dashboarden utan login?error=oauth/config/state."
+step "Denna färska OAuth-runda är obligatorisk eftersom en redan giltig dashboard-session inte verifierar KROSA_MAJA_CLIENT_SECRET/GITHUB_OAUTH_CLIENT_SECRET efter rotation."
+step "Öppna Insyn och kör Uppdatera för en explicit read-only reconciliation."
+step "Kräv färska status=available-resultat för önskade GitHub- och Cloudflare-reads, inklusive GitHub App-proben samt Cloudflare R1, R2 och R3. last success ska vara från den aktuella refreshen och freshness ska vara fresh."
+step "Godkänn inte error, unknown, not_observed, stale, unavailable eller permission_denied som verifierad credential-state."
+step "Organization-only GitHub capabilities får vara not_supported när current owner fortfarande är en GitHub User; detta är det uttryckliga undantaget."
+step "Kontrollera samtidigt att inga credentialvärden exponeras i dashboard/API."
+if ! confirm "Har färsk OAuth lyckats och är alla önskade providerreads fresh+available (med endast explicit not_supported-undantag)?"; then
+  warn "Credentialverifieringen är inte klar. Fixa den specifika felande OAuth/providerreaden utan att bredda tokenklasser generellt."
   exit 2
 fi
 
