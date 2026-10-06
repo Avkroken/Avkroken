@@ -146,6 +146,17 @@ test("theme metadata is hidden in auto mode instead of rendered disabled", () =>
   assert.doesNotMatch(markup, /id="asset-upload-size" disabled/);
 });
 
+test("media library bootstrap exports loaders before guarded bindings", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-apps"/);
+  assert.match(markup, /Laddar mediebibliotek/);
+
+  const script = publicAssetsScript();
+  assert.match(script, /window\.loadAssets=loadAssets/);
+  assert.match(script, /media-library-bootstrap/);
+  assert.match(script, /dumpenClientError/);
+});
+
 test("media library script contains queue, progress, clipboard and item mutations", () => {
   const handlers = [];
   const selects = Array.from({ length: 5 }, () => ({
