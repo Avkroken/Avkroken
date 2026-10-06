@@ -34,7 +34,7 @@ export function publicAssetsMarkup() {
     return "<option value=\"" + entry[0] + "\">" + entry[1] + "</option>";
   }).join("");
   return [
-    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"2\">",
+    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"2\" data-deployment-contract=\"provider-version\">",
     "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Appbilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div><strong>Släpp filer här</strong><p>Drag & drop, klistra in från urklipp eller välj flera filer. Max 20 MB per fil.</p></div><div><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><button id=\"choose-assets\" type=\"button\">Välj filer</button></div></div>",
     "<div class=\"asset-upload-config\">",
