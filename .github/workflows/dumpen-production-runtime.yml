@@ -20,9 +20,37 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: "24"
-      - name: Verify deployed Media Library
-        working-directory: apps/dumpen
-        run: node scripts/verify-production.mjs
+      - name: Verify deployed Media Library in a browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          google-chrome --version
+          profile="$(mktemp -d)"
+          trap 'rm -rf "$profile"' EXIT
+
+          for attempt in $(seq 1 12); do
+            dom="$(mktemp)"
+            url="https://dumpen.denied.se/?runtime_check=${GITHUB_SHA}-${attempt}"
+            if timeout 20s google-chrome \
+              --headless=new \
+              --no-sandbox \
+              --disable-gpu \
+              --disable-dev-shm-usage \
+              --no-first-run \
+              --user-data-dir="$profile" \
+              --virtual-time-budget=5000 \
+              --dump-dom "$url" >"$dom" 2>/dev/null; then
+              if grep -Fq 'data-media-library-version="2"' "$dom"; then
+                echo "dumpen: Media Library v2 verified in production on attempt $attempt"
+                rm -f "$dom"
+                exit 0
+              fi
+            fi
+            bytes="$(wc -c <"$dom" | tr -d ' ')"
+            rm -f "$dom"
+            echo "::warning::Attempt $attempt did not observe Media Library v2 (DOM bytes: $bytes)."
+            if [[ "$attempt" -lt 12 ]]; then sleep 10; fi
+          done
+
+          echo "::error::dumpen.denied.se did not expose Media Library v2 to headless Chrome."
+          exit 1
