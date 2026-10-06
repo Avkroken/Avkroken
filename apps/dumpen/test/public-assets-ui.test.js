@@ -108,20 +108,42 @@ test("media library markup exposes the production runtime marker", () => {
   assert.match(publicAssetsMarkup(), /data-deployment-contract="provider-version"/);
 });
 
-test("media library uses native iOS-compatible file inputs", () => {
+test("media library uses one native iOS-compatible file input", () => {
   const markup = publicAssetsMarkup();
-  assert.match(markup, /id="asset-photo-files" type="file" multiple accept="image\/\*"/);
   assert.match(markup, /id="asset-files" type="file" multiple/);
-  assert.match(markup, /Bildbibliotek \/ Kamera/);
-  assert.match(markup, /Filer \/ iCloud Drive/);
+  assert.match(markup, /Bilder, kamera och iCloud Drive/);
   assert.match(markup, /Launcher-loggor/);
   assert.match(markup, /Temabilder/);
+  assert.doesNotMatch(markup, /id="asset-photo-files"/);
   assert.doesNotMatch(markup, /id="choose-assets"/);
 
   const script = publicAssetsScript();
   assert.doesNotMatch(script, /asset-files"\)\.click\(\)/);
   assert.doesNotMatch(script, /asset-replace-file"\)\.click\(\)/);
-  assert.match(script, /#asset-photo-files/);
+  assert.doesNotMatch(script, /#asset-photo-files/);
+});
+
+test("file selection stages visibly behind an explicit upload action", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-files" type="file" multiple/);
+  assert.doesNotMatch(markup, /id="asset-photo-files"/);
+  assert.match(markup, /id="asset-queue-panel"/);
+  assert.match(markup, /id="asset-upload-button"/);
+  assert.match(markup, /Valda filer/);
+  assert.match(markup, /Ladda upp/);
+
+  const script = publicAssetsScript();
+  assert.match(script, /state:"staged"/);
+  assert.match(script, /#asset-upload-button/);
+  assert.match(script, /startSelectedUpload/);
+});
+
+test("theme metadata is hidden in auto mode instead of rendered disabled", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-theme-config"[^>]*hidden/);
+  assert.doesNotMatch(markup, /id="asset-upload-app" disabled/);
+  assert.doesNotMatch(markup, /id="asset-upload-theme" disabled/);
+  assert.doesNotMatch(markup, /id="asset-upload-size" disabled/);
 });
 
 test("media library script contains queue, progress, clipboard and item mutations", () => {
@@ -147,7 +169,9 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.match(script, /\/admin\/api\/assets\/item/);
   assert.match(script, /asset_upload_busy/);
   assert.match(script, /setTimeout\(runQueue, 0\)/);
-  assert.match(script, /Explicit Temabild-läge använder en canonical slot åt gången/);
+  assert.match(script, /Manuell temabild kräver exakt en vald fil/);
+  assert.match(script, /state === "staged"/);
+  assert.match(script, /uploadConfig/);
   assert.match(script, /#asset-filter-type/);
   assert.match(script, /asset\.mutable === true/);
   assert.match(script, /showModal/);

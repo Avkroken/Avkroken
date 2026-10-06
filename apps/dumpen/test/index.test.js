@@ -1084,7 +1084,9 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-other-files"/);
   assert.match(adminHtml, /id="asset-dialog"/);
   assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
-  assert.equal((adminHtml.match(/id="asset-photo-files"/g) || []).length, 1);
+  assert.equal((adminHtml.match(/id="asset-photo-files"/g) || []).length, 0);
+  assert.equal((adminHtml.match(/id="asset-upload-button"/g) || []).length, 1);
+  assert.equal((adminHtml.match(/id="asset-queue-panel"/g) || []).length, 1);
   assert.doesNotMatch(adminHtml, /id="choose-assets"/);
   assert.match(adminHtml, /class="admin-mode"/);
   assert.match(adminHtml, /id="asset-search"/);

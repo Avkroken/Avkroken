@@ -40,7 +40,9 @@ Efter ändringar i `src/access.js`, verifiera minst:
 Efter ändringar i galleri eller asset-API, verifiera minst:
 
 - transferlistan fungerar även om `ASSETS.list()` fallerar;
-- drag/drop, clipboard och filväljare hamnar i samma uploadkö; på iPhone/iPad ska både **Välj bilder** och **Välj filer** öppnas via native file-input utan JavaScript-triggad dold input;
+- drag/drop, clipboard och den enda **Välj filer**-kontrollen hamnar först i en synlig staged-kö; på iPhone/iPad ska native file-input kunna välja bilder/kamera och Files/iCloud Drive utan JavaScript-triggad dold input;
+- val av fil får inte starta upload automatiskt: filen ska synas under **Valda filer**, och först **Ladda upp** får skapa upload-requests; bildmått får läsas asynkront utan att blockera att filen visas;
+- Automatisk-läge döljer App/Tema/Storlek/Replace; **Manuell temabild** visar dessa som redigerbara kontroller före upload;
 - kön fortsätter efter en fil som misslyckas och kan ha högst tre aktiva uploads, medan quota-check + R2-write serialiseras av det privata asset-mutationslåset;
 - explicit app/tema/storlek ger rätt canonical key även när lokalt filnamn är godtyckligt;
 - legacy filnamnsdetektering fungerar när explicit metadata saknas;
