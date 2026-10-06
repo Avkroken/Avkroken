@@ -28,6 +28,10 @@ Use Matt Skills Curated as the preferred runtime engineering workflow catalog. R
 
 Use this repository's GitHub Issues for issues and specifications. Read `docs/agents/issue-tracker.md` before reading, creating, or publishing tickets.
 
+### Triage roles
+
+When issue classification or external-request triage is in scope, use the five canonical roles in `docs/agents/triage-labels.md`. Reuse equivalent existing repository labels; do not mutate provider labels merely to normalize names. A missing GitHub label does not erase the logical triage state.
+
 ### Domain docs
 
 This is a multi-context monorepo. Route domain and technical context through the affected application's own `AGENTS.md` and `docs/project-context.md` as described in `docs/agents/domain.md`.
