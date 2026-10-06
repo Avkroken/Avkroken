@@ -12,20 +12,22 @@ const APP_OPTIONS = [
 
 export function publicAssetsCss() {
   return [
-    ".asset-box{margin:20px 0 22px;padding:18px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--panel) 90%,transparent)}",
-    ".asset-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:14px}.asset-head h3{margin:0;font-size:18px;font-weight:720;letter-spacing:-.02em}.asset-head p{margin:4px 0 0;color:var(--muted);font-size:13px;max-width:760px}",
-    ".asset-dropzone{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:18px;border:1px dashed var(--line-strong);border-radius:14px;background:var(--bg-deep);transition:border-color .15s,background .15s}.asset-dropzone[data-drag=true]{border-color:var(--green);background:color-mix(in srgb,var(--green) 7%,var(--bg-deep))}.asset-dropzone strong{display:block;font-size:14px}.asset-dropzone p{margin:3px 0 0;color:var(--muted);font-size:11px}.asset-dropzone input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}",
-    ".asset-upload-config{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:10px}.asset-upload-config label,.asset-filter{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.asset-upload-config select,.asset-filter select,.asset-search input{width:100%;min-height:40px;padding:7px 9px;border:1px solid var(--line-strong);border-radius:9px;background:var(--bg-deep);color:var(--text);font:inherit;text-transform:none;letter-spacing:normal}.asset-upload-options{display:flex!important;grid-auto-flow:column;justify-content:start;align-items:center;gap:7px!important;text-transform:none!important;letter-spacing:normal!important}.asset-upload-options input{width:17px;height:17px;accent-color:var(--green)}",
-    ".asset-queue{display:grid;gap:7px;margin-top:10px}.asset-queue[hidden]{display:none}.asset-queue-item{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg-deep)}.asset-queue-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#050805}.asset-queue-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:700}.asset-queue-meta{margin-top:2px;color:var(--muted);font-size:9px}.asset-progress{height:4px;margin-top:5px;border-radius:99px;background:var(--panel-2);overflow:hidden}.asset-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--purple))}.asset-queue-actions{display:flex;gap:4px}.asset-queue-actions button{min-height:28px;padding:3px 6px;font-size:9px}",
-    ".asset-toolbar{display:grid;grid-template-columns:minmax(180px,1.5fr) repeat(5,minmax(105px,1fr));gap:8px;margin:16px 0 8px}.asset-search{display:grid;gap:5px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}",
-    ".asset-nav{display:flex;align-items:center;gap:7px;min-height:34px;margin:8px 0;color:var(--muted);font-size:11px;overflow-x:auto;white-space:nowrap}.asset-nav button{min-height:30px;padding:4px 8px;background:transparent;color:var(--text);border-color:var(--line);font-size:11px}.asset-nav-sep{color:var(--muted)}.asset-status{min-height:22px;margin:5px 0;color:var(--muted);font-size:11px}",
-    ".asset-app-grid,.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px;width:100%;margin-top:10px}.asset-app{position:relative;min-width:0;aspect-ratio:1/1;padding:0;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:var(--bg-deep);color:var(--text);text-align:left}.asset-app:hover,.asset-app:focus-visible{border-color:var(--line-strong);filter:none}.asset-app img{width:100%;height:100%;display:block;object-fit:cover}.asset-app-shade{position:absolute;inset:auto 0 0;padding:34px 9px 9px;background:linear-gradient(transparent,rgba(0,0,0,.88));pointer-events:none}.asset-app-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:760}.asset-app-count{display:block;margin-top:2px;color:#dce7f8;font-size:9px}",
-    ".asset-card{min-width:0;border:1px solid var(--line);border-radius:13px;background:var(--bg-deep);overflow:hidden}.asset-preview{position:relative;aspect-ratio:1/1;display:block;width:100%;padding:0;border:0;border-radius:0;background:#050805;overflow:hidden}.asset-preview img{display:block;width:100%;height:100%;object-fit:cover}.asset-card-caption{padding:8px;min-width:0}.asset-card-title{display:flex;align-items:center;justify-content:space-between;gap:5px}.asset-card-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.asset-size{flex:0 0 auto;color:var(--muted);font-size:9px}.asset-card-sub{margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:9px}.asset-card-actions{display:flex;gap:5px;margin-top:7px}.asset-card-actions button,.asset-card-actions a{flex:1;min-width:0;min-height:28px;padding:3px 5px;border-radius:7px;font-size:9px;text-align:center}.asset-card-actions a{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-strong);color:var(--text);text-decoration:none}",
-    ".asset-files{margin-top:14px}.asset-files details{border-top:1px solid var(--line);padding-top:10px}.asset-files summary{cursor:pointer;color:var(--muted);font-size:11px}.asset-file-list{display:grid;gap:7px;margin-top:9px}.asset-file{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--bg-deep)}.asset-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.asset-facts{margin-top:2px;color:var(--muted);font-size:9px}",
-    ".asset-empty{margin-top:12px;padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:11px;text-align:center}.asset-app-grid[hidden],.gallery[hidden],.asset-files[hidden],.asset-empty[hidden]{display:none}",
-    ".asset-dialog{width:min(760px,calc(100% - 24px));max-height:90vh;padding:0;border:1px solid var(--line-strong);border-radius:16px;background:var(--panel);color:var(--text);box-shadow:0 28px 90px rgba(0,0,0,.6)}.asset-dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(4px)}.asset-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)}.asset-dialog-head h4{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.asset-dialog-close{min-height:30px;padding:3px 8px}.asset-dialog-body{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(240px,.85fr);gap:16px;padding:15px}.asset-dialog-preview{aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#050805}.asset-dialog-preview img{width:100%;height:100%;display:block;object-fit:contain}.asset-dialog-info{min-width:0}.asset-dialog-facts{display:grid;gap:8px;margin:0}.asset-dialog-facts div{padding-bottom:7px;border-bottom:1px solid var(--line)}.asset-dialog-facts dt{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}.asset-dialog-facts dd{margin:2px 0 0;overflow-wrap:anywhere;font-size:11px}.asset-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px}.asset-dialog-actions .danger{color:var(--danger)}",
-    "@media(max-width:900px){.asset-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.asset-search{grid-column:1/-1}.asset-upload-config{grid-template-columns:repeat(2,minmax(0,1fr))}}",
-    "@media(max-width:680px){.asset-box{margin-inline:-10px;padding:12px;border-radius:14px}.asset-head{align-items:flex-start;flex-direction:column;gap:7px}.asset-dropzone{grid-template-columns:1fr}.asset-dropzone button{width:100%}.asset-toolbar{grid-template-columns:1fr 1fr}.asset-app-grid,.gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.asset-dialog-body{grid-template-columns:1fr}.asset-dialog-preview{max-height:45vh}.asset-queue-item{grid-template-columns:38px minmax(0,1fr)}.asset-queue-thumb{width:38px;height:38px}.asset-queue-actions{grid-column:1/-1;justify-content:flex-end}}"
+    ".asset-box{position:relative;margin:24px 0 28px;padding:clamp(16px,2.4vw,28px);border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 96%,transparent),color-mix(in srgb,var(--bg-deep) 96%,transparent));box-shadow:var(--shadow-lg);overflow:hidden}.asset-box::before{content:\"\";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--green) 55%,transparent),transparent);pointer-events:none}",
+    ".asset-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px}.asset-head h3{margin:0;font-size:clamp(1.35rem,2.4vw,1.8rem);font-weight:760;letter-spacing:-.035em}.asset-head p{margin:6px 0 0;color:var(--muted);font-size:14px;line-height:1.6;max-width:780px}",
+    ".asset-dropzone{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.72fr);gap:18px;align-items:center;padding:20px;border:1px solid var(--line-strong);border-radius:18px;background:color-mix(in srgb,var(--panel-2) 72%,var(--bg-deep));transition:border-color .15s,background .15s,transform .15s}.asset-dropzone[data-drag=true]{border-color:var(--green);background:color-mix(in srgb,var(--green) 7%,var(--panel-2));transform:translateY(-1px)}.asset-drop-copy{display:flex;align-items:center;gap:14px;min-width:0}.asset-drop-icon{display:grid;place-items:center;width:44px;height:44px;flex:0 0 auto;border:1px solid color-mix(in srgb,var(--green) 40%,var(--line));border-radius:13px;background:color-mix(in srgb,var(--green) 8%,var(--bg-deep));color:var(--green);font-size:22px;font-weight:500}.asset-dropzone strong{display:block;font-size:15px;letter-spacing:-.01em}.asset-dropzone p{margin:4px 0 0;color:var(--muted);font-size:12px;line-height:1.45}",
+    ".asset-picker-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.asset-picker{position:relative;display:flex;min-width:0;min-height:54px;flex-direction:column;justify-content:center;padding:10px 14px;border:1px solid var(--line-strong);border-radius:13px;background:var(--surface-raised);color:var(--text);cursor:pointer;overflow:hidden;isolation:isolate}.asset-picker-primary{border-color:color-mix(in srgb,var(--green) 45%,var(--line-strong));background:color-mix(in srgb,var(--green) 8%,var(--surface-raised))}.asset-picker span{font-size:13px;font-weight:760}.asset-picker small{margin-top:2px;color:var(--muted);font-size:10px}.asset-picker input[type=file]{position:absolute;inset:0;z-index:2;width:100%;height:100%;opacity:0;cursor:pointer;font-size:40px}.asset-picker:focus-within{outline:2px solid var(--green);outline-offset:2px}",
+    ".asset-upload-config{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(180px,1.2fr);gap:10px;margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:16px;background:color-mix(in srgb,var(--bg-deep) 62%,transparent)}.asset-upload-config label,.asset-filter{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:720;letter-spacing:.055em;text-transform:uppercase}.asset-upload-config select,.asset-filter select,.asset-search input{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:11px;background:var(--surface-control);color:var(--text);font-family:inherit;font-size:14px;text-transform:none;letter-spacing:normal;outline:none}.asset-upload-config select:focus,.asset-filter select:focus,.asset-search input:focus{border-color:color-mix(in srgb,var(--green) 55%,var(--line-strong));box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 10%,transparent)}.asset-upload-options{display:flex!important;justify-content:flex-start;align-items:center;align-self:end;min-height:44px;padding:0 4px;gap:9px!important;text-transform:none!important;letter-spacing:normal!important}.asset-upload-options input{width:19px;height:19px;accent-color:var(--green)}",
+    ".asset-queue{display:grid;gap:9px;margin-top:12px}.asset-queue[hidden]{display:none}.asset-queue-item{display:grid;grid-template-columns:54px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;background:var(--surface-raised)}.asset-queue-thumb{width:54px;height:54px;border-radius:11px;object-fit:cover;background:#050805}.asset-queue-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:750}.asset-queue-meta{margin-top:3px;color:var(--muted);font-size:10px}.asset-progress{height:5px;margin-top:7px;border-radius:99px;background:var(--panel-2);overflow:hidden}.asset-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--secondary));transition:width .15s}.asset-queue-actions{display:flex;gap:6px}.asset-queue-actions button{min-height:36px;padding:6px 9px;font-size:11px}",
+    ".asset-toolbar{display:grid;grid-template-columns:minmax(220px,1.8fr) repeat(5,minmax(115px,1fr));gap:10px;margin:20px 0 10px;padding-top:18px;border-top:1px solid var(--line)}.asset-search{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:720;letter-spacing:.055em;text-transform:uppercase}",
+    ".asset-nav{display:flex;align-items:center;gap:8px;min-height:38px;margin:8px 0;color:var(--muted);font-size:12px;overflow-x:auto;white-space:nowrap}.asset-nav button{min-height:34px;padding:5px 10px;background:transparent;color:var(--text);border-color:var(--line);font-size:12px}.asset-nav-sep{color:var(--muted)}.asset-status{min-height:24px;margin:5px 0 2px;color:var(--muted);font-size:12px}",
+    ".asset-app-grid,.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;width:100%;margin-top:12px}.asset-app{position:relative;min-width:0;aspect-ratio:1/1;padding:0;border:1px solid var(--line);border-radius:17px;overflow:hidden;background:var(--surface-raised);color:var(--text);text-align:left;box-shadow:var(--shadow-sm);transition:transform .16s,border-color .16s,box-shadow .16s}.asset-app:hover,.asset-app:focus-visible{border-color:color-mix(in srgb,var(--green) 35%,var(--line-strong));filter:none;transform:translateY(-2px);box-shadow:var(--shadow-md)}.asset-app img{width:100%;height:100%;display:block;object-fit:cover}.asset-app-shade{position:absolute;inset:auto 0 0;padding:48px 12px 12px;background:linear-gradient(transparent,rgba(2,6,4,.94));pointer-events:none}.asset-app-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:780}.asset-app-count{display:block;margin-top:3px;color:#dce7df;font-size:10px}",
+    ".asset-card{min-width:0;border:1px solid var(--line);border-radius:17px;background:var(--surface-raised);overflow:hidden;box-shadow:var(--shadow-sm);transition:transform .16s,border-color .16s,box-shadow .16s}.asset-card:hover{border-color:var(--line-strong);transform:translateY(-2px);box-shadow:var(--shadow-md)}.asset-preview{position:relative;aspect-ratio:1/1;display:block;width:100%;padding:0;border:0;border-radius:0;background:#050805;overflow:hidden}.asset-preview img{display:block;width:100%;height:100%;object-fit:cover}.asset-card-caption{padding:11px;min-width:0}.asset-card-title{display:flex;align-items:center;justify-content:space-between;gap:8px}.asset-card-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.asset-size{flex:0 0 auto;color:var(--muted);font-size:10px}.asset-card-sub{margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px}.asset-card-actions{display:flex;gap:7px;margin-top:9px}.asset-card-actions button,.asset-card-actions a{flex:1;min-width:0;min-height:38px;padding:6px 8px;border-radius:10px;font-size:11px;text-align:center}.asset-card-actions a{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line-strong);color:var(--text);text-decoration:none}",
+    ".asset-files{margin-top:18px}.asset-files details{border-top:1px solid var(--line);padding-top:12px}.asset-files summary{cursor:pointer;color:var(--muted);font-size:12px}.asset-file-list{display:grid;gap:8px;margin-top:10px}.asset-file{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-raised)}.asset-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.asset-facts{margin-top:2px;color:var(--muted);font-size:10px}",
+    ".asset-empty{margin-top:14px;padding:24px;border:1px dashed var(--line-strong);border-radius:16px;color:var(--muted);font-size:12px;text-align:center;background:color-mix(in srgb,var(--surface-raised) 70%,transparent)}.asset-app-grid[hidden],.gallery[hidden],.asset-files[hidden],.asset-empty[hidden]{display:none}",
+    ".asset-dialog{width:min(880px,calc(100% - 32px));max-height:90vh;padding:0;border:1px solid var(--line-strong);border-radius:22px;background:var(--panel);color:var(--text);box-shadow:0 32px 110px rgba(0,0,0,.68)}.asset-dialog::backdrop{background:rgba(0,0,0,.76);backdrop-filter:blur(8px)}.asset-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}.asset-dialog-head h4{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}.asset-dialog-close{min-height:40px;padding:6px 10px}.asset-dialog-body{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:20px;padding:18px}.asset-dialog-preview{aspect-ratio:1/1;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#050805}.asset-dialog-preview img{width:100%;height:100%;display:block;object-fit:contain}.asset-dialog-info{min-width:0}.asset-dialog-facts{display:grid;gap:9px;margin:0}.asset-dialog-facts div{padding-bottom:8px;border-bottom:1px solid var(--line)}.asset-dialog-facts dt{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}.asset-dialog-facts dd{margin:3px 0 0;overflow-wrap:anywhere;font-size:12px}.asset-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.asset-dialog-actions .danger{color:var(--danger)}.asset-dialog-file-action{position:relative;display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:10px;background:var(--control-bg);color:var(--control-text);font-weight:700;cursor:pointer;overflow:hidden}.asset-dialog-file-action[aria-disabled=true]{opacity:.45;pointer-events:none}.asset-dialog-file-action input[type=file]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:40px}",
+    "@media(max-width:980px){.asset-toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.asset-search{grid-column:1/-1}.asset-upload-config{grid-template-columns:repeat(2,minmax(0,1fr))}.asset-upload-options{grid-column:1/-1}.asset-dropzone{grid-template-columns:1fr}}",
+    "@media(max-width:680px){.asset-box{margin-inline:-4px;padding:14px;border-radius:20px}.asset-head{align-items:flex-start;flex-direction:column;gap:7px}.asset-dropzone{padding:14px;gap:14px}.asset-drop-copy{align-items:flex-start}.asset-drop-icon{width:40px;height:40px}.asset-picker-row{grid-template-columns:1fr 1fr}.asset-picker{min-height:58px;padding:10px 12px}.asset-upload-config{grid-template-columns:1fr 1fr;padding:12px}.asset-upload-config select,.asset-filter select,.asset-search input{font-size:16px;min-height:48px}.asset-upload-options{grid-column:1/-1;min-height:48px}.asset-toolbar{grid-template-columns:1fr 1fr;gap:9px}.asset-search{grid-column:1/-1}.asset-app-grid,.gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.asset-dialog{width:100%;max-width:none;max-height:92dvh;margin:auto 0 0;border-radius:22px 22px 0 0;border-left:0;border-right:0;border-bottom:0}.asset-dialog-body{grid-template-columns:1fr;padding:14px 14px calc(14px + env(safe-area-inset-bottom))}.asset-dialog-preview{max-height:42vh}.asset-dialog-actions{grid-template-columns:1fr 1fr}.asset-queue-item{grid-template-columns:46px minmax(0,1fr)}.asset-queue-thumb{width:46px;height:46px}.asset-queue-actions{grid-column:1/-1;justify-content:flex-end}.asset-queue-actions button,.asset-card-actions button,.asset-card-actions a{min-height:44px}.asset-status{font-size:11px}}",
+    "@media(max-width:390px){.asset-picker-row,.asset-upload-config,.asset-toolbar{grid-template-columns:1fr}.asset-upload-options,.asset-search{grid-column:auto}.asset-app-grid,.gallery{gap:7px}}"
   ].join("");
 }
 
@@ -34,15 +36,15 @@ export function publicAssetsMarkup() {
     return "<option value=\"" + entry[0] + "\">" + entry[1] + "</option>";
   }).join("");
   return [
-    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"2\" data-deployment-contract=\"provider-version\">",
-    "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Appbilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
-    "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div><strong>Släpp filer här</strong><p>Drag & drop, klistra in från urklipp eller välj flera filer. Max 20 MB per fil.</p></div><div><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><button id=\"choose-assets\" type=\"button\">Välj filer</button></div></div>",
+    "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"3\" data-deployment-contract=\"provider-version\">",
+    "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Launcher-loggor och temabilder visas som separata roller. Temabilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
+    "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Dra & släpp på dator, klistra in från urklipp eller använd iPhones inbyggda väljare.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-photo-files\" type=\"file\" multiple accept=\"image/*\"><span>Välj bilder</span><small>Bildbibliotek / Kamera</small></label><label class=\"asset-picker\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Filer / iCloud Drive</small></label></div></div>",
     "<div class=\"asset-upload-config\">",
-    "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Appbild</option></select></label>",
+    "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Temabild</option></select></label>",
     "<label>App<select id=\"asset-upload-app\" disabled><option value=\"\">Välj app</option>" + appOptions + "</select></label>",
     "<label>Tema<select id=\"asset-upload-theme\" disabled><option value=\"\">Välj tema</option><option value=\"1\">1 · Neon Glass</option><option value=\"2\">2 · Cyan Blueprint</option><option value=\"3\">3 · Isometric Console</option><option value=\"4\">4 · Illustrated Scene</option><option value=\"5\">5 · Emerald Radar</option><option value=\"6\">6 · Emerald Core</option><option value=\"7\">7 · Azure Orbit</option></select></label>",
     "<label>Storlek<select id=\"asset-upload-size\" disabled><option value=\"auto\">Från bildmått</option><option value=\"1254\">1254</option><option value=\"512\">512</option><option value=\"256\">256</option></select></label>",
-    "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig appbild</label>",
+    "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig temabild</label>",
     "</div>",
     "<div id=\"asset-queue\" class=\"asset-queue\" hidden></div>",
     "<div class=\"asset-toolbar\">",
@@ -50,7 +52,7 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-filter\">App<select id=\"asset-filter-app\"><option value=\"\">Alla appar</option></select></label>",
     "<label class=\"asset-filter\">Tema<select id=\"asset-filter-theme\"><option value=\"\">Alla teman</option></select></label>",
     "<label class=\"asset-filter\">Storlek<select id=\"asset-filter-size\"><option value=\"\">Original 1254</option><option value=\"512\">512</option><option value=\"256\">256</option><option value=\"all\">Alla</option></select></label>",
-    "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"app\">Appbilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
+    "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"launcher\">Launcher-loggor</option><option value=\"app\">Temabilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
     "<label class=\"asset-filter\">Sortera<select id=\"asset-sort\"><option value=\"app\">App / tema</option><option value=\"newest\">Nyast</option><option value=\"oldest\">Äldst</option><option value=\"name\">Namn</option></select></label>",
     "</div>",
     "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><span id=\"asset-nav-current\">Apps</span></nav>",
@@ -59,7 +61,7 @@ export function publicAssetsMarkup() {
     "<div id=\"asset-app-grid\" class=\"asset-app-grid\" aria-label=\"Applikationer\"></div>",
     "<div id=\"asset-gallery\" class=\"gallery\" hidden aria-label=\"Bilder\"></div>",
     "<div id=\"asset-other-files\" class=\"asset-files\" hidden><details><summary id=\"asset-file-summary\">Övriga filer</summary><div id=\"asset-file-list\" class=\"asset-file-list\"></div></details></div>",
-    "<dialog id=\"asset-dialog\" class=\"asset-dialog\"><div class=\"asset-dialog-head\"><h4 id=\"asset-dialog-title\">Asset</h4><button id=\"asset-dialog-close\" class=\"asset-dialog-close\" type=\"button\">Stäng</button></div><div class=\"asset-dialog-body\"><div id=\"asset-dialog-preview\" class=\"asset-dialog-preview\"><img id=\"asset-dialog-image\" alt=\"\"></div><div class=\"asset-dialog-info\"><dl id=\"asset-dialog-facts\" class=\"asset-dialog-facts\"></dl><div class=\"asset-dialog-actions\"><button id=\"asset-dialog-copy\" type=\"button\">Kopiera URL</button><button id=\"asset-dialog-open\" type=\"button\">Öppna original</button><button id=\"asset-dialog-download\" type=\"button\">Ladda ned</button><button id=\"asset-dialog-replace\" type=\"button\">Ersätt</button><button id=\"asset-dialog-delete\" class=\"danger\" type=\"button\">Ta bort</button></div><input id=\"asset-replace-file\" type=\"file\" hidden></div></div></dialog>",
+    "<dialog id=\"asset-dialog\" class=\"asset-dialog\"><div class=\"asset-dialog-head\"><h4 id=\"asset-dialog-title\">Asset</h4><button id=\"asset-dialog-close\" class=\"asset-dialog-close\" type=\"button\">Stäng</button></div><div class=\"asset-dialog-body\"><div id=\"asset-dialog-preview\" class=\"asset-dialog-preview\"><img id=\"asset-dialog-image\" alt=\"\"></div><div class=\"asset-dialog-info\"><dl id=\"asset-dialog-facts\" class=\"asset-dialog-facts\"></dl><div class=\"asset-dialog-actions\"><button id=\"asset-dialog-copy\" type=\"button\">Kopiera URL</button><button id=\"asset-dialog-open\" type=\"button\">Öppna original</button><button id=\"asset-dialog-download\" type=\"button\">Ladda ned</button><label id=\"asset-dialog-replace\" class=\"asset-dialog-file-action\"><input id=\"asset-replace-file\" type=\"file\"><span>Ersätt</span></label><button id=\"asset-dialog-delete\" class=\"danger\" type=\"button\">Ta bort</button></div></div></div></dialog>",
     "</section>"
   ].join("");
 }
@@ -72,7 +74,7 @@ export function resolveAssetFilter(options) {
   const type = value.type || "";
   const search = String(value.search || "").trim().toLocaleLowerCase("sv");
   const browseApps = !app && !size && !theme && !type && !search;
-  const implicitOriginal = !search && !size && (app || theme);
+  const implicitOriginal = !search && !size && type !== "launcher" && (app || theme);
   const effectiveSize = size === "all" ? "" : (size || (implicitOriginal ? "1254" : ""));
   return { app: app, size: size, theme: theme, type: type, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
 }
@@ -82,8 +84,8 @@ export function filterAssetRecords(assets, filters) {
   if (resolved.browseApps) return [];
   return assets.filter(function(asset) {
     const pixel = asset.pixelSize ? String(asset.pixelSize) : "";
-    const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
-    const kind = appImage ? "app" : (asset.image ? "image" : "file");
+    const appImage = Boolean(asset.image && asset.assetRole === "theme" && asset.appCategory && asset.theme && asset.pixelSize);
+    const kind = asset.assetRole === "launcher" ? "launcher" : (appImage ? "app" : (asset.image ? "image" : "file"));
     const haystack = [
       asset.name, asset.key, asset.appLabel, asset.appCategory,
       asset.themeLabel, asset.theme, asset.pixelLabel, asset.contentType,
@@ -156,7 +158,15 @@ function assetClient() {
   const maxConcurrent = 3;
 
   function appAssets(assets) {
-    return assets.filter(function(asset) { return asset.image && asset.appCategory && asset.theme && asset.pixelSize; });
+    return assets.filter(function(asset) { return asset.image && asset.assetRole === "theme" && asset.appCategory && asset.theme && asset.pixelSize; });
+  }
+
+  function launcherAssets(assets) {
+    return assets.filter(function(asset) { return asset.image && asset.assetRole === "launcher" && asset.appCategory; });
+  }
+
+  function appMediaAssets(assets) {
+    return assets.filter(function(asset) { return asset.image && asset.appCategory && (asset.assetRole === "theme" || asset.assetRole === "launcher"); });
   }
 
   function findPreview(assets, asset) {
@@ -245,7 +255,7 @@ function assetClient() {
     const grid = q("#asset-app-grid");
     grid.replaceChildren();
     const groups = new Map();
-    appAssets(assets).forEach(function(asset) {
+    appMediaAssets(assets).forEach(function(asset) {
       if (!groups.has(asset.appCategory)) groups.set(asset.appCategory, []);
       groups.get(asset.appCategory).push(asset);
     });
@@ -253,9 +263,13 @@ function assetClient() {
       return String(a[1][0].appLabel || a[0]).localeCompare(String(b[1][0].appLabel || b[0]), "sv");
     }).forEach(function(entry) {
       const app = entry[0], items = entry[1];
-      const representative = items.find(function(item) { return item.theme === "1" && item.pixelSize === 256; })
-        || items.find(function(item) { return item.pixelSize === 256; })
-        || items.find(function(item) { return item.pixelSize === 512; })
+      const themes = items.filter(function(item) { return item.assetRole === "theme"; });
+      const launcher = items.find(function(item) { return item.assetRole === "launcher"; });
+      const representative = launcher
+        || themes.find(function(item) { return item.theme === "1" && item.pixelSize === 256; })
+        || themes.find(function(item) { return item.pixelSize === 256; })
+        || themes.find(function(item) { return item.pixelSize === 512; })
+        || themes[0]
         || items[0];
       const button = document.createElement("button");
       button.type = "button";
@@ -273,7 +287,8 @@ function assetClient() {
       name.textContent = representative.appLabel || app;
       const count = document.createElement("span");
       count.className = "asset-app-count";
-      count.textContent = new Set(items.map(function(item) { return item.theme; })).size + " teman · " + items.length + " varianter";
+      const themeCount = new Set(themes.map(function(item) { return item.theme; })).size;
+      count.textContent = (launcher ? "Launcher · " : "") + themeCount + " teman · " + items.length + " objekt";
       shade.append(name, count);
       button.append(img, shade);
       button.addEventListener("click", function() {
@@ -294,16 +309,18 @@ function assetClient() {
     matches.forEach(function(asset) {
       const card = document.createElement("article");
       card.className = "asset-card";
-      const previewAsset = asset.appCategory ? findPreview(appAssets(assets), asset) : asset;
+      const previewAsset = asset.assetRole === "theme" ? findPreview(appAssets(assets), asset) : asset;
       const open = document.createElement("button");
       open.type = "button";
       open.className = "asset-preview";
       open.addEventListener("click", function() { openDetail(asset); });
       const img = document.createElement("img");
       img.src = previewAsset.previewUrl || previewAsset.directUrl;
-      img.alt = asset.appCategory
-        ? (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme))
-        : (asset.name || "Bild");
+      img.alt = asset.assetRole === "launcher"
+        ? (asset.appLabel || asset.appCategory || "App") + " · Launcher-logo"
+        : asset.appCategory
+          ? (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme))
+          : (asset.name || "Bild");
       img.loading = "lazy";
       img.decoding = "async";
       open.append(img);
@@ -319,7 +336,9 @@ function assetClient() {
       title.append(strong, size);
       const sub = document.createElement("div");
       sub.className = "asset-card-sub";
-      sub.textContent = asset.themeLabel || (asset.theme ? ("Tema " + asset.theme) : formatLabel(asset.contentType, asset.name));
+      sub.textContent = asset.assetRole === "launcher"
+        ? "Launcher-logo · legacy"
+        : (asset.themeLabel || (asset.theme ? ("Tema " + asset.theme) : formatLabel(asset.contentType, asset.name)));
       caption.append(title, sub, assetActions(asset, true));
       card.append(open, caption);
       gallery.append(card);
@@ -332,8 +351,8 @@ function assetClient() {
     list.replaceChildren();
     const resolved = resolveAssetFilter(filters);
     let other = assets.filter(function(asset) {
-      const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
-      return !asset.image || (resolved.browseApps && !appImage);
+      const structuredAppImage = Boolean(asset.image && asset.appCategory && (asset.assetRole === "theme" || asset.assetRole === "launcher"));
+      return !asset.image || (resolved.browseApps && !structuredAppImage);
     });
     if (!resolved.browseApps) other = filterAssetRecords(other, filters);
     other = sortAssets(other, filters.sort);
@@ -384,12 +403,12 @@ function assetClient() {
     q("#asset-app-grid").hidden = !browse;
     q("#asset-gallery").hidden = browse;
     if (browse) renderAppBrowser(currentAssets);
-    const visible = browse ? appAssets(currentAssets).length : renderGallery(currentAssets, filters);
+    const visible = browse ? appMediaAssets(currentAssets).length : renderGallery(currentAssets, filters);
     const fileCount = renderOtherFiles(currentAssets, filters);
     const empty = currentAssets.length === 0 || (!browse && visible === 0 && fileCount === 0);
     q("#asset-empty").hidden = !empty;
     q("#asset-status").textContent = browse
-      ? appAssets(currentAssets).length + " appbilder · välj en app eller använd sök/filter."
+      ? appMediaAssets(currentAssets).length + " appobjekt · välj en app eller använd sök/filter."
       : visible + " bild" + (visible === 1 ? "" : "er") + " · " + fileCount + " fil" + (fileCount === 1 ? "" : "er") + " visas.";
     if (scroll) q("#asset-nav").scrollIntoView({ behavior:"smooth", block:"start" });
   }
@@ -451,6 +470,7 @@ function assetClient() {
     const facts = q("#asset-dialog-facts");
     facts.replaceChildren(
       fact("Typ", formatLabel(asset.contentType, asset.name)),
+      fact("Roll", asset.assetRole === "launcher" ? "Launcher-logo (legacy)" : (asset.assetRole === "theme" ? "Temabild" : "Övrig asset")),
       fact("App", asset.appLabel || asset.appCategory),
       fact("Tema", asset.themeLabel || asset.theme),
       fact("Dimension", asset.pixelLabel),
@@ -461,11 +481,15 @@ function assetClient() {
     );
     const mutable = asset.mutable === true;
     q("#asset-dialog-download").disabled = !mutable;
-    q("#asset-dialog-replace").disabled = !mutable;
     q("#asset-dialog-delete").disabled = !mutable;
     q("#asset-dialog-download").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
-    q("#asset-dialog-replace").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
     q("#asset-dialog-delete").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
+    const replaceControl = q("#asset-dialog-replace");
+    const replaceInput = q("#asset-replace-file");
+    replaceControl.setAttribute("aria-disabled", mutable ? "false" : "true");
+    replaceControl.title = mutable ? "" : "Detta asset är read-only i Dumpen.";
+    replaceInput.disabled = !mutable;
+    replaceInput.accept = asset.contentType || "";
     dialog.showModal();
   }
 
@@ -606,8 +630,8 @@ function assetClient() {
       const app = q("#asset-upload-app").value, theme = q("#asset-upload-theme").value;
       let size = q("#asset-upload-size").value;
       if (size === "auto") size = item.width === item.height && [1254,512,256].includes(item.width) ? String(item.width) : "";
-      if (!app || !theme || !size) throw new Error("App, tema och giltig storlek krävs för appbilder.");
-      if (item.file.type !== "image/png") throw new Error("Appbilder måste vara PNG.");
+      if (!app || !theme || !size) throw new Error("App, tema och giltig storlek krävs för temabilder.");
+      if (item.file.type !== "image/png") throw new Error("Temabilder måste vara PNG.");
       if (item.width && item.height && (String(item.width) !== size || String(item.height) !== size)) throw new Error("Bildmåttet matchar inte vald storlek.");
       params.set("app", app);
       params.set("theme", theme);
@@ -679,7 +703,7 @@ function assetClient() {
         if (appMode && pending.length > 1) {
           pending.slice(1).forEach(function(item) {
             item.state = "error";
-            item.error = "Explicit Appbild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
+            item.error = "Explicit Temabild-läge använder en canonical slot åt gången. Ladda upp en fil eller använd Automatisk för batch.";
           });
           renderQueue();
         }
@@ -718,8 +742,13 @@ function assetClient() {
     q("#asset-upload-size").disabled = !appMode;
   });
 
-  q("#choose-assets").addEventListener("click", function() { q("#asset-files").click(); });
-  q("#asset-files").addEventListener("change", function() { addFiles(q("#asset-files").files); q("#asset-files").value = ""; });
+  ["#asset-photo-files","#asset-files"].forEach(function(selector) {
+    const input = q(selector);
+    input.addEventListener("change", function() {
+      addFiles(input.files);
+      input.value = "";
+    });
+  });
   const dropzone = q("#asset-dropzone");
   ["dragenter","dragover"].forEach(function(type) {
     dropzone.addEventListener(type, function(event) { event.preventDefault(); dropzone.dataset.drag = "true"; });
@@ -739,11 +768,6 @@ function assetClient() {
   q("#asset-dialog-open").addEventListener("click", function() { if (detailAsset) window.open(detailAsset.directUrl, "_blank", "noopener"); });
   q("#asset-dialog-download").addEventListener("click", function() { downloadDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
   q("#asset-dialog-delete").addEventListener("click", function() { deleteDetail().catch(function(error) { q("#asset-status").textContent = error.message; }); });
-  q("#asset-dialog-replace").addEventListener("click", function() {
-    const input = q("#asset-replace-file");
-    input.accept = detailAsset && detailAsset.contentType ? detailAsset.contentType : "";
-    input.click();
-  });
   q("#asset-replace-file").addEventListener("change", function() {
     const file = q("#asset-replace-file").files[0];
     q("#asset-replace-file").value = "";

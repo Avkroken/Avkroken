@@ -251,8 +251,8 @@ test("root visar privat dashboard och engångsticket-flöde", async () => {
   assert.match(html, /Privat kontrollpanel/);
   assert.match(html, /engångsticket/i);
   assert.match(html, /publika assets/);
-  assert.match(html, /--bg:#04070e/);
-  assert.match(html, /value="legacy">Legacy/);
+  assert.match(html, /--bg:#060908/);
+  assert.match(html, /value="legacy">Aurora/);
   assert.match(html, /20 MB per fil/);
   assert.match(html, /500 MB appgräns/);
 });
@@ -563,7 +563,7 @@ test("assetdirektlänkar bevarar tomma segment i giltiga R2-nycklar", async () =
   assert.equal(listed[0].directUrl, "https://logos.denied.se/apps//icon.png");
 });
 
-test("appbilder får kategori, tema och storleksvariant utan mirror- eller legacy-dubbletter", async () => {
+test("appassets skiljer launcher-logga från temabilder utan mirror- eller staging-dubbletter", async () => {
   const uploaded = new Date("2026-10-01T10:00:00Z");
   const png = { uploaded, body: new Uint8Array([1]), httpMetadata: { contentType: "image/png" } };
   const assets = fakeR2([
@@ -580,24 +580,28 @@ test("appbilder får kategori, tema och storleksvariant utan mirror- eller legac
 
   const listed = await listPublicAssets(assets);
   assert.deepEqual(listed.map((asset) => asset.key), [
+    "apps/dozzle/dozzle-256.png",
     "apps/dozzle/dozzle-1.png",
     "apps/dozzle/dozzle-1-256.png",
     "apps/dozzle/dozzle-1-512.png",
     "hotlink-ok/manual.png",
   ]);
-  assert.deepEqual(listed.slice(0, 3).map((asset) => ({
+  assert.deepEqual(listed.slice(0, 4).map((asset) => ({
     appCategory: asset.appCategory,
     theme: asset.theme,
     pixelSize: asset.pixelSize,
     variant: asset.variant,
+    assetRole: asset.assetRole,
   })), [
-    { appCategory: "dozzle", theme: "1", pixelSize: 1254, variant: "original" },
-    { appCategory: "dozzle", theme: "1", pixelSize: 256, variant: "resized" },
-    { appCategory: "dozzle", theme: "1", pixelSize: 512, variant: "resized" },
+    { appCategory: "dozzle", theme: null, pixelSize: 256, variant: "legacy", assetRole: "launcher" },
+    { appCategory: "dozzle", theme: "1", pixelSize: 1254, variant: "original", assetRole: "theme" },
+    { appCategory: "dozzle", theme: "1", pixelSize: 256, variant: "resized", assetRole: "theme" },
+    { appCategory: "dozzle", theme: "1", pixelSize: 512, variant: "resized", assetRole: "theme" },
   ]);
-  assert.equal(listed.slice(0, 3).every((asset) => asset.appLabel === "Dozzle"), true);
-  assert.equal(listed.slice(0, 3).every((asset) => asset.themeLabel === "Neon Glass"), true);
-  assert.equal(listed[3].mirror, false);
+  assert.equal(listed.slice(0, 4).every((asset) => asset.appLabel === "Dozzle"), true);
+  assert.equal(listed.slice(1, 4).every((asset) => asset.themeLabel === "Neon Glass"), true);
+  assert.equal(listed[0].themeLabel, null);
+  assert.equal(listed[4].mirror, false);
 });
 
 test("okända appkategorier använder sitt namn även om det matchar Object.prototype", async () => {
@@ -1080,6 +1084,9 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-other-files"/);
   assert.match(adminHtml, /id="asset-dialog"/);
   assert.equal((adminHtml.match(/id="asset-files"/g) || []).length, 1);
+  assert.equal((adminHtml.match(/id="asset-photo-files"/g) || []).length, 1);
+  assert.doesNotMatch(adminHtml, /id="choose-assets"/);
+  assert.match(adminHtml, /class="admin-mode"/);
   assert.match(adminHtml, /id="asset-search"/);
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
