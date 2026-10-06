@@ -51,6 +51,19 @@ test("search turns app browser into filtered results and combines with facets", 
   assert.equal(filterAssetRecords(assets, { search: "neon", app: "sonarr" }).length, 1);
 });
 
+test("type facet separates app images, generic images and files", () => {
+  const assets = [
+    { name: "plex-1.png", key: "apps/plex/plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1" },
+    { name: "photo.png", key: "uploads/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/photo.png", image: true },
+    { name: "notes.txt", key: "uploads/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/notes.txt", image: false },
+  ];
+
+  assert.equal(resolveAssetFilter({ type: "image" }).browseApps, false);
+  assert.deepEqual(filterAssetRecords(assets, { type: "app" }).map((asset) => asset.name), ["plex-1.png"]);
+  assert.deepEqual(filterAssetRecords(assets, { type: "image" }).map((asset) => asset.name), ["photo.png"]);
+  assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
+});
+
 test("explicit alla storlekar removes the implicit 1254 restriction", () => {
   const assets = [
     { appCategory: "plex", pixelSize: 1254, theme: "1" },
@@ -59,7 +72,7 @@ test("explicit alla storlekar removes the implicit 1254 restriction", () => {
   ];
 
   assert.deepEqual(resolveAssetFilter({ app: "plex" }), {
-    app: "plex", size: "", theme: "", search: "", browseApps: false, effectiveSize: "1254",
+    app: "plex", size: "", theme: "", type: "", search: "", browseApps: false, effectiveSize: "1254",
   });
   assert.equal(filterAssetRecords(assets, { app: "plex" }).length, 1);
   assert.equal(filterAssetRecords(assets, { app: "plex", size: "all" }).length, 3);
@@ -77,7 +90,7 @@ test("asset sorting supports newest, name and size", () => {
 
 test("media library script contains queue, progress, clipboard and item mutations", () => {
   const handlers = [];
-  const selects = Array.from({ length: 4 }, () => ({
+  const selects = Array.from({ length: 5 }, () => ({
     addEventListener(type, handler) {
       assert.equal(type, "change");
       handlers.push(handler);
@@ -86,7 +99,7 @@ test("media library script contains queue, progress, clipboard and item mutation
   let applied = 0;
   bindAssetFilterChanges(selects, () => { applied += 1; });
   for (const handler of handlers) handler();
-  assert.equal(applied, 4);
+  assert.equal(applied, 5);
 
   const script = publicAssetsScript();
   assert.doesNotThrow(() => new Function(script));
@@ -98,6 +111,7 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.match(script, /\/admin\/api\/assets\/item/);
   assert.match(script, /asset_upload_busy/);
   assert.match(script, /Explicit Appbild-läge använder en canonical slot åt gången/);
+  assert.match(script, /#asset-filter-type/);
   assert.match(script, /asset\.mutable === true/);
   assert.match(script, /showModal/);
 });
