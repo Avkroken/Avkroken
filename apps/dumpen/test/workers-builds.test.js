@@ -1,7 +1,25 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { main } from "../scripts/workers-build-production.mjs";
+
+test("non-main branch skips production commands", () => {
+  const emptyPath = mkdtempSync(join(tmpdir(), "dumpen-no-command-"));
+  try {
+    assert.doesNotThrow(() => main({
+      ...process.env,
+      WORKERS_CI: "1",
+      WORKERS_CI_BRANCH: "feature",
+      PATH: emptyPath,
+    }));
+  } finally {
+    rmSync(emptyPath, { recursive: true, force: true });
+  }
+});
 
 test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () => {
   assert.equal(existsSync(new URL("../../../.github/workflows/deploy-dumpen.yml", import.meta.url)), false);
@@ -28,31 +46,25 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const script = await readFile(new URL("../scripts/workers-build-production.mjs", import.meta.url), "utf8");
   assert.match(script, /WORKERS_CI !== "1"/);
   assert.match(script, /WORKERS_CI_BRANCH !== "main"/);
-  assert.match(script, /process\.exit\(0\)/);
   assert.match(script, /Skipping Dumpen production deployment for non-main branch/);
   assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const branchGuard = script.indexOf('WORKERS_CI_BRANCH !== "main"');
-  const branchExit = script.indexOf("process.exit(0)");
-  const check = script.indexOf('run("npm", ["run", "check"])');
-  const deploy = script.indexOf('run("npm", ["run", "deploy"])');
+  const branchExit = script.indexOf("return;", branchGuard);
+  const check = script.indexOf('run("npm", ["run", "check"]');
+  const deploy = script.indexOf('run("npm", ["run", "deploy"]');
+  const providerStatus = script.indexOf('"deployments", "status", "--json"');
   assert.ok(branchGuard >= 0 && branchExit > branchGuard && check > branchExit);
-  assert.ok(deploy > check);
+  assert.ok(deploy > check && providerStatus > deploy);
+  assert.match(script, /WRANGLER_OUTPUT_FILE_PATH/);
+  assert.match(script, /deploymentIsActive/);
   assert.doesNotMatch(script, /verify:production/);
 
   const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
   assert.match(productionCheck, /data-media-library-version="2"/);
   assert.match(productionCheck, /does not serve Media Library v2/);
-
-  const runtimeWorkflow = await readFile(
-    new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url),
-    "utf8",
+  assert.equal(
+    existsSync(new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url)),
+    false,
   );
-  assert.match(runtimeWorkflow, /push:/);
-  assert.match(runtimeWorkflow, /branches: \[main\]/);
-  assert.match(runtimeWorkflow, /google-chrome/);
-  assert.match(runtimeWorkflow, /--headless=new/);
-  assert.match(runtimeWorkflow, /data-media-library-version="2"/);
-  assert.doesNotMatch(runtimeWorkflow, /node scripts\/verify-production\.mjs/);
-  assert.doesNotMatch(runtimeWorkflow, /CLOUDFLARE_API_TOKEN|secrets\./);
 });

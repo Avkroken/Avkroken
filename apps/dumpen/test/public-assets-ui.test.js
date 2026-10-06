@@ -91,6 +91,7 @@ test("asset sorting supports newest, name and size", () => {
 
 test("media library markup exposes the production runtime marker", () => {
   assert.match(publicAssetsMarkup(), /data-media-library-version="2"/);
+  assert.match(publicAssetsMarkup(), /data-deployment-contract="provider-version"/);
 });
 
 test("media library script contains queue, progress, clipboard and item mutations", () => {
