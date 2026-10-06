@@ -184,10 +184,18 @@ async function acquireAssetMutationLock(env) {
 
 async function releaseAssetMutationLock(env, token) {
   const existing = await env.DUMPEN.get(ASSET_MUTATION_LOCK_KEY);
-  if (!existing) return;
+  if (!existing?.etag) return;
   try {
     const state = JSON.parse(await r2Text(existing));
-    if (state.token === token) await env.DUMPEN.delete(ASSET_MUTATION_LOCK_KEY);
+    if (state.token !== token) return;
+    await env.DUMPEN.put(
+      ASSET_MUTATION_LOCK_KEY,
+      JSON.stringify({ token: null, expiresAt: 0 }),
+      {
+        onlyIf: { etagMatches: existing.etag },
+        httpMetadata: { contentType: "application/json" },
+      },
+    );
   } catch {
     // Keep an unreadable lock fail-closed until its operator-visible cleanup.
   }
