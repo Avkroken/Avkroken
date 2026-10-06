@@ -441,6 +441,13 @@ function assetClient() {
       fact("Object key", asset.key),
       fact("Canonical URL", asset.directUrl)
     );
+    const mutable = asset.mutable === true;
+    q("#asset-dialog-download").disabled = !mutable;
+    q("#asset-dialog-replace").disabled = !mutable;
+    q("#asset-dialog-delete").disabled = !mutable;
+    q("#asset-dialog-download").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
+    q("#asset-dialog-replace").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
+    q("#asset-dialog-delete").title = mutable ? "" : "Detta asset är read-only i Dumpen.";
     dialog.showModal();
   }
 
