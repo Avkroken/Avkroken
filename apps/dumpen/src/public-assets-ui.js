@@ -694,6 +694,9 @@ function assetClient() {
       }
     } finally {
       queueRunning = false;
+      if (queue.some(function(item) { return item.state === "pending"; })) {
+        setTimeout(runQueue, 0);
+      }
     }
   }
 
