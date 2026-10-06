@@ -130,7 +130,7 @@ Efter en **avsedd** deployment:
 npm run verify:production
 ```
 
-Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke och kan blockeras av Dumpens edge-/bot-skydd. Canonical automatiserad deployment-verifiering sker därför provider-side i Cloudflare Workers Builds: deploykommandots strukturerade `version_id` måste efteråt finnas i `wrangler deployments status --json` med 100 % produktionstrafik. En grön PR-/preview-build räknas inte som productionbevis.
+Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke och kan blockeras av Dumpens edge-/bot-skydd. Canonical automatiserad deployment-verifiering sker därför provider-side i Cloudflare Workers Builds: deploykommandots strukturerade `version_id` måste efteråt finnas i `wrangler deployments status --json` med minst 99,99 % av produktionstrafiken. En grön PR-/preview-build räknas inte som productionbevis.
 
 Produktionsverifieringen kompletterar lokala tester; den ersätter dem inte.
 
