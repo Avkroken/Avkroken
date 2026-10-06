@@ -27,6 +27,12 @@ test("provider deployment status must route production traffic to the deployed v
   ]);
   assert.equal(deploymentIsActive(active, "version-new"), true);
   assert.equal(deploymentIsActive(active, "version-old"), false);
+  assert.equal(deploymentIsActive({
+    versions: [{ version_id: "version-new", percentage: 99.99 }],
+  }, "version-new"), true);
+  assert.equal(deploymentIsActive({
+    versions: [{ version_id: "version-new", percentage: 99.98 }],
+  }, "version-new"), false);
 
   assert.equal(deploymentIsActive({
     result: {
