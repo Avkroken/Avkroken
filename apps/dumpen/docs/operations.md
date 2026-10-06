@@ -40,7 +40,7 @@ Efter ändringar i `src/access.js`, verifiera minst:
 Efter ändringar i galleri eller asset-API, verifiera minst:
 
 - transferlistan fungerar även om `ASSETS.list()` fallerar;
-- drag/drop, clipboard och filväljare hamnar i samma uploadkö;
+- drag/drop, clipboard och filväljare hamnar i samma uploadkö; på iPhone/iPad ska både **Välj bilder** och **Välj filer** öppnas via native file-input utan JavaScript-triggad dold input;
 - kön fortsätter efter en fil som misslyckas och kan ha högst tre aktiva uploads, medan quota-check + R2-write serialiseras av det privata asset-mutationslåset;
 - explicit app/tema/storlek ger rätt canonical key även när lokalt filnamn är godtyckligt;
 - legacy filnamnsdetektering fungerar när explicit metadata saknas;
@@ -49,7 +49,8 @@ Efter ändringar i galleri eller asset-API, verifiera minst:
 - generisk replace behåller `uploads/<id>/...`-nyckeln, använder kort cache-TTL och respekterar total storage-gräns;
 - samtidiga uploadrequests, inklusive theme-v2 staging och adminuploads, kan inte godkänna samma gamla bucket-snapshot; lock-konflikt svarar `asset_upload_busy` och admin-klienten retry:ar;
 - `staging/...` och `hotlink-ok/...` inte kan adresseras av item-mutationer;
-- sökning, typ/app/tema/storleksfilter, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport.
+- sökning, typ/app/tema/storleksfilter, sortering, detaljdialog och responsiv grid fungerar i desktop- och mobilviewport;
+- i mobilviewport använder kontroller minst 44 px tryckyta, formulärfält 16 px text för att undvika Safari-zoom, safe-area-padding och en kompakt admin-workspace utan den fulla publika hero-/snabbflödesytan.
 
 ## R2
 
