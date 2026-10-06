@@ -33,7 +33,7 @@ const INTERNAL_PREFIX = "_system/";
 const TICKET_PREFIX = `${INTERNAL_PREFIX}tickets/`;
 const CLAIM_PREFIX = `${INTERNAL_PREFIX}claims/`;
 const ASSET_MUTATION_LOCK_KEY = `${INTERNAL_PREFIX}asset-mutation-lock.json`;
-const ASSET_MUTATION_LOCK_TTL_MS = 5 * 60 * 1000;
+const ASSET_MUTATION_LOCK_TTL_MS = 15 * 60 * 1000;
 
 async function listAll(bucket, options = {}) {
   const objects = [];
@@ -168,9 +168,11 @@ async function acquireAssetMutationLock(env) {
   if (existing) {
     try {
       const state = JSON.parse(await r2Text(existing));
-      if (Number(state.expiresAt) <= Date.now()) {
-        await env.DUMPEN.delete(ASSET_MUTATION_LOCK_KEY);
-        result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, options);
+      if (Number(state.expiresAt) <= Date.now() && existing.etag) {
+        result = await env.DUMPEN.put(ASSET_MUTATION_LOCK_KEY, payload, {
+          ...options,
+          onlyIf: new Headers({ "if-match": existing.etag }),
+        });
         if (result !== null) return token;
       }
     } catch {
