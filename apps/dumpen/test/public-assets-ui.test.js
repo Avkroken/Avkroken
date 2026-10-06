@@ -148,6 +148,26 @@ test("media library uses one native iOS-compatible file input", () => {
   assert.doesNotMatch(script, /#asset-photo-files/);
 });
 
+test("iOS file selection handles input and change without duplicate staging", () => {
+  const script = publicAssetsScript();
+  assert.match(script, /on\("#asset-files", "input", handleFileSelection\)/);
+  assert.match(script, /on\("#asset-files", "change", handleFileSelection\)/);
+  assert.match(script, /event\.currentTarget/);
+  assert.match(script, /input\.value = ""/);
+});
+
+test("staging paints before deferred preview generation", () => {
+  const script = publicAssetsScript();
+  const addFilesStart = script.indexOf("function addFiles");
+  const renderQueueIndex = script.indexOf("renderQueue();", addFilesStart);
+  const deferIndex = script.indexOf("setTimeout(function()", addFilesStart);
+  const previewIndex = script.indexOf("URL.createObjectURL", addFilesStart);
+  assert.ok(addFilesStart >= 0);
+  assert.ok(renderQueueIndex > addFilesStart);
+  assert.ok(deferIndex > renderQueueIndex);
+  assert.ok(previewIndex > deferIndex);
+});
+
 test("file selection stages visibly behind an explicit upload action", () => {
   const markup = publicAssetsMarkup();
   assert.match(markup, /id="asset-files" type="file" multiple/);

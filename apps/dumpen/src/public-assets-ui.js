@@ -39,6 +39,7 @@ export function publicAssetsMarkup() {
     "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"3\" data-deployment-contract=\"provider-version\">",
     "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Launcher-loggor och temabilder visas som separata roller. Temabilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Välj från iPhone, dra & släpp på dator eller klistra in från urklipp.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Bilder, kamera och iCloud Drive</small></label></div></div>",
+    "<section id=\"asset-queue-panel\" class=\"asset-queue-panel\" hidden aria-label=\"Valda filer\"><div class=\"asset-queue-head\"><div class=\"asset-queue-title\"><strong>Valda filer</strong><span id=\"asset-queue-count\" class=\"asset-queue-count\"></span></div><div class=\"asset-queue-toolbar\"><button id=\"asset-clear-button\" type=\"button\">Rensa</button><button id=\"asset-upload-button\" class=\"asset-queue-primary\" type=\"button\">Ladda upp</button></div></div><div id=\"asset-queue\" class=\"asset-queue\"></div></section>",
     "<div class=\"asset-upload-config\">",
     "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Manuell temabild</option></select></label>",
     "<p class=\"asset-upload-hint\">Automatisk behåller filen som vald asset. Manuell temabild låter dig välja canonical app, tema och storlek.</p>",
@@ -49,7 +50,7 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig temabild</label>",
     "</div>",
     "</div>",
-    "<section id=\"asset-queue-panel\" class=\"asset-queue-panel\" hidden aria-label=\"Valda filer\"><div class=\"asset-queue-head\"><div class=\"asset-queue-title\"><strong>Valda filer</strong><span id=\"asset-queue-count\" class=\"asset-queue-count\"></span></div><div class=\"asset-queue-toolbar\"><button id=\"asset-clear-button\" type=\"button\">Rensa</button><button id=\"asset-upload-button\" class=\"asset-queue-primary\" type=\"button\">Ladda upp</button></div></div><div id=\"asset-queue\" class=\"asset-queue\"></div></section>",
+    
     "<div class=\"asset-toolbar\">",
     "<label class=\"asset-search\">Sök<input id=\"asset-search\" type=\"search\" placeholder=\"Namn, app, tema…\" autocomplete=\"off\"></label>",
     "<label class=\"asset-filter\">App<select id=\"asset-filter-app\"><option value=\"\">Alla appar</option></select></label>",
@@ -584,8 +585,10 @@ function assetClient() {
   }
 
   function addFiles(files) {
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
     const added = [];
-    for (const file of Array.from(files || [])) {
+    for (const file of selected) {
       const item = {
         id: ++queueId,
         file:file,
@@ -595,23 +598,39 @@ function assetClient() {
         state:"staged",
         progress:0,
         error:"",
-        preview:String(file.type || "").startsWith("image/") ? URL.createObjectURL(file) : "",
+        preview:"",
         uploadConfig:null,
       };
       queue.push(item);
       added.push(item);
     }
+
     renderQueue();
+    const status = q("#asset-status");
+    if (status) status.textContent = selected.length + " fil" + (selected.length === 1 ? "" : "er") + " vald" + (selected.length === 1 ? "" : "a") + " · tryck Ladda upp.";
 
     added.forEach(function(item) {
-      if (!item.inspecting) return;
-      inspectImage(item.file).then(function(dims) {
+      if (!String(item.file.type || "").startsWith("image/")) return;
+      setTimeout(function() {
         if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
-        item.width = dims.width;
-        item.height = dims.height;
-        item.inspecting = false;
-        renderQueue();
-      });
+        try {
+          item.preview = URL.createObjectURL(item.file);
+          renderQueue();
+        } catch {
+          item.preview = "";
+        }
+        inspectImage(item.file).then(function(dims) {
+          if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
+          item.width = dims.width;
+          item.height = dims.height;
+          item.inspecting = false;
+          renderQueue();
+        }).catch(function() {
+          if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
+          item.inspecting = false;
+          renderQueue();
+        });
+      }, 0);
     });
   }
 
@@ -886,10 +905,22 @@ function assetClient() {
     on("#asset-upload-kind", "change", syncUploadMode);
     syncUploadMode();
 
-    const fileInput = on("#asset-files", "change", function() {
-      addFiles(fileInput.files);
-      fileInput.value = "";
-    });
+    let lastFileSelection = "";
+    function handleFileSelection(event) {
+      const input = event.currentTarget;
+      const files = Array.from(input && input.files || []);
+      if (!files.length) return;
+      const signature = files.map(function(file) {
+        return [file.name, file.size, file.lastModified, file.type].join(":");
+      }).join("|");
+      if (signature === lastFileSelection) return;
+      lastFileSelection = signature;
+      addFiles(files);
+      input.value = "";
+      setTimeout(function() { lastFileSelection = ""; }, 0);
+    }
+    on("#asset-files", "input", handleFileSelection);
+    on("#asset-files", "change", handleFileSelection);
     on("#asset-upload-button", "click", startSelectedUpload);
     on("#asset-clear-button", "click", function() {
       if (queueRunning) return;
