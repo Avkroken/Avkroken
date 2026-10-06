@@ -54,15 +54,29 @@ test("search turns app browser into filtered results and combines with facets", 
 
 test("type facet separates app images, generic images and files", () => {
   const assets = [
-    { name: "plex-1.png", key: "apps/plex/plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1" },
+    { name: "plex-256.png", key: "apps/plex/plex-256.png", image: true, appCategory: "plex", pixelSize: 256, assetRole: "launcher" },
+    { name: "plex-1.png", key: "apps/plex/plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1", assetRole: "theme" },
     { name: "photo.png", key: "uploads/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/photo.png", image: true },
     { name: "notes.txt", key: "uploads/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/notes.txt", image: false },
   ];
 
   assert.equal(resolveAssetFilter({ type: "image" }).browseApps, false);
+  assert.deepEqual(filterAssetRecords(assets, { type: "launcher" }).map((asset) => asset.name), ["plex-256.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "app" }).map((asset) => asset.name), ["plex-1.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "image" }).map((asset) => asset.name), ["photo.png"]);
   assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
+});
+
+test("launcher filter does not inherit original 1254 size", () => {
+  const resolved = resolveAssetFilter({ app: "tautulli", type: "launcher" });
+  assert.equal(resolved.effectiveSize, "");
+  assert.equal(resolved.browseApps, false);
+
+  const assets = [
+    { name: "tautulli-256.png", image: true, appCategory: "tautulli", pixelSize: 256, assetRole: "launcher" },
+    { name: "tautulli-1.png", image: true, appCategory: "tautulli", pixelSize: 1254, theme: "1", assetRole: "theme" },
+  ];
+  assert.deepEqual(filterAssetRecords(assets, { app: "tautulli", type: "launcher" }).map((asset) => asset.name), ["tautulli-256.png"]);
 });
 
 test("explicit alla storlekar removes the implicit 1254 restriction", () => {
@@ -90,8 +104,24 @@ test("asset sorting supports newest, name and size", () => {
 });
 
 test("media library markup exposes the production runtime marker", () => {
-  assert.match(publicAssetsMarkup(), /data-media-library-version="2"/);
+  assert.match(publicAssetsMarkup(), /data-media-library-version="3"/);
   assert.match(publicAssetsMarkup(), /data-deployment-contract="provider-version"/);
+});
+
+test("media library uses native iOS-compatible file inputs", () => {
+  const markup = publicAssetsMarkup();
+  assert.match(markup, /id="asset-photo-files" type="file" multiple accept="image\/\*"/);
+  assert.match(markup, /id="asset-files" type="file" multiple/);
+  assert.match(markup, /Bildbibliotek \/ Kamera/);
+  assert.match(markup, /Filer \/ iCloud Drive/);
+  assert.match(markup, /Launcher-loggor/);
+  assert.match(markup, /Temabilder/);
+  assert.doesNotMatch(markup, /id="choose-assets"/);
+
+  const script = publicAssetsScript();
+  assert.doesNotMatch(script, /asset-files"\)\.click\(\)/);
+  assert.doesNotMatch(script, /asset-replace-file"\)\.click\(\)/);
+  assert.match(script, /#asset-photo-files/);
 });
 
 test("media library script contains queue, progress, clipboard and item mutations", () => {
@@ -117,7 +147,7 @@ test("media library script contains queue, progress, clipboard and item mutation
   assert.match(script, /\/admin\/api\/assets\/item/);
   assert.match(script, /asset_upload_busy/);
   assert.match(script, /setTimeout\(runQueue, 0\)/);
-  assert.match(script, /Explicit Appbild-läge använder en canonical slot åt gången/);
+  assert.match(script, /Explicit Temabild-läge använder en canonical slot åt gången/);
   assert.match(script, /#asset-filter-type/);
   assert.match(script, /asset\.mutable === true/);
   assert.match(script, /showModal/);
