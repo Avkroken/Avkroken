@@ -136,6 +136,7 @@ const cfg=${data},stats=cfg.stats,limits=cfg.limits;
 const $=s=>document.querySelector(s);
 window.dumpenClientError=(error,feature="admin-bootstrap")=>{
   const message=error instanceof Error?error.message:String(error||"Okänt klientfel");
+  const name=error instanceof Error?error.name:"Error";
   console.error("Dumpen client error",feature,error);
   const err=$("#err"); if(err&&!err.textContent) err.textContent="Klientfelet hindrade en del av kontrollpanelen: "+message;
   try{
@@ -145,7 +146,7 @@ window.dumpenClientError=(error,feature="admin-bootstrap")=>{
       cache:"no-store",
       keepalive:true,
       headers:{"content-type":"application/json"},
-      body:JSON.stringify({feature:String(feature).slice(0,80),message:String(message).slice(0,240)})
+      body:JSON.stringify({feature:String(feature).slice(0,80),name:String(name).slice(0,40)})
     }).catch(()=>{});
   }catch{}
 };
