@@ -203,6 +203,7 @@ function assetClient() {
       app: q("#asset-filter-app").value,
       theme: q("#asset-filter-theme").value,
       size: q("#asset-filter-size").value,
+      type: q("#asset-filter-type").value,
       search: q("#asset-search").value.trim().toLocaleLowerCase("sv"),
       sort: q("#asset-sort").value,
     };
@@ -287,21 +288,22 @@ function assetClient() {
     const gallery = q("#asset-gallery");
     gallery.replaceChildren();
     const resolved = resolveAssetFilter(filters);
-    let matches = appAssets(assets);
+    let matches = assets.filter(function(asset) { return asset.image; });
     if (!resolved.browseApps) matches = filterAssetRecords(matches, filters);
-    matches = searchedAssets(matches, filters.search);
     matches = sortAssets(matches, filters.sort);
     matches.forEach(function(asset) {
       const card = document.createElement("article");
       card.className = "asset-card";
-      const previewAsset = findPreview(appAssets(assets), asset);
+      const previewAsset = asset.appCategory ? findPreview(appAssets(assets), asset) : asset;
       const open = document.createElement("button");
       open.type = "button";
       open.className = "asset-preview";
       open.addEventListener("click", function() { openDetail(asset); });
       const img = document.createElement("img");
       img.src = previewAsset.previewUrl || previewAsset.directUrl;
-      img.alt = (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme));
+      img.alt = asset.appCategory
+        ? (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme))
+        : (asset.name || "Bild");
       img.loading = "lazy";
       img.decoding = "async";
       open.append(img);
@@ -310,14 +312,14 @@ function assetClient() {
       const title = document.createElement("div");
       title.className = "asset-card-title";
       const strong = document.createElement("strong");
-      strong.textContent = asset.appLabel || asset.appCategory;
+      strong.textContent = asset.appLabel || asset.appCategory || asset.name || "Bild";
       const size = document.createElement("span");
       size.className = "asset-size";
-      size.textContent = asset.pixelLabel || "";
+      size.textContent = asset.pixelLabel || formatBytes(asset.size);
       title.append(strong, size);
       const sub = document.createElement("div");
       sub.className = "asset-card-sub";
-      sub.textContent = asset.themeLabel || ("Tema " + asset.theme);
+      sub.textContent = asset.themeLabel || (asset.theme ? ("Tema " + asset.theme) : formatLabel(asset.contentType, asset.name));
       caption.append(title, sub, assetActions(asset, true));
       card.append(open, caption);
       gallery.append(card);
@@ -325,11 +327,13 @@ function assetClient() {
     return matches.length;
   }
 
-  function renderOtherFiles(assets, search, sort) {
+  function renderOtherFiles(assets, filters) {
     const wrap = q("#asset-other-files"), list = q("#asset-file-list"), summary = q("#asset-file-summary");
     list.replaceChildren();
-    let other = assets.filter(function(asset) { return !(asset.image && asset.appCategory && asset.theme && asset.pixelSize); });
-    other = sortAssets(searchedAssets(other, search), sort);
+    const resolved = resolveAssetFilter(filters);
+    let other = assets.filter(function(asset) { return !asset.image; });
+    if (!resolved.browseApps) other = filterAssetRecords(other, filters);
+    other = sortAssets(other, filters.sort);
     wrap.hidden = other.length === 0;
     summary.textContent = "Övriga filer · " + other.length;
     other.forEach(function(asset) {
@@ -347,6 +351,7 @@ function assetClient() {
       row.append(meta, assetActions(asset, false));
       list.append(row);
     });
+    return other.length;
   }
 
   function updateNav(filters) {
@@ -360,6 +365,10 @@ function assetClient() {
       if (option) parts.push(option.textContent);
     }
     if (filters.size) parts.push(filters.size === "all" ? "Alla storlekar" : filters.size + "×" + filters.size);
+    if (filters.type) {
+      const option = Array.from(q("#asset-filter-type").options).find(function(item) { return item.value === filters.type; });
+      if (option) parts.push(option.textContent);
+    }
     if (filters.search) parts.push("Sök: " + filters.search);
     q("#asset-nav-current").textContent = parts.length ? parts.join(" › ") : "Apps";
   }
@@ -373,12 +382,12 @@ function assetClient() {
     q("#asset-gallery").hidden = browse;
     if (browse) renderAppBrowser(currentAssets);
     const visible = browse ? appAssets(currentAssets).length : renderGallery(currentAssets, filters);
-    renderOtherFiles(currentAssets, filters.search, filters.sort);
-    const empty = currentAssets.length === 0 || (!browse && visible === 0 && q("#asset-other-files").hidden);
+    const fileCount = renderOtherFiles(currentAssets, filters);
+    const empty = currentAssets.length === 0 || (!browse && visible === 0 && fileCount === 0);
     q("#asset-empty").hidden = !empty;
     q("#asset-status").textContent = browse
       ? appAssets(currentAssets).length + " appbilder · välj en app eller använd sök/filter."
-      : visible + " bild" + (visible === 1 ? "" : "er") + " visas.";
+      : visible + " bild" + (visible === 1 ? "" : "er") + " · " + fileCount + " fil" + (fileCount === 1 ? "" : "er") + " visas.";
     if (scroll) q("#asset-nav").scrollIntoView({ behavior:"smooth", block:"start" });
   }
 
@@ -685,12 +694,13 @@ function assetClient() {
     }
   }
 
-  bindAssetFilterChanges(["#asset-filter-app","#asset-filter-size","#asset-filter-theme","#asset-sort"].map(q), function() { applyFilters(false); });
+  bindAssetFilterChanges(["#asset-filter-app","#asset-filter-size","#asset-filter-theme","#asset-filter-type","#asset-sort"].map(q), function() { applyFilters(false); });
   q("#asset-search").addEventListener("input", function() { applyFilters(false); });
   q("#asset-home").addEventListener("click", function() {
     q("#asset-filter-app").value = "";
     q("#asset-filter-theme").value = "";
     q("#asset-filter-size").value = "";
+    q("#asset-filter-type").value = "";
     q("#asset-search").value = "";
     applyFilters(false);
   });
