@@ -25,8 +25,10 @@ function fakeR2(seed = []) {
       const onlyIf = options.onlyIf;
       const ifNoneMatch = onlyIf instanceof Headers ? onlyIf.get("if-none-match") : null;
       const ifMatch = onlyIf instanceof Headers ? onlyIf.get("if-match") : null;
+      const etagMatches = onlyIf && !(onlyIf instanceof Headers) ? onlyIf.etagMatches : null;
       if (ifNoneMatch === "*" && objects.has(key)) return null;
       if (ifMatch && objects.get(key)?.etag !== ifMatch) return null;
+      if (etagMatches && objects.get(key)?.etag !== etagMatches) return null;
       this.puts.push({ key, body, options });
       const timestamp = Number(key.match(/\/(\d+)\.zip$/)?.[1] || Date.now());
       const entry = {
@@ -754,7 +756,7 @@ test("utgånget asset-mutationslås återtas atomiskt via etag", async () => {
   assert.equal(assets.keys().some((key) => key.endsWith("/recovered.txt")), true);
 });
 
-test("assetmutationer serialiseras före kvotkontroll och R2-write", async () => {
+test("samtidiga assetmutationer väntar på låset utan att kräva klientomskick", async () => {
   const transfers = fakeR2();
   const assets = fakeR2();
   const originalList = assets.list.bind(assets);
@@ -779,17 +781,20 @@ test("assetmutationer serialiseras före kvotkontroll och R2-write", async () =>
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
-  const second = await worker.fetch(request("/api/assets/uploads?name=second.txt", {
+  const secondPromise = worker.fetch(request("/api/assets/uploads?name=second.txt", {
     method: "POST",
     body: "second",
     headers: { cookie: ADMIN_COOKIE, "content-type": "text/plain" },
   }), e);
-  assert.equal(second.status, 409);
-  assert.deepEqual(await second.json(), { error: "asset_upload_busy", retryAfterMs: 250 });
 
+  await new Promise((resolve) => setTimeout(resolve, 75));
   releaseFirst();
-  const first = await firstPromise;
+
+  const [first, second] = await Promise.all([firstPromise, secondPromise]);
   assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+  assert.equal(assets.keys().some((key) => key.endsWith("/first.txt")), true);
+  assert.equal(assets.keys().some((key) => key.endsWith("/second.txt")), true);
   assert.equal(transfers.has("_system/asset-mutation-lock.json"), false);
 });
 
