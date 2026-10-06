@@ -1,7 +1,25 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+
+import { main } from "../scripts/workers-build-production.mjs";
+
+test("non-main branch skips production commands", () => {
+  const emptyPath = mkdtempSync(join(tmpdir(), "dumpen-no-command-"));
+  try {
+    assert.doesNotThrow(() => main({
+      ...process.env,
+      WORKERS_CI: "1",
+      WORKERS_CI_BRANCH: "feature",
+      PATH: emptyPath,
+    }));
+  } finally {
+    rmSync(emptyPath, { recursive: true, force: true });
+  }
+});
 
 test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () => {
   assert.equal(existsSync(new URL("../../../.github/workflows/deploy-dumpen.yml", import.meta.url)), false);
@@ -29,7 +47,6 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   assert.match(script, /WORKERS_CI !== "1"/);
   assert.match(script, /WORKERS_CI_BRANCH !== "main"/);
   assert.match(script, /Skipping Dumpen production deployment for non-main branch/);
-  assert.match(script, /Skipping Dumpen production deployment for non-main branch/);
   assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const branchGuard = script.indexOf('WORKERS_CI_BRANCH !== "main"');
@@ -42,7 +59,6 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   assert.match(script, /WRANGLER_OUTPUT_FILE_PATH/);
   assert.match(script, /deploymentIsActive/);
   assert.doesNotMatch(script, /verify:production/);
-  assert.doesNotMatch(script, /CLOUDFLARE_API_TOKEN|secrets\./);
 
   const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
   assert.match(productionCheck, /data-media-library-version="2"/);
