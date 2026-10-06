@@ -1,6 +1,7 @@
 import {
   classifyAppAssetUploadName,
   listPublicAssets,
+  publicAssetRecord,
   safeAssetName,
   uploadPublicAsset,
 } from "./public-assets.js";
@@ -95,8 +96,14 @@ export async function listAssetLibrary(bucket) {
 export async function assetMetadata(bucket, key) {
   const mutation = mutableAssetKey(key);
   if (!mutation) return null;
-  const assets = await listAssetLibrary(bucket);
-  return assets.find((asset) => asset.key === mutation.key) || null;
+  const object = await bucket.head(mutation.key);
+  if (!object) return null;
+  const asset = publicAssetRecord(object);
+  if (!asset) return null;
+  return {
+    ...asset,
+    mutable: true,
+  };
 }
 
 export async function deleteAsset(bucket, key) {
