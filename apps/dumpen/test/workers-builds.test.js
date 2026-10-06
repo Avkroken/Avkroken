@@ -43,4 +43,13 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
   assert.match(productionCheck, /data-media-library-version="2"/);
   assert.match(productionCheck, /does not serve Media Library v2/);
+
+  const runtimeWorkflow = await readFile(
+    new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(runtimeWorkflow, /push:/);
+  assert.match(runtimeWorkflow, /branches: \[main\]/);
+  assert.match(runtimeWorkflow, /node scripts\/verify-production\.mjs/);
+  assert.doesNotMatch(runtimeWorkflow, /CLOUDFLARE_API_TOKEN|secrets\./);
 });
