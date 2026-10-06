@@ -611,23 +611,26 @@ function assetClient() {
 
     added.forEach(function(item) {
       if (!String(item.file.type || "").startsWith("image/")) return;
-      try {
-        item.preview = URL.createObjectURL(item.file);
-        renderQueue();
-      } catch {
-        item.preview = "";
-      }
-      inspectImage(item.file).then(function(dims) {
+      setTimeout(function() {
         if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
-        item.width = dims.width;
-        item.height = dims.height;
-        item.inspecting = false;
-        renderQueue();
-      }).catch(function() {
-        if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
-        item.inspecting = false;
-        renderQueue();
-      });
+        try {
+          item.preview = URL.createObjectURL(item.file);
+          renderQueue();
+        } catch {
+          item.preview = "";
+        }
+        inspectImage(item.file).then(function(dims) {
+          if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
+          item.width = dims.width;
+          item.height = dims.height;
+          item.inspecting = false;
+          renderQueue();
+        }).catch(function() {
+          if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
+          item.inspecting = false;
+          renderQueue();
+        });
+      }, 0);
     });
   }
 
