@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 
 const PRODUCTION_URL = "https://dumpen.denied.se/";
-const ATTEMPTS = 5;
+const ATTEMPTS = 12;
 const RETRY_DELAY_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 20_000;
 const PRODUCTION_MARKER = 'data-media-library-version="2"';
