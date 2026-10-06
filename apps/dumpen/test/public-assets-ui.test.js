@@ -67,6 +67,18 @@ test("type facet separates app images, generic images and files", () => {
   assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
 });
 
+test("launcher filter does not inherit original 1254 size", () => {
+  const resolved = resolveAssetFilter({ app: "tautulli", type: "launcher" });
+  assert.equal(resolved.effectiveSize, "");
+  assert.equal(resolved.browseApps, false);
+
+  const assets = [
+    { name: "tautulli-256.png", image: true, appCategory: "tautulli", pixelSize: 256, assetRole: "launcher" },
+    { name: "tautulli-1.png", image: true, appCategory: "tautulli", pixelSize: 1254, theme: "1", assetRole: "theme" },
+  ];
+  assert.deepEqual(filterAssetRecords(assets, { app: "tautulli", type: "launcher" }).map((asset) => asset.name), ["tautulli-256.png"]);
+});
+
 test("explicit alla storlekar removes the implicit 1254 restriction", () => {
   const assets = [
     { appCategory: "plex", pixelSize: 1254, theme: "1" },
