@@ -74,7 +74,7 @@ export function resolveAssetFilter(options) {
   const type = value.type || "";
   const search = String(value.search || "").trim().toLocaleLowerCase("sv");
   const browseApps = !app && !size && !theme && !type && !search;
-  const implicitOriginal = !search && !size && (app || theme);
+  const implicitOriginal = !search && !size && type !== "launcher" && (app || theme);
   const effectiveSize = size === "all" ? "" : (size || (implicitOriginal ? "1254" : ""));
   return { app: app, size: size, theme: theme, type: type, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
 }
