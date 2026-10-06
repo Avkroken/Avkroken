@@ -37,7 +37,7 @@ export function publicAssetsMarkup() {
   }).join("");
   return [
     "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"3\" data-deployment-contract=\"provider-version\">",
-    "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Appbilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
+    "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Launcher-loggor och temabilder visas som separata roller. Temabilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Dra & släpp på dator, klistra in från urklipp eller använd iPhones inbyggda väljare.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-photo-files\" type=\"file\" multiple accept=\"image/*\"><span>Välj bilder</span><small>Bildbibliotek / Kamera</small></label><label class=\"asset-picker\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Filer / iCloud Drive</small></label></div></div>",
     "<div class=\"asset-upload-config\">",
     "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Appbild</option></select></label>",
@@ -52,7 +52,7 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-filter\">App<select id=\"asset-filter-app\"><option value=\"\">Alla appar</option></select></label>",
     "<label class=\"asset-filter\">Tema<select id=\"asset-filter-theme\"><option value=\"\">Alla teman</option></select></label>",
     "<label class=\"asset-filter\">Storlek<select id=\"asset-filter-size\"><option value=\"\">Original 1254</option><option value=\"512\">512</option><option value=\"256\">256</option><option value=\"all\">Alla</option></select></label>",
-    "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"app\">Appbilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
+    "<label class=\"asset-filter\">Typ<select id=\"asset-filter-type\"><option value=\"\">Alla typer</option><option value=\"launcher\">Launcher-loggor</option><option value=\"app\">Temabilder</option><option value=\"image\">Övriga bilder</option><option value=\"file\">Övriga filer</option></select></label>",
     "<label class=\"asset-filter\">Sortera<select id=\"asset-sort\"><option value=\"app\">App / tema</option><option value=\"newest\">Nyast</option><option value=\"oldest\">Äldst</option><option value=\"name\">Namn</option></select></label>",
     "</div>",
     "<nav id=\"asset-nav\" class=\"asset-nav\" aria-label=\"Bildkategorier\"><button id=\"asset-home\" type=\"button\">Mediebibliotek</button><span class=\"asset-nav-sep\">›</span><span id=\"asset-nav-current\">Apps</span></nav>",
@@ -84,8 +84,8 @@ export function filterAssetRecords(assets, filters) {
   if (resolved.browseApps) return [];
   return assets.filter(function(asset) {
     const pixel = asset.pixelSize ? String(asset.pixelSize) : "";
-    const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
-    const kind = appImage ? "app" : (asset.image ? "image" : "file");
+    const appImage = Boolean(asset.image && asset.assetRole === "theme" && asset.appCategory && asset.theme && asset.pixelSize);
+    const kind = asset.assetRole === "launcher" ? "launcher" : (appImage ? "app" : (asset.image ? "image" : "file"));
     const haystack = [
       asset.name, asset.key, asset.appLabel, asset.appCategory,
       asset.themeLabel, asset.theme, asset.pixelLabel, asset.contentType,
@@ -158,7 +158,15 @@ function assetClient() {
   const maxConcurrent = 3;
 
   function appAssets(assets) {
-    return assets.filter(function(asset) { return asset.image && asset.appCategory && asset.theme && asset.pixelSize; });
+    return assets.filter(function(asset) { return asset.image && asset.assetRole === "theme" && asset.appCategory && asset.theme && asset.pixelSize; });
+  }
+
+  function launcherAssets(assets) {
+    return assets.filter(function(asset) { return asset.image && asset.assetRole === "launcher" && asset.appCategory; });
+  }
+
+  function appMediaAssets(assets) {
+    return assets.filter(function(asset) { return asset.image && asset.appCategory && (asset.assetRole === "theme" || asset.assetRole === "launcher"); });
   }
 
   function findPreview(assets, asset) {
@@ -247,7 +255,7 @@ function assetClient() {
     const grid = q("#asset-app-grid");
     grid.replaceChildren();
     const groups = new Map();
-    appAssets(assets).forEach(function(asset) {
+    appMediaAssets(assets).forEach(function(asset) {
       if (!groups.has(asset.appCategory)) groups.set(asset.appCategory, []);
       groups.get(asset.appCategory).push(asset);
     });
@@ -255,9 +263,13 @@ function assetClient() {
       return String(a[1][0].appLabel || a[0]).localeCompare(String(b[1][0].appLabel || b[0]), "sv");
     }).forEach(function(entry) {
       const app = entry[0], items = entry[1];
-      const representative = items.find(function(item) { return item.theme === "1" && item.pixelSize === 256; })
-        || items.find(function(item) { return item.pixelSize === 256; })
-        || items.find(function(item) { return item.pixelSize === 512; })
+      const themes = items.filter(function(item) { return item.assetRole === "theme"; });
+      const launcher = items.find(function(item) { return item.assetRole === "launcher"; });
+      const representative = launcher
+        || themes.find(function(item) { return item.theme === "1" && item.pixelSize === 256; })
+        || themes.find(function(item) { return item.pixelSize === 256; })
+        || themes.find(function(item) { return item.pixelSize === 512; })
+        || themes[0]
         || items[0];
       const button = document.createElement("button");
       button.type = "button";
@@ -275,7 +287,8 @@ function assetClient() {
       name.textContent = representative.appLabel || app;
       const count = document.createElement("span");
       count.className = "asset-app-count";
-      count.textContent = new Set(items.map(function(item) { return item.theme; })).size + " teman · " + items.length + " varianter";
+      const themeCount = new Set(themes.map(function(item) { return item.theme; })).size;
+      count.textContent = (launcher ? "Launcher · " : "") + themeCount + " teman · " + items.length + " objekt";
       shade.append(name, count);
       button.append(img, shade);
       button.addEventListener("click", function() {
@@ -296,16 +309,18 @@ function assetClient() {
     matches.forEach(function(asset) {
       const card = document.createElement("article");
       card.className = "asset-card";
-      const previewAsset = asset.appCategory ? findPreview(appAssets(assets), asset) : asset;
+      const previewAsset = asset.assetRole === "theme" ? findPreview(appAssets(assets), asset) : asset;
       const open = document.createElement("button");
       open.type = "button";
       open.className = "asset-preview";
       open.addEventListener("click", function() { openDetail(asset); });
       const img = document.createElement("img");
       img.src = previewAsset.previewUrl || previewAsset.directUrl;
-      img.alt = asset.appCategory
-        ? (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme))
-        : (asset.name || "Bild");
+      img.alt = asset.assetRole === "launcher"
+        ? (asset.appLabel || asset.appCategory || "App") + " · Launcher-logo"
+        : asset.appCategory
+          ? (asset.appLabel || asset.appCategory) + " · " + (asset.themeLabel || ("Tema " + asset.theme))
+          : (asset.name || "Bild");
       img.loading = "lazy";
       img.decoding = "async";
       open.append(img);
@@ -321,7 +336,9 @@ function assetClient() {
       title.append(strong, size);
       const sub = document.createElement("div");
       sub.className = "asset-card-sub";
-      sub.textContent = asset.themeLabel || (asset.theme ? ("Tema " + asset.theme) : formatLabel(asset.contentType, asset.name));
+      sub.textContent = asset.assetRole === "launcher"
+        ? "Launcher-logo · legacy"
+        : (asset.themeLabel || (asset.theme ? ("Tema " + asset.theme) : formatLabel(asset.contentType, asset.name)));
       caption.append(title, sub, assetActions(asset, true));
       card.append(open, caption);
       gallery.append(card);
@@ -334,8 +351,8 @@ function assetClient() {
     list.replaceChildren();
     const resolved = resolveAssetFilter(filters);
     let other = assets.filter(function(asset) {
-      const appImage = Boolean(asset.image && asset.appCategory && asset.theme && asset.pixelSize);
-      return !asset.image || (resolved.browseApps && !appImage);
+      const structuredAppImage = Boolean(asset.image && asset.appCategory && (asset.assetRole === "theme" || asset.assetRole === "launcher"));
+      return !asset.image || (resolved.browseApps && !structuredAppImage);
     });
     if (!resolved.browseApps) other = filterAssetRecords(other, filters);
     other = sortAssets(other, filters.sort);
@@ -391,7 +408,7 @@ function assetClient() {
     const empty = currentAssets.length === 0 || (!browse && visible === 0 && fileCount === 0);
     q("#asset-empty").hidden = !empty;
     q("#asset-status").textContent = browse
-      ? appAssets(currentAssets).length + " appbilder · välj en app eller använd sök/filter."
+      ? appMediaAssets(currentAssets).length + " appobjekt · välj en app eller använd sök/filter."
       : visible + " bild" + (visible === 1 ? "" : "er") + " · " + fileCount + " fil" + (fileCount === 1 ? "" : "er") + " visas.";
     if (scroll) q("#asset-nav").scrollIntoView({ behavior:"smooth", block:"start" });
   }
@@ -453,6 +470,7 @@ function assetClient() {
     const facts = q("#asset-dialog-facts");
     facts.replaceChildren(
       fact("Typ", formatLabel(asset.contentType, asset.name)),
+      fact("Roll", asset.assetRole === "launcher" ? "Launcher-logo (legacy)" : (asset.assetRole === "theme" ? "Temabild" : "Övrig asset")),
       fact("App", asset.appLabel || asset.appCategory),
       fact("Tema", asset.themeLabel || asset.theme),
       fact("Dimension", asset.pixelLabel),
