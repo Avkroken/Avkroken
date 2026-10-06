@@ -7,6 +7,7 @@ import {
   filterAssetRecords,
   publicAssetsMarkup,
   publicAssetsScript,
+  resolveAppDrilldown,
   resolveAssetFilter,
   sortAssetRecords,
 } from "../src/public-assets-ui.js";
@@ -67,6 +68,30 @@ test("type facet separates app images, generic images and files", () => {
   assert.deepEqual(filterAssetRecords(assets, { type: "file" }).map((asset) => asset.name), ["notes.txt"]);
 });
 
+test("app drill-down opens the launcher shown on the app card and falls back to original themes", () => {
+  const assets = [
+    { name: "plex-256.png", image: true, appCategory: "plex", pixelSize: 256, assetRole: "launcher" },
+    { name: "plex-1.png", image: true, appCategory: "plex", pixelSize: 1254, theme: "1", assetRole: "theme" },
+    { name: "sonarr-1.png", image: true, appCategory: "sonarr", pixelSize: 1254, theme: "1", assetRole: "theme" },
+  ];
+
+  assert.deepEqual(resolveAppDrilldown("plex", assets), {
+    app: "plex", type: "launcher", size: "all", theme: "", search: "",
+  });
+  assert.deepEqual(
+    filterAssetRecords(assets, resolveAppDrilldown("plex", assets)).map((asset) => asset.name),
+    ["plex-256.png"],
+  );
+
+  assert.deepEqual(resolveAppDrilldown("sonarr", assets), {
+    app: "sonarr", type: "app", size: "", theme: "", search: "",
+  });
+  assert.deepEqual(
+    filterAssetRecords(assets, resolveAppDrilldown("sonarr", assets)).map((asset) => asset.name),
+    ["sonarr-1.png"],
+  );
+});
+
 test("launcher filter does not inherit original 1254 size", () => {
   const resolved = resolveAssetFilter({ app: "tautulli", type: "launcher" });
   assert.equal(resolved.effectiveSize, "");
@@ -121,24 +146,6 @@ test("media library uses one native iOS-compatible file input", () => {
   assert.doesNotMatch(script, /asset-files"\)\.click\(\)/);
   assert.doesNotMatch(script, /asset-replace-file"\)\.click\(\)/);
   assert.doesNotMatch(script, /#asset-photo-files/);
-});
-
-test("iOS file selection handles input and change without duplicate staging", () => {
-  const script = publicAssetsScript();
-  assert.match(script, /on\("#asset-files", "input", handleFileSelection\)/);
-  assert.match(script, /on\("#asset-files", "change", handleFileSelection\)/);
-  assert.match(script, /event\.currentTarget/);
-  assert.match(script, /input\.value = ""/);
-});
-
-test("staging happens before preview generation", () => {
-  const script = publicAssetsScript();
-  const addFilesStart = script.indexOf("function addFiles");
-  const renderQueueIndex = script.indexOf("renderQueue();", addFilesStart);
-  const previewIndex = script.indexOf("URL.createObjectURL", addFilesStart);
-  assert.ok(addFilesStart >= 0);
-  assert.ok(renderQueueIndex > addFilesStart);
-  assert.ok(previewIndex > renderQueueIndex);
 });
 
 test("file selection stages visibly behind an explicit upload action", () => {

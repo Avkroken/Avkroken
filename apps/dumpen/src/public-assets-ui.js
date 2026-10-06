@@ -39,7 +39,6 @@ export function publicAssetsMarkup() {
     "<section id=\"asset-library\" class=\"asset-box\" data-media-library-version=\"3\" data-deployment-contract=\"provider-version\">",
     "<div class=\"asset-head\"><div><h3>Mediebibliotek <span id=\"asset-badge\" class=\"badge\"></span></h3><p>Bläddra, sök och hantera publika assets. Launcher-loggor och temabilder visas som separata roller. Temabilder kan klassificeras explicit; filnamnstolkning finns kvar som kompatibilitetsfallback.</p></div></div>",
     "<div id=\"asset-dropzone\" class=\"asset-dropzone\"><div class=\"asset-drop-copy\"><span class=\"asset-drop-icon\" aria-hidden=\"true\">↑</span><div><strong>Lägg till media</strong><p>Välj från iPhone, dra & släpp på dator eller klistra in från urklipp.</p></div></div><div class=\"asset-picker-row\"><label class=\"asset-picker asset-picker-primary\"><input id=\"asset-files\" type=\"file\" multiple accept=\"image/*,.pdf,.txt,.json,.css\"><span>Välj filer</span><small>Bilder, kamera och iCloud Drive</small></label></div></div>",
-    "<section id=\"asset-queue-panel\" class=\"asset-queue-panel\" hidden aria-label=\"Valda filer\"><div class=\"asset-queue-head\"><div class=\"asset-queue-title\"><strong>Valda filer</strong><span id=\"asset-queue-count\" class=\"asset-queue-count\"></span></div><div class=\"asset-queue-toolbar\"><button id=\"asset-clear-button\" type=\"button\">Rensa</button><button id=\"asset-upload-button\" class=\"asset-queue-primary\" type=\"button\">Ladda upp</button></div></div><div id=\"asset-queue\" class=\"asset-queue\"></div></section>",
     "<div class=\"asset-upload-config\">",
     "<label>Uppladdning<select id=\"asset-upload-kind\"><option value=\"auto\">Automatisk</option><option value=\"app\">Manuell temabild</option></select></label>",
     "<p class=\"asset-upload-hint\">Automatisk behåller filen som vald asset. Manuell temabild låter dig välja canonical app, tema och storlek.</p>",
@@ -50,7 +49,7 @@ export function publicAssetsMarkup() {
     "<label class=\"asset-upload-options\"><input id=\"replace-app-assets\" type=\"checkbox\"> Ersätt befintlig temabild</label>",
     "</div>",
     "</div>",
-    
+    "<section id=\"asset-queue-panel\" class=\"asset-queue-panel\" hidden aria-label=\"Valda filer\"><div class=\"asset-queue-head\"><div class=\"asset-queue-title\"><strong>Valda filer</strong><span id=\"asset-queue-count\" class=\"asset-queue-count\"></span></div><div class=\"asset-queue-toolbar\"><button id=\"asset-clear-button\" type=\"button\">Rensa</button><button id=\"asset-upload-button\" class=\"asset-queue-primary\" type=\"button\">Ladda upp</button></div></div><div id=\"asset-queue\" class=\"asset-queue\"></div></section>",
     "<div class=\"asset-toolbar\">",
     "<label class=\"asset-search\">Sök<input id=\"asset-search\" type=\"search\" placeholder=\"Namn, app, tema…\" autocomplete=\"off\"></label>",
     "<label class=\"asset-filter\">App<select id=\"asset-filter-app\"><option value=\"\">Alla appar</option></select></label>",
@@ -81,6 +80,19 @@ export function resolveAssetFilter(options) {
   const implicitOriginal = !search && !size && type !== "launcher" && (app || theme);
   const effectiveSize = size === "all" ? "" : (size || (implicitOriginal ? "1254" : ""));
   return { app: app, size: size, theme: theme, type: type, search: search, browseApps: browseApps, effectiveSize: effectiveSize };
+}
+
+export function resolveAppDrilldown(app, assets) {
+  const hasLauncher = (assets || []).some(function(asset) {
+    return asset.image && asset.appCategory === app && asset.assetRole === "launcher";
+  });
+  return {
+    app: app || "",
+    type: hasLauncher ? "launcher" : "app",
+    size: hasLauncher ? "all" : "",
+    theme: "",
+    search: "",
+  };
 }
 
 export function filterAssetRecords(assets, filters) {
@@ -202,7 +214,8 @@ function assetClient() {
 
   function rebuildFilters(assets) {
     const structured = appAssets(assets);
-    const apps = Array.from(new Map(structured.map(function(asset) { return [asset.appCategory, asset.appLabel || asset.appCategory]; })).entries())
+    const appMedia = appMediaAssets(assets);
+    const apps = Array.from(new Map(appMedia.map(function(asset) { return [asset.appCategory, asset.appLabel || asset.appCategory]; })).entries())
       .sort(function(a,b) { return a[1].localeCompare(b[1], "sv"); })
       .map(function(entry) { return { value: entry[0], label: entry[1] }; });
     const themes = Array.from(new Map(structured.map(function(asset) { return [asset.theme, asset.themeLabel || ("Tema " + asset.theme)]; })).entries())
@@ -296,7 +309,12 @@ function assetClient() {
       shade.append(name, count);
       button.append(img, shade);
       button.addEventListener("click", function() {
-        q("#asset-filter-app").value = app;
+        const drilldown = resolveAppDrilldown(app, items);
+        q("#asset-filter-app").value = drilldown.app;
+        q("#asset-filter-theme").value = drilldown.theme;
+        q("#asset-filter-size").value = drilldown.size;
+        q("#asset-filter-type").value = drilldown.type;
+        q("#asset-search").value = drilldown.search;
         applyFilters(true);
       });
       grid.append(button);
@@ -566,10 +584,8 @@ function assetClient() {
   }
 
   function addFiles(files) {
-    const selected = Array.from(files || []);
-    if (!selected.length) return;
     const added = [];
-    for (const file of selected) {
+    for (const file of Array.from(files || [])) {
       const item = {
         id: ++queueId,
         file:file,
@@ -579,33 +595,20 @@ function assetClient() {
         state:"staged",
         progress:0,
         error:"",
-        preview:"",
+        preview:String(file.type || "").startsWith("image/") ? URL.createObjectURL(file) : "",
         uploadConfig:null,
       };
       queue.push(item);
       added.push(item);
     }
-
     renderQueue();
-    const status = q("#asset-status");
-    if (status) status.textContent = selected.length + " fil" + (selected.length === 1 ? "" : "er") + " vald" + (selected.length === 1 ? "" : "a") + " · tryck Ladda upp.";
 
     added.forEach(function(item) {
-      if (!String(item.file.type || "").startsWith("image/")) return;
-      try {
-        item.preview = URL.createObjectURL(item.file);
-        renderQueue();
-      } catch {
-        item.preview = "";
-      }
+      if (!item.inspecting) return;
       inspectImage(item.file).then(function(dims) {
         if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
         item.width = dims.width;
         item.height = dims.height;
-        item.inspecting = false;
-        renderQueue();
-      }).catch(function() {
-        if (!queue.some(function(candidate) { return candidate.id === item.id; })) return;
         item.inspecting = false;
         renderQueue();
       });
@@ -883,22 +886,10 @@ function assetClient() {
     on("#asset-upload-kind", "change", syncUploadMode);
     syncUploadMode();
 
-    let lastFileSelection = "";
-    function handleFileSelection(event) {
-      const input = event.currentTarget;
-      const files = Array.from(input && input.files || []);
-      if (!files.length) return;
-      const signature = files.map(function(file) {
-        return [file.name, file.size, file.lastModified, file.type].join(":");
-      }).join("|");
-      if (signature === lastFileSelection) return;
-      lastFileSelection = signature;
-      addFiles(files);
-      input.value = "";
-      setTimeout(function() { lastFileSelection = ""; }, 0);
-    }
-    on("#asset-files", "input", handleFileSelection);
-    on("#asset-files", "change", handleFileSelection);
+    const fileInput = on("#asset-files", "change", function() {
+      addFiles(fileInput.files);
+      fileInput.value = "";
+    });
     on("#asset-upload-button", "click", startSelectedUpload);
     on("#asset-clear-button", "click", function() {
       if (queueRunning) return;
@@ -944,6 +935,7 @@ export function publicAssetsScript() {
   return [
     "const __name=(target)=>target;",
     "const resolveAssetFilter=", resolveAssetFilter.toString(), ";",
+    "const resolveAppDrilldown=", resolveAppDrilldown.toString(), ";",
     "const filterAssetRecords=", filterAssetRecords.toString(), ";",
     "const sortAssetRecords=", sortAssetRecords.toString(), ";",
     "const bindAssetFilterChanges=", bindAssetFilterChanges.toString(), ";",
