@@ -403,7 +403,7 @@ function assetClient() {
     q("#asset-app-grid").hidden = !browse;
     q("#asset-gallery").hidden = browse;
     if (browse) renderAppBrowser(currentAssets);
-    const visible = browse ? appAssets(currentAssets).length : renderGallery(currentAssets, filters);
+    const visible = browse ? appMediaAssets(currentAssets).length : renderGallery(currentAssets, filters);
     const fileCount = renderOtherFiles(currentAssets, filters);
     const empty = currentAssets.length === 0 || (!browse && visible === 0 && fileCount === 0);
     q("#asset-empty").hidden = !empty;
