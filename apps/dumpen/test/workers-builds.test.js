@@ -36,7 +36,23 @@ test("Dumpen production deploy is owned by Cloudflare Workers Builds", async () 
   const branchExit = script.indexOf("process.exit(0)");
   const check = script.indexOf('run("npm", ["run", "check"])');
   const deploy = script.indexOf('run("npm", ["run", "deploy"])');
-  const verify = script.indexOf('run("npm", ["run", "verify:production"])');
   assert.ok(branchGuard >= 0 && branchExit > branchGuard && check > branchExit);
-  assert.ok(deploy > check && verify > deploy);
+  assert.ok(deploy > check);
+  assert.doesNotMatch(script, /verify:production/);
+
+  const productionCheck = await readFile(new URL("../scripts/verify-production.mjs", import.meta.url), "utf8");
+  assert.match(productionCheck, /data-media-library-version="2"/);
+  assert.match(productionCheck, /does not serve Media Library v2/);
+
+  const runtimeWorkflow = await readFile(
+    new URL("../../../.github/workflows/dumpen-production-runtime.yml", import.meta.url),
+    "utf8",
+  );
+  assert.match(runtimeWorkflow, /push:/);
+  assert.match(runtimeWorkflow, /branches: \[main\]/);
+  assert.match(runtimeWorkflow, /google-chrome/);
+  assert.match(runtimeWorkflow, /--headless=new/);
+  assert.match(runtimeWorkflow, /data-media-library-version="2"/);
+  assert.doesNotMatch(runtimeWorkflow, /node scripts\/verify-production\.mjs/);
+  assert.doesNotMatch(runtimeWorkflow, /CLOUDFLARE_API_TOKEN|secrets\./);
 });

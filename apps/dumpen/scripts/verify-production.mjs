@@ -1,13 +1,18 @@
 import { pathToFileURL } from "node:url";
 
 const PRODUCTION_URL = "https://dumpen.denied.se/";
-const ATTEMPTS = 5;
+const ATTEMPTS = 12;
 const RETRY_DELAY_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 20_000;
+const PRODUCTION_MARKER = 'data-media-library-version="2"';
 
 export async function validateProductionResponse(response) {
   if (response.status !== 200) {
     throw new Error(`${PRODUCTION_URL} returned ${response.status}, expected 200`);
+  }
+  const html = await response.text();
+  if (!html.includes(PRODUCTION_MARKER)) {
+    throw new Error(`${PRODUCTION_URL} is reachable but does not serve Media Library v2`);
   }
 }
 

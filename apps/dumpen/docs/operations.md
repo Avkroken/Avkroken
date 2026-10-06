@@ -130,6 +130,8 @@ Efter en **avsedd** deployment:
 npm run verify:production
 ```
 
+Det direkta Node-baserade `verify:production`-kommandot är ett operator-smoke och kan blockeras av Dumpens edge-/bot-skydd. Den automatiska canonical runtime-verifieringen körs därför separat i GitHub Actions med headless Chrome och kräver `data-media-library-version="2"` i den renderade production-DOM:en. En grön PR-/preview-build räknas inte som productionbevis.
+
 Produktionsverifieringen kompletterar lokala tester; den ersätter dem inte.
 
 ## Felsökning
@@ -155,7 +157,7 @@ Wrangler-konfigurationen har persistent logs/traces med sampling och query-strin
 
 `Avkroken/Avkroken/.github/workflows/ci.yml` äger PR-/merge-group-checken `Dumpen` och kör `npm ci --ignore-scripts --no-audit --no-fund` följt av `npm run check` i `apps/dumpen`.
 
-Repositoryts produktionsmodell är Cloudflare Workers Builds, inte en GitHub Actions-deployworkflow. Workern ska skapas/importeras från repository `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med deploy command `npm run deploy:workers-builds`. Scriptet deployar endast från `main`; när Cloudflare startar samma build command för en PR-/feature-branch avslutas den explicit utan deployment. Scriptet skapar inga tokens eller runtime-secrets.
+Repositoryts produktionsmodell är Cloudflare Workers Builds. Workern ska skapas/importeras från repository `Avkroken/Avkroken`, branch `main`, root directory `apps/dumpen`, med deploy command `npm run deploy:workers-builds`. Scriptet kör appgaten och `wrangler deploy --strict` endast från `main`; när Cloudflare startar samma build command för en PR-/feature-branch avslutas den explicit utan deployment. Scriptet skapar inga tokens eller runtime-secrets. GitHub Actions-workflowen `Dumpen production runtime` är credential-fri och **deployar inte**; den verifierar endast den publika runtime-DOM:en med headless Chrome efter main-push.
 
 Branch-previews är dessutom explicit fail-closed i `wrangler.jsonc`: previewkonfigurationen är tom och ärver därför inte production-R2, Secrets Store eller authvars. Previewbuilden får inte använda production-data som genväg.
 

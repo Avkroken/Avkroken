@@ -5,6 +5,7 @@ import {
   bindAssetFilterChanges,
   filterAssetCards,
   filterAssetRecords,
+  publicAssetsMarkup,
   publicAssetsScript,
   resolveAssetFilter,
   sortAssetRecords,
@@ -86,6 +87,10 @@ test("asset sorting supports newest, name and size", () => {
   assert.deepEqual(sortAssetRecords(assets, "newest").map((x) => x.name), ["a.png", "b.png"]);
   assert.deepEqual(sortAssetRecords(assets, "name").map((x) => x.name), ["a.png", "b.png"]);
   assert.deepEqual(sortAssetRecords(assets, "size").map((x) => x.name), ["a.png", "b.png"]);
+});
+
+test("media library markup exposes the production runtime marker", () => {
+  assert.match(publicAssetsMarkup(), /data-media-library-version="2"/);
 });
 
 test("media library script contains queue, progress, clipboard and item mutations", () => {
