@@ -519,6 +519,7 @@ function assetClient() {
     const bits = [formatBytes(item.file.size)];
     if (item.width && item.height) bits.push(item.width + "×" + item.height);
     if (item.state === "uploading") bits.push(item.progress + "%");
+    if (item.state === "waiting") bits.push("väntar på lagringslås");
     if (item.state === "done") bits.push("klar");
     if (item.state === "error") bits.push(item.error || "fel");
     return bits.join(" · ");
@@ -614,13 +615,25 @@ function assetClient() {
         }
       };
       xhr.onload = function() {
+        let payload = null;
+        try { payload = JSON.parse(xhr.responseText); } catch {}
         if (xhr.status >= 200 && xhr.status < 300) {
           item.state = "done";
           item.progress = 100;
+          item.lockRetries = 0;
+        } else if (xhr.status === 409 && payload && payload.error === "asset_upload_busy" && (item.lockRetries || 0) < 20) {
+          item.lockRetries = (item.lockRetries || 0) + 1;
+          item.state = "waiting";
+          item.progress = 0;
+          item.error = "Väntar på lagringslås";
+          renderQueue();
+          setTimeout(function() {
+            uploadItem(item).then(resolve);
+          }, Number(payload.retryAfterMs) || 250);
+          return;
         } else {
           item.state = "error";
-          try { item.error = JSON.parse(xhr.responseText).error || ("HTTP " + xhr.status); }
-          catch { item.error = "HTTP " + xhr.status; }
+          item.error = (payload && payload.error) || ("HTTP " + xhr.status);
         }
         renderQueue();
         resolve();
