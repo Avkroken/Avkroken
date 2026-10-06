@@ -1060,6 +1060,7 @@ test("publik startsida leder till GitHub Auth före privata kontrollpanelen", as
   assert.match(adminHtml, /id="asset-filter-app"/);
   assert.match(adminHtml, /id="asset-filter-size"/);
   assert.match(adminHtml, /id="asset-filter-theme"/);
+  assert.match(adminHtml, /id="asset-filter-type"/);
   assert.match(adminHtml, /id="asset-sort"/);
   assert.match(adminHtml, /id="replace-app-assets"/);
   assert.match(adminHtml, /XMLHttpRequest/);
