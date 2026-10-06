@@ -308,7 +308,7 @@ function appAssetMetadata(key) {
   };
 }
 
-function assetRecord(object) {
+export function publicAssetRecord(object) {
   const key = String(object.key || "");
   if (!key) return null;
   const fallbackName = key.split("/").pop() || key;
@@ -354,7 +354,7 @@ async function listAll(bucket, options = {}) {
 export async function listPublicAssets(bucket) {
   const objects = await listAll(bucket);
   return objects
-    .map(assetRecord)
+    .map(publicAssetRecord)
     .filter((asset) => asset && !asset.mirror && !asset.legacy && !asset.key.startsWith("staging/"))
     .sort((a, b) => {
       if (a.app && b.app) {
