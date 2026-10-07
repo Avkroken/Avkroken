@@ -102,6 +102,10 @@ function correlation(value: unknown): CorrelationV1 {
   return result;
 }
 
+function assertJsonLength(value: unknown, field: string, max: number): void {
+  if (JSON.stringify(value).length > max) throw new InvalidIngressMessageError(field);
+}
+
 function metadata(value: unknown): Record<string, string | number | boolean | null> {
   const input = object(value, "metadata");
   const entries = Object.entries(input);
@@ -124,6 +128,7 @@ function metadata(value: unknown): Record<string, string | number | boolean | nu
     }
     throw new InvalidIngressMessageError(`metadata.${key}`);
   }
+  assertJsonLength(result, "metadata.size", 16384);
   return result;
 }
 
@@ -144,6 +149,14 @@ export function normalizeIngressMessage(value: unknown): IngressMessageV1 {
     throw new InvalidIngressMessageError("capability/provider");
   }
 
+  const normalizedResource = resource(input.resource);
+  const normalizedActor = actor(input.actor);
+  const normalizedCorrelation = correlation(input.correlation);
+  const normalizedMetadata = metadata(input.metadata);
+  if (normalizedResource) assertJsonLength(normalizedResource, "resource.size", 4096);
+  if (normalizedActor) assertJsonLength(normalizedActor, "actor.size", 4096);
+  assertJsonLength(normalizedCorrelation, "correlation.size", 8192);
+
   return {
     schemaVersion: 1,
     messageId: requiredString(input.messageId, "messageId", 128),
@@ -155,10 +168,10 @@ export function normalizeIngressMessage(value: unknown): IngressMessageV1 {
     action: optionalString(input.action, "action", 160),
     receivedAt: iso(input.receivedAt, "receivedAt", true),
     occurredAt: iso(input.occurredAt, "occurredAt", false),
-    resource: resource(input.resource),
-    actor: actor(input.actor),
-    correlation: correlation(input.correlation),
-    metadata: metadata(input.metadata),
+    resource: normalizedResource,
+    actor: normalizedActor,
+    correlation: normalizedCorrelation,
+    metadata: normalizedMetadata,
   };
 }
 
