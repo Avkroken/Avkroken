@@ -114,6 +114,20 @@ test("verified shadow validation fails closed before queue handoff", async () =>
     () => normalizeVerifiedShadowDelivery({ ...base, body: "x".repeat(MAX_VERIFIED_SHADOW_BODY_BYTES + 1) }),
     (error: unknown) => error instanceof InvalidVerifiedShadowDeliveryError && error.field === "body.size",
   );
+  assert.throws(
+    () => normalizeVerifiedShadowDelivery({
+      schemaVersion: 1,
+      kind: "cloudflare",
+      source: "issues",
+      deliveryId: "cloudflare-notifications:wrong-source",
+      receivedAt: "2026-10-07T12:00:00.000Z",
+      body: JSON.stringify({
+        alert_correlation_id: "id",
+        alert_event: "START",
+      }),
+    }),
+    (error: unknown) => error instanceof InvalidVerifiedShadowDeliveryError && error.field === "deliveryId.source",
+  );
   assert.equal(queue.messages.length, 0);
 });
 
