@@ -1,6 +1,8 @@
 import {
+  COVERAGE_VALUES,
   OBSERVATION_SOURCES,
   clampPageLimit,
+  isFlatMetadata,
   type ActorRefV1,
   type CorrelationV1,
   type EventQueryV1,
@@ -16,6 +18,19 @@ const DEFAULT_WINDOW_DAYS = 30;
 const MAX_WINDOW_DAYS = 90;
 const REPOSITORY = /^[A-Za-z0-9_.-]+$/;
 const EVENT_ID = /^evt_[0-9a-f]{64}$/;
+const CORRELATION_KEYS = new Set([
+  "correlationId",
+  "eventId",
+  "traceId",
+  "requestId",
+  "providerEventId",
+  "resourceId",
+  "repository",
+  "commitSha",
+  "deploymentId",
+  "service",
+  "environment",
+]);
 
 export class InvalidEventQueryError extends Error {
   constructor(readonly field: string) {
@@ -53,6 +68,13 @@ type EventRow = {
   metadata_json: string;
 };
 
+type EventCursor = {
+  from: string;
+  to: string;
+  receivedAt: string;
+  id: string;
+};
+
 type NormalizedEventQuery = {
   limit: number;
   provider: "github" | "cloudflare" | null;
@@ -60,11 +82,11 @@ type NormalizedEventQuery = {
   capability: string | null;
   event: string | null;
   repository: string | null;
-  repositories: string[];
+  repositories: string[] | null;
   resource: string | null;
   from: string;
   to: string;
-  cursor: { receivedAt: string; id: string } | null;
+  cursor: EventCursor | null;
 };
 
 function iso(value: string | undefined, field: string): string | null {
@@ -72,6 +94,10 @@ function iso(value: string | undefined, field: string): string | null {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) throw new InvalidEventQueryError(field);
   return new Date(parsed).toISOString();
+}
+
+function validIso(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
 function text(value: string | undefined, field: string, max: number): string | null {
@@ -89,16 +115,16 @@ function repository(value: string, field: string): string {
   return normalized;
 }
 
-function encodeCursor(receivedAt: string, id: string): string {
-  return btoa(`${receivedAt}\n${id}`)
+function encodeCursor(cursor: EventCursor): string {
+  return btoa(["v1", cursor.from, cursor.to, cursor.receivedAt, cursor.id].join("\n"))
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
 }
 
-function decodeCursor(value: string | undefined): { receivedAt: string; id: string } | null {
+function decodeCursor(value: string | undefined): EventCursor | null {
   if (value === undefined) return null;
-  if (!/^[A-Za-z0-9_-]{1,512}$/.test(value)) throw new InvalidEventQueryError("cursor");
+  if (!/^[A-Za-z0-9_-]{1,768}$/.test(value)) throw new InvalidEventQueryError("cursor");
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
   let decoded: string;
@@ -108,18 +134,31 @@ function decodeCursor(value: string | undefined): { receivedAt: string; id: stri
     throw new InvalidEventQueryError("cursor");
   }
   const parts = decoded.split("\n");
-  if (parts.length !== 2 || !EVENT_ID.test(parts[1])) throw new InvalidEventQueryError("cursor");
-  const receivedAt = iso(parts[0], "cursor");
-  if (!receivedAt) throw new InvalidEventQueryError("cursor");
-  return { receivedAt, id: parts[1] };
+  if (parts.length !== 5 || parts[0] !== "v1" || !EVENT_ID.test(parts[4])) {
+    throw new InvalidEventQueryError("cursor");
+  }
+  const from = iso(parts[1], "cursor");
+  const to = iso(parts[2], "cursor");
+  const receivedAt = iso(parts[3], "cursor");
+  if (!from || !to || !receivedAt) throw new InvalidEventQueryError("cursor");
+  if (Date.parse(from) > Date.parse(to) || Date.parse(to) - Date.parse(from) > MAX_WINDOW_DAYS * DAY_MS) {
+    throw new InvalidEventQueryError("cursor");
+  }
+  return { from, to, receivedAt, id: parts[4] };
 }
 
 export function normalizeEventQuery(
   input: EventQueryV1 = {},
   nowMs = Date.now(),
 ): NormalizedEventQuery {
-  const to = iso(input.to, "to") ?? new Date(nowMs).toISOString();
-  const from = iso(input.from, "from") ?? new Date(Date.parse(to) - DEFAULT_WINDOW_DAYS * DAY_MS).toISOString();
+  const cursor = decodeCursor(input.cursor);
+  const explicitTo = iso(input.to, "to");
+  const explicitFrom = iso(input.from, "from");
+  if (cursor && explicitTo && explicitTo !== cursor.to) throw new InvalidEventQueryError("cursor.to");
+  if (cursor && explicitFrom && explicitFrom !== cursor.from) throw new InvalidEventQueryError("cursor.from");
+
+  const to = cursor?.to ?? explicitTo ?? new Date(nowMs).toISOString();
+  const from = cursor?.from ?? explicitFrom ?? new Date(Date.parse(to) - DEFAULT_WINDOW_DAYS * DAY_MS).toISOString();
   const fromMs = Date.parse(from);
   const toMs = Date.parse(to);
   if (fromMs > toMs) throw new InvalidEventQueryError("range");
@@ -135,10 +174,10 @@ export function normalizeEventQuery(
   }
   const singleRepository = input.repository === undefined ? null : repository(input.repository, "repository");
   const repositories = input.repositories === undefined
-    ? []
+    ? null
     : [...new Set(input.repositories.map((value) => repository(value, "repositories")))];
-  if (repositories.length > 50) throw new InvalidEventQueryError("repositories");
-  if (singleRepository && repositories.length) throw new InvalidEventQueryError("repositories");
+  if (repositories && repositories.length > 50) throw new InvalidEventQueryError("repositories");
+  if (singleRepository && repositories !== null) throw new InvalidEventQueryError("repositories");
 
   return {
     limit: clampPageLimit(input.limit),
@@ -151,32 +190,151 @@ export function normalizeEventQuery(
     resource: text(input.resource, "resource", 200),
     from,
     to,
-    cursor: decodeCursor(input.cursor),
+    cursor,
   };
 }
 
-function parseObject<T>(value: string | null, field: string, nullable: true): T | null;
-function parseObject<T>(value: string | null, field: string, nullable: false): T;
-function parseObject<T>(value: string | null, field: string, nullable: boolean): T | null {
+function parseObject(value: string | null, field: string, nullable: true): Record<string, unknown> | null;
+function parseObject(value: string | null, field: string, nullable: false): Record<string, unknown>;
+function parseObject(value: string | null, field: string, nullable: boolean): Record<string, unknown> | null {
   if (value === null) {
     if (nullable) return null;
     throw new CorruptEventRowError(field);
   }
   try {
     const parsed = JSON.parse(value);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new Error("not object");
-    }
-    return parsed as T;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("not object");
+    return parsed as Record<string, unknown>;
   } catch {
     throw new CorruptEventRowError(field);
   }
 }
 
+function nullOrString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function requiredOwn(record: Record<string, unknown>, key: string, field: string): unknown {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) throw new CorruptEventRowError(field);
+  return record[key];
+}
+
+function validateResource(value: Record<string, unknown> | null): ResourceRefV1 | null {
+  if (value === null) return null;
+  const type = requiredOwn(value, "type", "resource_json.type");
+  const id = requiredOwn(value, "id", "resource_json.id");
+  const name = requiredOwn(value, "name", "resource_json.name");
+  const scope = requiredOwn(value, "scope", "resource_json.scope");
+  const repositoryValue = requiredOwn(value, "repository", "resource_json.repository");
+  if (typeof type !== "string" || !type.trim()) throw new CorruptEventRowError("resource_json.type");
+  for (const [field, item] of [["id", id], ["name", name], ["scope", scope], ["repository", repositoryValue]] as const) {
+    if (!nullOrString(item)) throw new CorruptEventRowError(`resource_json.${field}`);
+  }
+  return { type, id, name, scope, repository: repositoryValue };
+}
+
+function validateActor(value: Record<string, unknown> | null): ActorRefV1 | null {
+  if (value === null) return null;
+  const id = requiredOwn(value, "id", "actor_json.id");
+  const type = requiredOwn(value, "type", "actor_json.type");
+  const name = requiredOwn(value, "name", "actor_json.name");
+  const slug = requiredOwn(value, "slug", "actor_json.slug");
+  const resolved = requiredOwn(value, "resolved", "actor_json.resolved");
+  if (!nullOrString(id)) throw new CorruptEventRowError("actor_json.id");
+  if (typeof type !== "string" || !type.trim()) throw new CorruptEventRowError("actor_json.type");
+  if (!nullOrString(name)) throw new CorruptEventRowError("actor_json.name");
+  if (!nullOrString(slug)) throw new CorruptEventRowError("actor_json.slug");
+  if (typeof resolved !== "boolean") throw new CorruptEventRowError("actor_json.resolved");
+  return { id, type, name, slug, resolved };
+}
+
+function validateCorrelation(value: Record<string, unknown>): CorrelationV1 {
+  for (const [key, item] of Object.entries(value)) {
+    if (!CORRELATION_KEYS.has(key) || typeof item !== "string") {
+      throw new CorruptEventRowError(`correlation_json.${key}`);
+    }
+  }
+  return value as CorrelationV1;
+}
+
+function validateProvenance(value: Record<string, unknown>): ProvenanceV1 {
+  const source = requiredOwn(value, "source", "provenance_json.source");
+  const provider = requiredOwn(value, "provider", "provenance_json.provider");
+  const observedAt = requiredOwn(value, "observedAt", "provenance_json.observedAt");
+  const receivedAt = requiredOwn(value, "receivedAt", "provenance_json.receivedAt");
+  const coverage = requiredOwn(value, "coverage", "provenance_json.coverage");
+  const periodComplete = requiredOwn(value, "periodComplete", "provenance_json.periodComplete");
+  const sampling = requiredOwn(value, "sampling", "provenance_json.sampling");
+  const direct = requiredOwn(value, "direct", "provenance_json.direct");
+  const inherited = requiredOwn(value, "inherited", "provenance_json.inherited");
+  const derived = requiredOwn(value, "derived", "provenance_json.derived");
+  const sourceId = requiredOwn(value, "sourceId", "provenance_json.sourceId");
+
+  if (typeof source !== "string" || !(OBSERVATION_SOURCES as readonly string[]).includes(source)) {
+    throw new CorruptEventRowError("provenance_json.source");
+  }
+  if (!nullOrString(provider)) throw new CorruptEventRowError("provenance_json.provider");
+  if (!validIso(observedAt)) throw new CorruptEventRowError("provenance_json.observedAt");
+  if (receivedAt !== null && !validIso(receivedAt)) throw new CorruptEventRowError("provenance_json.receivedAt");
+  if (typeof coverage !== "string" || !(COVERAGE_VALUES as readonly string[]).includes(coverage)) {
+    throw new CorruptEventRowError("provenance_json.coverage");
+  }
+  if (periodComplete !== null && typeof periodComplete !== "boolean") {
+    throw new CorruptEventRowError("provenance_json.periodComplete");
+  }
+  if (!nullOrString(sampling)) throw new CorruptEventRowError("provenance_json.sampling");
+  if (typeof direct !== "boolean") throw new CorruptEventRowError("provenance_json.direct");
+  if (typeof inherited !== "boolean") throw new CorruptEventRowError("provenance_json.inherited");
+  if (typeof derived !== "boolean") throw new CorruptEventRowError("provenance_json.derived");
+  if (!nullOrString(sourceId)) throw new CorruptEventRowError("provenance_json.sourceId");
+
+  return {
+    source: source as ProvenanceV1["source"],
+    provider,
+    observedAt,
+    receivedAt,
+    coverage: coverage as ProvenanceV1["coverage"],
+    periodComplete,
+    sampling,
+    direct,
+    inherited,
+    derived,
+    sourceId,
+  };
+}
+
+function validateMetadata(value: Record<string, unknown>): Record<string, string | number | boolean | null> {
+  if (!isFlatMetadata(value)) throw new CorruptEventRowError("metadata_json");
+  return value;
+}
+
 export function eventFromRow(row: EventRow): ObservationEventV1 {
   if (row.schema_version !== 1) throw new CorruptEventRowError("schema_version");
   if (!EVENT_ID.test(row.id)) throw new CorruptEventRowError("id");
+  if (row.provider !== "github" && row.provider !== "cloudflare") throw new CorruptEventRowError("provider");
+  if (!row.capability || !row.event) throw new CorruptEventRowError("event");
+  if (!(OBSERVATION_SOURCES as readonly string[]).includes(row.source)) throw new CorruptEventRowError("source");
+  if (!(COVERAGE_VALUES as readonly string[]).includes(row.coverage)) throw new CorruptEventRowError("coverage");
   if (row.derived !== 0 && row.derived !== 1) throw new CorruptEventRowError("derived");
+  if (!validIso(row.received_at)) throw new CorruptEventRowError("received_at");
+  if (row.occurred_at !== null && !validIso(row.occurred_at)) throw new CorruptEventRowError("occurred_at");
+
+  const resource = validateResource(parseObject(row.resource_json, "resource_json", true));
+  const actor = validateActor(parseObject(row.actor_json, "actor_json", true));
+  const correlation = validateCorrelation(parseObject(row.correlation_json, "correlation_json", false));
+  const provenance = validateProvenance(parseObject(row.provenance_json, "provenance_json", false));
+  const metadata = validateMetadata(parseObject(row.metadata_json, "metadata_json", false));
+
+  if ((resource?.type ?? null) !== row.resource_type) throw new CorruptEventRowError("resource_type");
+  if ((resource?.id ?? null) !== row.resource_id) throw new CorruptEventRowError("resource_id");
+  if ((resource?.repository ?? null) !== row.repository) throw new CorruptEventRowError("repository");
+  if (provenance.source !== row.source) throw new CorruptEventRowError("source");
+  if (provenance.coverage !== row.coverage) throw new CorruptEventRowError("coverage");
+  if (provenance.provider !== null && provenance.provider !== row.provider) {
+    throw new CorruptEventRowError("provenance_json.provider");
+  }
+  if (provenance.derived !== (row.derived === 1)) throw new CorruptEventRowError("derived");
+
   return {
     id: row.id,
     schemaVersion: 1,
@@ -186,12 +344,12 @@ export function eventFromRow(row: EventRow): ObservationEventV1 {
     action: row.action,
     occurredAt: row.occurred_at,
     receivedAt: row.received_at,
-    resource: parseObject<ResourceRefV1>(row.resource_json, "resource_json", true),
-    actor: parseObject<ActorRefV1>(row.actor_json, "actor_json", true),
-    correlation: parseObject<CorrelationV1>(row.correlation_json, "correlation_json", false),
-    provenance: parseObject<ProvenanceV1>(row.provenance_json, "provenance_json", false),
+    resource,
+    actor,
+    correlation,
+    provenance,
     derived: row.derived === 1,
-    metadata: parseObject<Record<string, string | number | boolean | null>>(row.metadata_json, "metadata_json", false),
+    metadata,
   };
 }
 
@@ -230,9 +388,13 @@ export async function listEvents(
   add("event", query.event);
   add("repository", query.repository);
 
-  if (query.repositories.length) {
-    clauses.push(`repository IN (${query.repositories.map(() => "?").join(", ")})`);
-    values.push(...query.repositories);
+  if (query.repositories !== null) {
+    if (query.repositories.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push(`repository IN (${query.repositories.map(() => "?").join(", ")})`);
+      values.push(...query.repositories);
+    }
   }
   if (query.resource) {
     clauses.push("(resource_type = ? OR resource_id = ?)");
@@ -261,7 +423,9 @@ export async function listEvents(
   const last = pageRows.at(-1);
   return {
     items,
-    nextCursor: truncated && last ? encodeCursor(last.received_at, last.id) : null,
+    nextCursor: truncated && last
+      ? encodeCursor({ from: query.from, to: query.to, receivedAt: last.received_at, id: last.id })
+      : null,
     truncated,
   };
 }

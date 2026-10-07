@@ -25,7 +25,7 @@ Events normaliserar till `ObservationEventV1` och ansvarar för:
 - bounded resource/actor/metadata;
 - compatibility projection under migration;
 - bounded keyset-paginerad event query;
-- deterministic legacy import/backfill transform;
+- deterministic legacy import/backfill transform med strict `received_at < shadowStart`-gräns;
 - 90-dagars retention/prune seam;
 - item-level Queue ack/retry-adapter utan provisionerad Queue.
 

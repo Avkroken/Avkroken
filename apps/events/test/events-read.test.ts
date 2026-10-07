@@ -204,11 +204,21 @@ test("listEvents applies bounded filters and keyset pagination", async () => {
   const second = await listEvents(secondDb, {
     limit: 2,
     cursor: first.nextCursor ?? undefined,
-  }, Date.parse("2026-10-07T12:00:00.000Z"));
+  }, Date.parse("2026-10-08T12:00:00.000Z"));
   assert.equal(second.truncated, false);
   const secondCall = secondDb.calls.find((item) => item.operation === "all");
   assert.ok(secondCall);
   assert.match(secondCall.sql, /received_at < \? OR \(received_at = \? AND id < \?\)/);
+  assert.deepEqual(
+    secondCall.params.slice(0, 2),
+    ["2026-09-07T12:00:00.000Z", "2026-10-07T12:00:00.000Z"],
+  );
+
+  const denyAllDb = new TestDb();
+  await listEvents(denyAllDb, { repositories: [] }, Date.parse("2026-10-07T12:00:00.000Z"));
+  const denyAllCall = denyAllDb.calls.find((item) => item.operation === "all");
+  assert.ok(denyAllCall);
+  assert.match(denyAllCall.sql, /1 = 0/);
 });
 
 test("row reconstruction and event detail fail closed on corrupt rows", async () => {
@@ -226,6 +236,14 @@ test("row reconstruction and event detail fail closed on corrupt rows", async ()
   );
   assert.throws(
     () => eventFromRow({ ...row, metadata_json: "[]" } as never),
+    CorruptEventRowError,
+  );
+  assert.throws(
+    () => eventFromRow({ ...row, provenance_json: "{}" } as never),
+    CorruptEventRowError,
+  );
+  assert.throws(
+    () => eventFromRow({ ...row, metadata_json: JSON.stringify({ nested: { value: true } }) } as never),
     CorruptEventRowError,
   );
 });
@@ -262,6 +280,7 @@ test("legacy backfill transform preserves current Activity fields deterministica
   const second = await canonicalEventFromLegacyRow(row);
   assert.equal(first.event.id, second.event.id);
   assert.equal(first.contentHash, second.contentHash);
+  assert.equal(first.idempotencyKey, "github:delivery-legacy");
   assert.deepEqual(legacyActivityProjection(first.event), {
     provider: row.provider,
     capability: row.capability,
@@ -279,12 +298,17 @@ test("legacy backfill transform preserves current Activity fields deterministica
   const plan = await planLegacyImport([
     row,
     { ...row, event_key: "bad", provider: "other" },
-  ]);
-  assert.equal(plan.total, 2);
+    { ...row, event_key: "github:overlap:github.avkroken.actions", received_at: "2026-10-02T00:00:00.000Z" },
+  ], { beforeExclusive: "2026-10-02T00:00:00.000Z" });
+  assert.equal(plan.total, 3);
   assert.equal(plan.valid, 1);
   assert.deepEqual(plan.invalid, [{ index: 1, field: "provider" }]);
+  assert.deepEqual(plan.excluded, [{ index: 2, reason: "at_or_after_cutover" }]);
   await assert.rejects(
-    () => planLegacyImport(Array.from({ length: MAX_LEGACY_IMPORT_BATCH + 1 }, () => row)),
+    () => planLegacyImport(
+      Array.from({ length: MAX_LEGACY_IMPORT_BATCH + 1 }, () => row),
+      { beforeExclusive: "2026-10-02T00:00:00.000Z" },
+    ),
     RangeError,
   );
 });

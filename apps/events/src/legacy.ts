@@ -80,6 +80,25 @@ function legacyResource(row: LegacyObservationEventRow): ResourceRefV1 | null {
   return { type, id, name: repository, scope: repository ? "repository" : null, repository };
 }
 
+function canonicalLegacyIdempotencyKey(
+  row: LegacyObservationEventRow,
+  eventKey: string,
+  capability: string,
+): string {
+  if (row.source !== "webhook") return `legacy:${eventKey}`;
+  const suffix = `:${capability}`;
+  if (!eventKey.endsWith(suffix)) throw new InvalidLegacyEventError("event_key");
+  const deliveryKey = eventKey.slice(0, -suffix.length);
+  if (row.provider === "github") {
+    if (!deliveryKey.startsWith("github:")) throw new InvalidLegacyEventError("event_key");
+    return deliveryKey;
+  }
+  if (!deliveryKey.startsWith("cloudflare:")) throw new InvalidLegacyEventError("event_key");
+  const canonical = deliveryKey.slice("cloudflare:".length);
+  if (!canonical.startsWith("cloudflare-")) throw new InvalidLegacyEventError("event_key");
+  return canonical;
+}
+
 export async function canonicalEventFromLegacyRow(
   row: LegacyObservationEventRow,
 ): Promise<CanonicalEventWrite> {
@@ -93,12 +112,13 @@ export async function canonicalEventFromLegacyRow(
   const receivedAt = timestamp(row.received_at, "received_at", true);
   const occurredAt = timestamp(row.occurred_at, "occurred_at", false);
   const resource = legacyResource(row);
-  const idempotencyKey = `legacy:${eventKey}`;
+  const capability = required(row.capability, "capability", 200);
+  const idempotencyKey = canonicalLegacyIdempotencyKey(row, eventKey, capability);
   const event: ObservationEventV1 = {
     id: await canonicalEventIdForKey(idempotencyKey),
     schemaVersion: 1,
     provider,
-    capability: required(row.capability, "capability", 200),
+    capability,
     event: required(row.event, "event", 160),
     action: optional(row.action, "action", 160),
     occurredAt,
@@ -150,20 +170,30 @@ export const MAX_LEGACY_IMPORT_BATCH = 1000;
 export type LegacyImportPlan = {
   total: number;
   valid: number;
+  excluded: Array<{ index: number; reason: "at_or_after_cutover" }>;
   invalid: Array<{ index: number; field: string }>;
   writes: CanonicalEventWrite[];
 };
 
 export async function planLegacyImport(
   rows: readonly LegacyObservationEventRow[],
+  input: { beforeExclusive: string },
 ): Promise<LegacyImportPlan> {
   if (rows.length > MAX_LEGACY_IMPORT_BATCH) {
     throw new RangeError("legacy import batch exceeds configured maximum");
   }
+  const boundary = Date.parse(input.beforeExclusive);
+  if (!Number.isFinite(boundary)) throw new InvalidLegacyEventError("beforeExclusive");
   const writes: CanonicalEventWrite[] = [];
+  const excluded: Array<{ index: number; reason: "at_or_after_cutover" }> = [];
   const invalid: Array<{ index: number; field: string }> = [];
   for (let index = 0; index < rows.length; index += 1) {
     try {
+      const receivedAt = Date.parse(rows[index].received_at);
+      if (Number.isFinite(receivedAt) && receivedAt >= boundary) {
+        excluded.push({ index, reason: "at_or_after_cutover" });
+        continue;
+      }
       writes.push(await canonicalEventFromLegacyRow(rows[index]));
     } catch (error) {
       if (error instanceof InvalidLegacyEventError) {
@@ -173,5 +203,5 @@ export async function planLegacyImport(
       throw error;
     }
   }
-  return { total: rows.length, valid: writes.length, invalid, writes };
+  return { total: rows.length, valid: writes.length, excluded, invalid, writes };
 }
