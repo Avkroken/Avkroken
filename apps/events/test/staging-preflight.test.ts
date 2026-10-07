@@ -140,6 +140,19 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
     maxBatchTimeoutSeconds: 1,
     maxRetries: 5,
   }];
+  value.workers.push({
+    name: "events-staging",
+    deploymentCommitSha: "repo-sha",
+    ownershipConfirmed: true,
+    publicRoutes: [],
+    secretBindings: [],
+    d1Bindings: [],
+    queueProducerBindings: [],
+    queueConsumerBindings: [{
+      queueId: "staging-queue",
+      queueName: "avkroken-ingest-events-preview-v1",
+    }],
+  });
   const configured = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(configured.ready, true);
 
