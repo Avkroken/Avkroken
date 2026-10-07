@@ -317,7 +317,11 @@ export function eventFromRow(row: EventRow): ObservationEventV1 {
   if (row.schema_version !== 1) throw new CorruptEventRowError("schema_version");
   if (!EVENT_ID.test(row.id)) throw new CorruptEventRowError("id");
   if (row.provider !== "github" && row.provider !== "cloudflare") throw new CorruptEventRowError("provider");
-  if (!row.capability || !row.event) throw new CorruptEventRowError("event");
+  if (typeof row.capability !== "string" || !row.capability.trim() || !row.capability.startsWith(`${row.provider}.`)) {
+    throw new CorruptEventRowError("capability");
+  }
+  if (typeof row.event !== "string" || !row.event.trim()) throw new CorruptEventRowError("event");
+  if (row.action !== null && typeof row.action !== "string") throw new CorruptEventRowError("action");
   if (!(OBSERVATION_SOURCES as readonly string[]).includes(row.source)) throw new CorruptEventRowError("source");
   if (!(COVERAGE_VALUES as readonly string[]).includes(row.coverage)) throw new CorruptEventRowError("coverage");
   if (row.derived !== 0 && row.derived !== 1) throw new CorruptEventRowError("derived");
