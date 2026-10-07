@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   CloudflareControlPlaneReadError,
@@ -317,6 +318,39 @@ test("request timeout is bounded and sanitized", async () => {
       && error.code === "network"
       && !String(error).includes(TOKEN),
   );
+});
+
+test("timeout remains active while reading a hanging response body", async () => {
+  const proxy = service(
+    async (_input, init) => {
+      const response = new Response(null, { status: 200 });
+      Object.defineProperty(response, "text", {
+        value: () => new Promise<string>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error(`body ${TOKEN}`)));
+        }),
+      });
+      return response;
+    },
+    5,
+  );
+
+  await assert.rejects(
+    () => proxy.listWorkers(),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "body_read"
+      && !String(error).includes(TOKEN),
+  );
+});
+
+test("control-plane source contains no provider write HTTP verbs", async () => {
+  const source = await readFile(
+    new URL("../control-plane/cloudflare-staging-inventory-proxy.ts", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/);
+  assert.match(source, /extends WorkerEntrypoint/);
+  assert.match(source, /method:\s*"GET"/);
 });
 
 test("credential lookup failures are sanitized before network access", async () => {
