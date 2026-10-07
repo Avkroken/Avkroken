@@ -1,6 +1,6 @@
 # Release- och versionsstandard — Avkroken/Avkroken
 
-**Senast verifierad:** 2026-09-28
+**Senast verifierad:** 2026-10-07
 
 Det här dokumentet gäller **Avkroken/Avkroken-monorepot**. Fristående repositories äger sina egna releasekontrakt.
 
@@ -20,7 +20,7 @@ Pull request-titlar ska följa Conventional Commits:
 
 Tillåtna typer är `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore` och `revert`.
 
-Scope är valfri och ska vara tekniskt relevant, exempelvis `portal`, `jobb`, `skvallerbyttan` eller `dumpen`.
+Scope är valfri och ska vara tekniskt relevant, exempelvis `portal`, `jobb`, `skvallerbyttan`, `ingest`, `events` eller `dumpen`.
 
 `!` eller en `BREAKING CHANGE:`-footer markerar breaking change.
 
@@ -76,6 +76,8 @@ För Avkroken/Avkroken kräver releaseprocessen push-verifiering av:
 
 - Portal;
 - Skvallerbyttan;
+- Ingest;
+- Events;
 - Spam filter;
 - Krosa-Maja retirement guard;
 - Jobb;
@@ -118,7 +120,7 @@ Canonical SemVer-/GitHub Release-publication använder ingen PAT, bypass eller u
 
 ## Deployment
 
-GitHub Release och runtime-deployment är separata operationer. En repositoryrelease får inte implicit deploya Portal, Jobb, Skvallerbyttan, Dumpen eller annan runtime om inte respektive deployments kontrakt uttryckligen säger det.
+GitHub Release och runtime-deployment är separata operationer. En repositoryrelease får inte implicit deploya Portal, Jobb, Skvallerbyttan, Ingest, Events, Dumpen eller annan runtime om inte respektive deployments kontrakt uttryckligen säger det.
 
 ## Hotfix och rollback
 
