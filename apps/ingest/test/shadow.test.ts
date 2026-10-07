@@ -128,6 +128,13 @@ test("verified shadow validation fails closed before queue handoff", async () =>
     }),
     (error: unknown) => error instanceof InvalidVerifiedShadowDeliveryError && error.field === "deliveryId.source",
   );
+  assert.throws(
+    () => normalizeVerifiedShadowDelivery({
+      ...base,
+      authorization: "Bearer must-not-cross-shadow-boundary",
+    }),
+    (error: unknown) => error instanceof InvalidVerifiedShadowDeliveryError && error.field === "delivery.authorization",
+  );
   assert.equal(queue.messages.length, 0);
 });
 
