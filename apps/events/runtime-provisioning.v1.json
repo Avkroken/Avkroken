@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "status": "planned",
+  "cloudflare": {
+    "accountBinding": "CLOUDFLARE_ACCOUNT_ID",
+    "wranglerMinimum": "4.135.0"
+  },
+  "production": {
+    "eventsWorker": "events",
+    "ingestWorker": "ingest",
+    "database": {
+      "binding": "EVENTS_DB",
+      "name": "avkroken-events-eu",
+      "jurisdiction": "eu",
+      "readReplication": "disabled",
+      "databaseId": null
+    },
+    "queue": {
+      "producerBinding": "EVENTS_QUEUE",
+      "name": "avkroken-ingest-events-v1",
+      "deadLetterQueue": "avkroken-ingest-events-v1-dlq",
+      "messageRetentionSeconds": 604800,
+      "consumerWorker": "events",
+      "maxBatchSize": 10,
+      "maxBatchTimeoutSeconds": 1,
+      "maxRetries": 5
+    }
+  },
+  "shadow": {
+    "mode": "persistent_staging_environment",
+    "eventsWorker": "events-staging",
+    "ingestWorker": "ingest-staging",
+    "database": {
+      "binding": "EVENTS_DB",
+      "name": "avkroken-events-preview-eu",
+      "jurisdiction": "eu",
+      "readReplication": "disabled",
+      "databaseId": null
+    },
+    "queue": {
+      "producerBinding": "EVENTS_QUEUE",
+      "name": "avkroken-ingest-events-preview-v1",
+      "deadLetterQueue": "avkroken-ingest-events-preview-v1-dlq",
+      "messageRetentionSeconds": 604800,
+      "consumerWorker": "events-staging",
+      "maxBatchSize": 10,
+      "maxBatchTimeoutSeconds": 1,
+      "maxRetries": 5
+    },
+    "source": {
+      "canonicalWorker": "skvallerbyttan",
+      "serviceBinding": "AVKROKEN_INGEST_SHADOW",
+      "targetWorker": "ingest-staging",
+      "entrypoint": "VerifiedShadowIngressService",
+      "providerSecretsRequired": false,
+      "failSoft": true
+    }
+  }
+}
