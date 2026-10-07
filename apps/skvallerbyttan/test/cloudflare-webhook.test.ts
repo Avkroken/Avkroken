@@ -303,7 +303,7 @@ test("Cloudflare shadow failure remains fail-soft and does not log diagnostic bo
             throw new Error("raw-sensitive-cloudflare-body");
           },
         },
-      } as Env,
+      } as unknown as Env,
       context,
     );
     assert.equal(response.status, 202);
@@ -319,7 +319,7 @@ test("Cloudflare shadow failure remains fail-soft and does not log diagnostic bo
   assert.equal(deliveries.length, 1);
   const mirrored = deliveries[0] as { receivedAt: string; body: string; deliveryId: string };
   assert.equal(mirrored.body, body);
-  assert.match(mirrored.deliveryId, /^cloudflare-issues:/);
+  assert.equal(/^cloudflare-issues:/.test(mirrored.deliveryId), true);
   const activityStatement = batches[0][2];
   assert.equal(activityStatement.params.at(-1), mirrored.receivedAt);
   assert.equal(JSON.stringify(errors).includes("raw-sensitive-cloudflare-body"), false);
