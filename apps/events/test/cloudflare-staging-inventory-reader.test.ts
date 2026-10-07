@@ -106,6 +106,11 @@ test("Queue consumers normalize worker retry/DLQ settings from provider fields",
   const reader = new CloudflareStagingInventoryReaderV1(
     await plan(),
     proxy({
+      listQueues: async () => [{
+        queue_name: "avkroken-ingest-events-preview-v1",
+        queue_id: "queue-id",
+        settings: { message_retention_period: 604800 },
+      }],
       listQueueConsumers: async () => [{
         type: "worker",
         script_name: "events-staging",
@@ -126,6 +131,30 @@ test("Queue consumers normalize worker retry/DLQ settings from provider fields",
     maxRetries: 5,
     deadLetterQueue: "avkroken-ingest-events-preview-v1-dlq",
   }]);
+});
+
+test("Queue consumer inspection is restricted to inventoried planned staging queues", async () => {
+  let called = false;
+  const reader = new CloudflareStagingInventoryReaderV1(
+    await plan(),
+    proxy({
+      listQueues: async () => [{
+        queue_name: "unrelated",
+        queue_id: "other-queue",
+        settings: { message_retention_period: 604800 },
+      }],
+      listQueueConsumers: async () => {
+        called = true;
+        return [];
+      },
+    }),
+  );
+
+  await assert.rejects(
+    () => reader.listQueueConsumers("other-queue"),
+    (error: unknown) => error instanceof CloudflareInventoryShapeError && error.field === "queueId",
+  );
+  assert.equal(called, false);
 });
 
 test("planned worker inspection maps bindings/routes without exposing values", async () => {
