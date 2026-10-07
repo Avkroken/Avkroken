@@ -61,3 +61,15 @@ Canonical idempotency ägs av Events.
 ## Cutover gate
 
 Provider destination flyttas inte förrän Events-consumer, Queue/DLQ, preview-isolering, shadow/parity, deployment och rollback är verifierade.
+
+
+## Preverified shadow seam
+
+Repositoryt exporterar en named `VerifiedShadowIngressService`-adapter och ren
+`acceptVerifiedShadowDelivery()`-logik. Detta är fortfarande deploy-neutralt: ingen Worker,
+Service Binding, Queue eller provider destination är konfigurerad.
+
+Shadow-input är en bounded migration-only `VerifiedShadowDeliveryV1`. Ingest validerar
+schema/timestamp/delivery identity/body-size, reducerar med samma provider reducers som den
+framtida publika callbackvägen och skriver endast `IngressMessageV1` till `EVENTS_QUEUE`.
+Provider secret/signaturvärden ingår aldrig i shadow-envelope.
