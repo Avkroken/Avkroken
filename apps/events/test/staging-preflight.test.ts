@@ -88,14 +88,13 @@ test("stale or incomplete live inventory blocks every create decision", async ()
 });
 
 test("missing required coverage key fails closed instead of proving absence", async () => {
-  const value = snapshot() as StagingInventorySnapshotV1 & {
-    coverage: Partial<StagingInventorySnapshotV1["coverage"]>;
-  };
-  delete value.coverage.queues;
+  const value = snapshot();
+  const partialCoverage = value.coverage as Partial<StagingInventorySnapshotV1["coverage"]>;
+  delete partialCoverage.queues;
 
   const result = evaluateStagingProvisioningPreflightV1(
     await plan(),
-    value as StagingInventorySnapshotV1,
+    value,
     "account-1",
     "repo-sha",
     NOW,
