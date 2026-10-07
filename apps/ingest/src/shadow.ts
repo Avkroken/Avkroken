@@ -64,6 +64,9 @@ export function normalizeVerifiedShadowDelivery(value: unknown): VerifiedShadowD
     if (source !== "notifications" && source !== "issues" && source !== "casb") {
       throw new InvalidVerifiedShadowDeliveryError("source");
     }
+    if (!deliveryId.startsWith(`cloudflare-${source}:`)) {
+      throw new InvalidVerifiedShadowDeliveryError("deliveryId.source");
+    }
     return { schemaVersion: 1, kind: "cloudflare", source, deliveryId, receivedAt, body };
   }
   throw new InvalidVerifiedShadowDeliveryError("kind");
