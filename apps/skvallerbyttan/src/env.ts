@@ -1,3 +1,8 @@
+import type {
+  VerifiedShadowDeliveryResultV1,
+  VerifiedShadowDeliveryV1,
+} from "../../../packages/observability-contracts/src/index.ts";
+
 export interface AssetsBinding {
   fetch(request: Request): Promise<Response>;
 }
@@ -45,6 +50,12 @@ export interface AvkrokenOperationsServiceBinding {
   }>;
 }
 
+export interface AvkrokenIngestShadowServiceBinding {
+  acceptVerifiedDelivery(
+    delivery: VerifiedShadowDeliveryV1,
+  ): Promise<VerifiedShadowDeliveryResultV1>;
+}
+
 export type SecretValue = string | SecretsStoreSecretBinding;
 
 export interface Env {
@@ -53,6 +64,7 @@ export interface Env {
   OBSERVABILITY?: AnalyticsEngineBinding;
   AVKROKEN_PORTAL_DOCS?: AvkrokenPortalDocsServiceBinding;
   AVKROKEN_OPERATIONS?: AvkrokenOperationsServiceBinding;
+  AVKROKEN_INGEST_SHADOW?: AvkrokenIngestShadowServiceBinding;
 
   GAMNACKEN_GITHUB_APP_CLIENT_ID: string;
   GAMNACKEN_GITHUB_APP_PRIVATE_KEY?: string;

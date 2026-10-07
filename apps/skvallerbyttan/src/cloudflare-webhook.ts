@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { scheduleVerifiedShadowDelivery } from "./shadow-ingest";
 import {
   recordCloudflareWebhookObservation,
   type CloudflareEventRecord,
@@ -144,7 +145,11 @@ function hasIssueIdentity(payload: Record<string, unknown>): boolean {
   );
 }
 
-export async function handleCloudflareNotificationsWebhook(request: Request, env: Env): Promise<Response> {
+export async function handleCloudflareNotificationsWebhook(
+  request: Request,
+  env: Env,
+  context?: ExecutionContext,
+): Promise<Response> {
   if (request.method !== "POST") {
     const result = response({ error: "method not allowed" }, 405);
     result.headers.set("Allow", "POST");
@@ -167,8 +172,9 @@ export async function handleCloudflareNotificationsWebhook(request: Request, env
     return response({ error: "invalid webhook payload" }, 400);
   }
 
+  const receivedAt = new Date().toISOString();
   const id = await deliveryId("cloudflare-notifications", notificationExplicitDeliveryId(payload), body);
-  const event = notificationEventFromPayload(payload, id);
+  const event = notificationEventFromPayload(payload, id, receivedAt);
   const isNew = await recordCloudflareWebhookObservation(
     env,
     event,
@@ -182,10 +188,22 @@ export async function handleCloudflareNotificationsWebhook(request: Request, env
   );
 
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  scheduleVerifiedShadowDelivery(env, context, {
+    schemaVersion: 1,
+    kind: "cloudflare",
+    source: "notifications",
+    deliveryId: id,
+    receivedAt,
+    body,
+  });
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }
 
-export async function handleCloudflareIssuesWebhook(request: Request, env: Env): Promise<Response> {
+export async function handleCloudflareIssuesWebhook(
+  request: Request,
+  env: Env,
+  context?: ExecutionContext,
+): Promise<Response> {
   if (request.method !== "POST") {
     const result = response({ error: "method not allowed" }, 405);
     result.headers.set("Allow", "POST");
@@ -218,19 +236,32 @@ export async function handleCloudflareIssuesWebhook(request: Request, env: Env):
     return response({ error: "invalid issue webhook payload" }, 400);
   }
 
+  const receivedAt = new Date().toISOString();
   const id = await deliveryId("cloudflare-issues", notificationExplicitDeliveryId(payload), body);
-  const event = issuesEventFromPayload(payload, id);
+  const event = issuesEventFromPayload(payload, id, receivedAt);
   const isNew = await recordCloudflareWebhookObservation(
     env,
     event,
     activityFromCloudflareWebhook(event),
   );
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  scheduleVerifiedShadowDelivery(env, context, {
+    schemaVersion: 1,
+    kind: "cloudflare",
+    source: "issues",
+    deliveryId: id,
+    receivedAt,
+    body,
+  });
 
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }
 
-export async function handleCloudflareCasbWebhook(request: Request, env: Env): Promise<Response> {
+export async function handleCloudflareCasbWebhook(
+  request: Request,
+  env: Env,
+  context?: ExecutionContext,
+): Promise<Response> {
   if (request.method !== "POST") {
     const result = response({ error: "method not allowed" }, 405);
     result.headers.set("Allow", "POST");
@@ -253,14 +284,23 @@ export async function handleCloudflareCasbWebhook(request: Request, env: Env): P
     return response({ error: "invalid webhook payload" }, 400);
   }
 
+  const receivedAt = new Date().toISOString();
   const id = await deliveryId("cloudflare-casb", clipped(payload.id, 160), body);
-  const event = casbEventFromPayload(payload, id);
+  const event = casbEventFromPayload(payload, id, receivedAt);
   const isNew = await recordCloudflareWebhookObservation(
     env,
     event,
     activityFromCloudflareWebhook(event),
   );
   if (!isNew) return response({ ok: true, duplicate: true }, 202);
+  scheduleVerifiedShadowDelivery(env, context, {
+    schemaVersion: 1,
+    kind: "cloudflare",
+    source: "casb",
+    deliveryId: id,
+    receivedAt,
+    body,
+  });
 
   return response({ ok: true, source: event.source, eventType: event.eventType }, 202);
 }

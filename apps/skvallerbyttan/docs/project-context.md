@@ -171,3 +171,15 @@ Repository-deklarerad observability-konfiguration:
 - Produktionsverifieringen kontrollerar externa observability-destinationer och de samplinggränser som repositoryt själv deklarerar.
 
 Skvallerbyttan har för närvarande ingen AI/LLM- eller Workers AI-anropsväg. Ingen artificiell `gen_ai.conversation.id`-telemetri ska skapas utan en faktisk AI-konversation.
+
+
+## Deploy-neutral Events shadow caller
+
+Koden har en optional fail-soft shadow caller för redan verifierade webhookleveranser.
+`AVKROKEN_INGEST_SHADOW` är **inte** deklarerad i `wrangler.jsonc`; utan binding är vägen no-op.
+
+När en ny canonical legacy Activity-rad har skrivits schemaläggs `VerifiedShadowDeliveryV1`
+via `ExecutionContext.waitUntil`. Shadow failure påverkar aldrig provider-ACK och loggar inte
+body/secrets. Duplicate/test/invalid deliveries mirroras inte.
+
+Den planerade framtida bindingen pekar på `ingest-staging/VerifiedShadowIngressService`.
