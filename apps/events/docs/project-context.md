@@ -70,3 +70,11 @@ closed on stale/incomplete coverage, wrong account/control-plane evidence,
 ambiguous ownership/configuration or production resource reuse.
 
 The evaluator itself performs no provider/API call and no mutation.
+
+
+## Staging inventory collector
+
+The next preflight slice uses a read-only inventory port to build
+`StagingInventorySnapshotV1`. Provider read failures degrade coverage to
+`partial`/`unavailable`; they are never interpreted as proof that a resource is absent.
+The collector exposes no create/update/delete/deploy operation.

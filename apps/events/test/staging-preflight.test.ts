@@ -130,14 +130,13 @@ test("existing D1 must have proven ownership, EU jurisdiction, disabled replicat
   assert.ok(reusedProduction.reasons.some((reason) => reason.includes("production database")));
 });
 
-test("existing source Queue may be reused only with exact retention/DLQ and zero or exact consumer", async () => {
+test("existing source Queue may be reused before consumer creation and later requires exact consumer/DLQ config", async () => {
   const value = snapshot();
   value.queues.push(
     {
       name: "avkroken-ingest-events-preview-v1-dlq",
       id: "staging-dlq",
       messageRetentionSeconds: 345600,
-      deadLetterQueue: null,
       ownershipConfirmed: true,
       consumers: [],
     },
@@ -145,7 +144,6 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
       name: "avkroken-ingest-events-preview-v1",
       id: "staging-queue",
       messageRetentionSeconds: 604800,
-      deadLetterQueue: "avkroken-ingest-events-preview-v1-dlq",
       ownershipConfirmed: true,
       consumers: [],
     },
@@ -163,6 +161,7 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
     maxBatchSize: 10,
     maxBatchTimeoutSeconds: 1,
     maxRetries: 5,
+    deadLetterQueue: "avkroken-ingest-events-preview-v1-dlq",
   }];
   value.workers.push({
     name: "events-staging",
@@ -312,7 +311,6 @@ test("existing worker deployment and bound resource IDs must match current repos
       name: "avkroken-ingest-events-preview-v1-dlq",
       id: "staging-dlq",
       messageRetentionSeconds: 345600,
-      deadLetterQueue: null,
       ownershipConfirmed: true,
       consumers: [],
     },
@@ -320,7 +318,6 @@ test("existing worker deployment and bound resource IDs must match current repos
       name: "avkroken-ingest-events-preview-v1",
       id: "staging-queue",
       messageRetentionSeconds: 604800,
-      deadLetterQueue: "avkroken-ingest-events-preview-v1-dlq",
       ownershipConfirmed: true,
       consumers: [],
     },
