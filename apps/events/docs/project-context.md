@@ -49,3 +49,14 @@ Provider IDs och bindings är extern/runtime state och får inte antas från det
 ## Migration
 
 Current `observation_events` förblir source of truth tills cutover-gaten i storage/transport-ADR:n är uppfylld. Ingen distributed dual-write correctness antas.
+
+
+## Runtime preparation
+
+`runtime-provisioning.v1.json` is the exact planned resource contract. The shadow consumer must run as persistent
+`events-staging` because Worker Previews cannot consume Queues. No runtime resource IDs are recorded until
+provisioning has been explicitly approved and verified live.
+
+`evaluateShadowCutoverGateV1` is fail-closed: insufficient observation time/traffic, parity differences, mirror
+failures, unresolved retries/DLQ, unknown/old backlog, migration drift, production-resource leakage or read mismatch
+all keep Skvallerbyttan canonical.
