@@ -33,6 +33,10 @@ The snapshot must:
 - have complete D1, Queue, Worker, control-plane and production provider-destination coverage;
 - confirm that GitHub, Cloudflare Notifications, Workers Issues and CASB destinations remain unchanged.
 
+Every required coverage category is checked explicitly. A missing serialized
+coverage key therefore fails closed rather than being interpreted as proof of
+resource absence.
+
 Partial, unavailable or unknown coverage fails closed.
 
 The snapshot must be refreshed and re-evaluated before each create-operation in
@@ -76,7 +80,8 @@ Existing staging Workers must:
 - have confirmed ownership;
 - report the exact expected repository commit for the deployed version;
 - expose no public routes during shadowing;
-- bind no secrets in this v1 staging shape;
+- bind no secrets or plain-text vars in this v1 staging shape;
+- have no unplanned KV/R2/service/other bindings or scheduled/runtime triggers;
 - never bind a production D1 or Queue;
 - bind the exact live staging D1/Queue IDs reported by the same complete inventory;
 - agree with the Queue-side consumer inventory;
