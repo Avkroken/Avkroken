@@ -45,6 +45,18 @@ function normalizeBody(value: unknown): string {
   return value;
 }
 
+function rejectUnknownFields(
+  input: Record<string, unknown>,
+  allowed: readonly string[],
+): void {
+  const allowedFields = new Set(allowed);
+  for (const field of Object.keys(input)) {
+    if (!allowedFields.has(field)) {
+      throw new InvalidVerifiedShadowDeliveryError(`delivery.${field}`);
+    }
+  }
+}
+
 export function normalizeVerifiedShadowDelivery(value: unknown): VerifiedShadowDeliveryV1 {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new InvalidVerifiedShadowDeliveryError("delivery");
@@ -57,9 +69,11 @@ export function normalizeVerifiedShadowDelivery(value: unknown): VerifiedShadowD
   const body = normalizeBody(input.body);
 
   if (kind === "github") {
+    rejectUnknownFields(input, ["schemaVersion", "kind", "deliveryId", "event", "receivedAt", "body"]);
     return { schemaVersion: 1, kind: "github", deliveryId, event: requiredString(input.event, "event", 160), receivedAt, body };
   }
   if (kind === "cloudflare") {
+    rejectUnknownFields(input, ["schemaVersion", "kind", "source", "deliveryId", "receivedAt", "body"]);
     const source = requiredString(input.source, "source", 40);
     if (source !== "notifications" && source !== "issues" && source !== "casb") {
       throw new InvalidVerifiedShadowDeliveryError("source");
