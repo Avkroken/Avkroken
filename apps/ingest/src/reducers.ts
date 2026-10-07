@@ -45,10 +45,16 @@ function actorFromGitHub(payload: Record<string, unknown>): ActorRefV1 | null {
 }
 
 function githubCapability(event: string): string {
-  if (event === "pull_request" || event === "pull_request_review" || event === "pull_request_review_comment" || event === "issues") {
+  if (event.startsWith("pull_request")) return "github.avkroken.pull_requests";
+  if (
+    event === "issues" ||
+    event === "issue_comment" ||
+    event === "issue_dependencies" ||
+    event === "related_issues"
+  ) {
     return "github.avkroken.pull_requests";
   }
-  if (event === "workflow_run" || event === "workflow_job" || event === "check_run" || event === "check_suite" || event === "status") {
+  if (event.includes("workflow") || event === "check_run" || event === "check_suite" || event === "status") {
     return "github.avkroken.actions";
   }
   if (event.includes("scanning") || event === "dependabot_alert") return "github.avkroken.security";
