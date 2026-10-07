@@ -246,6 +246,14 @@ test("row reconstruction and event detail fail closed on corrupt rows", async ()
     () => eventFromRow({ ...row, metadata_json: JSON.stringify({ nested: { value: true } }) } as never),
     CorruptEventRowError,
   );
+  assert.throws(
+    () => eventFromRow({ ...row, action: 42 } as never),
+    CorruptEventRowError,
+  );
+  assert.throws(
+    () => eventFromRow({ ...row, capability: "cloudflare.avkroken.workers" } as never),
+    CorruptEventRowError,
+  );
 });
 
 test("retention seam deletes only rows older than the 90-day cutoff", async () => {
@@ -281,6 +289,12 @@ test("legacy backfill transform preserves current Activity fields deterministica
   assert.equal(first.event.id, second.event.id);
   assert.equal(first.contentHash, second.contentHash);
   assert.equal(first.idempotencyKey, "github:delivery-legacy");
+  const normalizedIdentity = await canonicalEventFromLegacyRow({
+    ...row,
+    provider: " github ",
+    source: " webhook ",
+  });
+  assert.equal(normalizedIdentity.idempotencyKey, "github:delivery-legacy");
   assert.deepEqual(legacyActivityProjection(first.event), {
     provider: row.provider,
     capability: row.capability,
