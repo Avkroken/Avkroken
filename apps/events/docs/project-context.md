@@ -78,3 +78,12 @@ The next preflight slice uses a read-only inventory port to build
 `StagingInventorySnapshotV1`. Provider read failures degrade coverage to
 `partial`/`unavailable`; they are never interpreted as proof that a resource is absent.
 The collector exposes no create/update/delete/deploy operation.
+
+
+## Cloudflare staging inventory adapter
+
+`CloudflareStagingInventoryReaderV1` maps current Cloudflare read-only inventory
+shapes into `StagingInventoryReadPortV1` through a named server-side proxy
+contract. Worker detail inspection is allowlisted to `events-staging` and
+`ingest-staging`; the adapter never receives a token or exposes a generic
+Cloudflare API proxy.
