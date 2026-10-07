@@ -173,7 +173,8 @@ test("backfill boundary must end strictly before shadow traffic", async () => {
 test("provisioning drift from ADR values is rejected", async () => {
   const value = await plan();
   value.shadow.queue.maxRetries = 3;
-  value.shadow.database.jurisdiction = "eu";
+  value.shadow.database.jurisdiction = "us";
   const reasons = validateRuntimeProvisioningPlanV1(value);
   assert.ok(reasons.some((reason) => reason.includes("shadow.queue.maxRetries")));
+  assert.ok(reasons.some((reason) => reason.includes("shadow.database.jurisdiction")));
 });
