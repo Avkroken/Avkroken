@@ -164,6 +164,14 @@ test("runtime normalization rejects provider/source mismatch and unbounded metad
     () => normalizeIngressMessage({ ...base, metadata: { value: "x".repeat(501) } }),
     InvalidIngressMessageError,
   );
+
+  const oversizedMetadata = Object.fromEntries(
+    Array.from({ length: 32 }, (_, index) => [`key-${index}`, "x".repeat(500)]),
+  );
+  assert.throws(
+    () => normalizeIngressMessage({ ...base, metadata: oversizedMetadata }),
+    (error: unknown) => error instanceof InvalidIngressMessageError && error.field === "metadata.size",
+  );
 });
 
 test("GitHub canonical event projects to current Activity semantics", async () => {
@@ -222,7 +230,10 @@ test("Cloudflare canonical event projects to current Activity semantics", async 
 
 test("Events migration owns unique idempotency and bounded normalized JSON", async () => {
   const sql = await readFile(new URL("../migrations/0001_events.sql", import.meta.url), "utf8");
+  assert.match(sql, /schema_version INTEGER NOT NULL CHECK \(schema_version = 1\)/);
   assert.match(sql, /idempotency_key TEXT NOT NULL UNIQUE/);
+  assert.match(sql, /provider TEXT NOT NULL CHECK \(provider IN \('github', 'cloudflare'\)\)/);
+  assert.match(sql, /derived INTEGER NOT NULL CHECK \(derived IN \(0, 1\)\)/);
   assert.match(sql, /json_valid\(metadata_json\)/);
   assert.match(sql, /length\(metadata_json\) <= 16384/);
   assert.match(sql, /idx_events_capability_received/);
