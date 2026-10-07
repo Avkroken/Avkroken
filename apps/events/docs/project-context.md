@@ -60,3 +60,13 @@ provisioning has been explicitly approved and verified live.
 `evaluateShadowCutoverGateV1` is fail-closed: insufficient observation time/traffic, parity differences, mirror
 failures, unresolved retries/DLQ, unknown/old backlog, migration drift, production-resource leakage or read mismatch
 all keep Skvallerbyttan canonical.
+
+
+## Staging preflight
+
+`evaluateStagingProvisioningPreflightV1` evaluates a caller-supplied, live
+read-only inventory snapshot before any staging create operation. It fails
+closed on stale/incomplete coverage, wrong account/control-plane evidence,
+ambiguous ownership/configuration or production resource reuse.
+
+The evaluator itself performs no provider/API call and no mutation.
