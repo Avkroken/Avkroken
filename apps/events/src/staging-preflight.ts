@@ -64,6 +64,13 @@ export type StagingInventorySnapshotV1 = {
     queues: InventoryCoverageV1;
     workers: InventoryCoverageV1;
     controlPlane: InventoryCoverageV1;
+    providerDestinations: InventoryCoverageV1;
+  };
+  providerDestinations: {
+    githubUnchanged: boolean;
+    cloudflareNotificationsUnchanged: boolean;
+    cloudflareIssuesUnchanged: boolean;
+    cloudflareCasbUnchanged: boolean;
   };
   controlPlane: {
     mechanism: string;
@@ -456,6 +463,15 @@ function globalReasons(
 
   for (const [field, value] of Object.entries(snapshot.coverage)) {
     if (value !== "complete") addReason(reasons, `coverage.${field} must equal complete`);
+  }
+
+  for (const [field, value] of Object.entries(snapshot.providerDestinations)) {
+    requireEqual(
+      value,
+      true,
+      `providerDestinations.${field}`,
+      reasons,
+    );
   }
 
   requireEqual(
