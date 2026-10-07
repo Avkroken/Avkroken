@@ -60,3 +60,22 @@ exporteras till terminal, GitHub Actions eller repositoryfiler.
 Efter D1/R2-provisioneringen är lagringsdelen stateful och production-isolerad. Full providerfunktionalitet är ett
 separat steg: den kräver dedikerade previewidentiteter/targets där side effects kan ske utan productionpåverkan.
 Frånvaro av sådana credentials ska fortsätta ge fail-closed state, inte fallback till production.
+
+
+## Planned Observability extraction resources
+
+The following resources are **planned, not provisioned** as of 2026-10-07:
+
+| App | Binding/edge | Isolated resource | Runtime form | Status |
+| --- | --- | --- | --- | --- |
+| Events | `EVENTS_DB` | `avkroken-events-preview-eu` | persistent `events-staging` Worker environment | planned |
+| Ingest → Events | `EVENTS_QUEUE` | `avkroken-ingest-events-preview-v1` | producer `ingest-staging`, consumer `events-staging` | planned |
+| Ingest → Events DLQ | — | `avkroken-ingest-events-preview-v1-dlq` | no production consumer | planned |
+
+Cloudflare Worker Previews may produce Queue messages but cannot be registered as Queue consumers. Therefore the
+stateful Ingest → Events shadow pipeline uses persistent Wrangler staging environments rather than a branch Preview
+as the Queue consumer. Branch Previews must not be wired to production Queues and must not silently share this
+staging Queue during parity measurement.
+
+The exact machine-validated plan lives in `apps/events/runtime-provisioning.v1.json`. Resource IDs remain null
+until the explicit provisioning gate is approved and live providerstate has been checked.
