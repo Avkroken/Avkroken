@@ -19,6 +19,8 @@
 
 - [Jobb](../../apps/jobb/README.md)
 - [Skvallerbyttan](../../apps/skvallerbyttan/README.md)
+- [Ingest](../../apps/ingest/README.md)
+- [Events](../../apps/events/README.md)
 - Portal: `apps/portal/`
 - [Dumpen](../../apps/dumpen/README.md)
 
