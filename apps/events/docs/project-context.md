@@ -87,3 +87,12 @@ shapes into `StagingInventoryReadPortV1` through a named server-side proxy
 contract. Worker detail inspection is allowlisted to `events-staging` and
 `ingest-staging`; the adapter never receives a token or exposes a generic
 Cloudflare API proxy.
+
+
+## Staging inventory control-plane proxy
+
+The W1-backed preflight proxy is a separate operator/control-plane seam under
+`apps/events/control-plane/`, outside the Events runtime source tree. Its public
+surface is named GET-only inventory operations, and it sanitizes Cloudflare
+responses before returning them to the Events inventory adapter. No runtime
+binding/deployment exists yet.
