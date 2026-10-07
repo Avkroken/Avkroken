@@ -212,6 +212,7 @@ export async function reduceCloudflareWebhook(input: {
   source: "notifications" | "issues" | "casb";
   payload: Record<string, unknown>;
   body: string;
+  deliveryId?: string;
   receivedAt?: string;
   messageId?: string;
 }): Promise<IngressMessageV1> {
@@ -224,9 +225,11 @@ export async function reduceCloudflareWebhook(input: {
   const explicitId = input.source === "casb"
     ? text(input.payload.id, 160)
     : notificationExplicitDeliveryId(input.payload);
-  const deliveryId = explicitId
-    ? `${sourcePrefix}:${explicitId}`
-    : `${sourcePrefix}:sha256:${await sha256Hex(input.body)}`;
+  const deliveryId = input.deliveryId?.trim() || (
+    explicitId
+      ? `${sourcePrefix}:${explicitId}`
+      : `${sourcePrefix}:sha256:${await sha256Hex(input.body)}`
+  );
   const event = input.source === "casb"
     ? text(input.payload.type, 160) || "posture_finding"
     : text(input.payload.alert_type, 160) || (input.source === "issues" ? "workers_issue" : "notification");

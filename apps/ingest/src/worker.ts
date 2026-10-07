@@ -9,6 +9,7 @@ import {
   reduceCloudflareWebhook,
   reduceGitHubWebhook,
 } from "./reducers.ts";
+import { enqueueIngressMessage } from "./handoff.ts";
 import type { IngestEnv } from "./types.ts";
 
 export const CASB_AUTH_HEADER = "x-skvallerbyttan-casb-auth";
@@ -30,9 +31,8 @@ function methodNotAllowed(): Response {
 }
 
 async function handoff(env: IngestEnv, message: IngressMessageV1): Promise<Response> {
-  if (!env.EVENTS_QUEUE) return json({ error: "event handoff not configured" }, 503);
   try {
-    await env.EVENTS_QUEUE.send(message);
+    await enqueueIngressMessage(env, message);
     return json({ ok: true, accepted: true, messageId: message.messageId }, 202);
   } catch {
     return json({ error: "event handoff unavailable" }, 503);

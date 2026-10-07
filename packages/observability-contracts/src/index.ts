@@ -82,6 +82,36 @@ export interface IngressMessageV1 {
   metadata: Record<string, string | number | boolean | null>;
 }
 
+/**
+ * Migration-only internal RPC envelope.
+ * The body is transient input to Ingest reduction and must never be persisted
+ * or forwarded as canonical event metadata.
+ */
+export type VerifiedShadowDeliveryV1 =
+  | {
+      schemaVersion: 1;
+      kind: "github";
+      deliveryId: string;
+      event: string;
+      receivedAt: string;
+      body: string;
+    }
+  | {
+      schemaVersion: 1;
+      kind: "cloudflare";
+      source: "notifications" | "issues" | "casb";
+      deliveryId: string;
+      receivedAt: string;
+      body: string;
+    };
+
+export interface VerifiedShadowDeliveryResultV1 {
+  schemaVersion: 1;
+  accepted: boolean;
+  messageId: string | null;
+  idempotencyKey: string | null;
+}
+
 export type CapabilityRuntimeState = {
   status: ObservationStatus;
   permissionState: PermissionState;
