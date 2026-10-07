@@ -6,7 +6,10 @@ import type {
 } from "../../../packages/observability-contracts/src/index.ts";
 import type { Env } from "../src/env";
 import { handleGitHubWebhook } from "../src/webhook";
-import { scheduleVerifiedShadowDelivery } from "../src/shadow-ingest";
+import {
+  SHADOW_INGEST_TIMEOUT_MS,
+  scheduleVerifiedShadowDelivery,
+} from "../src/shadow-ingest";
 
 class FakeStatement {
   params: unknown[] = [];
@@ -136,6 +139,40 @@ test("shadow helper absorbs synchronous RPC throws", async () => {
     console.error = originalError;
   }
   assert.equal(JSON.stringify(errors).includes("sensitive-sync-error"), false);
+});
+
+test("shadow RPC timeout is bounded and fail-soft", async () => {
+  const delivery: VerifiedShadowDeliveryV1 = {
+    schemaVersion: 1,
+    kind: "github",
+    deliveryId: "timeout",
+    event: "push",
+    receivedAt: "2026-10-07T12:00:00.000Z",
+    body: "{}",
+  };
+  const wait = new WaitUntilCapture();
+  const errors: unknown[][] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args); };
+  try {
+    assert.equal(scheduleVerifiedShadowDelivery(
+      {
+        AVKROKEN_INGEST_SHADOW: {
+          acceptVerifiedDelivery: () => new Promise(() => undefined),
+        },
+      } as unknown as Env,
+      wait as unknown as ExecutionContext,
+      delivery,
+    ), true);
+    assert.equal(wait.tasks.length, 1);
+    const startedAt = Date.now();
+    await Promise.all(wait.tasks);
+    assert.ok(Date.now() - startedAt >= SHADOW_INGEST_TIMEOUT_MS - 100);
+    assert.ok(Date.now() - startedAt < SHADOW_INGEST_TIMEOUT_MS + 2_000);
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(JSON.stringify(errors).includes("shadow ingest timeout"), false);
 });
 
 test("shadow failure does not change GitHub provider response and does not log raw body", async () => {
