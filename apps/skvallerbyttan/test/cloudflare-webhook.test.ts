@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { VerifiedShadowDeliveryV1 } from "../../../packages/observability-contracts/src/index.ts";
 import type { Env } from "../src/env";
 import { recordCloudflareWebhookObservation } from "../src/cloudflare-events";
 import {
@@ -298,7 +299,7 @@ test("Cloudflare shadow failure remains fail-soft and does not log diagnostic bo
         CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET: "expected-secret",
         STATS_DB: db,
         AVKROKEN_INGEST_SHADOW: {
-          async acceptVerifiedDelivery(delivery) {
+          async acceptVerifiedDelivery(delivery: VerifiedShadowDeliveryV1) {
             deliveries.push(delivery);
             throw new Error("raw-sensitive-cloudflare-body");
           },
