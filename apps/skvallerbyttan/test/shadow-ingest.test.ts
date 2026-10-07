@@ -105,6 +105,39 @@ test("shadow helper is a no-op without binding or context", () => {
   );
 });
 
+test("shadow helper absorbs synchronous RPC throws", async () => {
+  const delivery: VerifiedShadowDeliveryV1 = {
+    schemaVersion: 1,
+    kind: "github",
+    deliveryId: "sync-throw",
+    event: "push",
+    receivedAt: "2026-10-07T12:00:00.000Z",
+    body: "{}",
+  };
+  const wait = new WaitUntilCapture();
+  const errors: unknown[][] = [];
+  const originalError = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args); };
+  try {
+    const scheduled = scheduleVerifiedShadowDelivery(
+      {
+        AVKROKEN_INGEST_SHADOW: {
+          acceptVerifiedDelivery() {
+            throw new Error("sensitive-sync-error");
+          },
+        },
+      } as unknown as Env,
+      wait as unknown as ExecutionContext,
+      delivery,
+    );
+    assert.equal(scheduled, true);
+    await Promise.all(wait.tasks);
+  } finally {
+    console.error = originalError;
+  }
+  assert.equal(JSON.stringify(errors).includes("sensitive-sync-error"), false);
+});
+
 test("shadow failure does not change GitHub provider response and does not log raw body", async () => {
   const body = JSON.stringify({
     organization: { login: "Avkroken" },
