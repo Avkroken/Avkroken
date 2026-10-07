@@ -9,7 +9,8 @@ export function scheduleVerifiedShadowDelivery(
   const service = env.AVKROKEN_INGEST_SHADOW;
   if (!service || !context) return false;
 
-  const task = service.acceptVerifiedDelivery(delivery)
+  const task = Promise.resolve()
+    .then(() => service.acceptVerifiedDelivery(delivery))
     .then((result) => {
       if (!result?.accepted) {
         console.error("shadow ingest delivery was not accepted", {
