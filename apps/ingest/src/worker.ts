@@ -31,6 +31,7 @@ function methodNotAllowed(): Response {
 }
 
 async function handoff(env: IngestEnv, message: IngressMessageV1): Promise<Response> {
+  if (!env.EVENTS_QUEUE) return json({ error: "event handoff not configured" }, 503);
   try {
     await enqueueIngressMessage(env, message);
     return json({ ok: true, accepted: true, messageId: message.messageId }, 202);
