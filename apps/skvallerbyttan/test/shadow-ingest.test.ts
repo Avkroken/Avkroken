@@ -185,7 +185,7 @@ test("shadow failure does not change GitHub provider response and does not log r
   const activityInsert = shadowDb.statements.find((statement) =>
     statement.sql.includes("INSERT OR IGNORE INTO observation_events")
   );
-  assert.ok(activityInsert);
+  if (!activityInsert) throw new Error("expected canonical Activity insert");
   assert.equal(activityInsert.params.at(-1), mirrored.receivedAt);
 
   assert.equal(JSON.stringify(errors).includes("raw-sensitive-shadow-body"), false);
