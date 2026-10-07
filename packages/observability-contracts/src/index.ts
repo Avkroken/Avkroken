@@ -59,6 +59,29 @@ export type Completeness = "complete" | "partial" | "unknown";
 export type IncidentStateV1 = "open" | "recovering" | "resolved";
 export type IdentityKindV1 = "user" | "machine" | "service";
 
+export type IngressSourceV1 =
+  | "github"
+  | "cloudflare_notifications"
+  | "cloudflare_issues"
+  | "cloudflare_casb";
+
+export interface IngressMessageV1 {
+  schemaVersion: 1;
+  messageId: string;
+  idempotencyKey: string;
+  provider: Provider;
+  source: IngressSourceV1;
+  capability: string;
+  event: string;
+  action: string | null;
+  receivedAt: string;
+  occurredAt: string | null;
+  resource: ResourceRefV1 | null;
+  actor: ActorRefV1 | null;
+  correlation: CorrelationV1;
+  metadata: Record<string, string | number | boolean | null>;
+}
+
 export type CapabilityRuntimeState = {
   status: ObservationStatus;
   permissionState: PermissionState;
