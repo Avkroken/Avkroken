@@ -38,8 +38,8 @@ class MemoryDb implements D1DatabaseLike {
       async run() {
         if (!/INSERT OR IGNORE INTO events/.test(sql)) throw new Error("unexpected run");
         const id = String(this.params[0]);
-        const idempotencyKey = String(this.params[1]);
-        const contentHash = String(this.params[2]);
+        const idempotencyKey = String(this.params[2]);
+        const contentHash = String(this.params[3]);
         if (db.identities.has(idempotencyKey)) return { meta: { changes: 0 } };
         db.identities.set(idempotencyKey, { id, content_hash: contentHash });
         return { meta: { changes: 1 } };
@@ -166,7 +166,10 @@ test("runtime normalization rejects provider/source mismatch and unbounded metad
   );
 
   const oversizedMetadata = Object.fromEntries(
-    Array.from({ length: 32 }, (_, index) => [`key-${index}`, "x".repeat(500)]),
+    Array.from({ length: 32 }, (_, index) => [
+      `key-${String(index).padStart(2, "0")}-${"k".repeat(70)}`,
+      "x".repeat(500),
+    ]),
   );
   assert.throws(
     () => normalizeIngressMessage({ ...base, metadata: oversizedMetadata }),
