@@ -11,7 +11,9 @@ export const OBSERVATION_STATUSES = [
   "error",
 ] as const;
 
-export const AUTH_ISSUER_V1 = "https://auth.denied.se" as const;\n\nexport const SERVICE_IDS = [
+export const AUTH_ISSUER_V1 = "https://auth.denied.se" as const;
+
+export const SERVICE_IDS = [
   "auth",
   "ingest",
   "events",
