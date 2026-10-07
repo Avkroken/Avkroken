@@ -100,7 +100,7 @@ test("failed provider list cannot be interpreted as resource absence", async () 
     evidence(),
   );
 
-  assert.equal(result.snapshot.coverage.queues, "partial");
+  assert.equal(result.snapshot.coverage.queues, "unavailable");
   assert.deepEqual(result.snapshot.queues, []);
   assert.deepEqual(result.errors, ["queues:list:TypeError"]);
   assert.equal(JSON.stringify(result).includes("secret-bearing"), false);
