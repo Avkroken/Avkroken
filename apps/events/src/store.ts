@@ -8,10 +8,15 @@ export interface D1RunResultLike {
   meta?: { changes?: number | null };
 }
 
+export interface D1ResultSetLike<T> {
+  results?: T[];
+}
+
 export interface D1StatementLike {
   bind(...values: unknown[]): D1StatementLike;
   run(): Promise<D1RunResultLike>;
   first<T>(): Promise<T | null>;
+  all<T>(): Promise<D1ResultSetLike<T>>;
 }
 
 export interface D1DatabaseLike {
@@ -21,6 +26,13 @@ export interface D1DatabaseLike {
 type ExistingEventIdentity = {
   id: string;
   content_hash: string;
+};
+
+export type CanonicalEventWrite = {
+  event: ObservationEventV1;
+  idempotencyKey: string;
+  contentHash: string;
+  firstMessageId: string;
 };
 
 export type PersistResult =
@@ -37,12 +49,11 @@ function json(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export async function persistIngressMessage(
+export async function persistCanonicalEvent(
   db: D1DatabaseLike,
-  input: unknown,
+  canonical: CanonicalEventWrite,
   persistedAt = new Date().toISOString(),
 ): Promise<PersistResult> {
-  const canonical = await canonicalEventFromIngress(input);
   const event = canonical.event;
   const result = await db.prepare(
     `INSERT OR IGNORE INTO events (
@@ -97,6 +108,14 @@ export async function persistIngressMessage(
     existingContentHash: existing.content_hash,
     incomingContentHash: canonical.contentHash,
   };
+}
+
+export async function persistIngressMessage(
+  db: D1DatabaseLike,
+  input: unknown,
+  persistedAt = new Date().toISOString(),
+): Promise<PersistResult> {
+  return persistCanonicalEvent(db, await canonicalEventFromIngress(input), persistedAt);
 }
 
 export type ProcessIngressResult =

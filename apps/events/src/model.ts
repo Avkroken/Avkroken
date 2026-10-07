@@ -5,8 +5,7 @@ import {
   type ObservationEventV1,
   type ResourceRefV1,
 } from "../../../packages/observability-contracts/src/index.ts";
-
-const encoder = new TextEncoder();
+import { canonicalContentHash, canonicalEventIdForKey } from "./identity.ts";
 const INGEST_SOURCES = new Set([
   "github",
   "cloudflare_notifications",
@@ -175,12 +174,6 @@ export function normalizeIngressMessage(value: unknown): IngressMessageV1 {
   };
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const bytes = Uint8Array.from(encoder.encode(value));
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.buffer));
-  return [...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 function sortedMetadata(
   value: Record<string, string | number | boolean | null>,
 ): Record<string, string | number | boolean | null> {
@@ -211,8 +204,8 @@ export type CanonicalizedIngress = {
 
 export async function canonicalEventFromIngress(value: unknown): Promise<CanonicalizedIngress> {
   const message = normalizeIngressMessage(value);
-  const eventId = `evt_${await sha256Hex(message.idempotencyKey)}`;
-  const contentHash = await sha256Hex(semanticFingerprint(message));
+  const eventId = await canonicalEventIdForKey(message.idempotencyKey);
+  const contentHash = await canonicalContentHash(semanticFingerprint(message));
   const event: ObservationEventV1 = {
     id: eventId,
     schemaVersion: 1,
