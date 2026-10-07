@@ -343,14 +343,22 @@ test("timeout remains active while reading a hanging response body", async () =>
   );
 });
 
-test("control-plane source contains no provider write HTTP verbs", async () => {
-  const source = await readFile(
-    new URL("../control-plane/cloudflare-staging-inventory-proxy.ts", import.meta.url),
-    "utf8",
-  );
+test("control-plane service contains no provider write HTTP verbs and entrypoint stays thin", async () => {
+  const [source, entrypoint] = await Promise.all([
+    readFile(
+      new URL("../control-plane/cloudflare-staging-inventory-proxy.ts", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../control-plane/cloudflare-staging-inventory-proxy-entrypoint.ts", import.meta.url),
+      "utf8",
+    ),
+  ]);
   assert.doesNotMatch(source, /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/);
-  assert.match(source, /extends WorkerEntrypoint/);
   assert.match(source, /method:\s*"GET"/);
+  assert.match(entrypoint, /extends WorkerEntrypoint/);
+  assert.doesNotMatch(entrypoint, /fetch\s*\(/);
+  assert.doesNotMatch(entrypoint, /https:\/\/api\.cloudflare\.com/);
 });
 
 test("credential lookup failures are sanitized before network access", async () => {
