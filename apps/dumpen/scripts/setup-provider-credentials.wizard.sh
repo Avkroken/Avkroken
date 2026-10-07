@@ -232,7 +232,7 @@ say "Verifiera Dumpens etablerade productiondeploy."
 open_url "https://dash.cloudflare.com/"
 step "Öppna Workers & Pages → dumpen → Builds/Settings."
 step "Verifiera repository Avkroken/Avkroken, branch main, root directory apps/dumpen och production command npm run deploy:workers-builds."
-step "Kräv en aktuell lyckad main production-build som kör npm run check, Worker deploy och npm run verify:production."
+step "Kräv en aktuell lyckad main production-build som kör npm run check, Worker deploy och verifierar att deployens version_id är aktiv på minst 99,99 % av produktionstrafiken via wrangler deployments status --json."
 step "GitHub Actions ska inte bära Cloudflare deploycredential eller synka runtime-secrets."
 if ! confirm "Finns en aktuell lyckad main production-build som bevisar deployidentiteten?"; then
   warn "Deployidentiteten är overifierad tills ordinarie main-build lyckas."
