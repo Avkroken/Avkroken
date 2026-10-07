@@ -85,6 +85,24 @@ jobs:
           apps/skvallerbyttan/node_modules/.bin/tsx --test apps/ingest/test/*.test.ts
           apps/skvallerbyttan/node_modules/.bin/tsc --noEmit -p apps/ingest/tsconfig.json
 
+  events:
+    name: Events
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Install shared TypeScript test toolchain
+        working-directory: apps/skvallerbyttan
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate deploy-neutral Events seam
+        run: |
+          apps/skvallerbyttan/node_modules/.bin/tsx --test apps/events/test/*.test.ts
+          apps/skvallerbyttan/node_modules/.bin/tsc --noEmit -p apps/events/tsconfig.json
+
   krosa-maja:
     name: Krosa-Maja
     runs-on: ubuntu-latest

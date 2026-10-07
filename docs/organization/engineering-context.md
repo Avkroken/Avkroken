@@ -10,12 +10,17 @@ Extern GitHub-/Cloudflare-state — exempelvis plan, aktiva rulesets, webhookkon
 
 `Avkroken/Avkroken` är ett publikt monorepository med applikationer under `apps/`.
 
-Publikt versionsstyrda applikationsytor omfattar:
+Versionsstyrda applikationsytor omfattar:
 
 - Portal,
 - Skvallerbyttan,
+- Ingest,
+- Events,
+- Spam filter,
 - Jobb,
 - Dumpen.
+
+Att koden är publik i repositoryt betyder inte att varje app har en publik runtime eller egen provisionerad providerstate. Ingest och Events är för närvarande deploy-neutrala extraction-seams.
 
 Fristående publika Avkroken-repositories har sin egen kod, dokumentation, Wiki, Issues, Discussions och CI.
 
@@ -33,7 +38,7 @@ Monorepot kan innehålla repository-lokala workflows för sina appar. Workflowfi
 
 - `pull_request_target` får inte användas för att exekvera opålitlig PR-head-kod.
 - Secrets, tokens och privata nycklar får inte dokumenteras eller loggas.
-- Provider-write ska inte införas i Skvallerbyttans observationsruntime.
+- Provider-write ska inte införas i observationsruntime för Skvallerbyttan, Ingest, Events eller efterföljande observationsmoduler.
 - Extern enforcement verifieras i GitHub i stället för att antas från dokumentation.
 
 ## Dokumentation
@@ -41,7 +46,9 @@ Monorepot kan innehålla repository-lokala workflows för sina appar. Workflowfi
 - root-README är ingång till monorepot;
 - `docs/organization/` innehåller endast monorepo-delad kontext;
 - Jobb äger sin appdokumentation under `apps/jobb/docs/`;
-- Skvallerbyttan äger sin appdokumentation under `apps/skvallerbyttan/docs/`.
+- Skvallerbyttan äger sin appdokumentation under `apps/skvallerbyttan/docs/`;
+- Ingest äger sin appdokumentation under `apps/ingest/docs/`;
+- Events äger sin appdokumentation under `apps/events/docs/`;
 - Dumpen äger sin appdokumentation under `apps/dumpen/docs/`.
 
 Fristående repositories ska inte hänvisa hit för sin egen tekniska current-state.

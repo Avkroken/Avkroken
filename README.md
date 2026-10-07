@@ -5,7 +5,9 @@ Avkrokens samlade applikationsrepository.
 ## Applikationer
 
 - `apps/portal` — avkroken.denied.se
-- `apps/skvallerbyttan` — observationslager och dashboard
+- `apps/skvallerbyttan` — nuvarande observationslager och dashboard
+- `apps/ingest` — deploy-neutral provider-ingress-seam under extraction
+- `apps/events` — deploy-neutral canonical event-ledger-seam under extraction
 - `apps/spam-filter` — inkommande e-postfilter för denied.se
 - `apps/jobb` — Jobb-applikationen
 - `apps/dumpen` — Dumpen Worker och R2-baserad lagring

@@ -6,6 +6,8 @@ Det här är dokumentationskartan för `Avkroken/Avkroken`.
 
 - [Jobb](../apps/jobb/README.md) — appens egen README och `apps/jobb/docs/`.
 - [Skvallerbyttan](../apps/skvallerbyttan/README.md) — appens egen README och `apps/skvallerbyttan/docs/`.
+- [Ingest](../apps/ingest/README.md) — deploy-neutral ingress-seam och `apps/ingest/docs/`.
+- [Events](../apps/events/README.md) — deploy-neutral event-ledger-seam och `apps/events/docs/`.
 - [Spam filter](../apps/spam-filter/README.md) — inkommande Email Routing-filter för `denied.se`.
 - [Portal](../apps/portal/README.md) — appens egen README och `apps/portal/docs/`.
 - [Dumpen](../apps/dumpen/README.md) — appens egen README och `apps/dumpen/docs/`.
