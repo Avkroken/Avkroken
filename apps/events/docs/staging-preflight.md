@@ -69,9 +69,12 @@ before shadow activation.
 Existing staging Workers must:
 
 - have confirmed ownership;
+- report the exact expected repository commit for the deployed version;
 - expose no public routes during shadowing;
 - bind no secrets in this v1 staging shape;
 - never bind a production D1 or Queue;
+- bind the exact live staging D1/Queue IDs reported by the same complete inventory;
+- agree with the Queue-side consumer inventory;
 - have only the bounded role-appropriate staging bindings.
 
 ## Production isolation
