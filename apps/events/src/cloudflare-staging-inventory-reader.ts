@@ -184,6 +184,15 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
   async listQueueConsumers(queueId: string): Promise<ProviderQueueConsumerInventoryV1[]> {
     if (!queueId.trim()) throw new CloudflareInventoryShapeError("queueId");
+    const queues = await this.loadQueues();
+    const queue = queues.find((item) => item.id === queueId);
+    const allowedNames = new Set([
+      this.plan.shadow.queue.name,
+      this.plan.shadow.queue.deadLetterQueue,
+    ]);
+    if (!queue || !allowedNames.has(queue.name)) {
+      throw new CloudflareInventoryShapeError("queueId");
+    }
     const raw = directArrayResult(
       await this.proxy.listQueueConsumers(queueId),
       "queues.consumers",
