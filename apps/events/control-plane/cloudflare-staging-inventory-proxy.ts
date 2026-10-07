@@ -1,3 +1,4 @@
+import { WorkerEntrypoint } from "cloudflare:workers";
 import type {
   CloudflareStagingInventoryProxyV1,
   CloudflareWorkerInspectionPayloadV1,
@@ -267,59 +268,61 @@ implements CloudflareStagingInventoryProxyV1 {
     query: URLSearchParams = new URLSearchParams(),
   ): Promise<{ result: unknown; resultInfo: UnknownRecord | null }> {
     const url = new URL(`${CLOUDFLARE_API_BASE}${path}`);
-    for (const [key, value] of query) url.searchParams.append(key, value);
+    query.forEach((value, key) => url.searchParams.append(key, value));
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs);
-    let response: Response;
     try {
-      response = await this.fetcher(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        signal: controller.signal,
-      });
-    } catch {
-      throw new CloudflareControlPlaneReadError(operation, "network");
+      let response: Response;
+      try {
+        response = await this.fetcher(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+      } catch {
+        throw new CloudflareControlPlaneReadError(operation, "network");
+      }
+
+      if (!response.ok) {
+        throw new CloudflareControlPlaneReadError(operation, `http_${response.status}`);
+      }
+
+      const declaredLength = Number(response.headers.get("content-length"));
+      if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
+        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
+      }
+
+      let body: string;
+      try {
+        body = await response.text();
+      } catch {
+        throw new CloudflareControlPlaneReadError(operation, "body_read");
+      }
+      if (new TextEncoder().encode(body).byteLength > MAX_RESPONSE_BYTES) {
+        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
+      }
+
+      let parsed: UnknownRecord;
+      try {
+        parsed = record(JSON.parse(body), operation);
+      } catch (error) {
+        if (error instanceof CloudflareControlPlaneReadError) throw error;
+        throw new CloudflareControlPlaneReadError(operation, "invalid_json");
+      }
+      if (parsed.success !== true || !Object.prototype.hasOwnProperty.call(parsed, "result")) {
+        throw new CloudflareControlPlaneReadError(operation, "provider_failure");
+      }
+      return {
+        result: parsed.result,
+        resultInfo: resultInfo(parsed.result_info),
+      };
     } finally {
       clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      throw new CloudflareControlPlaneReadError(operation, `http_${response.status}`);
-    }
-
-    const declaredLength = Number(response.headers.get("content-length"));
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
-      throw new CloudflareControlPlaneReadError(operation, "response_too_large");
-    }
-
-    let body: string;
-    try {
-      body = await response.text();
-    } catch {
-      throw new CloudflareControlPlaneReadError(operation, "body_read");
-    }
-    if (new TextEncoder().encode(body).byteLength > MAX_RESPONSE_BYTES) {
-      throw new CloudflareControlPlaneReadError(operation, "response_too_large");
-    }
-
-    let parsed: UnknownRecord;
-    try {
-      parsed = record(JSON.parse(body), operation);
-    } catch (error) {
-      if (error instanceof CloudflareControlPlaneReadError) throw error;
-      throw new CloudflareControlPlaneReadError(operation, "invalid_json");
-    }
-    if (parsed.success !== true || !Object.prototype.hasOwnProperty.call(parsed, "result")) {
-      throw new CloudflareControlPlaneReadError(operation, "provider_failure");
-    }
-    return {
-      result: parsed.result,
-      resultInfo: resultInfo(parsed.result_info),
-    };
   }
 
   private async pagedArray(
@@ -363,6 +366,9 @@ implements CloudflareStagingInventoryProxyV1 {
   ): Promise<unknown[]> {
     const first = await this.getEnvelope(token, operation, path);
     const items = array(first.result, operation);
+    if (items.length > MAX_LIST_ITEMS) {
+      throw new CloudflareControlPlaneReadError(operation, "too_many_items");
+    }
     const info = first.resultInfo;
     const totalPages = number(info?.total_pages);
     const totalCount = number(info?.total_count);
@@ -586,5 +592,40 @@ implements CloudflareStagingInventoryProxyV1 {
       schedules: sanitizeSchedules(schedulesEnvelope.result),
       routes,
     };
+  }
+}
+
+
+export class CloudflareStagingInventoryProxyEntrypoint
+extends WorkerEntrypoint<CloudflareStagingInventoryProxyEnvV1>
+implements CloudflareStagingInventoryProxyV1 {
+  private service(): CloudflareStagingInventoryProxyServiceV1 {
+    return new CloudflareStagingInventoryProxyServiceV1(this.env);
+  }
+
+  listD1Databases(): Promise<unknown> {
+    return this.service().listD1Databases();
+  }
+
+  getD1Database(databaseId: string): Promise<unknown> {
+    return this.service().getD1Database(databaseId);
+  }
+
+  listQueues(): Promise<unknown> {
+    return this.service().listQueues();
+  }
+
+  listQueueConsumers(queueId: string): Promise<unknown> {
+    return this.service().listQueueConsumers(queueId);
+  }
+
+  listWorkers(): Promise<unknown> {
+    return this.service().listWorkers();
+  }
+
+  inspectPlannedWorker(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<CloudflareWorkerInspectionPayloadV1> {
+    return this.service().inspectPlannedWorker(workerName);
   }
 }
