@@ -46,6 +46,7 @@ export type StagingInventoryQueueBindingV1 = {
 
 export type StagingInventoryWorkerV1 = {
   name: string;
+  deploymentCommitSha: string | null;
   ownershipConfirmed: boolean;
   publicRoutes: string[];
   secretBindings: string[];
@@ -317,6 +318,7 @@ function workerDecision(
   snapshot: StagingInventorySnapshotV1,
   plan: RuntimeProvisioningPlanV1,
   expectedRole: "events" | "ingest",
+  expectedRepositorySha: string,
 ): StagingPreflightResourceDecisionV1 {
   const name = expectedRole === "events" ? plan.shadow.eventsWorker : plan.shadow.ingestWorker;
   const reasons: string[] = [];
@@ -329,6 +331,12 @@ function workerDecision(
 
   const worker = matches[0];
   if (!worker.ownershipConfirmed) addReason(reasons, "worker.ownershipConfirmed must be true");
+  requireEqual(
+    worker.deploymentCommitSha,
+    expectedRepositorySha,
+    "worker.deploymentCommitSha",
+    reasons,
+  );
   if (snapshot.production.workerNames.includes(worker.name)) {
     addReason(reasons, "staging worker name must not be classified as a production worker");
   }
@@ -342,10 +350,89 @@ function workerDecision(
   };
 }
 
+
+function crossResourceReasons(
+  snapshot: StagingInventorySnapshotV1,
+  plan: RuntimeProvisioningPlanV1,
+): string[] {
+  const reasons: string[] = [];
+  const databases = matching(snapshot.databases, plan.shadow.database.name);
+  const sourceQueues = matching(snapshot.queues, plan.shadow.queue.name);
+  const dlqs = matching(snapshot.queues, plan.shadow.queue.deadLetterQueue);
+  const eventWorkers = matching(snapshot.workers, plan.shadow.eventsWorker);
+  const ingestWorkers = matching(snapshot.workers, plan.shadow.ingestWorker);
+
+  const database = databases.length === 1 ? databases[0] : null;
+  const sourceQueue = sourceQueues.length === 1 ? sourceQueues[0] : null;
+  const dlq = dlqs.length === 1 ? dlqs[0] : null;
+  const eventWorker = eventWorkers.length === 1 ? eventWorkers[0] : null;
+  const ingestWorker = ingestWorkers.length === 1 ? ingestWorkers[0] : null;
+
+  if (sourceQueue && sourceQueue.deadLetterQueue === plan.shadow.queue.deadLetterQueue && !dlq) {
+    addReason(reasons, "source queue references planned DLQ but complete inventory says the DLQ is absent");
+  }
+
+  if (eventWorker) {
+    for (const binding of eventWorker.d1Bindings) {
+      if (binding.databaseName !== plan.shadow.database.name) continue;
+      if (!database) {
+        addReason(reasons, "events worker references planned staging database but complete inventory says it is absent");
+      } else if (binding.databaseId !== database.id) {
+        addReason(reasons, "events worker D1 binding ID must match inventoried staging database ID");
+      }
+    }
+
+    for (const binding of eventWorker.queueConsumerBindings) {
+      if (binding.queueName !== plan.shadow.queue.name) continue;
+      if (!sourceQueue) {
+        addReason(reasons, "events worker references planned staging queue but complete inventory says it is absent");
+      } else if (binding.queueId !== sourceQueue.id) {
+        addReason(reasons, "events worker queue binding ID must match inventoried staging queue ID");
+      }
+    }
+  }
+
+  if (ingestWorker) {
+    for (const binding of ingestWorker.queueProducerBindings) {
+      if (binding.queueName !== plan.shadow.queue.name) continue;
+      if (!sourceQueue) {
+        addReason(reasons, "ingest worker references planned staging queue but complete inventory says it is absent");
+      } else if (binding.queueId !== sourceQueue.id) {
+        addReason(reasons, "ingest worker queue binding ID must match inventoried staging queue ID");
+      }
+    }
+  }
+
+  if (sourceQueue?.consumers.length === 1) {
+    if (!eventWorker) {
+      addReason(reasons, "source queue has an events-staging consumer but complete worker inventory says events-staging is absent");
+    } else {
+      const workerBindings = eventWorker.queueConsumerBindings.filter(
+        (binding) => binding.queueName === plan.shadow.queue.name,
+      );
+      if (workerBindings.length !== 1) {
+        addReason(reasons, "source queue consumer and events worker queue binding must agree");
+      }
+    }
+  }
+
+  if (
+    sourceQueue?.consumers.length === 0
+    && eventWorker?.queueConsumerBindings.some(
+      (binding) => binding.queueName === plan.shadow.queue.name,
+    )
+  ) {
+    addReason(reasons, "events worker queue binding exists while source queue inventory has no consumer");
+  }
+
+  return reasons;
+}
+
 function globalReasons(
   plan: RuntimeProvisioningPlanV1,
   snapshot: StagingInventorySnapshotV1,
   expectedAccountId: string,
+  expectedRepositorySha: string,
   nowMs: number,
 ): string[] {
   const reasons = validateRuntimeProvisioningPlanV1(plan).map((reason) => `plan.${reason}`);
@@ -353,6 +440,7 @@ function globalReasons(
   if (snapshot.schemaVersion !== 1) addReason(reasons, "snapshot.schemaVersion must equal 1");
   if (!nonEmpty(expectedAccountId)) addReason(reasons, "expectedAccountId must be known");
   if (snapshot.accountId !== expectedAccountId) addReason(reasons, "snapshot.accountId does not match expected account");
+  if (!nonEmpty(expectedRepositorySha)) addReason(reasons, "expectedRepositorySha must be known");
 
   const observedAtMs = Date.parse(snapshot.observedAt);
   if (!Number.isFinite(observedAtMs)) {
@@ -408,9 +496,17 @@ export function evaluateStagingProvisioningPreflightV1(
   plan: RuntimeProvisioningPlanV1,
   snapshot: StagingInventorySnapshotV1,
   expectedAccountId: string,
+  expectedRepositorySha: string,
   nowMs = Date.now(),
 ): StagingPreflightResultV1 {
-  const reasons = globalReasons(plan, snapshot, expectedAccountId, nowMs);
+  const reasons = globalReasons(
+    plan,
+    snapshot,
+    expectedAccountId,
+    expectedRepositorySha,
+    nowMs,
+  );
+  for (const reason of crossResourceReasons(snapshot, plan)) addReason(reasons, reason);
   const resources: StagingPreflightResourceDecisionV1[] = [
     databaseDecision(
       snapshot,
@@ -420,8 +516,8 @@ export function evaluateStagingProvisioningPreflightV1(
     ),
     dlqDecision(snapshot, plan.shadow.queue.deadLetterQueue),
     sourceQueueDecision(snapshot, plan),
-    workerDecision(snapshot, plan, "events"),
-    workerDecision(snapshot, plan, "ingest"),
+    workerDecision(snapshot, plan, "events", expectedRepositorySha),
+    workerDecision(snapshot, plan, "ingest", expectedRepositorySha),
   ];
 
   for (const resource of resources) {
