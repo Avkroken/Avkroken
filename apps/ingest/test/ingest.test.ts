@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { IngressMessageV1 } from "../../../packages/observability-contracts/src/index.ts";
+import { reduceGitHubWebhook } from "../src/reducers.ts";
 import { handleIngestRequest } from "../src/worker.ts";
 import type { IngestEnv, QueueProducerLike } from "../src/types.ts";
 import { verifyGitHubSignature } from "../src/crypto.ts";
@@ -81,6 +82,37 @@ test("valid GitHub webhook is reduced and handed off without raw payload", async
   const serialized = JSON.stringify(message);
   assert.equal(serialized.includes("must-never-leave-ingest"), false);
   assert.equal(serialized.includes('"secret"'), false);
+});
+
+test("GitHub capability families preserve the canonical Skvallerbyttan mapper", () => {
+  for (const event of [
+    "pull_request",
+    "pull_request_review",
+    "pull_request_review_comment",
+    "pull_request_review_thread",
+    "issues",
+    "issue_comment",
+    "issue_dependencies",
+    "related_issues",
+  ]) {
+    assert.equal(reduceGitHubWebhook({
+      deliveryId: `delivery-${event}`,
+      event,
+      payload: { repository: { name: "Avkroken", owner: { login: "Avkroken" } } },
+      receivedAt: "2026-10-07T09:00:00.000Z",
+      messageId: `message-${event}`,
+    }).capability, "github.avkroken.pull_requests");
+  }
+
+  for (const event of ["workflow_run", "workflow_job", "check_run", "check_suite", "status"]) {
+    assert.equal(reduceGitHubWebhook({
+      deliveryId: `delivery-${event}`,
+      event,
+      payload: { repository: { name: "Avkroken", owner: { login: "Avkroken" } } },
+      receivedAt: "2026-10-07T09:00:00.000Z",
+      messageId: `message-${event}`,
+    }).capability, "github.avkroken.actions");
+  }
 });
 
 test("GitHub rejects invalid signature and ignores a different owner", async () => {
