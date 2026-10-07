@@ -46,6 +46,10 @@ export interface StagingInventoryReadPortV1 {
 export type StagingInventoryEvidenceV1 = {
   observedAt: string;
   accountId: string;
+  coverage: {
+    controlPlane: InventoryCoverageV1;
+    providerDestinations: InventoryCoverageV1;
+  };
   controlPlane: StagingInventorySnapshotV1["controlPlane"];
   providerDestinations: StagingInventorySnapshotV1["providerDestinations"];
   production: StagingInventorySnapshotV1["production"];
@@ -197,8 +201,8 @@ export async function collectStagingInventorySnapshotV1(
         d1: coverageFromErrors(errors, "d1:"),
         queues: coverageFromErrors(errors, "queues:"),
         workers: coverageFromErrors(errors, "workers:"),
-        controlPlane: "complete",
-        providerDestinations: "complete",
+        controlPlane: evidence.coverage.controlPlane,
+        providerDestinations: evidence.coverage.providerDestinations,
       },
       providerDestinations: { ...evidence.providerDestinations },
       controlPlane: { ...evidence.controlPlane },
