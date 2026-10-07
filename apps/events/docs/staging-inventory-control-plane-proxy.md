@@ -14,8 +14,11 @@ this control-plane service only. Events itself must never receive W1.
 
 ## Named RPC surface
 
-The exported RPC entrypoint is `CloudflareStagingInventoryProxyEntrypoint`.
-It wraps the pure `CloudflareStagingInventoryProxyServiceV1` and implements only:
+The exported RPC entrypoint is `CloudflareStagingInventoryProxyEntrypoint` in
+`cloudflare-staging-inventory-proxy-entrypoint.ts`. It is deliberately a thin
+Cloudflare-runtime wrapper around the pure, Node-testable
+`CloudflareStagingInventoryProxyServiceV1`; all provider HTTP and sanitization
+logic remains in the pure service. The entrypoint implements only:
 
 - `listD1Databases()`;
 - `getD1Database(databaseId)`, allowlisted to `avkroken-events-preview-eu`;
