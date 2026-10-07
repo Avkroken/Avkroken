@@ -25,7 +25,9 @@ export async function verifyGitHubSignature(
     false,
     ["verify"],
   );
-  return crypto.subtle.verify("HMAC", key, provided, encoder.encode(body));
+  const signatureBytes = Uint8Array.from(provided);
+  const bodyBytes = Uint8Array.from(encoder.encode(body));
+  return crypto.subtle.verify("HMAC", key, signatureBytes.buffer, bodyBytes.buffer);
 }
 
 export function secureEqual(left: string | null, right: string): boolean {
