@@ -87,6 +87,24 @@ test("stale or incomplete live inventory blocks every create decision", async ()
   assert.ok(result.resources.every((item) => item.action === "blocked"));
 });
 
+test("missing required coverage key fails closed instead of proving absence", async () => {
+  const value = snapshot() as StagingInventorySnapshotV1 & {
+    coverage: Partial<StagingInventorySnapshotV1["coverage"]>;
+  };
+  delete value.coverage.queues;
+
+  const result = evaluateStagingProvisioningPreflightV1(
+    await plan(),
+    value as StagingInventorySnapshotV1,
+    "account-1",
+    "repo-sha",
+    NOW,
+  );
+  assert.equal(result.ready, false);
+  assert.ok(result.reasons.some((reason) => reason.includes("coverage.queues")));
+  assert.ok(result.resources.every((item) => item.action === "blocked"));
+});
+
 test("existing D1 must have proven ownership, EU jurisdiction, disabled replication and unique identity", async () => {
   const value = snapshot();
   value.databases.push({
@@ -153,6 +171,9 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
     ownershipConfirmed: true,
     publicRoutes: [],
     secretBindings: [],
+    plainTextVars: [],
+    otherBindings: [],
+    triggers: [],
     d1Bindings: [],
     queueProducerBindings: [],
     queueConsumerBindings: [{
@@ -177,6 +198,9 @@ test("staging workers fail closed on public routes, provider secrets or producti
     ownershipConfirmed: true,
     publicRoutes: [],
     secretBindings: [],
+    plainTextVars: [],
+    otherBindings: [],
+    triggers: [],
     d1Bindings: [{ binding: "EVENTS_DB", databaseId: "prod-db", databaseName: "avkroken-events-preview-eu" }],
     queueProducerBindings: [],
     queueConsumerBindings: [{
@@ -190,6 +214,9 @@ test("staging workers fail closed on public routes, provider secrets or producti
     ownershipConfirmed: true,
     publicRoutes: ["ingest-staging.example.invalid"],
     secretBindings: ["SKVALLERBYTTAN_WEBHOOK_SECRET"],
+    plainTextVars: [],
+    otherBindings: [],
+    triggers: [],
     d1Bindings: [],
     queueProducerBindings: [{
       binding: "EVENTS_QUEUE",
@@ -243,6 +270,35 @@ test("duplicate planned names and wrong account/control-plane evidence block pro
 });
 
 
+test("existing staging worker rejects unplanned bindings, vars and triggers", async () => {
+  const value = snapshot();
+  value.workers.push({
+    name: "events-staging",
+    deploymentCommitSha: "repo-sha",
+    ownershipConfirmed: true,
+    publicRoutes: [],
+    secretBindings: [],
+    plainTextVars: ["UNPLANNED_FLAG"],
+    otherBindings: [{ type: "service", name: "UNPLANNED_SERVICE" }],
+    triggers: ["0 * * * *"],
+    d1Bindings: [],
+    queueProducerBindings: [],
+    queueConsumerBindings: [],
+  });
+
+  const result = evaluateStagingProvisioningPreflightV1(
+    await plan(),
+    value,
+    "account-1",
+    "repo-sha",
+    NOW,
+  );
+  assert.equal(result.ready, false);
+  for (const fragment of ["worker.plainTextVars", "worker.otherBindings", "worker.triggers"]) {
+    assert.ok(result.reasons.some((reason) => reason.includes(fragment)), fragment);
+  }
+});
+
 test("existing worker deployment and bound resource IDs must match current repository and inventory", async () => {
   const value = snapshot();
   value.databases.push({
@@ -276,6 +332,9 @@ test("existing worker deployment and bound resource IDs must match current repos
     ownershipConfirmed: true,
     publicRoutes: [],
     secretBindings: [],
+    plainTextVars: [],
+    otherBindings: [],
+    triggers: [],
     d1Bindings: [{
       binding: "EVENTS_DB",
       databaseId: "other-db",
