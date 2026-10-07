@@ -46,13 +46,14 @@ export async function persistIngressMessage(
   const event = canonical.event;
   const result = await db.prepare(
     `INSERT OR IGNORE INTO events (
-       id, idempotency_key, content_hash, provider, capability, source, coverage,
-       event, action, resource_type, resource_id, repository, occurred_at, received_at,
+       id, schema_version, idempotency_key, content_hash, provider, capability, source, coverage,
+       event, action, derived, resource_type, resource_id, repository, occurred_at, received_at,
        resource_json, actor_json, correlation_json, provenance_json, metadata_json,
        first_message_id, persisted_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     event.id,
+    event.schemaVersion,
     canonical.idempotencyKey,
     canonical.contentHash,
     event.provider,
@@ -61,6 +62,7 @@ export async function persistIngressMessage(
     event.provenance.coverage,
     event.event,
     event.action,
+    event.derived ? 1 : 0,
     event.resource?.type ?? null,
     event.resource?.id ?? null,
     event.resource?.repository ?? null,
