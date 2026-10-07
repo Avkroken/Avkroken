@@ -30,9 +30,14 @@ The snapshot must:
 - be schema version 1;
 - target the explicitly expected Cloudflare account;
 - be no older than 15 minutes;
-- have complete D1, Queue, Worker and control-plane coverage.
+- have complete D1, Queue, Worker, control-plane and production provider-destination coverage;
+- confirm that GitHub, Cloudflare Notifications, Workers Issues and CASB destinations remain unchanged.
 
 Partial, unavailable or unknown coverage fails closed.
+
+The snapshot must be refreshed and re-evaluated before each create-operation in
+the provisioning sequence; a previous `ready` result is not a lease over future
+provider state.
 
 ## Control-plane evidence
 
