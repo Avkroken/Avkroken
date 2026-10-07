@@ -4,22 +4,22 @@ export const STANDARD_VOLUME_EVENTS = 20;
 export const MAX_QUEUE_BACKLOG_AGE_SECONDS = 60;
 
 export type RuntimeProvisioningPlanV1 = {
-  schemaVersion: 1;
-  status: "planned" | "provisioned";
+  schemaVersion: number;
+  status: string;
   cloudflare: {
     accountBinding: string;
     wranglerMinimum: string;
   };
   production: RuntimeTargetV1;
   shadow: RuntimeTargetV1 & {
-    mode: "persistent_staging_environment";
+    mode: string;
     source: {
-      canonicalWorker: "skvallerbyttan";
-      serviceBinding: "AVKROKEN_INGEST_SHADOW";
-      targetWorker: "ingest-staging";
-      entrypoint: "VerifiedShadowIngressService";
-      providerSecretsRequired: false;
-      failSoft: true;
+      canonicalWorker: string;
+      serviceBinding: string;
+      targetWorker: string;
+      entrypoint: string;
+      providerSecretsRequired: boolean;
+      failSoft: boolean;
     };
   };
 };
@@ -28,21 +28,21 @@ export type RuntimeTargetV1 = {
   eventsWorker: string;
   ingestWorker: string;
   database: {
-    binding: "EVENTS_DB";
+    binding: string;
     name: string;
-    jurisdiction: "eu";
-    readReplication: "disabled";
+    jurisdiction: string;
+    readReplication: string;
     databaseId: string | null;
   };
   queue: {
-    producerBinding: "EVENTS_QUEUE";
+    producerBinding: string;
     name: string;
     deadLetterQueue: string;
-    messageRetentionSeconds: 604800;
+    messageRetentionSeconds: number;
     consumerWorker: string;
-    maxBatchSize: 10;
-    maxBatchTimeoutSeconds: 1;
-    maxRetries: 5;
+    maxBatchSize: number;
+    maxBatchTimeoutSeconds: number;
+    maxRetries: number;
   };
 };
 
@@ -139,6 +139,9 @@ export function validateRuntimeProvisioningPlanV1(plan: RuntimeProvisioningPlanV
   const reasons: string[] = [];
   if (plan.schemaVersion !== 1) reasons.push("schemaVersion must be 1");
   if (plan.status !== "planned" && plan.status !== "provisioned") reasons.push("status is invalid");
+  if (plan.cloudflare.wranglerMinimum !== "4.135.0") {
+    reasons.push("cloudflare.wranglerMinimum must remain 4.135.0");
+  }
   if (plan.cloudflare.accountBinding !== "CLOUDFLARE_ACCOUNT_ID") {
     reasons.push("cloudflare.accountBinding must remain CLOUDFLARE_ACCOUNT_ID");
   }
@@ -206,13 +209,16 @@ export function evaluateShadowCutoverGateV1(
 
   const from = parseIso(evidence.window.from, "window.from", reasons);
   const to = parseIso(evidence.window.to, "window.to", reasons);
-  parseIso(evidence.generatedAt, "generatedAt", reasons);
+  const generatedAt = parseIso(evidence.generatedAt, "generatedAt", reasons);
 
   const actualShadowHours = Number.isFinite(from) && Number.isFinite(to)
     ? Math.max(0, (to - from) / 3_600_000)
     : 0;
   if (Number.isFinite(from) && Number.isFinite(to) && from >= to) {
     reasons.push("window.to must be after window.from");
+  }
+  if (Number.isFinite(generatedAt) && Number.isFinite(to) && generatedAt < to) {
+    reasons.push("generatedAt must not be before window.to");
   }
 
   const canonicalCount = evidence.parity.canonicalCount;
@@ -262,6 +268,7 @@ export function evaluateShadowCutoverGateV1(
   requireEqual(evidence.queue.backlogKnown, true, "queue.backlogKnown", reasons);
   requireEqual(evidence.queue.unresolvedRetries, 0, "queue.unresolvedRetries", reasons);
   requireEqual(evidence.queue.dlqCount, 0, "queue.dlqCount", reasons);
+  requireEqual(evidence.queue.inserted, canonicalCount, "queue.inserted", reasons);
   requireEqual(
     evidence.queue.inserted + evidence.queue.duplicates,
     evidence.queue.accepted,
