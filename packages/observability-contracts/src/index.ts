@@ -11,7 +11,7 @@ export const OBSERVATION_STATUSES = [
   "error",
 ] as const;
 
-export const SERVICE_IDS = [
+export const AUTH_ISSUER_V1 = "https://auth.denied.se" as const;\n\nexport const SERVICE_IDS = [
   "auth",
   "ingest",
   "events",
@@ -252,7 +252,7 @@ export interface AggregateV1<TSections extends Record<string, SectionResultV1<un
 
 export interface AuthClaimsV1 {
   v: 1;
-  iss: "https://auth.denied.se";
+  iss: typeof AUTH_ISSUER_V1;
   sub: string;
   kind: IdentityKindV1;
   aud: string | string[];
@@ -329,7 +329,7 @@ export function authClaimsAllow(
   nowSeconds = Math.floor(Date.now() / 1000),
 ): boolean {
   const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (claims.iss !== "https://auth.denied.se") return false;
+  if (claims.iss !== AUTH_ISSUER_V1) return false;
   if (!audiences.includes(audience)) return false;
   if (claims.nbf !== undefined && claims.nbf > nowSeconds) return false;
   if (claims.iat > nowSeconds + 60) return false;

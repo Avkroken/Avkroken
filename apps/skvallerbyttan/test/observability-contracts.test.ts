@@ -82,7 +82,7 @@ test("page limits clamp untrusted values", () => {
 test("auth claims require issuer, audience, expiry and every requested scope", () => {
   const claims: AuthClaimsV1 = {
     v: 1,
-    iss: "https://auth.denied.se",
+    iss: AUTH_ISSUER_V1,
     sub: "machine:chatgpt",
     kind: "machine",
     aud: ["api"],
