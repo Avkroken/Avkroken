@@ -48,6 +48,9 @@ class MemoryDb implements D1DatabaseLike {
         if (!/SELECT id, content_hash FROM events/.test(sql)) throw new Error("unexpected first");
         return (db.identities.get(String(this.params[0])) ?? null) as T | null;
       }
+      async all<T>() {
+        return { results: [] as T[] };
+      }
     }();
   }
 }
