@@ -11,6 +11,8 @@ export interface QueueBatchLike<T> {
   messages: QueueMessageLike<T>[];
 }
 
+export const MAX_INGRESS_BATCH_SIZE = 10;
+
 export type BatchProcessSummary = {
   processed: number;
   inserted: number;
@@ -22,6 +24,9 @@ export async function processIngressQueueBatch(
   db: D1DatabaseLike,
   batch: QueueBatchLike<IngressMessageV1>,
 ): Promise<{ summary: BatchProcessSummary; results: ProcessIngressResult[] }> {
+  if (batch.messages.length > MAX_INGRESS_BATCH_SIZE) {
+    throw new RangeError("ingress batch exceeds configured maximum");
+  }
   const summary: BatchProcessSummary = {
     processed: 0,
     inserted: 0,
