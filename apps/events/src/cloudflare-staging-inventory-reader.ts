@@ -259,7 +259,7 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
     const secretBindings: string[] = [];
     const plainTextVars: string[] = [];
-    const otherBindings: string[] = [];
+    const otherBindings: ProviderWorkerInspectionV1["otherBindings"] = [];
     const d1Bindings: ProviderWorkerInspectionV1["d1Bindings"] = [];
     const queueProducerBindings: ProviderWorkerInspectionV1["queueProducerBindings"] = [];
 
@@ -308,7 +308,7 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
         continue;
       }
 
-      otherBindings.push(`${type}:${bindingName}`);
+      otherBindings.push({ type, name: bindingName });
     }
 
     const references = worker.references == null
@@ -386,7 +386,15 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
       publicRoutes: [...new Set(publicRoutes)].sort(),
       secretBindings: [...new Set(secretBindings)].sort(),
       plainTextVars: [...new Set(plainTextVars)].sort(),
-      otherBindings: [...new Set(otherBindings)].sort(),
+      otherBindings: otherBindings
+        .filter((binding, index, values) =>
+          values.findIndex((candidate) =>
+            candidate.type === binding.type && candidate.name === binding.name
+          ) === index
+        )
+        .sort((left, right) =>
+          left.type.localeCompare(right.type) || left.name.localeCompare(right.name)
+        ),
       triggers: [...new Set(triggers)].sort(),
       d1Bindings,
       queueProducerBindings,
