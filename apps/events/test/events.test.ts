@@ -48,6 +48,9 @@ class MemoryDb implements D1DatabaseLike {
         if (!/SELECT id, content_hash FROM events/.test(sql)) throw new Error("unexpected first");
         return (db.identities.get(String(this.params[0])) ?? null) as T | null;
       }
+      async all<T>() {
+        return { results: [] as T[] };
+      }
     }();
   }
 }
@@ -239,5 +242,7 @@ test("Events migration owns unique idempotency and bounded normalized JSON", asy
   assert.match(sql, /derived INTEGER NOT NULL CHECK \(derived IN \(0, 1\)\)/);
   assert.match(sql, /json_valid\(metadata_json\)/);
   assert.match(sql, /length\(metadata_json\) <= 16384/);
+  assert.match(sql, /idx_events_received_keyset/);
+  assert.match(sql, /ON events\(received_at DESC, id DESC\)/);
   assert.match(sql, /idx_events_capability_received/);
 });

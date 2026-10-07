@@ -34,7 +34,10 @@ Den första seamen implementerar:
 4. unique insert på `idempotency_key`;
 5. duplicate = idempotent success;
 6. samma idempotency key + annan semantic payload = conflict;
-7. compatibility-projection mot dagens Activity-fält.
+7. compatibility-projection mot dagens Activity-fält;
+8. bounded keyset-paginerad read/query-seam;
+9. deterministic legacy-backfill transform med strict pre-shadow cutover boundary + 90-dagars prune-seam;
+10. deploy-neutral item-level Queue ack/retry-adapter.
 
 ## Planerad storage
 

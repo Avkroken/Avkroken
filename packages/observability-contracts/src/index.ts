@@ -254,6 +254,18 @@ export interface PageRequestV1 {
   limit?: number;
 }
 
+export interface EventQueryV1 extends PageRequestV1 {
+  provider?: Provider;
+  source?: ObservationSourceV1;
+  capability?: string;
+  event?: string;
+  repository?: string;
+  repositories?: string[];
+  resource?: string;
+  from?: string;
+  to?: string;
+}
+
 export interface PageV1<T> {
   items: T[];
   nextCursor: string | null;

@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS events (
   persisted_at TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_events_received_keyset
+  ON events(received_at DESC, id DESC);
+
 CREATE INDEX IF NOT EXISTS idx_events_capability_received
   ON events(capability, received_at DESC);
 
