@@ -38,7 +38,7 @@ Monorepot kan innehålla repository-lokala workflows för sina appar. Workflowfi
 
 - `pull_request_target` får inte användas för att exekvera opålitlig PR-head-kod.
 - Secrets, tokens och privata nycklar får inte dokumenteras eller loggas.
-- Provider-write ska inte införas i Skvallerbyttans observationsruntime.
+- Provider-write ska inte införas i observationsruntime för Skvallerbyttan, Ingest, Events eller efterföljande observationsmoduler.
 - Extern enforcement verifieras i GitHub i stället för att antas från dokumentation.
 
 ## Dokumentation
