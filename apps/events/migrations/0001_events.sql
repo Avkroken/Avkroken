@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS events (
   id TEXT PRIMARY KEY,
+  schema_version INTEGER NOT NULL CHECK (schema_version = 1),
   idempotency_key TEXT NOT NULL UNIQUE,
   content_hash TEXT NOT NULL,
-  provider TEXT NOT NULL,
+  provider TEXT NOT NULL CHECK (provider IN ('github', 'cloudflare')),
   capability TEXT NOT NULL,
   source TEXT NOT NULL CHECK (
     source IN ('webhook', 'audit_log', 'snapshot_diff', 'reconciliation', 'provider_api', 'runtime', 'import', 'derived')
@@ -12,6 +13,7 @@ CREATE TABLE IF NOT EXISTS events (
   ),
   event TEXT NOT NULL,
   action TEXT,
+  derived INTEGER NOT NULL CHECK (derived IN (0, 1)),
   resource_type TEXT,
   resource_id TEXT,
   repository TEXT,
