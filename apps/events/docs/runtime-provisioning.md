@@ -111,6 +111,9 @@ Cutover requires, at minimum:
 - D1 jurisdiction is EU;
 - migrations applied and no pending migration;
 - no production D1/Queue/provider secret is referenced from staging;
+- staging D1 read replication remains disabled for v1;
+- staging Ingest/Events expose no public provider/runtime routes during shadowing;
+- the Skvallerbyttan shadow Service Binding targets exactly `ingest-staging/VerifiedShadowIngressService`;
 - exactly one Queue consumer;
 - zero missing/extra/content-mismatched events;
 - zero idempotency conflicts;
@@ -118,7 +121,7 @@ Cutover requires, at minimum:
 - zero unresolved retries and zero DLQ messages;
 - known Queue backlog and no backlog older than 60 seconds;
 - backfill complete with zero invalid rows/conflicts and strict pre-shadow boundary;
-- read parity comparisons > 0 with zero mismatch/error;
+- read parity covers every canonical event in the evidence window with zero mismatch/error;
 - at least 72 hours shadowing if 20+ canonical events were observed;
 - otherwise at least seven days;
 - zero observed events never qualifies as sufficient evidence.
