@@ -220,7 +220,10 @@ test("row reconstruction and event detail fail closed on corrupt rows", async ()
   const db = new TestDb();
   db.firstRow = row;
   assert.equal((await getEventById(db, event.id))?.id, event.id);
-  assert.throws(() => getEventById(db, "not-an-event-id"), InvalidEventQueryError);
+  await assert.rejects(
+    () => getEventById(db, "not-an-event-id"),
+    InvalidEventQueryError,
+  );
   assert.throws(
     () => eventFromRow({ ...row, metadata_json: "[]" } as never),
     CorruptEventRowError,
