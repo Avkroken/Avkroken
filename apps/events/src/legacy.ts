@@ -145,6 +145,8 @@ export async function canonicalEventFromLegacyRow(
   };
 }
 
+export const MAX_LEGACY_IMPORT_BATCH = 1000;
+
 export type LegacyImportPlan = {
   total: number;
   valid: number;
@@ -155,6 +157,9 @@ export type LegacyImportPlan = {
 export async function planLegacyImport(
   rows: readonly LegacyObservationEventRow[],
 ): Promise<LegacyImportPlan> {
+  if (rows.length > MAX_LEGACY_IMPORT_BATCH) {
+    throw new RangeError("legacy import batch exceeds configured maximum");
+  }
   const writes: CanonicalEventWrite[] = [];
   const invalid: Array<{ index: number; field: string }> = [];
   for (let index = 0; index < rows.length; index += 1) {
