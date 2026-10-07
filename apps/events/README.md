@@ -55,3 +55,11 @@ schema source som ska appliceras först när den separata provisioning-gaten öp
 The machine-validated target plan is `runtime-provisioning.v1.json`.
 `src/runtime-gate.ts` evaluates shadow/parity evidence before any production provider destination may move.
 See `docs/runtime-provisioning.md`.
+
+
+## Staging provisioning preflight
+
+The read-only inventory evaluator is `src/staging-preflight.ts`.
+Its contract and stop conditions are documented in
+[`docs/staging-preflight.md`](docs/staging-preflight.md). A passing preflight
+does not authorize Cloudflare writes.
