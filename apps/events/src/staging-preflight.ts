@@ -21,13 +21,13 @@ export type StagingInventoryQueueConsumerV1 = {
   maxBatchSize: number | null;
   maxBatchTimeoutSeconds: number | null;
   maxRetries: number | null;
+  deadLetterQueue: string | null;
 };
 
 export type StagingInventoryQueueV1 = {
   name: string;
   id: string;
   messageRetentionSeconds: number | null;
-  deadLetterQueue: string | null;
   ownershipConfirmed: boolean;
   consumers: StagingInventoryQueueConsumerV1[];
 };
@@ -190,7 +190,6 @@ function dlqDecision(
   ) {
     addReason(reasons, "dlq.messageRetentionSeconds must be a positive bounded duration");
   }
-  requireEqual(queue.deadLetterQueue, null, "dlq.deadLetterQueue", reasons);
   if (queue.consumers.length !== 0) addReason(reasons, "dlq.consumers must be empty before staging activation");
   if (snapshot.production.queueIds.includes(queue.id)) {
     addReason(reasons, "staging DLQ must not reuse a production queue");
@@ -228,7 +227,6 @@ function sourceQueueDecision(
     "queue.messageRetentionSeconds",
     reasons,
   );
-  requireEqual(queue.deadLetterQueue, target.deadLetterQueue, "queue.deadLetterQueue", reasons);
   if (snapshot.production.queueIds.includes(queue.id)) {
     addReason(reasons, "staging source queue must not reuse a production queue");
   }
@@ -254,6 +252,12 @@ function sourceQueueDecision(
       consumer.maxRetries,
       target.maxRetries,
       "queue.consumer.maxRetries",
+      reasons,
+    );
+    requireEqual(
+      consumer.deadLetterQueue,
+      target.deadLetterQueue,
+      "queue.consumer.deadLetterQueue",
       reasons,
     );
   }
@@ -387,8 +391,13 @@ function crossResourceReasons(
   const eventWorker = eventWorkers.length === 1 ? eventWorkers[0] : null;
   const ingestWorker = ingestWorkers.length === 1 ? ingestWorkers[0] : null;
 
-  if (sourceQueue && sourceQueue.deadLetterQueue === plan.shadow.queue.deadLetterQueue && !dlq) {
-    addReason(reasons, "source queue references planned DLQ but complete inventory says the DLQ is absent");
+  if (
+    sourceQueue?.consumers.some(
+      (consumer) => consumer.deadLetterQueue === plan.shadow.queue.deadLetterQueue,
+    )
+    && !dlq
+  ) {
+    addReason(reasons, "source queue consumer references planned DLQ but complete inventory says the DLQ is absent");
   }
 
   if (eventWorker) {
