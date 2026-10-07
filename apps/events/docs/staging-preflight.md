@@ -68,9 +68,11 @@ The exact names/settings still come from `../runtime-provisioning.v1.json`:
 If the D1 already exists it must have confirmed ownership, EU jurisdiction,
 read replication disabled and a non-production ID.
 
-If the source Queue already exists it must have confirmed ownership, seven-day
-retention, the exact staging DLQ and either zero consumers or exactly the planned
-`events-staging` consumer with batch 10 / timeout 1 s / retries 5.
+If the source Queue already exists it must have confirmed ownership and seven-day
+retention. Before the consumer exists, the Queue may have zero consumers and no DLQ
+relationship yet. Once the consumer exists it must be exactly the planned
+`events-staging` consumer with batch 10 / timeout 1 s / retries 5 and the exact
+staging DLQ. Cloudflare models DLQ on the consumer, not on the Queue resource.
 
 An existing DLQ must have confirmed ownership, no chained DLQ and no consumer
 before shadow activation.
