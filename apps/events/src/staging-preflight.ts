@@ -50,6 +50,9 @@ export type StagingInventoryWorkerV1 = {
   ownershipConfirmed: boolean;
   publicRoutes: string[];
   secretBindings: string[];
+  plainTextVars: string[];
+  otherBindings: Array<{ type: string; name: string }>;
+  triggers: string[];
   d1Bindings: StagingInventoryD1BindingV1[];
   queueProducerBindings: StagingInventoryQueueBindingV1[];
   queueConsumerBindings: StagingInventoryQueueBindingV1[];
@@ -276,6 +279,15 @@ function validateWorkerBindings(
   if (worker.secretBindings.length > 0) {
     addReason(reasons, "worker.secretBindings must be empty during staging shadow");
   }
+  if (worker.plainTextVars.length > 0) {
+    addReason(reasons, "worker.plainTextVars must be empty during staging shadow");
+  }
+  if (worker.otherBindings.length > 0) {
+    addReason(reasons, "worker.otherBindings must be empty during staging shadow");
+  }
+  if (worker.triggers.length > 0) {
+    addReason(reasons, "worker.triggers must be empty during staging shadow");
+  }
 
   if (expectedRole === "events") {
     if (worker.d1Bindings.length > 1) addReason(reasons, "events worker may have at most one D1 binding");
@@ -461,18 +473,41 @@ function globalReasons(
     }
   }
 
-  for (const [field, value] of Object.entries(snapshot.coverage)) {
-    if (value !== "complete") addReason(reasons, `coverage.${field} must equal complete`);
-  }
+  requireEqual(snapshot.coverage.d1, "complete", "coverage.d1", reasons);
+  requireEqual(snapshot.coverage.queues, "complete", "coverage.queues", reasons);
+  requireEqual(snapshot.coverage.workers, "complete", "coverage.workers", reasons);
+  requireEqual(snapshot.coverage.controlPlane, "complete", "coverage.controlPlane", reasons);
+  requireEqual(
+    snapshot.coverage.providerDestinations,
+    "complete",
+    "coverage.providerDestinations",
+    reasons,
+  );
 
-  for (const [field, value] of Object.entries(snapshot.providerDestinations)) {
-    requireEqual(
-      value,
-      true,
-      `providerDestinations.${field}`,
-      reasons,
-    );
-  }
+  requireEqual(
+    snapshot.providerDestinations.githubUnchanged,
+    true,
+    "providerDestinations.githubUnchanged",
+    reasons,
+  );
+  requireEqual(
+    snapshot.providerDestinations.cloudflareNotificationsUnchanged,
+    true,
+    "providerDestinations.cloudflareNotificationsUnchanged",
+    reasons,
+  );
+  requireEqual(
+    snapshot.providerDestinations.cloudflareIssuesUnchanged,
+    true,
+    "providerDestinations.cloudflareIssuesUnchanged",
+    reasons,
+  );
+  requireEqual(
+    snapshot.providerDestinations.cloudflareCasbUnchanged,
+    true,
+    "providerDestinations.cloudflareCasbUnchanged",
+    reasons,
+  );
 
   requireEqual(
     snapshot.controlPlane.mechanism,
