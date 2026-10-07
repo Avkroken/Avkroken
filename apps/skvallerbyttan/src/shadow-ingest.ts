@@ -1,6 +1,18 @@
 import type { VerifiedShadowDeliveryV1 } from "../../../packages/observability-contracts/src/index.ts";
 import type { Env } from "./env";
 
+export const SHADOW_INGEST_TIMEOUT_MS = 2_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = SHADOW_INGEST_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("shadow ingest timeout")), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
+}
+
 export function scheduleVerifiedShadowDelivery(
   env: Env,
   context: ExecutionContext | undefined,
@@ -10,7 +22,7 @@ export function scheduleVerifiedShadowDelivery(
   if (!service || !context) return false;
 
   const task = Promise.resolve()
-    .then(() => service.acceptVerifiedDelivery(delivery))
+    .then(() => withTimeout(Promise.resolve(service.acceptVerifiedDelivery(delivery))))
     .then((result) => {
       if (!result?.accepted) {
         console.error("shadow ingest delivery was not accepted", {
