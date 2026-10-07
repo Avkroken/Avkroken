@@ -13,7 +13,7 @@
 - Läs hela PR-review-state före merge, inklusive kommentarer och trådar som GitHub markerar som `outdated`; verifiera att grundproblemet faktiskt är löst.
 - Kör endast den berörda applikationens deploykommandon när deployment uttryckligen ingår i scope.
 - Lägg aldrig secrets, tokens, privata nycklar eller credentialvärden i repositoryt.
-- Skvallerbyttans providerarkitektur ska fortsatt vara read-only.
+- Observationsarkitekturen — inklusive Skvallerbyttan, Ingest och Events — ska fortsatt vara read-only mot externa providers.
 - Root-workflows får inte ersätta applikationsspecifik validering med generiska kontroller; Portal, Skvallerbyttan, Ingest, Events, Spam filter, Jobb och Dumpen ska köra respektive apps verifierade gate. `Krosa-Maja` är tills vidare en ruleset-kompatibel retirement guard.
 - `Avkroken/Avkroken` är ett publikt repository. Arbeta via PR och följ de checks och skydd som GitHub faktiskt visar för ändringen; repositoryt dokumenterar inte extern plan-/ruleset-live-state som canonical fakta.
 
