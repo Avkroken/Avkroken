@@ -58,6 +58,7 @@ export type ShadowParityEvidenceV1 = {
     ingestWorker: string;
     databaseName: string;
     databaseJurisdiction: string;
+    databaseReadReplication: string;
     migrationsApplied: boolean;
     noPendingMigrations: boolean;
     queueName: string;
@@ -71,6 +72,10 @@ export type ShadowParityEvidenceV1 = {
     productionDatabaseReferenced: boolean;
     productionQueueReferenced: boolean;
     productionProviderSecretsBound: boolean;
+    ingestPublicProviderRouteConfigured: boolean;
+    eventsPublicRouteConfigured: boolean;
+    shadowServiceBindingTarget: string;
+    shadowServiceBindingEntrypoint: string;
   };
   parity: {
     canonicalCount: number;
@@ -247,6 +252,12 @@ export function evaluateShadowCutoverGateV1(
   requireEqual(evidence.provisioning.ingestWorker, target.ingestWorker, "provisioning.ingestWorker", reasons);
   requireEqual(evidence.provisioning.databaseName, target.database.name, "provisioning.databaseName", reasons);
   requireEqual(evidence.provisioning.databaseJurisdiction, "eu", "provisioning.databaseJurisdiction", reasons);
+  requireEqual(
+    evidence.provisioning.databaseReadReplication,
+    target.database.readReplication,
+    "provisioning.databaseReadReplication",
+    reasons,
+  );
   requireEqual(evidence.provisioning.migrationsApplied, true, "provisioning.migrationsApplied", reasons);
   requireEqual(evidence.provisioning.noPendingMigrations, true, "provisioning.noPendingMigrations", reasons);
   requireEqual(evidence.provisioning.queueName, target.queue.name, "provisioning.queueName", reasons);
@@ -260,6 +271,20 @@ export function evaluateShadowCutoverGateV1(
   requireEqual(evidence.provisioning.productionDatabaseReferenced, false, "provisioning.productionDatabaseReferenced", reasons);
   requireEqual(evidence.provisioning.productionQueueReferenced, false, "provisioning.productionQueueReferenced", reasons);
   requireEqual(evidence.provisioning.productionProviderSecretsBound, false, "provisioning.productionProviderSecretsBound", reasons);
+  requireEqual(evidence.provisioning.ingestPublicProviderRouteConfigured, false, "provisioning.ingestPublicProviderRouteConfigured", reasons);
+  requireEqual(evidence.provisioning.eventsPublicRouteConfigured, false, "provisioning.eventsPublicRouteConfigured", reasons);
+  requireEqual(
+    evidence.provisioning.shadowServiceBindingTarget,
+    plan.shadow.source.targetWorker,
+    "provisioning.shadowServiceBindingTarget",
+    reasons,
+  );
+  requireEqual(
+    evidence.provisioning.shadowServiceBindingEntrypoint,
+    plan.shadow.source.entrypoint,
+    "provisioning.shadowServiceBindingEntrypoint",
+    reasons,
+  );
 
   for (const [field, value] of Object.entries(evidence.queue)) {
     if (field === "backlogKnown" || field === "oldestMessageAgeSeconds") continue;
@@ -304,6 +329,7 @@ export function evaluateShadowCutoverGateV1(
   if (!finiteNonNegative(evidence.reads.comparisons) || evidence.reads.comparisons <= 0) {
     reasons.push("reads.comparisons must be greater than zero");
   }
+  requireEqual(evidence.reads.comparisons, canonicalCount, "reads.comparisons", reasons);
   requireEqual(evidence.reads.mismatches, 0, "reads.mismatches", reasons);
   requireEqual(evidence.reads.errors, 0, "reads.errors", reasons);
 
