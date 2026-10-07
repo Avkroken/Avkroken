@@ -27,6 +27,7 @@ function evidence(): ShadowParityEvidenceV1 {
       ingestWorker: "ingest-staging",
       databaseName: "avkroken-events-preview-eu",
       databaseJurisdiction: "eu",
+      databaseReadReplication: "disabled",
       migrationsApplied: true,
       noPendingMigrations: true,
       queueName: "avkroken-ingest-events-preview-v1",
@@ -40,6 +41,10 @@ function evidence(): ShadowParityEvidenceV1 {
       productionDatabaseReferenced: false,
       productionQueueReferenced: false,
       productionProviderSecretsBound: false,
+      ingestPublicProviderRouteConfigured: false,
+      eventsPublicRouteConfigured: false,
+      shadowServiceBindingTarget: "ingest-staging",
+      shadowServiceBindingEntrypoint: "VerifiedShadowIngressService",
     },
     parity: {
       canonicalCount: 25,
@@ -144,6 +149,8 @@ test("parity, DLQ, backlog and isolation failures block cutover", async () => {
   value.queue.oldestMessageAgeSeconds = 90;
   value.provisioning.productionQueueReferenced = true;
   value.provisioning.productionProviderSecretsBound = true;
+  value.provisioning.ingestPublicProviderRouteConfigured = true;
+  value.provisioning.databaseReadReplication = "auto";
   value.reads.mismatches = 1;
 
   const result = evaluateShadowCutoverGateV1(await plan(), value);
@@ -156,10 +163,20 @@ test("parity, DLQ, backlog and isolation failures block cutover", async () => {
     "oldestMessageAgeSeconds",
     "productionQueueReferenced",
     "productionProviderSecretsBound",
+    "ingestPublicProviderRouteConfigured",
+    "databaseReadReplication",
     "reads.mismatches",
   ]) {
     assert.ok(result.reasons.some((reason) => reason.includes(fragment)), fragment);
   }
+});
+
+test("partial read sampling cannot qualify as parity", async () => {
+  const value = evidence();
+  value.reads.comparisons = 24;
+  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  assert.equal(result.pass, false);
+  assert.ok(result.reasons.some((reason) => reason.includes("reads.comparisons")));
 });
 
 test("backfill boundary must end strictly before shadow traffic", async () => {
