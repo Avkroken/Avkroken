@@ -48,3 +48,10 @@ ADR-namn:
 
 Den här PR:n skapar inga providerresurser. `migrations/0001_events.sql` är
 schema source som ska appliceras först när den separata provisioning-gaten öppnas.
+
+
+## Runtime/cutover preparation
+
+The machine-validated target plan is `runtime-provisioning.v1.json`.
+`src/runtime-gate.ts` evaluates shadow/parity evidence before any production provider destination may move.
+See `docs/runtime-provisioning.md`.
