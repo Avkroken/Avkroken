@@ -50,6 +50,7 @@ test("fresh complete inventory with all staging resources absent is ready to cre
     await plan(),
     snapshot(),
     "account-1",
+    "repo-sha",
     NOW,
   );
 
@@ -72,7 +73,7 @@ test("stale or incomplete live inventory blocks every create decision", async ()
   value.observedAt = new Date(NOW - MAX_STAGING_PREFLIGHT_AGE_MS - 1).toISOString();
   value.coverage.queues = "partial";
 
-  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(result.ready, false);
   assert.ok(result.reasons.some((reason) => reason.includes("observedAt")));
   assert.ok(result.reasons.some((reason) => reason.includes("coverage.queues")));
@@ -89,18 +90,18 @@ test("existing D1 must have proven ownership, EU jurisdiction, disabled replicat
     ownershipConfirmed: true,
   });
 
-  const ok = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const ok = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(ok.ready, true);
   assert.equal(ok.resources.find((item) => item.kind === "database")?.action, "reuse");
 
   value.databases[0].jurisdiction = "unknown";
-  const unknown = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const unknown = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(unknown.ready, false);
   assert.ok(unknown.reasons.some((reason) => reason.includes("database.jurisdiction")));
 
   value.databases[0].jurisdiction = "eu";
   value.databases[0].id = "prod-db";
-  const reusedProduction = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const reusedProduction = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(reusedProduction.ready, false);
   assert.ok(reusedProduction.reasons.some((reason) => reason.includes("production database")));
 });
@@ -126,7 +127,7 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
     },
   );
 
-  const partial = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const partial = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(partial.ready, true);
   assert.equal(
     partial.resources.find((item) => item.name === "avkroken-ingest-events-preview-v1")?.action,
@@ -139,11 +140,11 @@ test("existing source Queue may be reused only with exact retention/DLQ and zero
     maxBatchTimeoutSeconds: 1,
     maxRetries: 5,
   }];
-  const configured = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const configured = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(configured.ready, true);
 
   value.queues[1].consumers[0].maxRetries = 3;
-  const drift = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const drift = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(drift.ready, false);
   assert.ok(drift.reasons.some((reason) => reason.includes("queue.consumer.maxRetries")));
 });
@@ -152,6 +153,7 @@ test("staging workers fail closed on public routes, provider secrets or producti
   const value = snapshot();
   value.workers.push({
     name: "events-staging",
+    deploymentCommitSha: "repo-sha",
     ownershipConfirmed: true,
     publicRoutes: [],
     secretBindings: [],
@@ -164,6 +166,7 @@ test("staging workers fail closed on public routes, provider secrets or producti
   });
   value.workers.push({
     name: "ingest-staging",
+    deploymentCommitSha: "repo-sha",
     ownershipConfirmed: true,
     publicRoutes: ["ingest-staging.example.invalid"],
     secretBindings: ["SKVALLERBYTTAN_WEBHOOK_SECRET"],
@@ -176,7 +179,7 @@ test("staging workers fail closed on public routes, provider secrets or producti
     queueConsumerBindings: [],
   });
 
-  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", NOW);
+  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "account-1", "repo-sha", NOW);
   assert.equal(result.ready, false);
   for (const fragment of [
     "worker.publicRoutes",
@@ -209,10 +212,74 @@ test("duplicate planned names and wrong account/control-plane evidence block pro
   value.controlPlane.credentialValueExported = true;
   value.controlPlane.permissionsVerified = false;
 
-  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "different-account", NOW);
+  const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "different-account", "repo-sha", NOW);
   assert.equal(result.ready, false);
   assert.ok(result.reasons.some((reason) => reason.includes("accountId")));
   assert.ok(result.reasons.some((reason) => reason.includes("credentialValueExported")));
   assert.ok(result.reasons.some((reason) => reason.includes("permissionsVerified")));
   assert.ok(result.reasons.some((reason) => reason.includes("multiple database resources")));
+});
+
+
+test("existing worker deployment and bound resource IDs must match current repository and inventory", async () => {
+  const value = snapshot();
+  value.databases.push({
+    name: "avkroken-events-preview-eu",
+    id: "staging-db",
+    jurisdiction: "eu",
+    readReplication: "disabled",
+    ownershipConfirmed: true,
+  });
+  value.queues.push(
+    {
+      name: "avkroken-ingest-events-preview-v1-dlq",
+      id: "staging-dlq",
+      messageRetentionSeconds: 345600,
+      deadLetterQueue: null,
+      ownershipConfirmed: true,
+      consumers: [],
+    },
+    {
+      name: "avkroken-ingest-events-preview-v1",
+      id: "staging-queue",
+      messageRetentionSeconds: 604800,
+      deadLetterQueue: "avkroken-ingest-events-preview-v1-dlq",
+      ownershipConfirmed: true,
+      consumers: [],
+    },
+  );
+  value.workers.push({
+    name: "events-staging",
+    deploymentCommitSha: "old-sha",
+    ownershipConfirmed: true,
+    publicRoutes: [],
+    secretBindings: [],
+    d1Bindings: [{
+      binding: "EVENTS_DB",
+      databaseId: "other-db",
+      databaseName: "avkroken-events-preview-eu",
+    }],
+    queueProducerBindings: [],
+    queueConsumerBindings: [{
+      queueId: "other-queue",
+      queueName: "avkroken-ingest-events-preview-v1",
+    }],
+  });
+
+  const result = evaluateStagingProvisioningPreflightV1(
+    await plan(),
+    value,
+    "account-1",
+    "repo-sha",
+    NOW,
+  );
+  assert.equal(result.ready, false);
+  for (const fragment of [
+    "worker.deploymentCommitSha",
+    "D1 binding ID",
+    "queue binding ID",
+    "has no consumer",
+  ]) {
+    assert.ok(result.reasons.some((reason) => reason.includes(fragment)), fragment);
+  }
 });
