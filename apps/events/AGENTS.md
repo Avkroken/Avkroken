@@ -5,7 +5,6 @@
 - [README.md](README.md) — modulens bootstrap-scope och cutover-gräns.
 - [docs/project-context.md](docs/project-context.md) — appens canonical repository-state.
 - `../../docs/organization/` — delad monorepo-kontext när ändringen faktiskt berör flera appar.
-- Avkrokens Library-plan för Observability Architecture när arbetet rör service-map, storage eller cutover.
 
 ## Invariants
 
