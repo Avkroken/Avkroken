@@ -10,5 +10,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "../../packages/observability-contracts/src/**/*.ts"]
+  "include": ["src/**/*.ts", "control-plane/**/*.ts", "../../packages/observability-contracts/src/**/*.ts"]
 }
