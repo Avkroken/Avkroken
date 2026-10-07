@@ -19,6 +19,10 @@ function evidence(): StagingInventoryEvidenceV1 {
   return {
     observedAt: "2026-10-07T16:10:00.000Z",
     accountId: "account-1",
+    coverage: {
+      controlPlane: "complete",
+      providerDestinations: "complete",
+    },
     controlPlane: {
       mechanism: "secrets_store_edge_proxy",
       credentialClass: "CLOUDFLARE_API_TOKEN_W1",
@@ -88,6 +92,24 @@ test("complete empty provider inventory proves planned staging resources absent"
   );
   assert.equal(decision.ready, true);
   assert.ok(decision.resources.every((resource) => resource.action === "create"));
+});
+
+test("external control-plane evidence preserves its own coverage and fails closed", async () => {
+  const currentPlan = await plan();
+  const currentEvidence = evidence();
+  currentEvidence.coverage.controlPlane = "partial";
+  const result = await collectStagingInventorySnapshotV1(currentPlan, reader(), currentEvidence);
+  assert.equal(result.snapshot.coverage.controlPlane, "partial");
+
+  const decision = evaluateStagingProvisioningPreflightV1(
+    currentPlan,
+    result.snapshot,
+    "account-1",
+    "repo-sha",
+    Date.parse("2026-10-07T16:10:30.000Z"),
+  );
+  assert.equal(decision.ready, false);
+  assert.ok(decision.reasons.some((reason) => reason.includes("coverage.controlPlane")));
 });
 
 test("failed provider list cannot be interpreted as resource absence", async () => {
