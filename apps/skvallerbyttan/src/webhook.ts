@@ -1,4 +1,5 @@
 import { organization, type Env } from "./env";
+import { scheduleVerifiedShadowDelivery } from "./shadow-ingest";
 import { recordSecurityEvent, securityEventFromWebhook } from "./security-events";
 import { activityFromGitHubWebhook, recordObservedActivity } from "./activity";
 import {
@@ -222,7 +223,11 @@ function response(value: unknown, status: number): Response {
   });
 }
 
-export async function handleGitHubWebhook(request: Request, env: Env): Promise<Response> {
+export async function handleGitHubWebhook(
+  request: Request,
+  env: Env,
+  context?: ExecutionContext,
+): Promise<Response> {
   if (request.method !== "POST") {
     const result = response({ error: "method not allowed" }, 405);
     result.headers.set("Allow", "POST");
@@ -274,7 +279,8 @@ export async function handleGitHubWebhook(request: Request, env: Env): Promise<R
     ? await invalidatePortalDocs(env, docsInvalidation)
     : null;
 
-  const isNew = await recordWebhookDelivery(env, deliveryId, event, repo);
+  const receivedAt = new Date().toISOString();
+  const isNew = await recordWebhookDelivery(env, deliveryId, event, repo, receivedAt);
   if (!isNew) {
     return response({
       ok: true,
@@ -288,6 +294,7 @@ export async function handleGitHubWebhook(request: Request, env: Env): Promise<R
     event,
     repo,
     payload as unknown as Record<string, unknown>,
+    receivedAt,
   );
   const activityRecorded = await recordObservedActivity(env, observedActivity);
 
@@ -308,6 +315,17 @@ export async function handleGitHubWebhook(request: Request, env: Env): Promise<R
 
   const keys = webhookCacheKeys(event, repo);
   if (keys.length > 0) await invalidateSourceCache(env, keys, `github:${event}`);
+
+  if (activityRecorded) {
+    scheduleVerifiedShadowDelivery(env, context, {
+      schemaVersion: 1,
+      kind: "github",
+      deliveryId,
+      event,
+      receivedAt,
+      body,
+    });
+  }
 
   return response({
     ok: true,

@@ -54,3 +54,16 @@ Ingest har tills vidare ingen egen dependency-installation. Repository-CI instal
 Skvallerbyttans befintliga, låsta dev-toolchain och använder dess `tsx`/`tsc` för att
 köra Ingest-test och strict typecheck. Detta är endast build-tooling och inte ett
 runtimeberoende.
+
+
+## Preverified shadow RPC
+
+`VerifiedShadowIngressService` är den deploy-neutrala named RPC-adaptern för shadowfasen.
+Den tar endast emot `VerifiedShadowDeliveryV1` från en framtida Service Binding efter att
+Skvallerbyttan redan har verifierat provider-auth/signatur och skrivit sin canonical legacy-event.
+
+RPC-envelope innehåller delivery identity, original `receivedAt` och providerbody endast som
+transient reducer-input. Body får aldrig lagras, loggas eller följa med `IngressMessageV1`.
+Shadow-RPC kräver inga provider webhook-secrets; Service Binding-capability är trust boundary.
+
+Ingen Wrangler-binding eller Worker deploy deklareras ännu.

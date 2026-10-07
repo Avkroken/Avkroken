@@ -123,7 +123,7 @@ export default {
 
     if (url.pathname === "/webhooks/github") {
       try {
-        return await handleGitHubWebhook(request, env);
+        return await handleGitHubWebhook(request, env, context);
       } catch (error) {
         console.error("github webhook failed", {
           error: error instanceof Error ? error.message : String(error),
@@ -134,7 +134,7 @@ export default {
 
     if (url.pathname === "/webhooks/cloudflare/notifications") {
       try {
-        return await handleCloudflareNotificationsWebhook(request, env);
+        return await handleCloudflareNotificationsWebhook(request, env, context);
       } catch (error) {
         console.error("cloudflare notifications webhook failed", {
           error: error instanceof Error ? error.message : String(error),
@@ -145,7 +145,7 @@ export default {
 
     if (url.pathname === "/webhooks/cloudflare/issues") {
       try {
-        return await handleCloudflareIssuesWebhook(request, env);
+        return await handleCloudflareIssuesWebhook(request, env, context);
       } catch (error) {
         console.error("cloudflare issues webhook failed", {
           error: error instanceof Error ? error.message : String(error),
@@ -156,7 +156,7 @@ export default {
 
     if (url.pathname === "/webhooks/cloudflare/casb") {
       try {
-        return await handleCloudflareCasbWebhook(request, env);
+        return await handleCloudflareCasbWebhook(request, env, context);
       } catch (error) {
         console.error("cloudflare casb webhook failed", {
           error: error instanceof Error ? error.message : String(error),

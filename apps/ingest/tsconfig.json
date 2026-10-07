@@ -4,11 +4,23 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
-    "lib": ["ES2022", "DOM"],
-    "types": [],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "@cloudflare/workers-types"
+    ],
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "typeRoots": [
+      "../skvallerbyttan/node_modules",
+      "../../node_modules"
+    ]
   },
-  "include": ["src/**/*.ts", "../../packages/observability-contracts/src/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../../packages/observability-contracts/src/**/*.ts"
+  ]
 }
