@@ -111,7 +111,7 @@ export async function recordCloudflareWebhookObservation(
     ),
   ]);
 
-  return results.some((result) => Number(result.meta.changes ?? 0) > 0);
+  return Number(results[2]?.meta.changes ?? 0) > 0;
 }
 
 export async function pruneCloudflareEvents(env: Env, olderThanIso: string): Promise<void> {
