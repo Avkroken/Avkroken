@@ -1,7 +1,6 @@
 import {
   InvalidIngressMessageError,
   canonicalEventFromIngress,
-  type CanonicalizedIngress,
 } from "./model.ts";
 import type { ObservationEventV1 } from "../../../packages/observability-contracts/src/index.ts";
 
@@ -135,22 +134,3 @@ export async function processIngressMessage(
   }
 }
 
-export function canonicalInsertBindings(value: CanonicalizedIngress): readonly unknown[] {
-  const event = value.event;
-  return [
-    event.id,
-    value.idempotencyKey,
-    value.contentHash,
-    event.provider,
-    event.capability,
-    event.provenance.source,
-    event.provenance.coverage,
-    event.event,
-    event.action,
-    event.resource?.type ?? null,
-    event.resource?.id ?? null,
-    event.resource?.repository ?? null,
-    event.occurredAt,
-    event.receivedAt,
-  ];
-}
