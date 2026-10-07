@@ -62,6 +62,7 @@ export type StagingInventoryCollectionResultV1 = {
 };
 
 function coverageFromErrors(errors: readonly string[], prefix: string): InventoryCoverageV1 {
+  if (errors.some((error) => error.startsWith(`${prefix}list:`))) return "unavailable";
   return errors.some((error) => error.startsWith(prefix)) ? "partial" : "complete";
 }
 
