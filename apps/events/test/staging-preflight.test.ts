@@ -26,6 +26,13 @@ function snapshot(): StagingInventorySnapshotV1 {
       queues: "complete",
       workers: "complete",
       controlPlane: "complete",
+      providerDestinations: "complete",
+    },
+    providerDestinations: {
+      githubUnchanged: true,
+      cloudflareNotificationsUnchanged: true,
+      cloudflareIssuesUnchanged: true,
+      cloudflareCasbUnchanged: true,
     },
     controlPlane: {
       mechanism: "secrets_store_edge_proxy",
@@ -224,12 +231,14 @@ test("duplicate planned names and wrong account/control-plane evidence block pro
   );
   value.controlPlane.credentialValueExported = true;
   value.controlPlane.permissionsVerified = false;
+  value.providerDestinations.githubUnchanged = false;
 
   const result = evaluateStagingProvisioningPreflightV1(await plan(), value, "different-account", "repo-sha", NOW);
   assert.equal(result.ready, false);
   assert.ok(result.reasons.some((reason) => reason.includes("accountId")));
   assert.ok(result.reasons.some((reason) => reason.includes("credentialValueExported")));
   assert.ok(result.reasons.some((reason) => reason.includes("permissionsVerified")));
+  assert.ok(result.reasons.some((reason) => reason.includes("providerDestinations.githubUnchanged")));
   assert.ok(result.reasons.some((reason) => reason.includes("multiple database resources")));
 });
 
