@@ -14,7 +14,8 @@ this control-plane service only. Events itself must never receive W1.
 
 ## Named RPC surface
 
-The service implements only:
+The exported RPC entrypoint is `CloudflareStagingInventoryProxyEntrypoint`.
+It wraps the pure `CloudflareStagingInventoryProxyServiceV1` and implements only:
 
 - `listD1Databases()`;
 - `getD1Database(databaseId)`, allowlisted to `avkroken-events-preview-eu`;
@@ -28,7 +29,8 @@ There is no generic `get(path)`, URL method or arbitrary provider request.
 ## HTTP invariants
 
 Internally every provider request is hard-coded `GET`.
-There is no POST/PUT/PATCH/DELETE code path.
+There is no POST/PUT/PATCH/DELETE code path. The request timeout remains active
+through response-body consumption, not only until headers arrive.
 
 Reads are bounded by:
 
