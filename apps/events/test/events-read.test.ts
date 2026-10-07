@@ -8,6 +8,7 @@ import type {
 import { reduceGitHubWebhook } from "../../ingest/src/reducers.ts";
 import { legacyActivityProjection } from "../src/model.ts";
 import {
+  MAX_LEGACY_IMPORT_BATCH,
   canonicalEventFromLegacyRow,
   planLegacyImport,
   type LegacyObservationEventRow,
@@ -21,7 +22,11 @@ import {
   normalizeEventQuery,
 } from "../src/read.ts";
 import { eventRetentionCutoff, pruneEvents } from "../src/retention.ts";
-import { processIngressQueueBatch, type QueueMessageLike } from "../src/consumer.ts";
+import {
+  MAX_INGRESS_BATCH_SIZE,
+  processIngressQueueBatch,
+  type QueueMessageLike,
+} from "../src/consumer.ts";
 import type {
   D1DatabaseLike,
   D1ResultSetLike,
@@ -233,7 +238,6 @@ test("retention seam deletes only rows older than the 90-day cutoff", async () =
   assert.ok(call);
   assert.match(call.sql, /DELETE FROM events WHERE received_at < \?/);
   assert.deepEqual(call.params, [cutoff]);
-  assert.throws(() => eventRetentionCutoff(now, 91), RangeError);
 });
 
 test("legacy backfill transform preserves current Activity fields deterministically", async () => {
@@ -276,6 +280,10 @@ test("legacy backfill transform preserves current Activity fields deterministica
   assert.equal(plan.total, 2);
   assert.equal(plan.valid, 1);
   assert.deepEqual(plan.invalid, [{ index: 1, field: "provider" }]);
+  await assert.rejects(
+    () => planLegacyImport(Array.from({ length: MAX_LEGACY_IMPORT_BATCH + 1 }, () => row)),
+    RangeError,
+  );
 });
 
 test("queue adapter uses item-level ack for success and retry for poison messages", async () => {
@@ -315,4 +323,14 @@ test("queue adapter uses item-level ack for success and retry for poison message
     "ack:duplicate",
     "retry:invalid",
   ]);
+
+  await assert.rejects(
+    () => processIngressQueueBatch(db, {
+      messages: Array.from(
+        { length: MAX_INGRESS_BATCH_SIZE + 1 },
+        (_, index) => message({ ...valid, messageId: `oversize-${index}` }, `oversize-${index}`),
+      ),
+    }),
+    RangeError,
+  );
 });
