@@ -214,6 +214,11 @@ function nullOrString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function requireNullOrString(value: unknown, field: string): string | null {
+  if (!nullOrString(value)) throw new CorruptEventRowError(field);
+  return value;
+}
+
 function requiredOwn(record: Record<string, unknown>, key: string, field: string): unknown {
   if (!Object.prototype.hasOwnProperty.call(record, key)) throw new CorruptEventRowError(field);
   return record[key];
@@ -222,14 +227,14 @@ function requiredOwn(record: Record<string, unknown>, key: string, field: string
 function validateResource(value: Record<string, unknown> | null): ResourceRefV1 | null {
   if (value === null) return null;
   const type = requiredOwn(value, "type", "resource_json.type");
-  const id = requiredOwn(value, "id", "resource_json.id");
-  const name = requiredOwn(value, "name", "resource_json.name");
-  const scope = requiredOwn(value, "scope", "resource_json.scope");
-  const repositoryValue = requiredOwn(value, "repository", "resource_json.repository");
+  const id = requireNullOrString(requiredOwn(value, "id", "resource_json.id"), "resource_json.id");
+  const name = requireNullOrString(requiredOwn(value, "name", "resource_json.name"), "resource_json.name");
+  const scope = requireNullOrString(requiredOwn(value, "scope", "resource_json.scope"), "resource_json.scope");
+  const repositoryValue = requireNullOrString(
+    requiredOwn(value, "repository", "resource_json.repository"),
+    "resource_json.repository",
+  );
   if (typeof type !== "string" || !type.trim()) throw new CorruptEventRowError("resource_json.type");
-  for (const [field, item] of [["id", id], ["name", name], ["scope", scope], ["repository", repositoryValue]] as const) {
-    if (!nullOrString(item)) throw new CorruptEventRowError(`resource_json.${field}`);
-  }
   return { type, id, name, scope, repository: repositoryValue };
 }
 
