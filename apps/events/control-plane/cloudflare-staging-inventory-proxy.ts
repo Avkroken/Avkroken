@@ -236,7 +236,7 @@ implements CloudflareStagingInventoryProxyV1 {
     this.fetcher = options.fetcher ?? fetch;
     this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_TIMEOUT_MS;
     const accountId = env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? "";
-    if (!/^[A-Za-z0-9_-]{1,64}$/.test(accountId)) {
+    if (!/^[A-Za-z0-9_-]{1,32}$/.test(accountId)) {
       throw new CloudflareControlPlaneReadError("config", "invalid_account_id");
     }
     if (
