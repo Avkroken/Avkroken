@@ -81,15 +81,16 @@ function legacyResource(row: LegacyObservationEventRow): ResourceRefV1 | null {
 }
 
 function canonicalLegacyIdempotencyKey(
-  row: LegacyObservationEventRow,
+  provider: Provider,
+  source: ObservationSourceV1,
   eventKey: string,
   capability: string,
 ): string {
-  if (row.source !== "webhook") return `legacy:${eventKey}`;
+  if (source !== "webhook") return `legacy:${eventKey}`;
   const suffix = `:${capability}`;
   if (!eventKey.endsWith(suffix)) throw new InvalidLegacyEventError("event_key");
   const deliveryKey = eventKey.slice(0, -suffix.length);
-  if (row.provider === "github") {
+  if (provider === "github") {
     if (!deliveryKey.startsWith("github:")) throw new InvalidLegacyEventError("event_key");
     return deliveryKey;
   }
@@ -113,7 +114,7 @@ export async function canonicalEventFromLegacyRow(
   const occurredAt = timestamp(row.occurred_at, "occurred_at", false);
   const resource = legacyResource(row);
   const capability = required(row.capability, "capability", 200);
-  const idempotencyKey = canonicalLegacyIdempotencyKey(row, eventKey, capability);
+  const idempotencyKey = canonicalLegacyIdempotencyKey(provider, source, eventKey, capability);
   const event: ObservationEventV1 = {
     id: await canonicalEventIdForKey(idempotencyKey),
     schemaVersion: 1,
