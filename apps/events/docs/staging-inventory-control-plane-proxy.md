@@ -60,7 +60,8 @@ Provider responses are minimized before leaving the control-plane seam:
 - consumer: type, Worker name, DLQ and bounded delivery policy;
 - Worker: name, subdomain flags, queue/domain references;
 - settings: binding type/name/resource reference plus non-secret annotations needed by the adapter;
-- active deployment: serving version ID, traffic percentage and commit SHA only;
+- active deployment: serving version ID, traffic percentage, commit SHA and
+  sanitized binding type/name/resource references;
 - account: account ID only;
 - schedules: cron only;
 - routes: pattern only for the requested staging Worker.
@@ -98,5 +99,6 @@ missing inventory is not treated as an empty collection.
 
 The account identity used in the report comes from `GET /accounts/{account_id}`
 and must equal the configured account. Worker deployment evidence is resolved from
-the active deployment and each serving version; an unresolved/mixed commit cannot
-qualify an existing Worker for reuse.
+the active deployment and each serving version. Reuse requires one active
+version; gradual deployments are blocked, and binding evidence comes from that
+active version instead of the independently mutable script-settings surface.
