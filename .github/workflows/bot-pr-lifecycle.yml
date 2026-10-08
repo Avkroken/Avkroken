@@ -12,6 +12,7 @@ permissions: {}
 jobs:
   reconcile:
     permissions:
+      actions: write
       contents: write
       pull-requests: write
     uses: Avkroken/.github/.github/workflows/reusable-bot-pr-lifecycle.yml@b3c0c2f2192cbb1f352c796a749967b04f4c3d07
