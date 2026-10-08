@@ -36,6 +36,7 @@ export type ProviderWorkerInventoryV1 = {
 export type ProviderWorkerInspectionV1 = Omit<StagingInventoryWorkerV1, "ownershipConfirmed">;
 
 export interface StagingInventoryReadPortV1 {
+  getAccountId(): Promise<string>;
   listDatabases(): Promise<ProviderDatabaseInventoryV1[]>;
   listQueues(): Promise<ProviderQueueInventoryV1[]>;
   listQueueConsumers(queueId: string): Promise<ProviderQueueConsumerInventoryV1[]>;
@@ -180,6 +181,14 @@ export async function collectStagingInventorySnapshotV1(
 ): Promise<StagingInventoryCollectionResultV1> {
   const errors: string[] = [];
 
+  let accountId = "";
+  try {
+    accountId = await reader.getAccountId();
+    if (accountId !== evidence.accountId) errors.push("account:evidence_mismatch");
+  } catch (error) {
+    errors.push(`account:read:${safeError(error)}`);
+  }
+
   let databases: StagingInventoryDatabaseV1[] = [];
   try {
     databases = normalizeDatabases(await reader.listDatabases(), evidence.ownership);
@@ -196,12 +205,15 @@ export async function collectStagingInventorySnapshotV1(
     snapshot: {
       schemaVersion: 1,
       observedAt: evidence.observedAt,
-      accountId: evidence.accountId,
+      accountId,
       coverage: {
         d1: coverageFromErrors(errors, "d1:"),
         queues: coverageFromErrors(errors, "queues:"),
         workers: coverageFromErrors(errors, "workers:"),
-        controlPlane: evidence.coverage.controlPlane,
+        controlPlane: errors.some((error) => error.startsWith("account:"))
+          && evidence.coverage.controlPlane === "complete"
+          ? "partial"
+          : evidence.coverage.controlPlane,
         providerDestinations: evidence.coverage.providerDestinations,
       },
       providerDestinations: { ...evidence.providerDestinations },

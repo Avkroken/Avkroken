@@ -3,9 +3,10 @@
 This is the repository seam for the **read-only inventory phase** before the first
 Ingest → Events staging resources are created.
 
-It does not call Cloudflare and it never provisions or mutates anything. A caller
-must collect a live inventory snapshot separately, then pass it to
-`evaluateStagingProvisioningPreflightV1()`.
+The pure evaluator does not call Cloudflare and never provisions or mutates anything.
+The operator-only runner in `../control-plane/staging-preflight-runner.ts` composes
+the named read-only proxy, Cloudflare reader, collector and evaluator without adding
+any provider-write operation.
 
 ## Decision semantics
 
@@ -28,7 +29,8 @@ separate provisioning gate. It is not authorization to execute control-plane wri
 The snapshot must:
 
 - be schema version 1;
-- target the explicitly expected Cloudflare account;
+- target the explicitly expected Cloudflare account, with that identity read back
+  from the same provider-backed proxy used for resource inventory;
 - be no older than 15 minutes;
 - have complete D1, Queue, Worker, control-plane and production provider-destination coverage;
 - confirm that GitHub, Cloudflare Notifications, Workers Issues and CASB destinations remain unchanged.
@@ -80,7 +82,10 @@ before shadow activation.
 Existing staging Workers must:
 
 - have confirmed ownership;
-- report the exact expected repository commit for the deployed version;
+- resolve the active deployment and require a single serving version with the
+  exact expected repository commit; gradual/multi-version deployment blocks reuse;
+- derive Worker binding evidence from that active version, not from an unrelated
+  latest-upload/settings view;
 - expose no public routes during shadowing;
 - bind no secrets or plain-text vars in this v1 staging shape;
 - have no unplanned KV/R2/service/other bindings or scheduled/runtime triggers;
@@ -105,3 +110,16 @@ may be considered. That gate is responsible for explicit approval, creation,
 migration application, consumer configuration and post-create verification.
 
 Skvallerbyttan remains provider-facing and canonical throughout this preflight.
+
+
+## Operator report
+
+`runStagingProvisioningPreflightV1()` returns a sanitized report containing
+`ready`, reasons, per-resource `create|reuse|blocked` decisions, coverage,
+collection errors, account identity, timestamps and inventory/evidence counts.
+
+The report intentionally does not return production resource ID lists, provider
+payload bodies, credential values or secret/plaintext binding values.
+
+A passing report remains evidence for a separate provisioning decision. It is
+not authorization to create, update, deploy or delete Cloudflare resources.

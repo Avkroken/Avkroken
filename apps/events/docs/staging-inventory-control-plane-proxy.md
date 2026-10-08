@@ -1,7 +1,7 @@
 # Staging inventory control-plane proxy seam
 
 **Status:** deploy-neutral operator/control-plane code — not deployed  
-**Verified provider documentation:** 2026-10-07
+**Verified provider documentation:** 2026-10-08
 
 ## Ownership boundary
 
@@ -20,6 +20,8 @@ Cloudflare-runtime wrapper around the pure, Node-testable
 `CloudflareStagingInventoryProxyServiceV1`; all provider HTTP and sanitization
 logic remains in the pure service. The entrypoint implements only:
 
+- `getAccountIdentity()`, returning only the provider-read account ID;
+- `getActiveWorkerDeployment(name)`, allowlisted to `events-staging` / `ingest-staging`;
 - `listD1Databases()`;
 - `getD1Database(databaseId)`, allowlisted to `avkroken-events-preview-eu`;
 - `listQueues()`;
@@ -38,7 +40,7 @@ through response-body consumption, not only until headers arrive.
 Reads are bounded by:
 
 - 5 s default timeout per provider request;
-- 2 MB max response body;
+- 2 MB max response body enforced while streaming;
 - max 100 pages;
 - max 5,000 list objects;
 - max 100 zones for route inspection;
@@ -57,7 +59,9 @@ Provider responses are minimized before leaving the control-plane seam:
 - Queue: name, ID, retention;
 - consumer: type, Worker name, DLQ and bounded delivery policy;
 - Worker: name, subdomain flags, queue/domain references;
-- settings: only `workers/commit_sha` and binding type/name/resource reference;
+- active deployment: serving version ID, traffic percentage, commit SHA and
+  sanitized binding type/name/resource references;
+- account: account ID only;
 - schedules: cron only;
 - routes: pattern only for the requested staging Worker.
 
@@ -68,10 +72,11 @@ and unrelated provider metadata are discarded before return.
 
 Current Cloudflare read surfaces used by the seam:
 
+- Account detail for binding the inventory to the account actually queried;
 - D1 list/detail;
 - Queues list/consumers;
 - Workers beta list/detail;
-- Worker script/version settings;
+- Worker deployments plus active version detail;
 - Worker schedules;
 - Worker custom domains;
 - account-filtered Zones list + per-zone Worker routes.
@@ -82,3 +87,16 @@ The server-side W1 credential never appears in returned values or errors.
 
 No `wrangler` config, Secrets Store binding, Worker service, DNS route, D1,
 Queue or provider destination is introduced by this seam.
+
+
+## Fail-closed completeness
+
+Provider pagination is rejected when reported page/count metadata is inconsistent.
+A successful schedules response must contain the documented schedule collection;
+missing inventory is not treated as an empty collection.
+
+The account identity used in the report comes from `GET /accounts/{account_id}`
+and must equal the configured account. Worker deployment evidence is resolved from
+the active deployment and each serving version. Reuse requires one active
+version; gradual deployments are blocked, and binding evidence comes from that
+active version instead of the independently mutable script-settings surface.
