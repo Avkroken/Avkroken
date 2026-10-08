@@ -82,8 +82,10 @@ before shadow activation.
 Existing staging Workers must:
 
 - have confirmed ownership;
-- resolve the active deployment and report the exact expected repository commit
-  for every serving version; mixed or missing active-version commit evidence blocks reuse;
+- resolve the active deployment and require a single serving version with the
+  exact expected repository commit; gradual/multi-version deployment blocks reuse;
+- derive Worker binding evidence from that active version, not from an unrelated
+  latest-upload/settings view;
 - expose no public routes during shadowing;
 - bind no secrets or plain-text vars in this v1 staging shape;
 - have no unplanned KV/R2/service/other bindings or scheduled/runtime triggers;
