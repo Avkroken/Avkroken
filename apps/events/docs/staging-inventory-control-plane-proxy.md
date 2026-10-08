@@ -9,8 +9,9 @@ This seam lives under `apps/events/control-plane/`, outside the Events runtime
 source tree. It is an operator helper for staging preflight, not part of the
 canonical Events data plane.
 
-The future runtime may bind `CLOUDFLARE_API_TOKEN_W1` from Secrets Store to
-this control-plane service only. Events itself must never receive W1.
+The planned live preflight binds `CLOUDFLARE_API_TOKEN_W1` from the existing
+Secrets Store to the temporary `events-staging-inventory-proxy` only. Events
+itself and the local operator must never receive the credential value.
 
 ## Named RPC surface
 
@@ -87,6 +88,18 @@ The server-side W1 credential never appears in returned values or errors.
 
 No `wrangler` config, Secrets Store binding, Worker service, DNS route, D1,
 Queue or provider destination is introduced by this seam.
+
+The machine-validated plan in
+[`../live-preflight-deployment.v1.json`](../live-preflight-deployment.v1.json)
+defines the separate deployment boundary. The
+[live preflight deployment gate](live-preflight-deployment-gate.md) requires
+`workers_dev=false`, preview URLs disabled, no routes and no D1, Queue, KV, R2
+or Service Bindings on the proxy. The operator remains local and uses a remote
+Service Binding to `CloudflareStagingInventoryProxyEntrypoint`.
+
+Deployment requires explicit approval; after the run, the temporary proxy must
+be deleted and the absence of routes and residual bindings verified. The plan
+does not deploy the proxy or authorize staging provisioning.
 
 
 ## Fail-closed completeness

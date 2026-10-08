@@ -8,6 +8,14 @@ The operator-only runner in `../control-plane/staging-preflight-runner.ts` compo
 the named read-only proxy, Cloudflare reader, collector and evaluator without adding
 any provider-write operation.
 
+Live execution is bounded by the machine-validated
+[`../live-preflight-deployment.v1.json`](../live-preflight-deployment.v1.json) and
+the [live preflight deployment gate](live-preflight-deployment-gate.md).
+That separate gate requires explicit approval to deploy the temporary private
+inventory proxy, local operator access through the named remote Service Binding,
+and mandatory proxy deletion plus route/residual-binding verification after the
+run. The plan itself performs no deployment or staging provisioning.
+
 ## Decision semantics
 
 Each planned staging resource is classified as:
