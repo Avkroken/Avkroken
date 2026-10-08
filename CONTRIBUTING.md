@@ -1,6 +1,6 @@
 # Bidra till Avkroken
 
-Tack för att du vill bidra till Avkrokens projekt. Den här guiden gäller som standard för Avkrokens publika repositories när ett repository inte har egna, mer specifika riktlinjer.
+Tack för att du vill bidra till `Avkroken/Avkroken`. Den här guiden gäller för detta repository; andra Avkroken-repositories har egna lokala bidragsriktlinjer.
 
 ## Hitta rätt kanal
 
@@ -57,4 +57,4 @@ Genom att bidra intygar du att du har rätt att skicka in ändringen. Bidrag omf
 
 Följ repositoryts egna `CONTRIBUTING.md`, `AGENTS.md` och dokumentation när sådana finns. Intern drift- och arkitekturkontext publiceras inte genom det här repositoryt.
 
-Om ett repository innehåller en lokal `CONTRIBUTING.md` gäller den före den här gemensamma standarden.
+Repositoryts lokala `AGENTS.md` och mer specifika instruktioner i `docs/` har företräde när de preciserar denna guide.
