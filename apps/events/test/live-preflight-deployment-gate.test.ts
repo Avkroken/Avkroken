@@ -94,4 +94,12 @@ test("deployment gate rejects malformed array fields without throwing", async ()
       reason.includes("proxy.routes")
     ),
   );
+
+  const malformedMethods = value.proxy as unknown as { providerMethods: unknown };
+  malformedMethods.providerMethods = null;
+  assert.ok(
+    validateLivePreflightDeploymentPlanV1(value).some((reason) =>
+      reason.includes("proxy.providerMethods")
+    ),
+  );
 });
