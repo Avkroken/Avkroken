@@ -11,6 +11,10 @@
 - Om `{agent}/{feature}/{date}` redan finns för uppgiften ska agenten fortsätta den befintliga arbetslinjen i stället för att skapa en ny.
 - Commits ska använda Conventional Commits eller motsvarande tydlig typ, exempelvis `feat:`, `fix:`, `docs:`, `chore:`, `ci:` eller `test:`.
 - Läs hela PR-review-state före merge, inklusive kommentarer och trådar som GitHub markerar som `outdated`; verifiera att grundproblemet faktiskt är löst.
+- GitHub Issues är agentens spårbara arbetsplats: länka specifikation, genomförande, testresultat, changelog/release och PR. Använd `Fixes #N` endast när hela issueacceptansen faktiskt är uppfylld.
+- Agentinitierade GitHub-skrivoperationer via användarens OAuth-anslutning måste redovisas som agentoperationer i relevant issue/PR med vilken agent, ändring och commit/PR som berörs. Visa separat att GitHubs registrerade aktör är `Avkroken` och **inte bevisar** vilken person eller session som utförde åtgärden.
+- Stäng inte en PR utan merge på eget initiativ. Om den inte ska fortsätta: dokumentera orsak och uttryckligt beslut i PR innan stängning. Den repo-lokala closure-auditen registrerar provideraktören även när GitHubs aktörsnamn inte kan skilja agent från kontoägare.
+- Behandla aldrig grennamn (`codex/*`, `chatgpt/*`) eller commit-metadata som autentiserad agentidentitet. Automatiskt privilegierade flöden kräver en av GitHub verifierad separat botidentitet.
 - Kör endast den berörda applikationens deploykommandon när deployment uttryckligen ingår i scope.
 - Lägg aldrig secrets, tokens, privata nycklar eller credentialvärden i repositoryt.
 - Observationsarkitekturen — inklusive Skvallerbyttan, Ingest och Events — ska fortsatt vara read-only mot externa providers.
