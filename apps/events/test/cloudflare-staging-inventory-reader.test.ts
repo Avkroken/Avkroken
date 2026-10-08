@@ -20,6 +20,7 @@ async function plan(): Promise<RuntimeProvisioningPlanV1> {
 
 function proxy(overrides: Partial<CloudflareStagingInventoryProxyV1> = {}): CloudflareStagingInventoryProxyV1 {
   return {
+    getAccountIdentity: async () => ({ id: "account-1" }),
     listD1Databases: async () => [],
     getD1Database: async () => { throw new Error("unexpected detail"); },
     listQueues: async () => [],
