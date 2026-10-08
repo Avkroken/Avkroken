@@ -16,9 +16,12 @@ on:
       - ".github/scripts/test_wait_for_checks.py"
       - ".github/workflows/automation-post-merge.yml"
       - ".github/workflows/bot-pr-lifecycle.yml"
+      - ".github/workflows/pr-closure-audit.yml"
       - ".github/workflows/ci.yml"
       - ".github/scripts/automation_post_merge.py"
       - ".github/scripts/test_automation_post_merge.py"
+      - ".github/scripts/audit_pr_closure.py"
+      - ".github/scripts/test_audit_pr_closure.py"
       - ".github/release-baseline"
       - ".github/release-required-checks"
   push:
@@ -70,10 +73,13 @@ jobs:
             .github/scripts/wait_for_checks.py \
             .github/scripts/test_wait_for_checks.py \
             .github/scripts/automation_post_merge.py \
-            .github/scripts/test_automation_post_merge.py
+            .github/scripts/test_automation_post_merge.py \
+            .github/scripts/audit_pr_closure.py \
+            .github/scripts/test_audit_pr_closure.py
           python3 .github/scripts/test_publish_release.py
           python3 .github/scripts/test_wait_for_checks.py
           python3 .github/scripts/test_automation_post_merge.py
+          python3 .github/scripts/test_audit_pr_closure.py
           python3 .github/scripts/semantic_release.py \
             --forced-bump auto \
             --channel stable \
