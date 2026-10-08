@@ -673,6 +673,8 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
         const requireKinds = accessRuleKinds(policy.require);
         const excludeKinds = accessRuleKinds(policy.exclude);
         const decision = text(policy.decision);
+        const selectorsComplete = Array.isArray(policy.include)
+          && ![...includeKinds, ...requireKinds, ...excludeKinds].includes("unknown");
         const hasEveryoneInclude = includeKinds.includes("everyone");
         return [{
           id: text(policy.id),
@@ -683,14 +685,19 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
           requireKinds,
           excludeKinds,
           mfaDisabled: bool(record(policy.mfa_config)?.mfa_disabled),
+          selectorsComplete,
           // A review signal, not a claim that the application is publicly open.
-          reviewRequired: (decision === "allow" || decision === "bypass") && hasEveryoneInclude && requireKinds.length === 0,
+          reviewRequired: selectorsComplete
+            ? (decision === "allow" || decision === "bypass") && hasEveryoneInclude && requireKinds.length === 0
+            : null,
         }];
       });
-      item.policyCoverage = page.truncated ? "partial" : "available";
+      const policyEvidenceComplete = policies.every((policy) => policy.selectorsComplete);
+      const itemComplete = !page.truncated && page.items.length === policies.length && policyEvidenceComplete;
+      item.policyCoverage = itemComplete ? "available" : "partial";
       item.policyCount = page.totalCount ?? policies.length;
       item.policies = policies;
-      if (page.truncated || page.items.length !== policies.length) complete = false;
+      if (!itemComplete) complete = false;
     } catch (error) {
       complete = false;
       item.policyCoverage = error instanceof CloudflareApiError
