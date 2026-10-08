@@ -684,7 +684,7 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
           excludeKinds,
           mfaDisabled: bool(record(policy.mfa_config)?.mfa_disabled),
           // A review signal, not a claim that the application is publicly open.
-          reviewRequired: decision === "allow" && hasEveryoneInclude && requireKinds.length === 0,
+          reviewRequired: (decision === "allow" || decision === "bypass") && hasEveryoneInclude && requireKinds.length === 0,
         }];
       });
       item.policyCoverage = page.truncated ? "partial" : "available";
