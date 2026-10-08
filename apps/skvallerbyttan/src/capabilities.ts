@@ -277,7 +277,7 @@ export const CAPABILITY_DEFINITIONS: readonly CapabilityDefinition[] = [
     scope: "account",
     implemented: true,
     providerSupport: "supported",
-    endpoint: "GET /accounts/{account_id}/access/apps/{app_id}/policies",
+    endpoint: "GET /accounts/{account_id}/access/apps/{app_id}/policies + /accounts/{account_id}/access/policies",
     permission: "Access: Apps and Policies Read",
     permissionLevel: "read",
     supports: ["app_policy_rules", "reusable_policy_rules", "coverage", "review_signals"],

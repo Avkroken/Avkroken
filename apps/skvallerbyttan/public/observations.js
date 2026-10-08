@@ -304,13 +304,20 @@ function renderCloudflareZeroTrust(access, tunnels, posture) {
   const postureStatus = posture.available === false
     ? pathStatus(posture)
     : posture.complete === true ? "available" : "partial";
+  const shared = posture.reusablePolicies || { policyCoverage: "unknown", items: [] };
   return `
     ${kv([
       ["Access applications", `${statusBadge(pathStatus(access))} ${access.available === false ? "—" : fmtInt(access.count)}`],
       ["Access policy evidence", `${statusBadge(postureStatus)} ${posture.available === false ? "—" : fmtInt(posture.count)}`],
+      ["Reusable Access policies", `${statusBadge(shared.policyCoverage)} ${shared.count == null ? "—" : fmtInt(shared.count)}`],
       ["Tunnels", `${statusBadge(pathStatus(tunnels))} ${tunnels.available === false ? "—" : fmtInt(tunnels.count)}`],
     ])}
     <p class="small">Policyer: sanerade Include/Require/Exclude-typer. Granskningssignal är inte bevis för offentlig åtkomst. Okänd/partiell täckning är aldrig ett godkännande.</p>
+    <p class="small">Återanvändbara policys: ${statusBadge(shared.policyCoverage)} · policyns appCount är provideruppgift, inte bevis för effektiv åtkomst.</p>
+    ${list((shared.items || []).slice(0, 20).map((policy) =>
+      `<li><strong>${esc(policy.name || "Reusable policy")}</strong> · ${policy.reviewRequired === null ? statusBadge("partial") : policy.reviewRequired ? statusBadge("review") : statusBadge("available")}
+      <span class="small">· kopplade appar: ${esc(policy.appCount ?? "—")} · ${esc(policy.decision || "unknown")} · Include: ${esc((policy.includeKinds || []).join(", ") || "—")} · Require: ${esc((policy.requireKinds || []).join(", ") || "—")}</span></li>`
+    ), "Inga återanvändbara policys observerade.")}
     ${list((posture.items || []).slice(0, 15).map((item) => {
       const flags = (item.policies || []).filter((policy) => policy.reviewRequired).length;
       const includeKinds = [...new Set((item.policies || []).flatMap((policy) => policy.includeKinds || []))];
