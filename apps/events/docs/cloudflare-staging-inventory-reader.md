@@ -51,7 +51,8 @@ The adapter returns only:
 - Worker binding names/types/resource IDs;
 - route/trigger identifiers;
 - provider-bound account ID;
-- active deployment commit SHA only when every serving version resolves to the same commit.
+- active deployment commit SHA and bindings from the single serving version.
+  Gradual/two-version deployments do not qualify for reuse.
 
 It intentionally drops:
 
