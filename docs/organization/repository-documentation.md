@@ -36,9 +36,9 @@ Varje app under `apps/*` äger:
 
 Det finns ingen central engineeringkälla som fristående repositories måste läsa.
 
-### Avkroken/.github
+### Repository-lokal modell
 
-Får bära organisationsprofil, community health och en **genererad lässpegel** av dokumentation. Spegeln är navigation, inte source of truth.
+Det finns inget separat centralt repository för organisationsprofil, community health eller dokumentationsspegel. Varje repository bär de community-, dokumentations- och automationsfiler som det behöver.
 
 ## Navigationsflöde
 

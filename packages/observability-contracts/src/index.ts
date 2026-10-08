@@ -11,8 +11,6 @@ export const OBSERVATION_STATUSES = [
   "error",
 ] as const;
 
-export const AUTH_ISSUER_V1 = "https://auth.denied.se" as const;
-
 export const SERVICE_IDS = [
   "auth",
   "ingest",
@@ -57,7 +55,6 @@ export type PermissionState = "granted" | "permission_denied" | "not_required" |
 export type Freshness = "fresh" | "stale" | "unknown";
 export type Completeness = "complete" | "partial" | "unknown";
 export type IncidentStateV1 = "open" | "recovering" | "resolved";
-export type IdentityKindV1 = "user" | "machine" | "service";
 
 export type IngressSourceV1 =
   | "github"
@@ -317,19 +314,6 @@ export interface AggregateV1<TSections extends Record<string, SectionResultV1<un
   sections: TSections;
 }
 
-export interface AuthClaimsV1 {
-  v: 1;
-  iss: typeof AUTH_ISSUER_V1;
-  sub: string;
-  kind: IdentityKindV1;
-  aud: string | string[];
-  scopes: string[];
-  iat: number;
-  exp: number;
-  nbf?: number;
-  jti: string;
-}
-
 export function isObservationStatus(value: string): value is ObservationStatus {
   return (OBSERVATION_STATUSES as readonly string[]).includes(value);
 }
@@ -387,22 +371,6 @@ export function clampPageLimit(value: number | undefined, defaults = { value: 50
   const integer = Math.trunc(value as number);
   if (integer < 1) return 1;
   return Math.min(integer, defaults.max);
-}
-
-export function authClaimsAllow(
-  claims: AuthClaimsV1,
-  audience: string,
-  requiredScopes: readonly string[],
-  nowSeconds = Math.floor(Date.now() / 1000),
-): boolean {
-  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (claims.iss !== AUTH_ISSUER_V1) return false;
-  if (!audiences.includes(audience)) return false;
-  if (claims.nbf !== undefined && claims.nbf > nowSeconds) return false;
-  if (claims.iat > nowSeconds + 60) return false;
-  if (claims.exp <= nowSeconds) return false;
-  const scopes = new Set(claims.scopes);
-  return requiredScopes.every((scope) => scopes.has(scope));
 }
 
 export function isFlatMetadata(

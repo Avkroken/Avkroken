@@ -42,6 +42,7 @@ Dokumentet beskriver de GitHub App-permissions som observationskoden behöver. F
 | KV inventory | `GET /accounts/{id}/storage/kv/namespaces` | Workers KV Storage Read | R1 | account | implementerad |
 | R2 inventory | `GET /accounts/{id}/r2/buckets` | Workers R2 Storage Read | R1 | account | implementerad |
 | Access applications | `GET /accounts/{id}/access/apps` | Access: Apps and Policies Read | R3 | account | implementerad |
+| Access policy posture (redacted selector kinds only) | `GET /accounts/{id}/access/apps/{app_id}/policies` + `GET /accounts/{id}/access/policies` | Access: Apps and Policies Read | R3 | account | implementerad; values och e-postadresser exponeras aldrig; `permission_denied` och partiell coverage visas explicit |
 | Tunnels | `GET /accounts/{id}/cfd_tunnel` | Cloudflare One Connector: cloudflared Read | R3 | account | implementerad |
 | Notifications | `GET /accounts/{id}/alerting/v3/*` | Notifications Read | R2 | account | implementerad |
 | CASB/Zero Trust | CASB read API/webhook config | Zero Trust Read | R3 | account | implementerad |

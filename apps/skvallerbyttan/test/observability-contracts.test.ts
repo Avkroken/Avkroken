@@ -1,17 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  AUTH_ISSUER_V1,
   OBSERVATION_STATUSES,
   SERVICE_IDS,
-  authClaimsAllow,
   clampPageLimit,
   effectiveStatus,
   freshnessFromTimestamp,
   isFlatMetadata,
   isObservationStatus,
   statusFromHttp,
-  type AuthClaimsV1,
 } from "../../../packages/observability-contracts/src/index.ts";
 
 test("shared status vocabulary preserves current Skvallerbyttan semantics", () => {
@@ -80,22 +77,10 @@ test("page limits clamp untrusted values", () => {
   assert.equal(clampPageLimit(17.9), 17);
 });
 
-test("auth claims require issuer, audience, expiry and every requested scope", () => {
-  const claims: AuthClaimsV1 = {
-    v: 1,
-    iss: AUTH_ISSUER_V1,
-    sub: "machine:chatgpt",
-    kind: "machine",
-    aud: ["api"],
-    scopes: ["observations:read", "events:read"],
-    iat: 1_000,
-    exp: 2_000,
-    jti: "opaque",
-  };
-  assert.equal(authClaimsAllow(claims, "api", ["observations:read"], 1_500), true);
-  assert.equal(authClaimsAllow(claims, "api", ["logs:read"], 1_500), false);
-  assert.equal(authClaimsAllow(claims, "state", ["observations:read"], 1_500), false);
-  assert.equal(authClaimsAllow(claims, "api", ["observations:read"], 2_001), false);
+test("retired Krösa-Maja auth issuer and claim evaluator are not exported", async () => {
+  const contracts = await import("../../../packages/observability-contracts/src/index.ts");
+  assert.equal("AUTH_ISSUER_V1" in contracts, false);
+  assert.equal("authClaimsAllow" in contracts, false);
 });
 
 test("event metadata stays flat instead of carrying raw provider payloads", () => {

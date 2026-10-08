@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   getCloudflareAccessApplications,
+  getCloudflareAccessPolicyPosture,
   getCloudflareAccount,
   getCloudflareAuditLogs,
   getCloudflareD1Databases,
@@ -135,5 +136,172 @@ test("Cloudflare inventories follow page and cursor pagination without reading c
     assert.equal(seen.some((url) => url.includes("/objects")), false);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("Access posture uses R3 GET and redacts rule values while highlighting broad policies", async () => {
+  const previous = globalThis.fetch;
+  const calls: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    calls.push(url.pathname);
+    assert.equal((init?.method || "GET").toUpperCase(), "GET");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer token-r3");
+    if (url.pathname.endsWith("/access/apps")) {
+      return new Response(JSON.stringify({ success: true, result: [
+        { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "Private dashboard", domain: "private.example" },
+      ] }));
+    }
+    if (url.pathname.endsWith("/access/policies")) {
+      return new Response(JSON.stringify({ success: true, result: [] }));
+    }
+    if (url.pathname.endsWith("/access/apps/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/policies")) {
+      return new Response(JSON.stringify({ success: true, result: [{
+        id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        name: "Everyone",
+        decision: "allow",
+        include: [{ everyone: {} }, { email: { email: "private@example.com" } }],
+        require: [],
+        exclude: [{ ip: { ip: "192.0.2.4" } }],
+        mfa_config: { mfa_disabled: true },
+        secret: "highly-sensitive-secret",
+      }, {
+        id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        decision: "bypass",
+        include: [{everyone: {}}],
+        require: [],
+        exclude: [],
+      }] }));
+    }
+    throw new Error("unexpected endpoint " + url.pathname);
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.count, 1);
+    assert.equal(posture.items[0].policyCoverage, "available");
+    assert.equal(posture.items[0].policies[0].reviewRequired, true);
+    assert.equal(posture.items[0].policies[1].reviewRequired, true);
+    assert.deepEqual(posture.items[0].policies[0].includeKinds, ["email", "everyone"]);
+    assert.deepEqual(posture.items[0].policies[0].excludeKinds, ["ip"]);
+    assert.deepEqual(posture.items[0].policies[0].requireKinds, []);
+    assert.equal(posture.items[0].policies[0].mfaDisabled, true);
+    const serialized = JSON.stringify(posture);
+    for (const secret of ["private@example.com", "192.0.2.4", "highly-sensitive-secret"]) {
+      assert.equal(serialized.includes(secret), false);
+    }
+    assert.equal(calls.length, 3);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("Access posture fails to unknown on denied policy details, not to green", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/access/apps?")) {
+      return new Response(JSON.stringify({success:true, result:[
+        { id: "cccccccc-cccc-cccc-cccc-cccccccccccc", name: "Portal" },
+      ]}));
+    }
+    return new Response(JSON.stringify({success:false, errors:[{message:"forbidden"}]}), {status:403});
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.items[0].policyCoverage, "permission_denied");
+    assert.deepEqual(posture.items[0].policies, []);
+    assert.equal(posture.complete, false);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("policy list metadata without selector evidence cannot be marked complete", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/access/apps?")) {
+      return new Response(JSON.stringify({success:true, result:[
+        {id:"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",name:"Protected app"},
+      ]}));
+    }
+    if (url.includes("/access/policies?")) {
+      return new Response(JSON.stringify({success:true, result:[]}));
+    }
+    return new Response(JSON.stringify({success:true, result:[
+      {id:"ffffffff-ffff-ffff-ffff-ffffffffffff", decision:"allow", name:"Reference only"},
+    ]}));
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.complete, false);
+    assert.equal(posture.items[0].policyCoverage, "partial");
+    assert.equal(posture.items[0].policies[0].reviewRequired, null);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("reusable Access policies are observed via standalone R3 GET with sanitized rule kinds", async () => {
+  const previous = globalThis.fetch;
+  const urls: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    urls.push(url.pathname);
+    assert.equal(init?.method, "GET");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer token-r3");
+    if (url.pathname.endsWith("/access/apps")) {
+      return new Response(JSON.stringify({success:true,result:[]}));
+    }
+    if (url.pathname.endsWith("/access/policies")) {
+      return new Response(JSON.stringify({success:true,result:[{
+        id:"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        name:"Shared rule",
+        reusable:true,
+        app_count:3,
+        decision:"allow",
+        include:[{everyone:{}},{email:{email:"private@example.com"}}],
+        require:[],
+        exclude:[{ip:{ip:"192.0.2.12"}}],
+        secret:"do-not-expose",
+      }]}));
+    }
+    throw new Error("unexpected read " + url.pathname);
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.reusablePolicies.policyCoverage, "available");
+    assert.equal(posture.reusablePolicies.count, 1);
+    assert.equal(posture.reusablePolicies.items[0].appCount, 3);
+    assert.equal(posture.reusablePolicies.items[0].reviewRequired, true);
+    assert.deepEqual(posture.reusablePolicies.items[0].includeKinds, ["email", "everyone"]);
+    assert.deepEqual(posture.reusablePolicies.items[0].excludeKinds, ["ip"]);
+    assert.deepEqual(posture.reusablePolicies.items[0].requireKinds, []);
+    assert.equal(posture.complete, true);
+    assert.ok(urls.some((url) => url.endsWith("/access/policies")));
+    const serialized = JSON.stringify(posture);
+    for (const value of ["private@example.com","192.0.2.12","do-not-expose"]) {
+      assert.equal(serialized.includes(value), false);
+    }
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("denied reusable policy inventory makes posture incomplete without leaking details", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    if (String(input).includes("/access/apps?")) {
+      return new Response(JSON.stringify({success:true,result:[]}));
+    }
+    return new Response(JSON.stringify({success:false,errors:[{message:"denied"}]}),{status:403});
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.complete, false);
+    assert.equal(posture.reusablePolicies.policyCoverage, "permission_denied");
+    assert.deepEqual(posture.reusablePolicies.items, []);
+  } finally {
+    globalThis.fetch = previous;
   }
 });
