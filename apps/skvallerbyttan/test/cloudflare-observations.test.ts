@@ -162,6 +162,12 @@ test("Access posture uses R3 GET and redacts rule values while highlighting broa
         exclude: [{ ip: { ip: "192.0.2.4" } }],
         mfa_config: { mfa_disabled: true },
         secret: "highly-sensitive-secret",
+      }, {
+        id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+        decision: "bypass",
+        include: [{everyone: {}}],
+        require: [],
+        exclude: [],
       }] }));
     }
     throw new Error("unexpected endpoint " + url.pathname);
@@ -171,6 +177,7 @@ test("Access posture uses R3 GET and redacts rule values while highlighting broa
     assert.equal(posture.count, 1);
     assert.equal(posture.items[0].policyCoverage, "available");
     assert.equal(posture.items[0].policies[0].reviewRequired, true);
+    assert.equal(posture.items[0].policies[1].reviewRequired, true);
     assert.deepEqual(posture.items[0].policies[0].includeKinds, ["email", "everyone"]);
     assert.deepEqual(posture.items[0].policies[0].excludeKinds, ["ip"]);
     assert.deepEqual(posture.items[0].policies[0].requireKinds, []);
