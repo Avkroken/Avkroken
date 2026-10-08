@@ -674,6 +674,7 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
         const excludeKinds = accessRuleKinds(policy.exclude);
         const decision = text(policy.decision);
         const selectorsComplete = Array.isArray(policy.include)
+          && includeKinds.length > 0
           && ![...includeKinds, ...requireKinds, ...excludeKinds].includes("unknown");
         const hasEveryoneInclude = includeKinds.includes("everyone");
         return [{
