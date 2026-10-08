@@ -6,6 +6,7 @@ import {
   type LivePreflightDeploymentPlanV1,
 } from "../control-plane/live-preflight-deployment-gate.ts";
 
+/** Load the canonical live-preflight deployment plan fixture. */
 async function plan(): Promise<LivePreflightDeploymentPlanV1> {
   return JSON.parse(
     await readFile(new URL("../live-preflight-deployment.v1.json", import.meta.url), "utf8"),
@@ -41,6 +42,7 @@ test("deployment gate rejects public exposure, provider writes and staging resou
   value.proxy.providerMethods = ["GET", "POST"];
   value.proxy.resourceBindings.d1 = ["EVENTS_DB"];
   value.proxy.resourceBindings.queues = ["EVENTS_QUEUE"];
+  value.proxy.resourceBindings.services = ["PROD_SERVICE"];
   value.providerMutationAllowed = true;
   value.providerDestinationsMayChange = true;
   value.teardown.required = false;
@@ -53,6 +55,7 @@ test("deployment gate rejects public exposure, provider writes and staging resou
     "proxy.providerMethods",
     "proxy.resourceBindings.d1",
     "proxy.resourceBindings.queues",
+    "proxy.resourceBindings.services",
     "providerMutationAllowed",
     "providerDestinationsMayChange",
     "teardown.required",
@@ -71,4 +74,24 @@ test("operator binding must target the exact temporary proxy named entrypoint re
   assert.ok(reasons.some((reason) => reason.includes("operator.serviceBinding.service")));
   assert.ok(reasons.some((reason) => reason.includes("operator.serviceBinding.entrypoint")));
   assert.ok(reasons.some((reason) => reason.includes("operator.serviceBinding.remote")));
+});
+
+
+test("deployment gate rejects malformed array fields without throwing", async () => {
+  const value = await plan();
+  const malformed = value.proxy as unknown as { routes: unknown };
+
+  malformed.routes = "";
+  assert.ok(
+    validateLivePreflightDeploymentPlanV1(value).some((reason) =>
+      reason.includes("proxy.routes")
+    ),
+  );
+
+  malformed.routes = null;
+  assert.ok(
+    validateLivePreflightDeploymentPlanV1(value).some((reason) =>
+      reason.includes("proxy.routes")
+    ),
+  );
 });
