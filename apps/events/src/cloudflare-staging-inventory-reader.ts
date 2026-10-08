@@ -18,6 +18,7 @@ export type CloudflareWorkerInspectionPayloadV1 = {
 };
 
 export interface CloudflareStagingInventoryProxyV1 {
+  getAccountIdentity(): Promise<unknown>;
   listD1Databases(): Promise<unknown>;
   getD1Database(databaseId: string): Promise<unknown>;
   listQueues(): Promise<unknown>;
@@ -111,6 +112,11 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
     private readonly plan: RuntimeProvisioningPlanV1,
     private readonly proxy: CloudflareStagingInventoryProxyV1,
   ) {}
+
+  async getAccountId(): Promise<string> {
+    const account = record(await this.proxy.getAccountIdentity(), "account.detail");
+    return requiredString(account.id, "account.detail.id");
+  }
 
   private async loadDatabases(): Promise<ProviderDatabaseInventoryV1[]> {
     if (this.databaseListPromise) return this.databaseListPromise;
