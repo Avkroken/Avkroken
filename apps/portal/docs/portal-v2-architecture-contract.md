@@ -46,7 +46,7 @@ User-owner-modellen är därför implementerad på Del 1-arbetet:
 - GitHub App-installationen valideras genom current canonical repository `Avkroken/Avkroken`;
 - `SKVALLERBYTTAN_GITHUB_OWNER=Avkroken` är current config, med legacy `SKVALLERBYTTAN_ORG` endast som kompatibilitetsfallback;
 - organization-only Actions policies, Custom Properties och organization security configuration markeras explicit `not_supported` när GitHub App-installationens account type är User, i stället för att 404 behandlas som okänd providerstate;
-- motsvarande Pages/Wiki-spegeländring är mergad i `Avkroken/.github` via PR #89.
+- Wiki- och dokumentationspublicering ägs repository-lokalt; ingen central dokumentationsspegel används.
 
 Eftersom current owner är ett GitHub User-konto ska organization-only capabilities fortsatt vara `not_supported` så länge account type förblir User. Canonical owner-värden, GitHub App-installation, repository discovery, webhooks, Pages/Wiki och Portalens publiceringsflöden är därför verifierade mot det oförändrade loginet `Avkroken`, inte mot en framtida rename.
 
@@ -187,21 +187,17 @@ Repository-Wiki är presentation/navigation, inte canonical teknisk source of tr
 
 Verifierad `wiki-sync.yml` finns i current repositories för bland annat monorepot, Bastion, Produkter och Klarspråk. Ytterligare fristående repositories har också repo-lokala Wiki-flöden.
 
-`Avkroken/.github` innehåller den automatiska dokumentationsspegeln och Pages-workflowen. Den spegeln:
+`Det finns ingen central dokumentationsspegel eller central Pages-workflow. Varje repository äger sin dokumentation, Wiki-synk och eventuell Pages-publicering lokalt.
 
-- läser publik repositorydokumentation/Wikis;
-- publicerar en genererad läsvy;
-- är inte canonical;
-- exkluderar monorepots generiska `apps/**`-innehåll;
-- exkluderar `Avkroken/Avkroken` från den generiska sökindexvägen eftersom monorepot innehåller både publika och skyddade appytor.
+Portal får läsa publika repositorykällor genom sina uttryckliga adapters, men ska inte skapa en andra canonical dokumentationsyta. Monorepots skyddade appytor ska fortsatt hållas utanför publik indexering.
 
-Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske genom uttrycklig app-policy, inte genom en generell Pages-indexerare.
+Detta bevarar Jobb/Auth-gränsen. Portalens app-publicering ska fortsatt ske genom uttrycklig app-policy, inte genom en generell organisationsindexerare.
 
 ## 3. B — Gap mot målbild
 
 | Gap | Current state | Önskat state | Påverkat område | Risk | Fas |
 | --- | --- | --- | --- | --- | --- |
-| GitHub owner/login | **Löst** — Organization → privat User-owner är redan genomfört, login är fortsatt `Avkroken`, user-owner-stöd är implementerat och providerflöden använder current owner | Behåll `Avkroken` som canonical owner så länge providerstate inte ändras; någon rename-migrering är inte aktuell | Portal + Skvallerbyttan + `.github` | låg; verifiera live igen endast om owner/account type faktiskt ändras | slutfört |
+| GitHub owner/login | **Löst** — Organization → privat User-owner är redan genomfört, login är fortsatt `Avkroken`, user-owner-stöd är implementerat och providerflöden använder current owner | Behåll `Avkroken` som canonical owner så länge providerstate inte ändras; någon rename-migrering är inte aktuell | Portal + Skvallerbyttan | låg; verifiera live igen endast om owner/account type faktiskt ändras | slutfört |
 | Cloudflare Workers Previews | **Storage löst 2026-10-01** — Portal har isolerad Preview-Durable Object; Jobb binder separat EU-D1 `jobb-preview-eu` och EU-R2 `jobb-evidence-preview`; Skvallerbyttan binder separat EU-D1 `skvallerbyttan-stats-preview-eu` och separat Analytics Engine-dataset. Båda D1-previewresurserna är migrerade `0001`–`0006`. Production-D1/R2 återanvänds inte | Behåll statebindings isolerade och applicera framtida D1-migrationer på både production och preview. Workflow/Email/Secrets Store/Service Bindings/providercredentials ska fortsatt vara fail-closed tills dedikerade previewtargets/identiteter finns | Portal + Skvallerbyttan + Jobb | låg för isolerad storage; side-effect-risk hålls stängd genom frånvarande providerbindings | storage slutfört; provider-side effects medvetet fail-closed |
 | Figma | **Parkerad** — den tidigare länkade filen är inte originaldesignen och får inte användas som designreferens | Återuppta endast efter ett nytt uttryckligt beslut och en verifierad originalkälla; runtime/Git gäller tills dess | Portal design | låg | deferred |
 | Del 1 efter implementation | Betydande Del 2/3-lik implementation är redan mergad på `main` | Fortsatt arbete utgår från verifierad current implementation, inte från briefens ursprungliga clean-slate-ordning | Portal | regressionsrisk om gammal plan återimplementeras | Del 1 |
@@ -450,14 +446,14 @@ Varje separat implementationjobb använder egen branch/PR, men ett redan påbör
 | Portal current architecture | verifierad i repository | runtime/routes/adapters/cache/docs lästa |
 | Skvallerbyttan portalrelevanta API/state | verifierad i repository | named RPC/read-only kontrakt och storage/reconciliation dokumenterade |
 | Jobb/Auth-boundary | verifierad i repository | server-side Portal-redirect + Jobbs authmodell |
-| Pages/Wiki-flöden | verifierad i repository | repo-local Wiki sync + .github Pages mirror/accessgräns |
-| repo-/appinventering | verifierad för connector-visible repos | 9 repositories + tre aktiva monorepo-appar |
+| Pages/Wiki-flöden | verifierad i repository | repo-local Wiki sync och repo-local Pages/publiceringspolicy |
+| repo-/appinventering | verifierad för connector-visible repos | 7 repositories + tre aktiva monorepo-appar |
 | IA | beslutad | behåll current Portal v2 IA ovan |
 | URL-modell | beslutad | behåll current path-baserade kontrakt |
 | adapter/cachemodell | beslutad | adapters för repo/docs, Skvallerbyttan för operations, separat Jobb backend |
 | public/protected-kontrakt | beslutad | fail-closed före index/cache/datafetch |
 | designsystemplan | verifierad i repo; Figma parkerad och tidigare fil ej originaldesign | runtime Git/Git-historik är source of truth tills verifierad originalkälla uttryckligen återinförs |
-| releaseinventering | verifierad | komplett publik providerinventering genomförd för Avkroken, Bastion, Politiker, Pastebinit, Docker-idempotent-update, Produkter, Klarsprak och `.github`; repoägda kontrakt separat verifierade |
+| releaseinventering | verifierad | komplett publik providerinventering genomförd för Avkroken, Bastion, Politiker, Pastebinit, Docker-idempotent-update, Produkter och Klarsprak; repoägda kontrakt separat verifierade |
 | Del 2/3-ordning | beslutad | audit/completion ovan |
 | blockers dokumenterade | verifierad | Preview-build och isolerad stateful storage är lösta. Provider-side effects är medvetet fail-closed tills separata previewidentiteter finns. Discussion-innehåll kräver `Discussions: read`, som nuvarande GitHub App-kontrakt inte deklarerar. Figma är parkerat. GitHub owner/scope är löst |
 | out-of-scope governance ändrad | nej | inga rulesets/branch protections/planändringar gjorda |
