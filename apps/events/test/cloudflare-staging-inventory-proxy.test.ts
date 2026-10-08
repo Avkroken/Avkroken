@@ -460,3 +460,71 @@ test("response body limit is enforced while streaming", async () => {
   );
   assert.ok(pulls <= 2);
 });
+
+
+test("account identity is provider-bound and sanitized", async () => {
+  const proxy = service(async (input) => {
+    const url = new URL(String(input));
+    assert.equal(url.pathname, `/client/v4/accounts/${ACCOUNT_ID}`);
+    return success({ id: ACCOUNT_ID, name: TOKEN, settings: { secret: TOKEN } });
+  });
+
+  const identity = await proxy.getAccountIdentity();
+  assert.deepEqual(identity, { id: ACCOUNT_ID });
+  assert.equal(JSON.stringify(identity).includes(TOKEN), false);
+});
+
+test("active Worker deployment resolves every serving version without leaking metadata", async () => {
+  const proxy = service(async (input) => {
+    const url = new URL(String(input));
+    const path = url.pathname;
+    if (path.endsWith("/workers/workers")) {
+      return success(
+        [{ id: "worker-id", name: "events-staging" }],
+        { page: 1, per_page: 100, total_count: 1, total_pages: 1 },
+      );
+    }
+    if (path.endsWith("/workers/scripts/events-staging/deployments")) {
+      return success({
+        deployments: [{
+          id: "deployment-id",
+          versions: [
+            { version_id: "version-a", percentage: 60 },
+            { version_id: "version-b", percentage: 40 },
+          ],
+          annotations: { "workers/message": TOKEN },
+        }],
+      });
+    }
+    if (path.endsWith("/workers/workers/worker-id/versions/version-a")) {
+      return success({
+        id: "version-a",
+        annotations: {
+          "workers/commit_sha": "a".repeat(40),
+          "workers/message": TOKEN,
+        },
+        ignored: TOKEN,
+      });
+    }
+    if (path.endsWith("/workers/workers/worker-id/versions/version-b")) {
+      return success({
+        id: "version-b",
+        annotations: {
+          "workers/commit_sha": "b".repeat(40),
+          "workers/message": TOKEN,
+        },
+        ignored: TOKEN,
+      });
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+
+  const deployment = await proxy.getActiveWorkerDeployment("events-staging");
+  assert.deepEqual(deployment, {
+    versions: [
+      { version_id: "version-a", percentage: 60, commit_sha: "a".repeat(40) },
+      { version_id: "version-b", percentage: 40, commit_sha: "b".repeat(40) },
+    ],
+  });
+  assert.equal(JSON.stringify(deployment).includes(TOKEN), false);
+});
