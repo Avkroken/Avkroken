@@ -197,16 +197,20 @@ test("planned worker inspection maps bindings/routes without exposing values", a
             }],
           },
         },
-        settings: {
-          annotations: { "workers/commit_sha": "a".repeat(40) },
-          bindings: [
-            { type: "d1", name: "EVENTS_DB", database_id: "staging-db" },
-            { type: "plain_text", name: "SHOULD_BLOCK", text: "must-not-leak" },
-            { type: "secret_text", name: "SECRET", text: "must-not-leak-secret" },
-          ],
-        },
         schedules: { schedules: [] },
         routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [
+            { type: "d1", name: "EVENTS_DB", database_id: "staging-db" },
+            { type: "plain_text", name: "SHOULD_BLOCK" },
+            { type: "secret_text", name: "SECRET" },
+          ],
+        }],
       }),
     }),
   );
@@ -293,6 +297,14 @@ test("unknown provider shape fails closed through collector coverage without pro
         },
         schedules: { schedules: [] },
         routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [{ name: "UNKNOWN_WITH_SECRET", value: "provider-secret" }],
+        }],
       }),
     }),
   );
