@@ -29,4 +29,4 @@ Varje fristående repository äger själv:
 - Discussions,
 - repo-specifika tekniska instruktioner.
 
-Den samlade organisationsvyn kan speglas automatiskt via `Avkroken/.github`, men spegeln är inte canonical.
+Det finns ingen central dokumentationsspegel. Varje repository äger sin dokumentation och sina tekniska instruktioner lokalt.
