@@ -200,20 +200,6 @@ test("worker inspection is named, complete, and sanitizes binding values", async
         ignored: TOKEN,
       });
     }
-    if (path.endsWith("/workers/scripts/events-staging/settings")) {
-      return success({
-        annotations: {
-          "workers/commit_sha": "b".repeat(40),
-          "workers/message": TOKEN,
-        },
-        bindings: [
-          { type: "d1", name: "EVENTS_DB", database_id: "stage-db", secret: TOKEN },
-          { type: "plain_text", name: "PLAIN", text: TOKEN },
-          { type: "secret_text", name: "SECRET", text: TOKEN },
-          { type: "service", name: "UNPLANNED", service: TOKEN },
-        ],
-      });
-    }
     if (path.endsWith("/workers/scripts/events-staging/schedules")) {
       return success({ schedules: [{ cron: "*/5 * * * *", ignored: TOKEN }] });
     }
@@ -254,15 +240,6 @@ test("worker inspection is named, complete, and sanitizes binding values", async
           queue_name: "avkroken-ingest-events-preview-v1",
         }],
       },
-    },
-    settings: {
-      annotations: { "workers/commit_sha": "b".repeat(40) },
-      bindings: [
-        { type: "d1", name: "EVENTS_DB", database_id: "stage-db" },
-        { type: "plain_text", name: "PLAIN" },
-        { type: "secret_text", name: "SECRET" },
-        { type: "service", name: "UNPLANNED" },
-      ],
     },
     schedules: { schedules: [{ cron: "*/5 * * * *" }] },
     routes: ["example.test/events/*"],
@@ -413,9 +390,6 @@ test("missing schedule inventory fails closed", async () => {
     }
     if (path.endsWith("/workers/workers/worker-id")) {
       return success({ name: "events-staging", references: {} });
-    }
-    if (path.endsWith("/workers/scripts/events-staging/settings")) {
-      return success({ annotations: {}, bindings: [] });
     }
     if (path.endsWith("/workers/scripts/events-staging/schedules")) {
       return success({});
