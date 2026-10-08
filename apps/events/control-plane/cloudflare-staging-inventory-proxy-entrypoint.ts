@@ -19,6 +19,12 @@ implements CloudflareStagingInventoryProxyV1 {
     return this.service().getAccountIdentity();
   }
 
+  getActiveWorkerDeployment(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<unknown> {
+    return this.service().getActiveWorkerDeployment(workerName);
+  }
+
   listD1Databases(): Promise<unknown> {
     return this.service().listD1Databases();
   }
