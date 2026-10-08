@@ -19,6 +19,9 @@ export type CloudflareWorkerInspectionPayloadV1 = {
 
 export interface CloudflareStagingInventoryProxyV1 {
   getAccountIdentity(): Promise<unknown>;
+  getActiveWorkerDeployment(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<unknown>;
   listD1Databases(): Promise<unknown>;
   getD1Database(databaseId: string): Promise<unknown>;
   listQueues(): Promise<unknown>;
@@ -93,15 +96,46 @@ function plannedWorkerName(
   throw new CloudflareInventoryShapeError("worker.name");
 }
 
-function annotationCommitSha(settings: UnknownRecord): string | null {
-  const annotations = settings.annotations;
-  if (annotations == null) return null;
-  const values = record(annotations, "worker.settings.annotations");
-  const commit = optionalString(values["workers/commit_sha"], "worker.settings.annotations.workers/commit_sha");
-  if (commit !== null && !/^[0-9a-f]{40,64}$/i.test(commit)) {
-    throw new CloudflareInventoryShapeError("worker.settings.annotations.workers/commit_sha");
+function activeDeploymentCommitSha(value: unknown): string | null {
+  const deployment = record(value, "worker.deployment");
+  const versions = array(deployment.versions, "worker.deployment.versions");
+  if (versions.length < 1 || versions.length > 2) {
+    throw new CloudflareInventoryShapeError("worker.deployment.versions");
   }
-  return commit;
+
+  const commits = new Set<string>();
+  let percentageTotal = 0;
+  for (let index = 0; index < versions.length; index += 1) {
+    const version = record(versions[index], `worker.deployment.versions[${index}]`);
+    requiredString(version.version_id, `worker.deployment.versions[${index}].version_id`);
+    const percentage = optionalNumber(
+      version.percentage,
+      `worker.deployment.versions[${index}].percentage`,
+    );
+    if (percentage === null || percentage <= 0 || percentage > 100) {
+      throw new CloudflareInventoryShapeError(
+        `worker.deployment.versions[${index}].percentage`,
+      );
+    }
+    percentageTotal += percentage;
+
+    const commit = optionalString(
+      version.commit_sha,
+      `worker.deployment.versions[${index}].commit_sha`,
+    );
+    if (commit === null) return null;
+    if (!/^[0-9a-f]{40,64}$/i.test(commit)) {
+      throw new CloudflareInventoryShapeError(
+        `worker.deployment.versions[${index}].commit_sha`,
+      );
+    }
+    commits.add(commit.toLowerCase());
+  }
+
+  if (Math.abs(percentageTotal - 100) > 0.000001) {
+    throw new CloudflareInventoryShapeError("worker.deployment.percentageTotal");
+  }
+  return commits.size === 1 ? [...commits][0] : null;
 }
 
 export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadPortV1 {
@@ -249,7 +283,10 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
   async inspectWorker(name: string): Promise<ProviderWorkerInspectionV1> {
     const allowedName = plannedWorkerName(this.plan, name);
-    const payload = await this.proxy.inspectPlannedWorker(allowedName);
+    const [payload, activeDeployment] = await Promise.all([
+      this.proxy.inspectPlannedWorker(allowedName),
+      this.proxy.getActiveWorkerDeployment(allowedName),
+    ]);
     const worker = record(payload.worker, "worker.detail");
     const actualName = requiredString(worker.name, "worker.detail.name");
     if (actualName !== allowedName) throw new CloudflareInventoryShapeError("worker.detail.name");
@@ -388,7 +425,7 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
     return {
       name: allowedName,
-      deploymentCommitSha: annotationCommitSha(settings),
+      deploymentCommitSha: activeDeploymentCommitSha(activeDeployment),
       publicRoutes: [...new Set(publicRoutes)].sort(),
       secretBindings: [...new Set(secretBindings)].sort(),
       plainTextVars: [...new Set(plainTextVars)].sort(),
