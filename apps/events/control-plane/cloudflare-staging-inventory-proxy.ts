@@ -82,6 +82,42 @@ function resultInfo(value: unknown): UnknownRecord | null {
     : null;
 }
 
+async function readBoundedResponseBody(
+  response: Response,
+  operation: string,
+): Promise<string> {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let body = "";
+  let receivedBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > MAX_RESPONSE_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Preserve the bounded-response classification.
+        }
+        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+    body += decoder.decode();
+    return body;
+  } catch (error) {
+    if (error instanceof CloudflareControlPlaneReadError) throw error;
+    throw new CloudflareControlPlaneReadError(operation, "body_read");
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function sanitizeD1ListItem(value: unknown): UnknownRecord {
   const item = record(value, "d1.list");
   return {
@@ -293,15 +329,7 @@ implements CloudflareStagingInventoryProxyV1 {
         throw new CloudflareControlPlaneReadError(operation, "response_too_large");
       }
 
-      let body: string;
-      try {
-        body = await response.text();
-      } catch {
-        throw new CloudflareControlPlaneReadError(operation, "body_read");
-      }
-      if (new TextEncoder().encode(body).byteLength > MAX_RESPONSE_BYTES) {
-        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
-      }
+      const body = await readBoundedResponseBody(response, operation);
 
       let parsed: UnknownRecord;
       try {
