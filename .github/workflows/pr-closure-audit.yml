@@ -1,0 +1,29 @@
+name: Unmerged PR closure audit
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  audit:
+    name: Record GitHub closure actor and immutable run
+    if: ${{ github.event.pull_request.merged == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Never execute PR head code with a write-capable token.
+      - name: Checkout trusted default branch scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Audit unmerged closure
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: python3 .github/scripts/audit_pr_closure.py
