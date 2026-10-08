@@ -213,12 +213,10 @@ function sanitizeSettings(value: unknown): UnknownRecord {
 
 function sanitizeSchedules(value: unknown): UnknownRecord {
   const schedule = record(value, "worker.schedules");
-  const schedules = schedule.schedules == null
-    ? []
-    : array(schedule.schedules, "worker.schedules.schedules").map((value) => {
-        const item = record(value, "worker.schedules.schedules[]");
-        return { cron: item.cron ?? null };
-      });
+  const schedules = array(schedule.schedules, "worker.schedules.schedules").map((value) => {
+    const item = record(value, "worker.schedules.schedules[]");
+    return { cron: item.cron ?? null };
+  });
   return { schedules };
 }
 
