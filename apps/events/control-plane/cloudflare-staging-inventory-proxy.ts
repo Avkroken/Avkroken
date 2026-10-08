@@ -235,23 +235,6 @@ function sanitizeWorkerDetail(
   };
 }
 
-function sanitizeSettings(value: unknown): UnknownRecord {
-  const settings = record(value, "worker.settings");
-  const annotations = settings.annotations == null
-    ? {}
-    : record(settings.annotations, "worker.settings.annotations");
-  const bindings = settings.bindings == null
-    ? []
-    : array(settings.bindings, "worker.settings.bindings").map(sanitizeBinding);
-
-  return {
-    annotations: {
-      "workers/commit_sha": annotations["workers/commit_sha"] ?? null,
-    },
-    bindings,
-  };
-}
-
 function sanitizeSchedules(value: unknown): UnknownRecord {
   const schedule = record(value, "worker.schedules");
   const schedules = array(schedule.schedules, "worker.schedules.schedules").map((value) => {
@@ -712,17 +695,12 @@ implements CloudflareStagingInventoryProxyV1 {
 
     const account = encodeURIComponent(this.accountId);
     const script = encodeURIComponent(workerName);
-    const [detailEnvelope, settingsEnvelope, schedulesEnvelope, domains, routes] =
+    const [detailEnvelope, schedulesEnvelope, domains, routes] =
       await Promise.all([
         this.getEnvelope(
           token,
           "worker.detail",
           `/accounts/${account}/workers/workers/${encodeURIComponent(workerId)}`,
-        ),
-        this.getEnvelope(
-          token,
-          "worker.settings",
-          `/accounts/${account}/workers/scripts/${script}/settings`,
         ),
         this.getEnvelope(
           token,
@@ -740,7 +718,6 @@ implements CloudflareStagingInventoryProxyV1 {
 
     return {
       worker: sanitizeWorkerDetail(detailEnvelope.result, domainReferences),
-      settings: sanitizeSettings(settingsEnvelope.result),
       schedules: sanitizeSchedules(schedulesEnvelope.result),
       routes,
     };
