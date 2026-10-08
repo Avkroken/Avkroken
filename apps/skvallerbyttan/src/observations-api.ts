@@ -3,6 +3,7 @@ import {
   CloudflareApiError,
   getCloudflareAccount,
   getCloudflareAccessApplications,
+  getCloudflareAccessPolicyPosture,
   getCloudflareAuditLogs,
   getCloudflareCasbWebhooks,
   getCloudflareD1Databases,
@@ -852,6 +853,19 @@ export async function handleObservationApi(
       15 * MINUTE,
       { capability: "cloudflare.avkroken.zero_trust.access", provider: "cloudflare", consumer },
       () => cloudflareRead(env, "cloudflare.avkroken.zero_trust.access", () => getCloudflareAccessApplications(env)),
+      forceRefresh,
+    );
+  }
+
+  if (url.pathname === "/api/v1/cloudflare/zero-trust/access-posture") {
+    return cached(
+      env,
+      context,
+      "cloudflare:zero-trust:access-posture",
+      "cloudflare",
+      15 * MINUTE,
+      { capability: "cloudflare.avkroken.zero_trust.policy_posture", provider: "cloudflare", consumer },
+      () => cloudflareRead(env, "cloudflare.avkroken.zero_trust.policy_posture", () => getCloudflareAccessPolicyPosture(env)),
       forceRefresh,
     );
   }
