@@ -387,3 +387,18 @@ test("credential lookup failures are sanitized before network access", async () 
   );
   assert.equal(called, false);
 });
+
+
+test("Worker pagination fails closed when provider count metadata is inconsistent", async () => {
+  const proxy = service(async () => success(
+    [{ id: "worker-id", name: "events-staging" }],
+    { page: 1, per_page: 100, total_count: 2, total_pages: 1 },
+  ));
+
+  await assert.rejects(
+    () => proxy.listWorkers(),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "pagination_incomplete",
+  );
+});
