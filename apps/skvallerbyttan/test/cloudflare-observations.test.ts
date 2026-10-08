@@ -152,6 +152,9 @@ test("Access posture uses R3 GET and redacts rule values while highlighting broa
         { id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name: "Private dashboard", domain: "private.example" },
       ] }));
     }
+    if (url.pathname.endsWith("/access/policies")) {
+      return new Response(JSON.stringify({ success: true, result: [] }));
+    }
     if (url.pathname.endsWith("/access/apps/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/policies")) {
       return new Response(JSON.stringify({ success: true, result: [{
         id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -186,7 +189,7 @@ test("Access posture uses R3 GET and redacts rule values while highlighting broa
     for (const secret of ["private@example.com", "192.0.2.4", "highly-sensitive-secret"]) {
       assert.equal(serialized.includes(secret), false);
     }
-    assert.equal(calls.length, 2);
+    assert.equal(calls.length, 3);
   } finally {
     globalThis.fetch = previous;
   }
@@ -221,6 +224,9 @@ test("policy list metadata without selector evidence cannot be marked complete",
       return new Response(JSON.stringify({success:true, result:[
         {id:"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",name:"Protected app"},
       ]}));
+    }
+    if (url.includes("/access/policies?")) {
+      return new Response(JSON.stringify({success:true, result:[]}));
     }
     return new Response(JSON.stringify({success:true, result:[
       {id:"ffffffff-ffff-ffff-ffff-ffffffffffff", decision:"allow", name:"Reference only"},
