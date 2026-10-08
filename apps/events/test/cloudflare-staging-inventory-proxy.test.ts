@@ -438,3 +438,27 @@ test("missing schedule inventory fails closed", async () => {
       && error.code === "invalid_shape",
   );
 });
+
+
+test("response body limit is enforced while streaming", async () => {
+  let pulls = 0;
+  const proxy = service(async () => new Response(new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls += 1;
+      if (pulls === 1) {
+        controller.enqueue(new Uint8Array(2_000_001));
+        return;
+      }
+      throw new Error(`body should have been cancelled ${TOKEN}`);
+    },
+  }), { status: 200, headers: { "content-type": "application/json" } }));
+
+  await assert.rejects(
+    () => proxy.listWorkers(),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "response_too_large"
+      && !String(error).includes(TOKEN),
+  );
+  assert.equal(pulls, 1);
+});
