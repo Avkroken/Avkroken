@@ -503,6 +503,7 @@ test("active Worker deployment resolves every serving version without leaking me
           "workers/commit_sha": "a".repeat(40),
           "workers/message": TOKEN,
         },
+        bindings: [{ type: "secret_text", name: "ACTIVE_SECRET", text: TOKEN }],
         ignored: TOKEN,
       });
     }
@@ -513,6 +514,7 @@ test("active Worker deployment resolves every serving version without leaking me
           "workers/commit_sha": "b".repeat(40),
           "workers/message": TOKEN,
         },
+        bindings: [],
         ignored: TOKEN,
       });
     }
@@ -522,8 +524,18 @@ test("active Worker deployment resolves every serving version without leaking me
   const deployment = await proxy.getActiveWorkerDeployment("events-staging");
   assert.deepEqual(deployment, {
     versions: [
-      { version_id: "version-a", percentage: 60, commit_sha: "a".repeat(40) },
-      { version_id: "version-b", percentage: 40, commit_sha: "b".repeat(40) },
+      {
+        version_id: "version-a",
+        percentage: 60,
+        commit_sha: "a".repeat(40),
+        bindings: [{ type: "secret_text", name: "ACTIVE_SECRET" }],
+      },
+      {
+        version_id: "version-b",
+        percentage: 40,
+        commit_sha: "b".repeat(40),
+        bindings: [],
+      },
     ],
   });
   assert.equal(JSON.stringify(deployment).includes(TOKEN), false);
