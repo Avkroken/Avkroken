@@ -12,7 +12,6 @@ type UnknownRecord = Record<string, unknown>;
 
 export type CloudflareWorkerInspectionPayloadV1 = {
   worker: unknown;
-  settings: unknown;
   schedules: unknown;
   routes: unknown;
 };
