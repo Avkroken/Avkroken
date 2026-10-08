@@ -235,3 +235,67 @@ test("policy list metadata without selector evidence cannot be marked complete",
     globalThis.fetch = previous;
   }
 });
+
+test("reusable Access policies are observed via standalone R3 GET with sanitized rule kinds", async () => {
+  const previous = globalThis.fetch;
+  const urls: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    urls.push(url.pathname);
+    assert.equal(init?.method, "GET");
+    assert.equal(new Headers(init?.headers).get("authorization"), "Bearer token-r3");
+    if (url.pathname.endsWith("/access/apps")) {
+      return new Response(JSON.stringify({success:true,result:[]}));
+    }
+    if (url.pathname.endsWith("/access/policies")) {
+      return new Response(JSON.stringify({success:true,result:[{
+        id:"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        name:"Shared rule",
+        reusable:true,
+        app_count:3,
+        decision:"allow",
+        include:[{everyone:{}},{email:{email:"private@example.com"}}],
+        require:[],
+        exclude:[{ip:{ip:"192.0.2.12"}}],
+        secret:"do-not-expose",
+      }]}));
+    }
+    throw new Error("unexpected read " + url.pathname);
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.reusablePolicies.policyCoverage, "available");
+    assert.equal(posture.reusablePolicies.count, 1);
+    assert.equal(posture.reusablePolicies.items[0].appCount, 3);
+    assert.equal(posture.reusablePolicies.items[0].reviewRequired, true);
+    assert.deepEqual(posture.reusablePolicies.items[0].includeKinds, ["email", "everyone"]);
+    assert.deepEqual(posture.reusablePolicies.items[0].excludeKinds, ["ip"]);
+    assert.deepEqual(posture.reusablePolicies.items[0].requireKinds, []);
+    assert.equal(posture.complete, true);
+    assert.ok(urls.some((url) => url.endsWith("/access/policies")));
+    const serialized = JSON.stringify(posture);
+    for (const value of ["private@example.com","192.0.2.12","do-not-expose"]) {
+      assert.equal(serialized.includes(value), false);
+    }
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("denied reusable policy inventory makes posture incomplete without leaking details", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    if (String(input).includes("/access/apps?")) {
+      return new Response(JSON.stringify({success:true,result:[]}));
+    }
+    return new Response(JSON.stringify({success:false,errors:[{message:"denied"}]}),{status:403});
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.complete, false);
+    assert.equal(posture.reusablePolicies.policyCoverage, "permission_denied");
+    assert.deepEqual(posture.reusablePolicies.items, []);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
