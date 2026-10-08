@@ -51,6 +51,7 @@ function evidence(): StagingInventoryEvidenceV1 {
 
 function reader(overrides: Partial<StagingInventoryReadPortV1> = {}): StagingInventoryReadPortV1 {
   return {
+    getAccountId: async () => "account-1",
     listDatabases: async () => [],
     listQueues: async () => [],
     listQueueConsumers: async () => [],
