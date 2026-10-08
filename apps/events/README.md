@@ -65,3 +65,9 @@ The operator-only composition seam is
 only and returns a sanitized preflight report. Its contract and stop conditions
 are documented in [`docs/staging-preflight.md`](docs/staging-preflight.md).
 A passing preflight does not authorize Cloudflare writes.
+
+The next provider-write boundary is described by
+`live-preflight-deployment.v1.json` and
+[`docs/live-preflight-deployment-gate.md`](docs/live-preflight-deployment-gate.md).
+It is a machine-validated deployment plan only; no proxy Worker is deployed by
+the repository contract.

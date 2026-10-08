@@ -116,3 +116,17 @@ returned by the report. It has no provider-write, deploy or provisioning method.
 
 No control-plane Worker/binding has been deployed yet; live read-only execution
 remains a separate operational gate.
+
+
+## Live preflight deployment gate
+
+`live-preflight-deployment.v1.json` now locks the smallest allowed temporary
+topology for the first provider-backed staging inventory run: a private
+`events-staging-inventory-proxy` with W1 bound server-side from the existing
+Secrets Store, GET-only provider access, no runtime resource bindings and no
+public route/workers.dev/preview URL.
+
+The operator remains local and may reach only the named
+`CloudflareStagingInventoryProxyEntrypoint` through a remote Service Binding.
+Deployment and teardown are separate provider-write operations and have not been
+performed by this repository slice.
