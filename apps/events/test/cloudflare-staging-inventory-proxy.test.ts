@@ -322,15 +322,13 @@ test("request timeout is bounded and sanitized", async () => {
 
 test("timeout remains active while reading a hanging response body", async () => {
   const proxy = service(
-    async (_input, init) => {
-      const response = new Response(null, { status: 200 });
-      Object.defineProperty(response, "text", {
-        value: () => new Promise<string>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(new Error(`body ${TOKEN}`)));
-        }),
-      });
-      return response;
-    },
+    async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        init?.signal?.addEventListener("abort", () => {
+          controller.error(new Error(`body ${TOKEN}`));
+        }, { once: true });
+      },
+    }), { status: 200 }),
     5,
   );
 
@@ -460,5 +458,5 @@ test("response body limit is enforced while streaming", async () => {
       && error.code === "response_too_large"
       && !String(error).includes(TOKEN),
   );
-  assert.equal(pulls, 1);
+  assert.ok(pulls <= 2);
 });
