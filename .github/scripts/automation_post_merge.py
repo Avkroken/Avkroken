@@ -46,10 +46,13 @@ def is_trusted_merge(pr, repository, default_branch, head_sha):
     role = user.get("type")
     if login in {"dependabot[bot]", "copilot-swe-agent[bot]"}:
         return role == "Bot"
-    if not str(head.get("ref") or "").startswith("codex/"):
-        return False
-    return (login == "Avkroken" and role == "User") or (
-        login == "gamnacken[bot]" and role == "Bot"
+    # A user OAuth connection may act as Avkroken on a codex/* branch; a
+    # branch name is not an authenticated agent principal. Do not elevate it.
+    # OAuth-authored merges trigger native push workflows without this dispatch.
+    return (
+        login == "gamnacken[bot]"
+        and role == "Bot"
+        and str(head.get("ref") or "").startswith("codex/")
     )
 
 
