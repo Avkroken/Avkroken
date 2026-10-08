@@ -327,3 +327,38 @@ test("D1 detail identity mismatch fails closed", async () => {
     (error: unknown) => error instanceof CloudflareInventoryShapeError && error.field === "d1.detail.identity",
   );
 });
+
+
+test("deployment commit requires every active version to agree", async () => {
+  const activePayload = {
+    worker: {
+      name: "events-staging",
+      subdomain: { enabled: false, previews_enabled: false },
+      references: { domains: [], queues: [] },
+    },
+    settings: {
+      annotations: { "workers/commit_sha": "b".repeat(40) },
+      bindings: [],
+    },
+    schedules: { schedules: [] },
+    routes: [],
+    deployment: {
+      versions: [
+        { version_id: "version-old", percentage: 50, commit_sha: "a".repeat(40) },
+        { version_id: "version-new", percentage: 50, commit_sha: "b".repeat(40) },
+      ],
+    },
+  };
+
+  const reader = new CloudflareStagingInventoryReaderV1(
+    await plan(),
+    proxy({
+      listD1Databases: async () => [],
+      listQueues: async () => [],
+      inspectPlannedWorker: async () => activePayload,
+    }),
+  );
+
+  const inspected = await reader.inspectWorker("events-staging");
+  assert.equal(inspected.deploymentCommitSha, null);
+});
