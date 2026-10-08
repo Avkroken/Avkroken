@@ -212,3 +212,26 @@ test("Access posture fails to unknown on denied policy details, not to green", a
     globalThis.fetch = previous;
   }
 });
+
+test("policy list metadata without selector evidence cannot be marked complete", async () => {
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.includes("/access/apps?")) {
+      return new Response(JSON.stringify({success:true, result:[
+        {id:"eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",name:"Protected app"},
+      ]}));
+    }
+    return new Response(JSON.stringify({success:true, result:[
+      {id:"ffffffff-ffff-ffff-ffff-ffffffffffff", decision:"allow", name:"Reference only"},
+    ]}));
+  };
+  try {
+    const posture = await getCloudflareAccessPolicyPosture(env) as any;
+    assert.equal(posture.complete, false);
+    assert.equal(posture.items[0].policyCoverage, "partial");
+    assert.equal(posture.items[0].policies[0].reviewRequired, null);
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
