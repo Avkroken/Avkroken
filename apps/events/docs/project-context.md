@@ -89,8 +89,9 @@ shapes into `StagingInventoryReadPortV1` through a named server-side proxy
 contract. Worker detail inspection is allowlisted to `events-staging` and
 `ingest-staging`; the adapter never receives a token or exposes a generic
 Cloudflare API proxy. Existing Worker reuse is bound to the active deployment:
-every serving version is resolved and all active versions must expose the same
-expected repository commit or reuse is blocked.
+every serving version is resolved. Reuse is allowed only for a single active
+version whose commit matches the expected repository commit; bindings are read
+from that active version rather than from independently mutable script settings.
 
 
 ## Staging inventory control-plane proxy
