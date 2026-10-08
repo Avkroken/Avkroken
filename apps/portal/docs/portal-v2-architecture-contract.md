@@ -17,7 +17,6 @@ GitHub-connectorn visar följande åtkomliga repositories:
 | Repository | Visibility | Default branch | Roll i Portal v2 |
 | --- | --- | --- | --- |
 | `Avkroken/Avkroken` | public | `main` | monorepo för Portal, Skvallerbyttan och Jobb |
-| `Avkroken/.github` | public | `main` | GitHub-profil/community health och genererad dokumentationsspegel |
 | `Avkroken/Bastion` | public | `main` | fristående projekt |
 | `Avkroken/Produkter` | public | `main` | självständig publik produkt |
 | `Avkroken/Klarsprak` | public | `main` | självständig publik produkt |
