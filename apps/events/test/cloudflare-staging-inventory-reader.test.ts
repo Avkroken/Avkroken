@@ -21,6 +21,13 @@ async function plan(): Promise<RuntimeProvisioningPlanV1> {
 function proxy(overrides: Partial<CloudflareStagingInventoryProxyV1> = {}): CloudflareStagingInventoryProxyV1 {
   return {
     getAccountIdentity: async () => ({ id: "account-1" }),
+    getActiveWorkerDeployment: async () => ({
+      versions: [{
+        version_id: "version-default",
+        percentage: 100,
+        commit_sha: "a".repeat(40),
+      }],
+    }),
     listD1Databases: async () => [],
     getD1Database: async () => { throw new Error("unexpected detail"); },
     listQueues: async () => [],
@@ -342,12 +349,6 @@ test("deployment commit requires every active version to agree", async () => {
     },
     schedules: { schedules: [] },
     routes: [],
-    deployment: {
-      versions: [
-        { version_id: "version-old", percentage: 50, commit_sha: "a".repeat(40) },
-        { version_id: "version-new", percentage: 50, commit_sha: "b".repeat(40) },
-      ],
-    },
   };
 
   const reader = new CloudflareStagingInventoryReaderV1(
@@ -356,6 +357,12 @@ test("deployment commit requires every active version to agree", async () => {
       listD1Databases: async () => [],
       listQueues: async () => [],
       inspectPlannedWorker: async () => activePayload,
+      getActiveWorkerDeployment: async () => ({
+        versions: [
+          { version_id: "version-old", percentage: 50, commit_sha: "a".repeat(40) },
+          { version_id: "version-new", percentage: 50, commit_sha: "b".repeat(40) },
+        ],
+      }),
     }),
   );
 
