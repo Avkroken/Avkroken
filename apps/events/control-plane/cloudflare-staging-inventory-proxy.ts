@@ -614,10 +614,13 @@ implements CloudflareStagingInventoryProxyV1 {
           "invalid_commit_sha",
         );
       }
+      const bindings = array(version.bindings, "worker.version.bindings")
+        .map(sanitizeBinding);
       return {
         version_id: versionId,
         percentage,
         commit_sha: commitSha,
+        bindings,
       };
     }));
 
