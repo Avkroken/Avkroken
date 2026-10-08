@@ -531,6 +531,106 @@ implements CloudflareStagingInventoryProxyV1 {
     return this.listWorkersWithToken(await this.token("workers.list"));
   }
 
+  async getActiveWorkerDeployment(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<unknown> {
+    if (!PLANNED_WORKER_NAMES.has(workerName)) {
+      throw new CloudflareControlPlaneReadError("worker.deployment", "not_allowlisted");
+    }
+
+    const token = await this.token("worker.deployment");
+    const workers = await this.listWorkersWithToken(token);
+    const workerSummary = workers
+      .map((value) => record(value, "workers.list"))
+      .find((value) => string(value.name) === workerName);
+    const workerId = string(workerSummary?.id);
+    if (!workerId) {
+      throw new CloudflareControlPlaneReadError("worker.deployment", "not_found");
+    }
+
+    const account = encodeURIComponent(this.accountId);
+    const script = encodeURIComponent(workerName);
+    const deploymentsEnvelope = await this.getEnvelope(
+      token,
+      "worker.deployments",
+      `/accounts/${account}/workers/scripts/${script}/deployments`,
+    );
+    const deploymentContainer = record(
+      deploymentsEnvelope.result,
+      "worker.deployments",
+    );
+    const deployments = array(
+      deploymentContainer.deployments,
+      "worker.deployments.deployments",
+    );
+    if (deployments.length < 1) {
+      throw new CloudflareControlPlaneReadError("worker.deployments", "not_found");
+    }
+
+    const active = record(deployments[0], "worker.deployments.active");
+    const versions = array(
+      active.versions,
+      "worker.deployments.active.versions",
+    );
+    if (versions.length < 1 || versions.length > 2) {
+      throw new CloudflareControlPlaneReadError(
+        "worker.deployments",
+        "invalid_shape",
+      );
+    }
+
+    let percentageTotal = 0;
+    const resolved = await Promise.all(versions.map(async (value, index) => {
+      const item = record(value, `worker.deployments.active.versions[${index}]`);
+      const versionId = string(item.version_id);
+      const percentage = number(item.percentage);
+      if (!versionId || percentage === null || percentage <= 0 || percentage > 100) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.deployments",
+          "invalid_shape",
+        );
+      }
+      percentageTotal += percentage;
+
+      const versionEnvelope = await this.getEnvelope(
+        token,
+        "worker.version",
+        `/accounts/${account}/workers/workers/${encodeURIComponent(workerId)}/versions/${encodeURIComponent(versionId)}`,
+      );
+      const version = record(versionEnvelope.result, "worker.version");
+      if (string(version.id) !== versionId) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.version",
+          "identity_mismatch",
+        );
+      }
+      const annotations = version.annotations == null
+        ? {}
+        : record(version.annotations, "worker.version.annotations");
+      const commitSha = string(annotations["workers/commit_sha"]);
+      if (commitSha !== null && !/^[0-9a-f]{40,64}$/i.test(commitSha)) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.version",
+          "invalid_commit_sha",
+        );
+      }
+      return {
+        version_id: versionId,
+        percentage,
+        commit_sha: commitSha,
+      };
+    }));
+
+    if (Math.abs(percentageTotal - 100) > 0.000001) {
+      throw new CloudflareControlPlaneReadError(
+        "worker.deployments",
+        "invalid_percentage_total",
+      );
+    }
+
+    return { versions: resolved };
+  }
+
   private async listDomainsWithToken(token: string): Promise<unknown[]> {
     return this.singlePageArray(
       token,
