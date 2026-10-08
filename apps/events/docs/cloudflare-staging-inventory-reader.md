@@ -1,7 +1,7 @@
 # Cloudflare staging inventory reader
 
 **Status:** deploy-neutral read adapter  
-**Verified provider documentation:** 2026-10-07
+**Verified provider documentation:** 2026-10-08
 
 ## Boundary
 
@@ -11,6 +11,8 @@
 The proxy is **not** a generic Cloudflare URL proxy. It exposes named inventory
 operations only:
 
+- read the configured account identity;
+- read the active deployment of an allowlisted staging Worker;
 - list D1 databases;
 - read one D1 database detail;
 - list Queues;
@@ -27,11 +29,13 @@ boundary. Events never receives the token value.
 
 The adapter is based on the current Cloudflare API read surfaces:
 
+- `GET /accounts/{account_id}`;
 - `GET /accounts/{account_id}/d1/database`;
 - `GET /accounts/{account_id}/d1/database/{database_id}`;
 - `GET /accounts/{account_id}/queues`;
 - `GET /accounts/{account_id}/queues/{queue_id}/consumers`;
-- Worker inventory/detail and script/version settings GET surfaces;
+- Worker inventory/detail, active deployments and active version detail GET surfaces;
+- script/version settings GET surfaces;
 - Worker schedules and route/domain/subdomain reads needed to prove staging has no public route.
 
 The proxy implementation must paginate provider list endpoints completely before
@@ -46,7 +50,8 @@ The adapter returns only:
 - Queue retention and consumer policy;
 - Worker binding names/types/resource IDs;
 - route/trigger identifiers;
-- deployment commit SHA when provider metadata exposes `workers/commit_sha`.
+- provider-bound account ID;
+- active deployment commit SHA only when every serving version resolves to the same commit.
 
 It intentionally drops:
 
@@ -64,5 +69,5 @@ interpreting the failure as absence.
 ## Still not provisioned
 
 This file adds no `wrangler` binding, Worker service, credential, Queue, D1,
-DNS route or provider destination. A future server-side proxy implementation and
-live read-only run remain separate steps.
+DNS route or provider destination. The server-side proxy implementation is still
+deploy-neutral; live read-only deployment/binding and execution remain separate steps.
