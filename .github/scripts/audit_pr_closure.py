@@ -29,10 +29,10 @@ def closure_comment(event, repository, run_id):
     run = normalized(run_id, r"[0-9]+")
     return (
         "### GitHub closure audit (unmerged PR)\n\n"
-        f"- GitHub actor: \`{actor}\` (account identity; not verified agent/session identity)\n"
-        f"- Closed at: \`{closed_at}\`\n"
+        f"- GitHub actor: `{actor}` (account identity; not verified agent/session identity)\n"
+        f"- Closed at: `{closed_at}`\n"
         f"- Pull request: #{number}\n"
-        f"- Head SHA: \`{sha}\`\n"
+        f"- Head SHA: `{sha}`\n"
         f"- Audit workflow: https://github.com/{repo}/actions/runs/{run}\n\n"
         "This closure is **not a merge**. If unintended, reopen the PR and "
         "complete checks and review. An OAuth account login cannot establish which "
