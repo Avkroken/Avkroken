@@ -118,6 +118,11 @@ async function readBoundedResponseBody(
   }
 }
 
+function sanitizeAccountIdentity(value: unknown): UnknownRecord {
+  const account = record(value, "account.detail");
+  return { id: account.id };
+}
+
 function sanitizeD1ListItem(value: unknown): UnknownRecord {
   const item = record(value, "d1.list");
   return {
@@ -432,6 +437,20 @@ implements CloudflareStagingInventoryProxyV1 {
       throw new CloudflareControlPlaneReadError(operation, "pagination_incomplete");
     }
     return collected;
+  }
+
+  async getAccountIdentity(): Promise<unknown> {
+    const token = await this.token("account.detail");
+    const envelope = await this.getEnvelope(
+      token,
+      "account.detail",
+      `/accounts/${encodeURIComponent(this.accountId)}`,
+    );
+    const account = sanitizeAccountIdentity(envelope.result);
+    if (string(account.id) !== this.accountId) {
+      throw new CloudflareControlPlaneReadError("account.detail", "identity_mismatch");
+    }
+    return account;
   }
 
   private async listD1WithToken(token: string): Promise<unknown[]> {
