@@ -369,3 +369,39 @@ test("deployment commit requires every active version to agree", async () => {
   const inspected = await reader.inspectWorker("events-staging");
   assert.equal(inspected.deploymentCommitSha, null);
 });
+
+
+test("worker bindings are read from the single active deployment version", async () => {
+  const reader = new CloudflareStagingInventoryReaderV1(
+    await plan(),
+    proxy({
+      listD1Databases: async () => [],
+      listQueues: async () => [],
+      inspectPlannedWorker: async () => ({
+        worker: {
+          name: "events-staging",
+          subdomain: { enabled: false, previews_enabled: false },
+          references: { domains: [], queues: [] },
+        },
+        settings: {
+          annotations: {},
+          bindings: [{ type: "plain_text", name: "UPLOADED_NOT_ACTIVE" }],
+        },
+        schedules: { schedules: [] },
+        routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [{ type: "secret_text", name: "ACTIVE_SECRET" }],
+        }],
+      }),
+    }),
+  );
+
+  const inspected = await reader.inspectWorker("events-staging");
+  assert.deepEqual(inspected.plainTextVars, []);
+  assert.deepEqual(inspected.secretBindings, ["ACTIVE_SECRET"]);
+});
