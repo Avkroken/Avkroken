@@ -59,7 +59,6 @@ Provider responses are minimized before leaving the control-plane seam:
 - Queue: name, ID, retention;
 - consumer: type, Worker name, DLQ and bounded delivery policy;
 - Worker: name, subdomain flags, queue/domain references;
-- settings: binding type/name/resource reference plus non-secret annotations needed by the adapter;
 - active deployment: serving version ID, traffic percentage, commit SHA and
   sanitized binding type/name/resource references;
 - account: account ID only;
@@ -78,7 +77,6 @@ Current Cloudflare read surfaces used by the seam:
 - Queues list/consumers;
 - Workers beta list/detail;
 - Worker deployments plus active version detail;
-- Worker script/version settings;
 - Worker schedules;
 - Worker custom domains;
 - account-filtered Zones list + per-zone Worker routes.
