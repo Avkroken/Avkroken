@@ -316,7 +316,7 @@ function renderCloudflareZeroTrust(access, tunnels, posture) {
       const includeKinds = [...new Set((item.policies || []).flatMap((policy) => policy.includeKinds || []))];
       const requireKinds = [...new Set((item.policies || []).flatMap((policy) => policy.requireKinds || []))];
       return `<li><strong>${esc(item.name || "Access application")}</strong> · ${statusBadge(item.policyCoverage || "unknown")}
-        <span class="small">· ${flags ? esc(flags) + " policy(er) kräver granskning" : "ingen bred Everyone-policy belagd"} · Include: ${esc(includeKinds.join(", ") || "—")} · Require: ${esc(requireKinds.join(", ") || "—")}</span></li>`;
+        <span class="small">· ${item.policyCoverage !== "available" ? "ofullständiga policysvar" : flags ? esc(flags) + " policy(er) kräver granskning" : "ingen bred Everyone-policy belagd"} · Include: ${esc(includeKinds.join(", ") || "—")} · Require: ${esc(requireKinds.join(", ") || "—")}</span></li>`;
     }), "Ingen Access-policyinformation observerad.")}
     ${list((tunnels.items || []).slice(0, 12).map((tunnel) =>
       `<li><strong>${esc(tunnel.name || tunnel.id || "tunnel")}</strong> · ${statusBadge(tunnel.status || "unknown")}<br><span class="small">${esc(tunnel.type || "—")} · ${esc(tunnel.configSource || "—")}</span></li>`
