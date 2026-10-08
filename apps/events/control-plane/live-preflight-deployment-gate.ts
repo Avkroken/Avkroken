@@ -42,10 +42,12 @@ export type LivePreflightDeploymentPlanV1 = {
   };
 };
 
+/** Add a validation reason once while preserving first-seen order. */
 function addReason(reasons: string[], reason: string): void {
   if (!reasons.includes(reason)) reasons.push(reason);
 }
 
+/** Require an exact scalar/configuration value. */
 function requireEqual(
   actual: unknown,
   expected: unknown,
@@ -55,14 +57,29 @@ function requireEqual(
   if (actual !== expected) addReason(reasons, `${field} must equal ${String(expected)}`);
 }
 
+/** Require an actual empty array; malformed non-arrays fail closed. */
 function requireEmpty(
-  value: readonly unknown[],
+  value: unknown,
   field: string,
   reasons: string[],
 ): void {
-  if (value.length !== 0) addReason(reasons, `${field} must be empty`);
+  if (!Array.isArray(value) || value.length !== 0) {
+    addReason(reasons, `${field} must be an empty array`);
+  }
 }
 
+/** Require the provider-method allowlist to contain GET and nothing else. */
+function requireGetOnly(
+  value: unknown,
+  field: string,
+  reasons: string[],
+): void {
+  if (!Array.isArray(value) || value.length !== 1 || value[0] !== "GET") {
+    addReason(reasons, `${field} must contain only GET`);
+  }
+}
+
+/** Validate the exact deploy-neutral topology allowed for live preflight. */
 export function validateLivePreflightDeploymentPlanV1(
   plan: LivePreflightDeploymentPlanV1,
 ): string[] {
@@ -118,12 +135,7 @@ export function validateLivePreflightDeploymentPlanV1(
     reasons,
   );
 
-  if (
-    plan.proxy.providerMethods.length !== 1
-    || plan.proxy.providerMethods[0] !== "GET"
-  ) {
-    addReason(reasons, "proxy.providerMethods must contain only GET");
-  }
+  requireGetOnly(plan.proxy.providerMethods, "proxy.providerMethods", reasons);
 
   requireEmpty(plan.proxy.resourceBindings.d1, "proxy.resourceBindings.d1", reasons);
   requireEmpty(
