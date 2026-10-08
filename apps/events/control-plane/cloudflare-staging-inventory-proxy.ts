@@ -346,7 +346,12 @@ implements CloudflareStagingInventoryProxyV1 {
       const totalPages = number(info?.total_pages);
       const totalCount = number(info?.total_count);
       if (totalPages !== null) {
-        if (page >= totalPages) return collected;
+        if (page >= totalPages) {
+          if (totalCount !== null && collected.length !== totalCount) {
+            throw new CloudflareControlPlaneReadError(operation, "pagination_incomplete");
+          }
+          return collected;
+        }
       } else if (totalCount !== null) {
         if (collected.length >= totalCount) return collected;
       } else if (items.length < perPage) {
