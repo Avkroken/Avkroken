@@ -299,5 +299,6 @@ test("snapshot account is bound to the reader account identity", async () => {
   );
 
   assert.equal(result.snapshot.accountId, "queried-account");
-  assert.equal(result.snapshot.coverage.controlPlane, "complete");
+  assert.equal(result.snapshot.coverage.controlPlane, "partial");
+  assert.deepEqual(result.errors, ["account:evidence_mismatch"]);
 });
