@@ -35,7 +35,6 @@ The adapter is based on the current Cloudflare API read surfaces:
 - `GET /accounts/{account_id}/queues`;
 - `GET /accounts/{account_id}/queues/{queue_id}/consumers`;
 - Worker inventory/detail, active deployments and active version detail GET surfaces;
-- script/version settings GET surfaces;
 - Worker schedules and route/domain/subdomain reads needed to prove staging has no public route.
 
 The proxy implementation must paginate provider list endpoints completely before
