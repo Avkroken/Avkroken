@@ -597,6 +597,122 @@ export async function getCloudflareAccessApplications(env: Env): Promise<Record<
   };
 }
 
+// Access policy rule *values* are intentionally excluded. Even email/domain/group
+// selectors may contain personal or operationally sensitive information.
+const ACCESS_SELECTOR_KINDS = new Set([
+  "everyone", "email", "email_domain", "email_list", "group",
+  "github-organization", "gsuite", "azureAD", "okta", "saml",
+  "ip", "ip_list", "geo", "certificate", "common_name",
+  "service_token", "device_posture", "login_method", "external_evaluation",
+  "any_valid_service_token", "auth_method", "auth_context", "identity",
+]);
+
+function accessRuleKinds(value: unknown): string[] {
+  const kinds = new Set<string>();
+  for (const selector of array(value)) {
+    const rule = record(selector);
+    if (!rule) {
+      kinds.add("unknown");
+      continue;
+    }
+    for (const key of Object.keys(rule)) {
+      kinds.add(ACCESS_SELECTOR_KINDS.has(key) ? key : "unknown");
+    }
+  }
+  return [...kinds].sort();
+}
+
+/**
+ * Account-only, read-only evidence for Access policy triage. Lists app-scoped
+ * AND reusable policies as returned by the provider, without storing rule
+ * values. This is not proof of public reachability or effective MFA state.
+ */
+export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record<string, unknown>> {
+  const apps = await cloudflareListAll<unknown>(env, "/access/apps?per_page=100", {
+    credentialClass: "r3",
+  });
+  // A bounded sequential fan-out limits R3 usage under routine dashboard reads.
+  const maxDetailed = 40;
+  const items: Record<string, unknown>[] = [];
+  let complete = !apps.truncated && apps.items.length <= maxDetailed;
+  const appIdPattern = /^[a-fA-F0-9-]{36}$/;
+
+  for (const value of apps.items.slice(0, maxDetailed)) {
+    const app = record(value);
+    if (!app) {
+      complete = false;
+      continue;
+    }
+    const id = text(app.id);
+    const item: Record<string, unknown> = {
+      id,
+      name: text(app.name),
+      domain: text(app.domain),
+      type: text(app.type),
+      appLauncherVisible: bool(app.app_launcher_visible),
+      pathCookieAttribute: bool(app.path_cookie_attribute),
+      policyCoverage: "unknown",
+      policyCount: null,
+      policies: [],
+    };
+    if (!id || !appIdPattern.test(id)) {
+      complete = false;
+      items.push(item);
+      continue;
+    }
+    try {
+      const page = await cloudflareListAll<unknown>(
+        env,
+        `/access/apps/${encodeURIComponent(id)}/policies?per_page=100`,
+        { credentialClass: "r3", maxPages: 3 },
+      );
+      const policies = page.items.flatMap((entry) => {
+        const policy = record(entry);
+        if (!policy) return [];
+        const includeKinds = accessRuleKinds(policy.include);
+        const requireKinds = accessRuleKinds(policy.require);
+        const excludeKinds = accessRuleKinds(policy.exclude);
+        const decision = text(policy.decision);
+        const hasEveryoneInclude = includeKinds.includes("everyone");
+        return [{
+          id: text(policy.id),
+          name: text(policy.name),
+          decision,
+          precedence: number(policy.precedence),
+          includeKinds,
+          requireKinds,
+          excludeKinds,
+          mfaDisabled: bool(record(policy.mfa_config)?.mfa_disabled),
+          // A review signal, not a claim that the application is publicly open.
+          reviewRequired: decision === "allow" && hasEveryoneInclude && requireKinds.length === 0,
+        }];
+      });
+      item.policyCoverage = page.truncated ? "partial" : "available";
+      item.policyCount = page.totalCount ?? policies.length;
+      item.policies = policies;
+      if (page.truncated || page.items.length !== policies.length) complete = false;
+    } catch (error) {
+      complete = false;
+      item.policyCoverage = error instanceof CloudflareApiError
+        && (error.status === 401 || error.status === 403)
+        ? "permission_denied"
+        : "error";
+    }
+    items.push(item);
+  }
+
+  return {
+    schemaVersion: 2,
+    available: true,
+    complete,
+    count: items.length,
+    totalCount: apps.totalCount,
+    truncated: !complete || apps.truncated,
+    semantics: "policy-rules-only; no claims about effective perimeter or MFA",
+    items,
+  };
+}
+
 export async function getCloudflareTunnels(env: Env): Promise<Record<string, unknown>> {
   const page = await cloudflareListAll<unknown>(
     env,
