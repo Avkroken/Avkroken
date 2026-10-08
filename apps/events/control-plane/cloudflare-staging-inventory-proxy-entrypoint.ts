@@ -15,6 +15,10 @@ implements CloudflareStagingInventoryProxyV1 {
     return new CloudflareStagingInventoryProxyServiceV1(this.env);
   }
 
+  getAccountIdentity(): Promise<unknown> {
+    return this.service().getAccountIdentity();
+  }
+
   listD1Databases(): Promise<unknown> {
     return this.service().listD1Databases();
   }
