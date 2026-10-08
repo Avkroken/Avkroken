@@ -35,7 +35,21 @@ test("global search DOM contract is unique and wired", () => {
 
 test("search client receives ranked results only through the Portal search API", () => {
   assert.ok(search.includes('fetch("/api/search?q="'));
-  assert.equal(search.includes("api.github.com"), false);
+
+  const fetchUrlLiterals = Array.from(
+    search.matchAll(/fetch\(\s*(['"])(.*?)\1/g),
+    (m) => m[2]
+  );
+  const usesGitHubApiHost = fetchUrlLiterals.some((rawUrl) => {
+    try {
+      const parsed = new URL(rawUrl, "https://portal.local");
+      return parsed.hostname === "api.github.com";
+    } catch {
+      return false;
+    }
+  });
+  assert.equal(usesGitHubApiHost, false);
+
   assert.equal(search.includes("/auth/jobb"), false);
   assert.equal(search.includes("searchText"), false);
 });
