@@ -402,3 +402,39 @@ test("Worker pagination fails closed when provider count metadata is inconsisten
       && error.code === "pagination_incomplete",
   );
 });
+
+
+test("missing schedule inventory fails closed", async () => {
+  const proxy = service(async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (path.endsWith("/workers/workers")) {
+      return success([{ id: "worker-id", name: "events-staging" }]);
+    }
+    if (path.endsWith("/workers/workers/worker-id")) {
+      return success({ name: "events-staging", references: {} });
+    }
+    if (path.endsWith("/workers/scripts/events-staging/settings")) {
+      return success({ annotations: {}, bindings: [] });
+    }
+    if (path.endsWith("/workers/scripts/events-staging/schedules")) {
+      return success({});
+    }
+    if (path.endsWith("/workers/domains")) {
+      return success([]);
+    }
+    if (path === "/client/v4/zones") {
+      return success([]);
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+
+  await assert.rejects(
+    () => proxy.inspectPlannedWorker("events-staging"),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "invalid_shape",
+  );
+});
