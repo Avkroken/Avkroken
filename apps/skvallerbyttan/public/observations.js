@@ -313,9 +313,10 @@ function renderCloudflareZeroTrust(access, tunnels, posture) {
     <p class="small">Policyer: sanerade Include/Require/Exclude-typer. Granskningssignal är inte bevis för offentlig åtkomst. Okänd/partiell täckning är aldrig ett godkännande.</p>
     ${list((posture.items || []).slice(0, 15).map((item) => {
       const flags = (item.policies || []).filter((policy) => policy.reviewRequired).length;
-      const selectorKinds = [...new Set((item.policies || []).flatMap((policy) => [...(policy.includeKinds || []), ...(policy.requireKinds || [])]))];
+      const includeKinds = [...new Set((item.policies || []).flatMap((policy) => policy.includeKinds || []))];
+      const requireKinds = [...new Set((item.policies || []).flatMap((policy) => policy.requireKinds || []))];
       return `<li><strong>${esc(item.name || "Access application")}</strong> · ${statusBadge(item.policyCoverage || "unknown")}
-        <span class="small">· ${flags ? esc(flags) + " policy(er) kräver granskning" : "ingen bred Everyone-policy belagd"} · ${esc(selectorKinds.join(", ") || "selektorer ej observerade")}</span></li>`;
+        <span class="small">· ${flags ? esc(flags) + " policy(er) kräver granskning" : "ingen bred Everyone-policy belagd"} · Include: ${esc(includeKinds.join(", ") || "—")} · Require: ${esc(requireKinds.join(", ") || "—")}</span></li>`;
     }), "Ingen Access-policyinformation observerad.")}
     ${list((tunnels.items || []).slice(0, 12).map((tunnel) =>
       `<li><strong>${esc(tunnel.name || tunnel.id || "tunnel")}</strong> · ${statusBadge(tunnel.status || "unknown")}<br><span class="small">${esc(tunnel.type || "—")} · ${esc(tunnel.configSource || "—")}</span></li>`
