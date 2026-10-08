@@ -28,7 +28,7 @@
 
 Bastion, Docker-idempotent-update, Klarsprak, Pastebinit, Politiker och Produkter äger själva sin dokumentation, Wiki, Issues och Discussions. Denna katalog ska inte duplicera eller styra deras tekniska current-state.
 
-Den samlade organisationsvyn kan byggas automatiskt i `Avkroken/.github`, men den vyn är endast en lässpegel.
+Ingen central dokumentationsspegel används. Fristående repositories äger sina egna canonical dokument och instruktioner.
 
 ## Grundregel
 

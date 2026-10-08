@@ -24,7 +24,7 @@ Att koden är publik i repositoryt betyder inte att varje app har en publik runt
 
 Fristående publika Avkroken-repositories har sin egen kod, dokumentation, Wiki, Issues, Discussions och CI.
 
-`Avkroken/.github` är separat för organisationsprofil/community health och kan bära en genererad dokumentationsspegel.
+Det finns inget separat centralrepository för organisationsprofil, community health eller teknisk automation; varje repository är självbärande.
 
 ## Repository-lokal CI
 
