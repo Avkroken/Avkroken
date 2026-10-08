@@ -622,6 +622,35 @@ function accessRuleKinds(value: unknown): string[] {
   return [...kinds].sort();
 }
 
+/** Only selector categories and non-secret policy metadata leave this boundary. */
+function normalizeAccessPolicy(value: unknown): Record<string, unknown>[] {
+  const policy = record(value);
+  if (!policy) return [];
+  const includeKinds = accessRuleKinds(policy.include);
+  const requireKinds = accessRuleKinds(policy.require);
+  const excludeKinds = accessRuleKinds(policy.exclude);
+  const decision = text(policy.decision);
+  const selectorsComplete = Array.isArray(policy.include)
+    && includeKinds.length > 0
+    && ![...includeKinds, ...requireKinds, ...excludeKinds].includes("unknown");
+  return [{
+    id: text(policy.id),
+    name: text(policy.name),
+    decision,
+    precedence: number(policy.precedence),
+    appCount: number(policy.app_count),
+    includeKinds,
+    requireKinds,
+    excludeKinds,
+    mfaDisabled: bool(record(policy.mfa_config)?.mfa_disabled),
+    selectorsComplete,
+    reviewRequired: selectorsComplete
+      ? (decision === "allow" || decision === "bypass")
+        && includeKinds.includes("everyone") && requireKinds.length === 0
+      : null,
+  }];
+}
+
 /**
  * Account-only, read-only evidence for Access policy triage. Lists app-scoped
  * AND reusable policies as returned by the provider, without storing rule
@@ -666,33 +695,7 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
         `/access/apps/${encodeURIComponent(id)}/policies?per_page=100`,
         { credentialClass: "r3", maxPages: 3 },
       );
-      const policies = page.items.flatMap((entry) => {
-        const policy = record(entry);
-        if (!policy) return [];
-        const includeKinds = accessRuleKinds(policy.include);
-        const requireKinds = accessRuleKinds(policy.require);
-        const excludeKinds = accessRuleKinds(policy.exclude);
-        const decision = text(policy.decision);
-        const selectorsComplete = Array.isArray(policy.include)
-          && includeKinds.length > 0
-          && ![...includeKinds, ...requireKinds, ...excludeKinds].includes("unknown");
-        const hasEveryoneInclude = includeKinds.includes("everyone");
-        return [{
-          id: text(policy.id),
-          name: text(policy.name),
-          decision,
-          precedence: number(policy.precedence),
-          includeKinds,
-          requireKinds,
-          excludeKinds,
-          mfaDisabled: bool(record(policy.mfa_config)?.mfa_disabled),
-          selectorsComplete,
-          // A review signal, not a claim that the application is publicly open.
-          reviewRequired: selectorsComplete
-            ? (decision === "allow" || decision === "bypass") && hasEveryoneInclude && requireKinds.length === 0
-            : null,
-        }];
-      });
+      const policies = page.items.flatMap(normalizeAccessPolicy);
       const policyEvidenceComplete = policies.every((policy) => policy.selectorsComplete);
       const itemComplete = !page.truncated && page.items.length === policies.length && policyEvidenceComplete;
       item.policyCoverage = itemComplete ? "available" : "partial";
@@ -709,6 +712,39 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
     items.push(item);
   }
 
+  // Reusable policies have their own account-scoped endpoint and may be
+  // absent from every app-scoped policy list. Missing this read cannot be green.
+  const reusablePolicies: Record<string, unknown> = {
+    policyCoverage: "unknown",
+    count: null,
+    totalCount: null,
+    truncated: true,
+    items: [],
+  };
+  try {
+    const page = await cloudflareListAll<unknown>(
+      env,
+      "/access/policies?per_page=100",
+      { credentialClass: "r3", maxPages: 3 },
+    );
+    const policies = page.items.flatMap(normalizeAccessPolicy);
+    const coverageComplete = !page.truncated
+      && page.items.length === policies.length
+      && policies.every((policy) => policy.selectorsComplete);
+    reusablePolicies.policyCoverage = coverageComplete ? "available" : "partial";
+    reusablePolicies.count = policies.length;
+    reusablePolicies.totalCount = page.totalCount;
+    reusablePolicies.truncated = !coverageComplete;
+    reusablePolicies.items = policies;
+    if (!coverageComplete) complete = false;
+  } catch (error) {
+    complete = false;
+    reusablePolicies.policyCoverage = error instanceof CloudflareApiError
+      && (error.status === 401 || error.status === 403)
+      ? "permission_denied"
+      : "error";
+  }
+
   return {
     schemaVersion: 2,
     available: true,
@@ -717,6 +753,7 @@ export async function getCloudflareAccessPolicyPosture(env: Env): Promise<Record
     totalCount: apps.totalCount,
     truncated: !complete || apps.truncated,
     semantics: "policy-rules-only; no claims about effective perimeter or MFA",
+    reusablePolicies,
     items,
   };
 }
