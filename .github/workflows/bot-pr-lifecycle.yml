@@ -121,9 +121,7 @@ jobs:
             [[ "${auto_merge}" == "false" ]] || return 0
 
             repo_json="$(gh api "repos/${REPOSITORY}")"
-            if [[ "$(jq -r '.allow_merge_commit' <<<"${repo_json}")" == "true" ]]; then
-              method="--merge"
-            elif [[ "$(jq -r '.allow_squash_merge' <<<"${repo_json}")" == "true" ]]; then
+            if [[ "$(jq -r '.allow_squash_merge' <<<"${repo_json}")" == "true" ]]; then
               method="--squash"
             elif [[ "$(jq -r '.allow_rebase_merge' <<<"${repo_json}")" == "true" ]]; then
               method="--rebase"

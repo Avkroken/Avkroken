@@ -142,26 +142,52 @@ jobs:
 
           reconcile_pr() {
             local number="$1"
-            local pr_json state author head_repo head_ref base_ref draft
+            local pr_json state author author_type permission_json permission head_repo base_ref draft
             local head_sha mergeable mergeable_state new_sha repo_json method pr_url
 
             pr_json="$(gh api "repos/${REPOSITORY}/pulls/$number")"
             state="$(jq -r '.state' <<<"$pr_json")"
-            author="$(jq -r '.user.login' <<<"$pr_json")"
+            author="$(jq -r '.user.login // ""' <<<"$pr_json")"
+            author_type="$(jq -r '.user.type // ""' <<<"$pr_json")"
             head_repo="$(jq -r '.head.repo.full_name // ""' <<<"$pr_json")"
-            head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
             base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
             draft="$(jq -r '.draft' <<<"$pr_json")"
             pr_url="$(jq -r '.html_url' <<<"$pr_json")"
 
+            # Only automate ready same-repository PRs targeting the default branch.
+            # Anyone with read access can propose a fork PR; such PRs remain manual.
             if [[ "$state" != "open" ||
-                  "$author" != "gamnacken[bot]" ||
                   "$head_repo" != "$REPOSITORY" ||
                   "$base_ref" != "$default_branch" ||
-                  "$head_ref" != codex/* ||
                   "$draft" == "true" ]]; then
               return 0
             fi
+
+            # Do not infer trust from a login string or a branch prefix.
+            # Human authors need current write permission. GitHub Apps/Bots that
+            # created same-repository branches are admitted by their GitHub-granted
+            # repository access, and still face all native review/ruleset gates.
+            case "$author_type" in
+              User)
+                permission_json="$(gh api "repos/${REPOSITORY}/collaborators/${author}/permission" 2>/dev/null)" || {
+                  log "Cannot verify PR #$number author permissions; skipping."
+                  return 0
+                }
+                permission="$(jq -r '.permission // "none"' <<<"$permission_json")"
+                case "$permission" in
+                  write|maintain|admin) ;;
+                  *)
+                    log "PR #$number author lacks write permission; skipping."
+                    return 0
+                    ;;
+                esac
+                ;;
+              Bot) ;;
+              *)
+                log "PR #$number author type is not supported; skipping."
+                return 0
+                ;;
+            esac
 
             if ! review_gate "$number"; then
               disable_auto_merge "$pr_url"
@@ -214,14 +240,13 @@ jobs:
             fi
 
             repo_json="$(gh api "repos/${REPOSITORY}")"
-            if [[ "$(jq -r '.allow_merge_commit' <<<"$repo_json")" == "true" ]]; then
-              method="--merge"
-            elif [[ "$(jq -r '.allow_squash_merge' <<<"$repo_json")" == "true" ]]; then
+            # main requires linear history; prefer the native squash strategy.
+            if [[ "$(jq -r '.allow_squash_merge' <<<"$repo_json")" == "true" ]]; then
               method="--squash"
             elif [[ "$(jq -r '.allow_rebase_merge' <<<"$repo_json")" == "true" ]]; then
               method="--rebase"
             else
-              log "Repository has no supported merge method enabled."
+              log "No linear-history-compatible merge method is enabled."
               return 0
             fi
 

@@ -21,6 +21,25 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/agent-automerge-policy.yml", text)
         self.assertIn("cron: '*/5 * * * *'", text)
 
+    def test_agent_merge_eligibility_is_permission_based(self):
+        text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
+        self.assertIn('author_type="$(jq -r', text)
+        self.assertIn('collaborators/${author}/permission', text)
+        self.assertIn('write|maintain|admin)', text)
+        self.assertIn('Bot) ;;', text)
+        self.assertIn('"$head_repo" != "$REPOSITORY"', text)
+        self.assertIn('"$draft" == "true"', text)
+        self.assertNotIn('"gamnacken[bot]"', text)
+        self.assertNotIn('codex/*', text)
+        self.assertIn('method="--squash"', text)
+        self.assertNotIn('method="--merge"', text)
+        self.assertIn('gh pr merge --auto', text)
+
+    def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
+        text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
+        self.assertIn('method="--squash"', text)
+        self.assertNotIn('method="--merge"', text)
+
     def test_bot_lifecycle_serializes_and_dispatches_only_trusted_workflows(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
         self.assertIn("concurrency:", text)
