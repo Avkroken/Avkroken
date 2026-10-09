@@ -145,6 +145,44 @@ test("GitHub rejects invalid signature and ignores a different owner", async () 
   assert.equal(different.EVENTS_QUEUE.messages.length, 0);
 });
 
+test("retired GitHub app markers cannot bypass signature verification", async (t) => {
+  const cases = [
+    { name: "target header", target: "integration", body: "{}" },
+    { name: "installation payload", target: "repository", body: JSON.stringify({ installation: { id: 42 } }) },
+    { name: "target header with malformed JSON", target: "integration", body: "{ invalid-sensitive-json }" },
+  ];
+  for (const fixture of cases) {
+    for (const signatureKind of ["missing", "malformed", "wrong secret", "valid"] as const) {
+      await t.test(`${fixture.name}: ${signatureKind}`, async () => {
+        const current = env();
+        const headers = new Headers({
+          "x-github-event": "push",
+          "x-github-delivery": "retired-delivery",
+          "x-github-hook-installation-target-type": fixture.target,
+        });
+        if (signatureKind !== "missing") {
+          headers.set("x-hub-signature-256", signatureKind === "malformed"
+            ? "sha256=00"
+            : await githubSignature(fixture.body, signatureKind === "wrong secret"
+              ? "different-test-secret"
+              : current.SKVALLERBYTTAN_WEBHOOK_SECRET));
+        }
+        const response = await handleIngestRequest(new Request("https://ingest.invalid/github", {
+          method: "POST",
+          headers,
+          body: fixture.body,
+        }), current);
+
+        assert.equal(response.status, signatureKind === "valid" ? 202 : 401);
+        assert.deepEqual(await response.json(), signatureKind === "valid"
+          ? { ok: true, ignored: "retired github app webhook" }
+          : { error: "invalid webhook signature" });
+        assert.equal(current.EVENTS_QUEUE.messages.length, 0);
+      });
+    }
+  }
+});
+
 test("Cloudflare Issues fails closed before parsing body when auth is missing", async () => {
   const current = env();
   const response = await handleIngestRequest(new Request("https://ingest.invalid/cloudflare/issues", {
