@@ -43,8 +43,10 @@ explicit notice and leaves the issue queued, without trying an unauthorized
 write or creating a new secret.
 Do not invent a new token or secret. Skvallerbyttan stays read-only.
 
-A run can create/reopen up to 100 tracking issues. It queues new agent work
-behind existing open pull requests in the repository. When the queue is
+A run can create/reopen up to 100 tracking issues. Additional creations and
+reopenings are counted as deferred work and reported as a notice, without
+failing the completed batch. API and validation failures still fail the run.
+It queues new agent work behind existing open pull requests in the repository. When the queue is
 clear, it reports the next eligible issue for separately authorized
 assignment, without claiming any agent was assigned. Only owner-authored issues and tracking
 issues created by GitHub Actions with the expected marker are automatically
