@@ -67,3 +67,33 @@ transient reducer-input. Body får aldrig lagras, loggas eller följa med `Ingre
 Shadow-RPC kräver inga provider webhook-secrets; Service Binding-capability är trust boundary.
 
 Ingen Wrangler-binding eller Worker deploy deklareras ännu.
+
+## Outcome metrics (ING-109)
+
+HTTP-ingress och preverified shadow RPC kan skriva best-effort-metrics genom en
+valfri `INGEST_METRICS` Analytics Engine-binding. Ingen binding, dataset eller
+Worker provisioneras av denna kodseam. Utan binding fortsätter leveransen som tidigare.
+
+Varje avslutat anrop gör ett skrivförsök med följande versionsbundna schema:
+
+| Fält | Innehåll |
+| --- | --- |
+| `index1` | `ingest-v1` |
+| `blob1` | `http` eller `shadow` |
+| `blob2` | `github`, `notifications`, `issues`, `casb` eller `unknown` |
+| `blob3` | `accepted`, `ignored`, `invalid`, `unauthorized`, `method_not_allowed`, `not_found`, `unavailable` eller `error` |
+| `double1` | Antal anrop (`1`) |
+| `double2` | Förfluten tid i millisekunder, inklusive väntan på Queue-handoff |
+
+`accepted` registreras först när Queue-send lyckats. Avsiktligt ignorerade HTTP-callbacks
+som svarar 202 registreras som `ignored`. Saknad konfiguration/Queue och misslyckad
+handoff ger `unavailable`; oväntade fel ger `error` och behåller befintligt felbeteende.
+Ogiltiga shadow-envelopes får source `unknown` tills hela envelope-valideringen passerat.
+
+Metrics innehåller inga request-URL:er, headers, providerpayloads, delivery-/message-ID:n,
+reducerad metadata eller feltexter. Fel i metrics-skrivningen ändrar aldrig HTTP-svar,
+RPC-resultat eller retry-beteende. Ingen console-/payload-loggning införs.
+
+Vid senare Analytics Engine-queries viktas räknare med `_sample_interval` och
+latensmedelvärden med samma samplingvikt. Detta är kodvaliderad instrumentering;
+live-metrics, dashboards/alerts och deployment/cutover-verifiering återstår.

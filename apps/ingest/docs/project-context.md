@@ -1,6 +1,6 @@
 # Ingest — project context
 
-**Senast verifierad:** 2026-10-07  
+**Senast verifierad:** 2026-10-09
 **Repository:** `Avkroken/Avkroken`  
 **App path:** `apps/ingest`  
 **Default branch:** `main`
@@ -73,3 +73,16 @@ Shadow-input är en bounded migration-only `VerifiedShadowDeliveryV1`. Ingest va
 schema/timestamp/delivery identity/body-size, reducerar med samma provider reducers som den
 framtida publika callbackvägen och skriver endast `IngressMessageV1` till `EVENTS_QUEUE`.
 Provider secret/signaturvärden ingår aldrig i shadow-envelope.
+
+## Outcome metrics
+
+HTTP-ingress och shadow-RPC har valfri best-effort-instrumentering via
+`INGEST_METRICS.writeDataPoint()`. Schemat `ingest-v1` innehåller endast fasta
+surface/source/outcome-kategorier, antal och förfluten tid inklusive Queue-send.
+Accepterad handoff räknas först efter lyckad send; ignorerade callbacks skiljs från
+accepterade meddelanden. Metrics-fel påverkar inte leverans eller provider retries.
+
+Inga payloads, credentials, URL:er, leveransidentiteter eller feltexter skickas till
+metrics. [README](../README.md#outcome-metrics-ing-109) beskriver fältschemat.
+Ingen Analytics Engine-binding/dataset är provisionerad av denna kodändring;
+live-observability och cutover-verifiering återstår.
