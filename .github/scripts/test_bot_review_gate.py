@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Execute the bot lifecycle shell against a local, mutation-recording GitHub stub."""
+import copy
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import textwrap
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / '.github/workflows/bot-pr-lifecycle.yml'
+SHA = 'a' * 40
+
+GH_STUB = r'''#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+fixture = json.loads(Path(os.environ['FIXTURE']).read_text())
+with open(os.environ['CALLS'], 'a') as log:
+    log.write(json.dumps(args) + '\n')
+if args[:2] == ['api', 'graphql']:
+    print(json.dumps(fixture['review']))
+    sys.exit(fixture.get('review_exit', 0))
+if args[:2] == ['pr', 'merge']:
+    sys.exit(fixture.get('disable_exit', 0) if '--disable-auto' in args else 0)
+if args[0] == 'api':
+    endpoint = next((arg for arg in args if arg.startswith('repos/')), '')
+    if endpoint.endswith('/update-branch'):
+        sys.exit(1)  # Do not enter the polling loop in a unit test.
+    if '/pulls?' in endpoint:
+        print(17)
+    elif endpoint.endswith('/pulls/17'):
+        print(json.dumps(fixture['pr']))
+    elif '--jq' in args:
+        print('main')
+    else:
+        print(json.dumps({'allow_squash_merge': True}))
+    sys.exit(0)
+raise SystemExit('Unexpected gh call: ' + repr(args))
+'''
+
+
+def review(state, author='reviewer', order=1):
+    return {'author': {'login': author}, 'state': state,
+            'submittedAt': f'2026-10-09T00:00:{order:02d}Z'}
+
+
+class BotReviewGateTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = {
+            'pr': {'user': {'login': 'dependabot[bot]'}, 'state': 'open',
+                   'draft': False, 'base': {'ref': 'main'},
+                   'head': {'repo': {'full_name': 'Avkroken/Avkroken'},
+                            'ref': 'dependabot/example', 'sha': SHA},
+                   'html_url': 'https://github.com/Avkroken/Avkroken/pull/17',
+                   'mergeable_state': 'clean', 'auto_merge': None},
+            'review': {'data': {'repository': {'pullRequest': {
+                'headRefOid': SHA, 'reviewDecision': 'APPROVED',
+                'reviewThreads': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
+                'reviews': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
+            }}}},
+        }
+        self.state = self.fixture['review']['data']['repository']['pullRequest']
+
+    def run_workflow(self):
+        script = textwrap.dedent(WORKFLOW.read_text().split('        run: |\n', 1)[1])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stub = root / 'gh'
+            stub.write_text(GH_STUB)
+            stub.chmod(0o755)
+            fixture = root / 'fixture.json'
+            fixture.write_text(json.dumps(self.fixture))
+            calls = root / 'calls.jsonl'
+            env = {**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
+                   'FIXTURE': str(fixture), 'CALLS': str(calls),
+                   'REPOSITORY': 'Avkroken/Avkroken', 'GH_TOKEN': 'test-only'}
+            result = subprocess.run(['bash'], input=script, text=True, env=env,
+                                    capture_output=True, timeout=10)
+            return result, [json.loads(line) for line in calls.read_text().splitlines()]
+
+    def assert_blocked(self):
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any('--auto' in call for call in calls), calls)
+        self.assertFalse(any(any('/update-branch' in arg for arg in call) for call in calls), calls)
+        self.assertTrue(any('--disable-auto' in call for call in calls), calls)
+
+    def test_clean_reviews_enable_squash_for_observed_head(self):
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        merge = next(call for call in calls if '--auto' in call)
+        self.assertIn('--squash', merge)
+        self.assertIn('--match-head-commit', merge)
+        self.assertIn(SHA, merge)
+
+    def test_unresolved_threads_including_outdated_block(self):
+        for outdated in (False, True):
+            with self.subTest(outdated=outdated):
+                self.state['reviewThreads']['nodes'] = [{'isResolved': False, 'isOutdated': outdated}]
+                self.assert_blocked()
+
+    def test_active_request_survives_later_comment(self):
+        self.state['reviews']['nodes'] = [review('CHANGES_REQUESTED'), review('COMMENTED', order=2)]
+        self.assert_blocked()
+
+    def test_other_reviewer_approval_does_not_clear_request(self):
+        self.state['reviews']['nodes'] = [review('CHANGES_REQUESTED'), review('APPROVED', 'other', 2)]
+        self.assert_blocked()
+
+    def test_later_approval_or_dismissal_clears_same_reviewer_request(self):
+        for state in ('APPROVED', 'DISMISSED'):
+            with self.subTest(state=state):
+                self.state['reviews']['nodes'] = [review('CHANGES_REQUESTED'), review(state, order=2)]
+                result, calls = self.run_workflow()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(any('--auto' in call for call in calls), calls)
+
+    def test_required_or_negative_aggregate_review_blocks(self):
+        for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'UNKNOWN'):
+            with self.subTest(decision=decision):
+                self.state['reviewDecision'] = decision
+                self.assert_blocked()
+
+    def test_truncated_review_connections_block(self):
+        for connection in ('reviews', 'reviewThreads'):
+            with self.subTest(connection=connection):
+                self.state[connection]['pageInfo']['hasNextPage'] = True
+                self.assert_blocked()
+                self.state[connection]['pageInfo']['hasNextPage'] = False
+
+    def test_api_failure_and_incomplete_responses_block(self):
+        valid = copy.deepcopy(self.fixture['review'])
+        for payload, exit_code in ((valid, 1), ({}, 0),
+                                   ({'data': {'repository': {'pullRequest': None}}}, 0),
+                                   ({**valid, 'errors': [{'message': 'partial response'}]}, 0)):
+            with self.subTest(payload=payload, exit_code=exit_code):
+                self.fixture['review'] = payload
+                self.fixture['review_exit'] = exit_code
+                self.assert_blocked()
+
+    def test_changed_head_blocks(self):
+        self.state['headRefOid'] = 'b' * 40
+        self.assert_blocked()
+
+    def test_malformed_review_fields_block(self):
+        valid = copy.deepcopy(self.state)
+        variants = [
+            {'reviews': {'nodes': [], 'pageInfo': {}}},
+            {'reviewThreads': {'nodes': None, 'pageInfo': {'hasNextPage': False}}},
+            {'reviewThreads': {'nodes': [{}], 'pageInfo': {'hasNextPage': False}}},
+            {'reviews': {'nodes': [review('UNKNOWN')], 'pageInfo': {'hasNextPage': False}}},
+            {'reviews': {'nodes': [review('CHANGES_REQUESTED', None)],
+                         'pageInfo': {'hasNextPage': False}}},
+        ]
+        for fields in variants:
+            with self.subTest(fields=fields):
+                self.state.clear()
+                self.state.update({**valid, **fields})
+                self.assert_blocked()
+        self.state.clear()
+        self.state.update(valid)
+        del self.state['reviewDecision']
+        self.assert_blocked()
+
+    def test_resolved_outdated_thread_without_required_reviews_can_pass(self):
+        self.state['reviewDecision'] = None
+        self.state['reviewThreads']['nodes'] = [{'isResolved': True, 'isOutdated': True}]
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('--auto' in call for call in calls), calls)
+
+    def test_draft_fork_and_other_authors_remain_excluded(self):
+        valid = copy.deepcopy(self.fixture['pr'])
+        for fields in ({'draft': True}, {'user': {'login': 'another-user'}},
+                       {'head': {**valid['head'], 'repo': {'full_name': 'other/fork'}}}):
+            with self.subTest(fields=fields):
+                self.fixture['pr'] = {**valid, **fields}
+                result, calls = self.run_workflow()
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+                self.assertFalse(any('graphql' in call for call in calls), calls)
+
+    def test_existing_automerge_is_revoked_before_behind_branch_update(self):
+        self.fixture['pr'].update(auto_merge={'enabled_by': {}}, mergeable_state='behind')
+        self.state['reviewThreads']['nodes'] = [{'isResolved': False}]
+        self.assert_blocked()
+
+    def test_revocation_failure_is_reported(self):
+        self.state['reviewDecision'] = 'CHANGES_REQUESTED'
+        self.fixture['disable_exit'] = 1
+        result, calls = self.run_workflow()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any('--auto' in call for call in calls), calls)
+
+
+if __name__ == '__main__':
+    unittest.main()
