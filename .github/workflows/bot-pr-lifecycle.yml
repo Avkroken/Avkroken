@@ -35,6 +35,10 @@ jobs:
           owner="${REPOSITORY%%/*}"
           repo_name="${REPOSITORY#*/}"
 
+          log() {
+            printf '[bot-pr-lifecycle] %s\n' "$*"
+          }
+
           review_gate() {
             local number="$1"
             local review_json unresolved changes_requested review_decision
@@ -80,7 +84,7 @@ jobs:
 
             (( unresolved == 0 )) || { log "PR #$number has unresolved review threads."; return 1; }
             (( changes_requested == 0 )) || { log "PR #$number has an active changes-requested review."; return 1; }
-            [[ "$review_decision" != "CHANGES_REQUESTED" ]] || { log "PR #$number review decision requests changes."; return 1; }
+            [[ "$review_decision" == "APPROVED" ]] || { log "PR #$number has no current, valid approving review."; return 1; }
           }
 
           reconcile_pr() {
@@ -123,7 +127,6 @@ jobs:
               return 0
             fi
             # Only act after a real GitHub APPROVED review decision.
-            [[ "$(gh api graphql -F owner="$owner" -F name="$repo_name" -F number="$number" -f query=\'query($owner:String!, $name:String!, $number:Int!) { repository(owner:$owner,name:$name) { pullRequest(number:$number) { reviewDecision } } }\' --jq '.data.repository.pullRequest.reviewDecision')" == "APPROVED" ]] || return 0
             auto_merge="$(jq -r 'if .auto_merge == null then "false" else "true" end' <<<"${pr}")"
             [[ "${auto_merge}" == "false" ]] || return 0
 
