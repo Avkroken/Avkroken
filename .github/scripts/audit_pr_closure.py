@@ -17,13 +17,13 @@ def closure_marker(number, sha, closed_at):
     if not isinstance(number, int) or number <= 0:
         return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
     safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
-    safe_time = normalized(closed_at, r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z")
+    safe_time = normalized(closed_at, r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
     return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_time} -->"
 
 
 def has_existing_audit_comment(comments, marker):
     """Trust only a genuine GitHub Actions audit message, not user text."""
-    prefix = marker + "\\n### GitHub closure audit (unmerged PR)\\n"
+    prefix = marker + "\n### GitHub closure audit (unmerged PR)\n"
     return any(
         (comment or {}).get("user", {}).get("login") == "github-actions[bot]"
         and str((comment or {}).get("body") or "").startswith(prefix)
