@@ -23,11 +23,12 @@ def merged_pr(login="copilot-swe-agent[bot]", role="Bot", ref="copilot/trusted/2
 
 
 class FakeApi:
-    def __init__(self, pr=None, ci=None, release=None, codeql=None):
+    def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None):
         self.pr = merged_pr() if pr is None else pr
         self.ci = [] if ci is None else ci
         self.release = [] if release is None else release
         self.codeql = [] if codeql is None else codeql
+        self.recovery_runs = [] if recovery_runs is None else recovery_runs
         self.posts = []
 
     def __call__(self, method, path, payload=None):
@@ -48,6 +49,8 @@ class FakeApi:
             return {"workflow_runs": self.release}
         if path == f"actions/workflows/codeql.yml/runs?head_sha={SHA}&per_page=100":
             return {"workflow_runs": self.codeql}
+        if path == f"actions/workflows/automation-post-merge.yml/runs?head_sha={SHA}&per_page=100":
+            return {"workflow_runs": self.recovery_runs}
         raise AssertionError(path)
 
 
@@ -126,6 +129,38 @@ class AutomationPostMergeTests(unittest.TestCase):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()])
         self.assertTrue(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts[0]["event_type"], "agent-pr-merged")
+
+
+    def test_dispatch_stops_after_three_prior_reconciliation_attempts_for_sha(self):
+        recorded = [
+            {"id": i, "head_sha": SHA, "event": "schedule",
+             "status": "completed", "created_at": f"2026-10-08T{hour:02d}:30:00Z"}
+            for i, hour in enumerate((10, 11, 11), 1)
+        ]
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       recovery_runs=recorded)
+        with self.assertRaisesRegex(RuntimeError, "missing CodeQL.*retry limit"):
+            reconcile(fake, REPO, TIME)
+        self.assertEqual(fake.posts, [])
+
+    def test_dispatch_backoff_for_recent_attempt_on_same_sha(self):
+        recorded = [{"id": 1, "head_sha": SHA, "event": "schedule",
+                     "status": "completed", "created_at": "2026-10-08T11:50:00Z"}]
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       recovery_runs=recorded)
+        self.assertFalse(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts, [])
+
+    def test_unrelated_sha_attempts_do_not_block_missing_run_recovery(self):
+        recorded = [
+            {"id": i, "head_sha": "f" * 40, "event": "schedule",
+             "status": "completed", "created_at": "2026-10-08T11:00:00Z"}
+            for i in range(1, 5)
+        ]
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       recovery_runs=recorded)
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual(len(fake.posts), 1)
 
     def test_untrusted_tip_not_dispatched(self):
         forged = merged_pr("external", "User")
