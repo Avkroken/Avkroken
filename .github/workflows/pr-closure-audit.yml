@@ -1,8 +1,13 @@
 name: Unmerged PR closure audit
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
+
+# Serialize reruns of one occurrence without cancelling other closure events.
+concurrency:
+  group: pr-closure-audit-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions: {}
 

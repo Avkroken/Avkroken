@@ -12,17 +12,27 @@ def normalized(value, pattern, fallback="unknown"):
     return text if re.fullmatch(pattern, text) else fallback
 
 
-def closure_marker(number, sha):
-    """Return a stable non-rendered marker for one PR closure/head pair."""
+def closure_marker(number, sha, run_id):
+    """Identify one workflow occurrence; GITHUB_RUN_ID is stable across reruns."""
     if not isinstance(number, int) or number <= 0:
         return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
     safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
-    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha} -->"
+    safe_run = normalized(run_id, r"[0-9]+")
+    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_run} -->"
 
 
-def has_existing_audit_comment(comments, marker):
-    """Return whether a previously published issue comment contains the marker."""
-    return any(marker in str((comment or {}).get("body") or "") for comment in comments)
+def has_existing_audit_comment(comments, expected_comment):
+    """Deduplicate only an exact audit published by GitHub Actions' bot account."""
+    for comment in comments:
+        comment = comment or {}
+        author = comment.get("user") or {}
+        if (
+            author.get("login") == "github-actions[bot]"
+            and author.get("type") == "Bot"
+            and comment.get("body") == expected_comment
+        ):
+            return True
+    return False
 
 
 def closure_comment(event, repository, run_id):
@@ -43,7 +53,9 @@ def closure_comment(event, repository, run_id):
     closed_at = normalized(pr.get("closed_at"), r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
     sha = normalized(((pr.get("head") or {}).get("sha")), r"[0-9a-fA-F]{40}")
     run = normalized(run_id, r"[0-9]+")
-    marker = closure_marker(number, sha)
+    if run == "unknown":
+        return None
+    marker = closure_marker(number, sha, run)
     return (
         f"{marker}\n"
         "### GitHub closure audit (unmerged PR)\n\n"
@@ -58,7 +70,7 @@ def closure_comment(event, repository, run_id):
     )
 
 
-def existing_comment(repository, number, token, marker):
+def existing_comment(repository, number, token, expected_comment):
     """Check existing PR issue comments with bounded pagination."""
     for page in range(1, 11):
         url = (
@@ -78,7 +90,7 @@ def existing_comment(repository, number, token, marker):
             comments = json.load(response)
         if not isinstance(comments, list):
             raise RuntimeError("Closure audit comments response was not a list")
-        if has_existing_audit_comment(comments, marker):
+        if has_existing_audit_comment(comments, expected_comment):
             return True
         if len(comments) < 100:
             return False
@@ -94,8 +106,7 @@ def main():
         print("Not an unmerged PR closure; no audit comment.")
         return
 
-    # A workflow summary is retained even when the PR came from a fork, where
-    # GITHUB_TOKEN permissions may be read-only.
+    # Retain evidence for fork PRs in the summary without publishing comments.
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with Path(summary).open("a", encoding="utf-8") as handle:
@@ -110,8 +121,7 @@ def main():
     if not token:
         raise RuntimeError("GITHUB_TOKEN absent for same-repository closure audit")
 
-    marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"))
-    if existing_comment(repository, pr["number"], token, marker):
+    if existing_comment(repository, pr["number"], token, comment):
         print("Closure audit comment already exists; skipping duplicate publication.")
         return
 

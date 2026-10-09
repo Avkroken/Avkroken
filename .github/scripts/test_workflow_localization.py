@@ -50,6 +50,16 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("failures=0", text)
         self.assertIn("failures=$((failures + 1))", text)
 
+    def test_closure_audit_handles_conflicts_without_executing_pr_code(self):
+        text = (WORKFLOWS / "pr-closure-audit.yml").read_text(encoding="utf-8")
+        self.assertIn("\n  pull_request_target:\n    types: [closed]", text)
+        self.assertNotIn("\n  pull_request:\n", text)
+        self.assertIn("ref: main", text)
+        self.assertIn("persist-credentials: false", text)
+        self.assertNotIn("github.event.pull_request.head", text)
+        self.assertIn("group: pr-closure-audit-${{ github.run_id }}", text)
+        self.assertIn("cancel-in-progress: false", text)
+
     def test_issue_tracker_requires_explicit_closure_decision(self):
         text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
         self.assertIn("concrete reason and explicit decision", text)
