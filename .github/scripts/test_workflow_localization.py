@@ -15,6 +15,14 @@ class WorkflowLocalizationTests(unittest.TestCase):
                 offenders.append(path.name)
         self.assertEqual([], offenders, f"deleted central workflow calls: {offenders}")
 
+    def test_privileged_agent_reconciliation_uses_default_branch_context(self):
+        text = (WORKFLOWS / "agent-automerge.yml").read_text(encoding="utf-8")
+        self.assertNotIn("\\n  pull_request:\\n", text)
+        self.assertIn("workflow_run:", text)
+        self.assertIn('workflows: ["Agent lifecycle signal"]', text)
+        self.assertIn("schedule:", text)
+        self.assertIn("permissions: {}", text)
+
     def test_agent_automerge_avoids_unfiltered_check_run_recursion(self):
         text = (WORKFLOWS / "agent-automerge.yml").read_text(encoding="utf-8")
         self.assertNotIn("\n  check_run:\n", text)
