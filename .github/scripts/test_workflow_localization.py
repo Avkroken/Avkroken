@@ -21,18 +21,19 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/agent-automerge-policy.yml", text)
         self.assertIn("cron: '*/5 * * * *'", text)
 
-    def test_agent_merge_requires_explicit_queue_and_collaborator_permission(self):
+    def test_agent_merge_requires_verified_bot_or_explicit_author_consent(self):
         text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
         self.assertIn('author_type="$(jq -r', text)
         self.assertIn(".auto_merge == null", text)
-        self.assertIn("PR #$number was not queued for native auto-merge", text)
+        self.assertIn('.auto_merge.enabled_by.login // ""', text)
         self.assertIn("collaborators/${author}/permission", text)
         self.assertIn("write|maintain|admin)", text)
-        self.assertIn("Bot) ;;", text)
-        self.assertNotIn("bot author is not allowlisted", text)
+        self.assertIn('"dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]"', text)
+        self.assertIn("bot author is not allowlisted", text)
+        self.assertNotIn("Bot) ;;", text)
         self.assertIn('"$head_repo" != "$REPOSITORY"', text)
         self.assertIn('"$draft" == "true"', text)
-        self.assertIn('gh pr merge --auto', text)
+        self.assertIn("gh pr merge --auto", text)
         self.assertIn('"$review_decision" == "APPROVED"', text)
 
     def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
