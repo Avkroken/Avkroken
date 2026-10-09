@@ -1,7 +1,9 @@
 name: Unmerged PR closure audit
 
 on:
-  pull_request:
+  # Run from the trusted default-branch context even if the PR has conflicts.
+  # Never check out or execute the PR head under this write-capable token.
+  pull_request_target:
     types: [closed]
 
 permissions: {}
