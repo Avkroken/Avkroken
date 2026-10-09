@@ -63,18 +63,19 @@ def matching_run(event="push", sha=SHA, status="completed", conclusion="success"
 class AutomationPostMergeTests(unittest.TestCase):
     def test_only_trusted_same_repository_default_branch_merge(self):
         self.assertTrue(is_trusted_merge(merged_pr(), REPO, "main", SHA))
-        # OAuth-authored commits cannot be attested as bot mutations by branch name.
-        self.assertFalse(is_trusted_merge(
+        # A provider-confirmed merge can be checked without inventing bot
+        # attribution from branch names or OAuth user accounts.
+        self.assertTrue(is_trusted_merge(
             merged_pr("Avkroken", "User", "codex/trusted/2026-10-08"), REPO, "main", SHA
         ))
-        self.assertFalse(is_trusted_merge(
+        self.assertTrue(is_trusted_merge(
             merged_pr("copilot-swe-agent[bot]", "User"), REPO, "main", SHA
         ))
         self.assertTrue(is_trusted_merge(merged_pr(
             "dependabot[bot]", "Bot", "dependabot/npm_and_yarn/example"
         ), REPO, "main", SHA))
-        self.assertFalse(is_trusted_merge(
-            merged_pr("intruder", "User"), REPO, "main", SHA
+        self.assertTrue(is_trusted_merge(
+            merged_pr("other-collaborator", "User"), REPO, "main", SHA
         ))
         self.assertFalse(is_trusted_merge(
             {**merged_pr(), "merge_commit_sha": "not-main"}, REPO, "main", SHA
@@ -127,7 +128,9 @@ class AutomationPostMergeTests(unittest.TestCase):
         self.assertEqual(fake.posts[0]["event_type"], "agent-pr-merged")
 
     def test_untrusted_tip_not_dispatched(self):
-        fake = FakeApi(pr=merged_pr("external", "User"))
+        forged = merged_pr("external", "User")
+        forged["head"]["repo"]["full_name"] = "other/repository"
+        fake = FakeApi(pr=forged)
         self.assertFalse(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts, [])
 
