@@ -27,7 +27,7 @@ def merged_pr(login="copilot-swe-agent[bot]", role="Bot", ref="copilot/trusted/2
 
 class FakeApi:
     def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None, commit_comments=None):
-        self.pr = merged_pr() if pr is None else pr
+        self.pr = merged_pr('Avkroken', 'User') if pr is None else pr
         self.ci = [] if ci is None else ci
         self.release = [] if release is None else release
         self.codeql = [] if codeql is None else codeql
@@ -117,6 +117,35 @@ class AutomationPostMergeTests(unittest.TestCase):
             {"workflow_runs": [matching_run(status="in_progress", conclusion=None)]},
             SHA,
         ))
+
+    def test_failed_native_run_does_not_satisfy_registration(self):
+        self.assertFalse(has_target_run(
+            {"workflow_runs": [matching_run(conclusion="failure")]}, SHA
+        ))
+        self.assertFalse(has_target_run(
+            {"workflow_runs": [matching_run(conclusion="timed_out")]}, SHA
+        ))
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       codeql=[matching_run(conclusion="failure")])
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts[-1][0], "dispatch")
+
+    def test_dependabot_requires_trusted_dispatch_even_with_successful_push(self):
+        fake = FakeApi(
+            pr=merged_pr("dependabot[bot]", "Bot"),
+            ci=[matching_run()], release=[matching_run()], codeql=[matching_run()],
+        )
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts[-1][0], "dispatch")
+
+    def test_dependabot_trusted_dispatch_registration_is_idempotent(self):
+        trusted = matching_run(event="repository_dispatch")
+        fake = FakeApi(
+            pr=merged_pr("dependabot[bot]", "Bot"),
+            ci=[trusted], release=[trusted], codeql=[trusted],
+        )
+        self.assertFalse(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts, [])
 
     def test_no_duplicate_when_both_required_workflows_registered(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()], codeql=[matching_run()])
