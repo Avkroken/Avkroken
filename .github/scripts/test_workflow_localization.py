@@ -21,23 +21,16 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/agent-automerge-policy.yml", text)
         self.assertIn("cron: '*/5 * * * *'", text)
 
-    def test_agent_merge_eligibility_is_permission_based(self):
+    def test_agent_merge_eligibility_is_verified_and_fails_closed(self):
         text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
         self.assertIn('author_type="$(jq -r', text)
-        self.assertIn("PR #$number was not queued for native auto-merge", text)
-        self.assertIn(".auto_merge == null", text)
-        self.assertNotIn("expected_external_checks()", text)
-        # Queuing is an explicit native GitHub action, not an inference from
-        # a contributor name, branch prefix, or fixed vendor-bot allowlist.
-        self.assertIn('write|maintain|admin)', text)
-        self.assertIn('Bot) ;;', text)
-        self.assertNotIn('Human authors are not verified automation principals', text)
+        self.assertIn('"dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]"', text)
+        self.assertIn('Human authors are not verified automation principals', text)
+        self.assertIn('bot author is not allowlisted', text)
+        self.assertNotIn('Bot) ;;', text)
+        self.assertNotIn('write|maintain|admin)', text)
         self.assertIn('"$head_repo" != "$REPOSITORY"', text)
         self.assertIn('"$draft" == "true"', text)
-        self.assertNotIn('"gamnacken[bot]"', text)
-        self.assertNotIn('codex/*', text)
-        self.assertIn('method="--squash"', text)
-        self.assertNotIn('method="--merge"', text)
         self.assertIn('gh pr merge --auto', text)
         self.assertIn('"$review_decision" == "APPROVED"', text)
         self.assertNotIn('"$review_decision" != "CHANGES_REQUESTED"', text)
