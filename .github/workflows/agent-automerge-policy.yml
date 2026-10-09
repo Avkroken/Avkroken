@@ -113,26 +113,23 @@ jobs:
               return 0
             fi
 
-            # Do not infer trust from a login string or a branch prefix.
-            # Human authors need current write permission. GitHub Apps/Bots that
-            # created same-repository branches are admitted by their GitHub-granted
-            # repository access, and still face all native review/ruleset gates.
+            # Human authors are not verified automation principals.
+            # Even repository write permission does not attest AI origin.
+            # Native GitHub review/ruleset gates apply to allowlisted bots too.
             case "$author_type" in
-              User)
-                permission_json="$(gh api "repos/${REPOSITORY}/collaborators/${author}/permission" 2>/dev/null)" || {
-                  log "Cannot verify PR #$number author permissions; skipping."
-                  return 0
-                }
-                permission="$(jq -r '.permission // "none"' <<<"$permission_json")"
-                case "$permission" in
-                  write|maintain|admin) ;;
+              Bot)
+                case "$author" in
+                  "dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]") ;;
                   *)
-                    log "PR #$number author lacks write permission; skipping."
+                    log "PR #$number bot author is not allowlisted; skipping."
                     return 0
                     ;;
                 esac
                 ;;
-              Bot) ;;
+              User)
+                log "Human authors are not verified automation principals; skipping PR #$number."
+                return 0
+                ;;
               *)
                 log "PR #$number author type is not supported; skipping."
                 return 0
