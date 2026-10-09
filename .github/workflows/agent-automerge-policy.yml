@@ -78,63 +78,6 @@ jobs:
             [[ "$review_decision" != "CHANGES_REQUESTED" ]] || { log "PR #$number review decision requests changes."; return 1; }
           }
 
-          expected_external_checks() {
-            case "$REPOSITORY" in
-              "Avkroken/Avkroken")
-                printf '%s\n' \
-                  "Workers Builds: avkroken" \
-                  "Workers Builds: dumpen" \
-                  "Workers Builds: jobb" \
-                  "Workers Builds: skvallerbyttan"
-                ;;
-              "Avkroken/Klarsprak")
-                printf '%s\n' "Workers Builds: klarsprak"
-                ;;
-              "Avkroken/Politiker")
-                printf '%s\n' "Workers Builds: politiker"
-                ;;
-              "Avkroken/Produkter")
-                printf '%s\n' \
-                  "Workers Builds: produkter" \
-                  "Workers Builds: produkter-bearbetare" \
-                  "Workers Builds: produkter-motor"
-                ;;
-            esac
-          }
-
-          external_check_gate() {
-            local head_sha="$1"
-            local checks_json row status conclusion expected_name
-            local -a expected_checks
-
-            mapfile -t expected_checks < <(expected_external_checks)
-            ((${#expected_checks[@]} > 0)) || return 0
-
-            checks_json="$(gh api "repos/${REPOSITORY}/commits/${head_sha}/check-runs?per_page=100")" || {
-              log "Could not read external checks for $head_sha."
-              return 1
-            }
-
-            for expected_name in "${expected_checks[@]}"; do
-              row="$(jq -c --arg name "$expected_name" '
-                [.check_runs[] | select(.name == $name)]
-                | if length == 0 then null else max_by(.id) end
-              ' <<<"$checks_json")"
-
-              if [[ "$row" == "null" ]]; then
-                log "Waiting for external check: $expected_name."
-                return 1
-              fi
-
-              status="$(jq -r '.status // ""' <<<"$row")"
-              conclusion="$(jq -r '.conclusion // ""' <<<"$row")"
-              if [[ "$status" != "completed" || "$conclusion" != "success" ]]; then
-                log "External check not green: $expected_name status=$status conclusion=$conclusion."
-                return 1
-              fi
-            done
-          }
-
           disable_auto_merge() {
             local pr_url="$1"
             gh pr merge --disable-auto "$pr_url" >/dev/null 2>&1 || true
