@@ -211,6 +211,10 @@ jobs:
           fi
 
           [[ -n "$candidates" ]] || { log "No open pull requests need reconciliation."; exit 0; }
-          while read -r number; do
-            [[ -n "$number" ]] && reconcile_pr "$number"
+          failures=0
+          while IFS= read -r number; do
+            if [[ -n "$number" ]]; then
+              reconcile_pr "$number" || failures=$((failures + 1))
+            fi
           done <<<"$candidates"
+          [[ "$failures" -eq 0 ]] || exit 1
