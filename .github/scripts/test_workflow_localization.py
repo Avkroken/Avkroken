@@ -21,6 +21,20 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/agent-automerge-policy.yml", text)
         self.assertIn("cron: '*/5 * * * *'", text)
 
+    def test_bot_lifecycle_serializes_and_dispatches_only_trusted_workflows(self):
+        text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
+        self.assertIn("concurrency:", text)
+        self.assertIn("group: bot-pr-lifecycle", text)
+        self.assertIn("workflow_matches_default", text)
+        self.assertIn("modifies trusted workflow definitions", text)
+        self.assertIn("update-branch request failed", text)
+        self.assertIn("failures=0", text)
+        self.assertIn("failures=$((failures + 1))", text)
+
+    def test_issue_tracker_requires_explicit_closure_decision(self):
+        text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
+        self.assertIn("concrete reason and explicit decision", text)
+
     def test_security_reconciliation_is_repository_local(self):
         text = (WORKFLOWS / "security-alert-issues.yml").read_text(encoding="utf-8")
         self.assertIn("issues:", text)
