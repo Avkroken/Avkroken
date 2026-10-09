@@ -67,3 +67,25 @@ transient reducer-input. Body får aldrig lagras, loggas eller följa med `Ingre
 Shadow-RPC kräver inga provider webhook-secrets; Service Binding-capability är trust boundary.
 
 Ingen Wrangler-binding eller Worker deploy deklareras ännu.
+
+## Queue-handoff telemetry
+
+Den gemensamma `enqueueIngressMessage()`-seamen skriver ett strukturerat
+`ingest_queue_handoff`-loggmeddelande per avslutat försök, både för HTTP-ingress
+och verified shadow. Fälten är strikt begränsade till:
+
+- `source`: `github`, `cloudflare_notifications`, `cloudflare_issues`,
+  `cloudflare_casb` eller `unknown`;
+- `outcome`: `sent`, `failed` eller `unconfigured`;
+- `durationMs`: förfluten tid mätt med en monoton klocka.
+
+`sent` loggas först när `EVENTS_QUEUE.send()` har lyckats. Loggningsfel påverkar
+inte handoff-resultatet eller retrybeteendet. Providerpayload, event-/delivery-ID,
+metadata, credentials och exception-text ingår aldrig i loggen.
+
+Loggarna kan aggregeras till antal handoff-försök och latens per källa/utfall.
+De räknar försök, inte unika canonical events; dedup ägs fortsatt av Events.
+HTTP-avslag och konfigurationskontroller som returnerar före handoff-seamen
+ingår inte. Loggarna är best effort och är inte en komplett leveransjournal.
+Detta är en avgränsad ING-109-kodseam; auth-/reducer-metrics, dashboards och
+verifierad live-telemetri återstår inför cutover.
