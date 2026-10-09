@@ -45,7 +45,7 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIn("GitHub actor: `dependabot[bot]`", comment)
 
     def test_closure_comment_has_stable_marker_and_deduplicates(self):
-        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z")
+        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z", "12345")
         comment = closure_comment(event(), REPO, "12345")
         self.assertIn(marker, comment)
         trusted = {"user": {"login": "github-actions[bot]"}, "body": comment}
@@ -68,11 +68,21 @@ class ClosureAuditTests(unittest.TestCase):
         first_comment = closure_comment(first, REPO, "123")
         second_comment = closure_comment(second, REPO, "124")
         self.assertNotEqual(first_comment.splitlines()[0], second_comment.splitlines()[0])
-        marker = closure_marker(214, SHA, second["pull_request"]["closed_at"])
+        marker = closure_marker(214, SHA, second["pull_request"]["closed_at"], "124")
         self.assertFalse(has_existing_audit_comment(
             [{"user": {"login": "github-actions[bot]"}, "body": first_comment}],
             marker,
         ))
+
+    def test_same_second_closures_unique_but_reruns_idempotent(self):
+        first = closure_comment(event(), REPO, "12345")
+        second = closure_comment(event(), REPO, "12346")
+        rerun = closure_comment(event(), REPO, "12345")
+        self.assertNotEqual(first.splitlines()[0], second.splitlines()[0])
+        self.assertEqual(first.splitlines()[0], rerun.splitlines()[0])
+        self.assertFalse(has_existing_audit_comment([
+            {"user": {"login": "github-actions[bot]"}, "body": first}
+        ], second.splitlines()[0]))
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)
