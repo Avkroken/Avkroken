@@ -1,15 +1,16 @@
 name: Unmerged PR closure audit
 
 on:
+  # Target context also receives closures of PRs with merge conflicts.
   pull_request_target:
     types: [closed]
 
-# Serialize reruns of one occurrence without cancelling other closure events.
-concurrency:
-  group: pr-closure-audit-${{ github.run_id }}
-  cancel-in-progress: false
-
 permissions: {}
+
+# Serialize duplicate deliveries without dropping distinct closure occurrences.
+concurrency:
+  group: pr-closure-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.closed_at }}
+  cancel-in-progress: false
 
 jobs:
   audit:

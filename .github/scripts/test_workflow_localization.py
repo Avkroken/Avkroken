@@ -57,7 +57,7 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("ref: main", text)
         self.assertIn("persist-credentials: false", text)
         self.assertNotIn("github.event.pull_request.head", text)
-        self.assertIn("group: pr-closure-audit-${{ github.run_id }}", text)
+        self.assertIn("group: pr-closure-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.closed_at }}", text)
         self.assertIn("cancel-in-progress: false", text)
 
     def test_issue_tracker_requires_explicit_closure_decision(self):
