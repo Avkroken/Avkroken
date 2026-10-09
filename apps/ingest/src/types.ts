@@ -6,6 +6,9 @@ export interface QueueProducerLike<T> {
 
 export interface IngestEnv {
   EVENTS_QUEUE?: QueueProducerLike<IngressMessageV1>;
+  INGEST_METRICS?: {
+    writeDataPoint(point: { indexes: string[]; blobs: string[]; doubles: number[] }): void;
+  };
   SKVALLERBYTTAN_WEBHOOK_SECRET?: string;
   CLOUDFLARE_NOTIFICATIONS_WEBHOOK_SECRET?: string;
   CLOUDFLARE_CASB_WEBHOOK_SECRET?: string;

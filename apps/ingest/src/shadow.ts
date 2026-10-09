@@ -2,7 +2,8 @@ import type {
   VerifiedShadowDeliveryResultV1,
   VerifiedShadowDeliveryV1,
 } from "../../../packages/observability-contracts/src/index.ts";
-import { enqueueIngressMessage } from "./handoff.ts";
+import { enqueueIngressMessage, EventHandoffUnavailableError } from "./handoff.ts";
+import { recordIngestOutcome, type IngestMetricSource } from "./metrics.ts";
 import {
   githubOwner,
   hasCloudflareIssueIdentity,
@@ -90,7 +91,26 @@ export async function acceptVerifiedShadowDelivery(
   env: IngestEnv,
   value: unknown,
 ): Promise<VerifiedShadowDeliveryResultV1> {
-  const delivery = normalizeVerifiedShadowDelivery(value);
+  const startedAt = performance.now();
+  let source: IngestMetricSource = "unknown";
+  try {
+    const delivery = normalizeVerifiedShadowDelivery(value);
+    source = delivery.kind === "github" ? "github" : delivery.source;
+    const result = await handoffVerifiedShadowDelivery(env, delivery);
+    recordIngestOutcome(env, "shadow", source, "accepted", startedAt);
+    return result;
+  } catch (error) {
+    const outcome = error instanceof InvalidVerifiedShadowDeliveryError ? "invalid"
+      : error instanceof EventHandoffUnavailableError ? "unavailable" : "error";
+    recordIngestOutcome(env, "shadow", source, outcome, startedAt);
+    throw error;
+  }
+}
+
+async function handoffVerifiedShadowDelivery(
+  env: IngestEnv,
+  delivery: VerifiedShadowDeliveryV1,
+): Promise<VerifiedShadowDeliveryResultV1> {
   const payload = parseObjectJson(delivery.body);
   if (!payload) throw new InvalidVerifiedShadowDeliveryError("body.json");
 

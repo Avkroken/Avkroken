@@ -10,12 +10,28 @@ import {
   reduceGitHubWebhook,
 } from "./reducers.ts";
 import { enqueueIngressMessage } from "./handoff.ts";
+import { recordIngestOutcome, type IngestMetricOutcome, type IngestMetricSource } from "./metrics.ts";
 import type { IngestEnv } from "./types.ts";
 
 export const CASB_AUTH_HEADER = "x-skvallerbyttan-casb-auth";
 
-function json(value: unknown, status: number, extraHeaders: HeadersInit = {}): Response {
-  return new Response(JSON.stringify(value), {
+type IngestResponse = { response: Response; outcome: IngestMetricOutcome };
+
+function json(
+  value: unknown,
+  status: number,
+  extraHeaders: HeadersInit = {},
+  outcome?: IngestMetricOutcome,
+): IngestResponse {
+  const outcomes: Record<number, IngestMetricOutcome> = {
+    202: "ignored",
+    400: "invalid",
+    401: "unauthorized",
+    404: "not_found",
+    405: "method_not_allowed",
+    503: "unavailable",
+  };
+  const response = new Response(JSON.stringify(value), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
@@ -24,23 +40,24 @@ function json(value: unknown, status: number, extraHeaders: HeadersInit = {}): R
       ...extraHeaders,
     },
   });
+  return { response, outcome: outcome ?? outcomes[status] ?? "error" };
 }
 
-function methodNotAllowed(): Response {
+function methodNotAllowed(): IngestResponse {
   return json({ error: "method not allowed" }, 405, { Allow: "POST" });
 }
 
-async function handoff(env: IngestEnv, message: IngressMessageV1): Promise<Response> {
+async function handoff(env: IngestEnv, message: IngressMessageV1): Promise<IngestResponse> {
   if (!env.EVENTS_QUEUE) return json({ error: "event handoff not configured" }, 503);
   try {
     await enqueueIngressMessage(env, message);
-    return json({ ok: true, accepted: true, messageId: message.messageId }, 202);
+    return json({ ok: true, accepted: true, messageId: message.messageId }, 202, {}, "accepted");
   } catch {
     return json({ error: "event handoff unavailable" }, 503);
   }
 }
 
-async function github(request: Request, env: IngestEnv): Promise<Response> {
+async function github(request: Request, env: IngestEnv): Promise<IngestResponse> {
   if (request.method !== "POST") return methodNotAllowed();
   const secret = env.SKVALLERBYTTAN_WEBHOOK_SECRET?.trim() || "";
   if (!secret) return json({ error: "webhook not configured" }, 503);
@@ -75,7 +92,7 @@ async function cloudflare(
   request: Request,
   env: IngestEnv,
   source: "notifications" | "issues" | "casb",
-): Promise<Response> {
+): Promise<IngestResponse> {
   if (request.method !== "POST") return methodNotAllowed();
   const secret = source === "casb"
     ? env.CLOUDFLARE_CASB_WEBHOOK_SECRET?.trim() || ""
@@ -100,12 +117,23 @@ async function cloudflare(
 }
 
 export async function handleIngestRequest(request: Request, env: IngestEnv): Promise<Response> {
+  const startedAt = performance.now();
   const path = new URL(request.url).pathname;
-  if (path === "/github") return github(request, env);
-  if (path === "/cloudflare/notifications") return cloudflare(request, env, "notifications");
-  if (path === "/cloudflare/issues") return cloudflare(request, env, "issues");
-  if (path === "/cloudflare/casb") return cloudflare(request, env, "casb");
-  return json({ error: "not found" }, 404);
+  const source: IngestMetricSource = path === "/github" ? "github"
+    : path === "/cloudflare/notifications" ? "notifications"
+    : path === "/cloudflare/issues" ? "issues"
+    : path === "/cloudflare/casb" ? "casb"
+    : "unknown";
+  try {
+    const result = source === "github" ? await github(request, env)
+      : source === "unknown" ? json({ error: "not found" }, 404)
+      : await cloudflare(request, env, source);
+    recordIngestOutcome(env, "http", source, result.outcome, startedAt);
+    return result.response;
+  } catch (error) {
+    recordIngestOutcome(env, "http", source, "error", startedAt);
+    throw error;
+  }
 }
 
 export default {
