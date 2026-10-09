@@ -2,7 +2,7 @@ name: Automation post-merge dispatch
 
 on:
   workflow_run:
-    workflows: ["Agent auto-merge", "Bot PR lifecycle", "Dependabot auto-merge"]
+    workflows: ["Agent auto-merge", "Bot PR lifecycle"]
     types: [completed]
   schedule:
     # Reconciliation recovers pending workflow_run events discarded by GitHub concurrency.
