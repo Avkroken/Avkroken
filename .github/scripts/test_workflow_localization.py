@@ -32,6 +32,8 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('"$draft" == "true"', text)
         self.assertIn("headRefOid", text)
         self.assertIn('reviewDecision == "APPROVED"', text)
+        self.assertIn('commit { oid }', text)
+        self.assertIn('(.commit.oid // "") == $sha', text)
         self.assertIn("--match-head-commit", text)
         self.assertIn("gh pr merge --disable-auto", text)
         self.assertIn("disable_auto_merge \"$number\" \"$head_sha\"", text)
@@ -52,6 +54,7 @@ class WorkflowLocalizationTests(unittest.TestCase):
     def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
         self.assertIn('method="--squash"', text)
+        self.assertIn('method="--squash"', text)
         self.assertNotIn('method="--merge"', text)
 
     def test_bot_lifecycle_serializes_and_dispatches_only_trusted_workflows(self):
@@ -68,6 +71,8 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('(.reviewDecision == "APPROVED")', text)
         self.assertIn('.headRefOid == $sha', text)
         self.assertIn('all(.reviewThreads.nodes[]; .isResolved == true)', text)
+        self.assertIn('commit { oid }', text)
+        self.assertIn('(.commit.oid // "") == $sha', text)
         self.assertIn('--match-head-commit "${head_sha}"', text)
         self.assertIn('.user.type == "Bot"', text)
         self.assertIn("failures=0", text)
