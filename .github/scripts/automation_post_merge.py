@@ -37,23 +37,15 @@ def is_trusted_merge(pr, repository, default_branch, head_sha):
         return False
     base = pr.get("base") or {}
     head = pr.get("head") or {}
-    user = pr.get("user") or {}
     if base.get("ref") != default_branch:
         return False
     if (head.get("repo") or {}).get("full_name") != repository:
         return False
-    login = user.get("login")
-    role = user.get("type")
-    if login in {"dependabot[bot]", "copilot-swe-agent[bot]"}:
-        return role == "Bot"
-    # A user OAuth connection may act as Avkroken on a codex/* branch; a
-    # branch name is not an authenticated agent principal. Do not elevate it.
-    # OAuth-authored merges trigger native push workflows without this dispatch.
-    return (
-        login == "gamnacken[bot]"
-        and role == "Bot"
-        and str(head.get("ref") or "").startswith("codex/")
-    )
+    # We only act on a merge GitHub has already completed at the current main
+    # tip. Do not infer an agent identity from login, branch, or commit metadata.
+    # Re-running canonical checks on already-merged code is safe regardless
+    # of whether the merge was initiated by a GitHub App or a human collaborator.
+    return True
 
 
 def has_target_run(payload, head_sha):
@@ -76,7 +68,7 @@ def reconcile(api, repository, now):
         if is_trusted_merge(pr, repository, branch, head_sha)
     ]
     if not matches:
-        print("Default-branch tip is not a trusted automation merge; no dispatch.")
+        print("Default-branch tip is not a verified same-repository merge; no dispatch.")
         return False
 
     pr = max(matches, key=lambda item: item["merged_at"])
