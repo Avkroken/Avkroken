@@ -34,7 +34,7 @@ test('security reconciliation paginates, deduplicates and delegates without disc
       if (path.endsWith('/issues') && method==='POST') return response({
         number:issueNumber++,state:'open',body:payload.body,user:{login:'github-actions[bot]'},assignees:[{login:'Avkroken'}]
       });
-      if (path.endsWith('/code-scanning/alerts')) return response([{number:1},{number:2}]);
+      if (path.endsWith('/code-scanning/alerts')) return response([{number:1},{number:2,html_url:'https://github.com/Avkroken/example/security/code-scanning/2?token=do-not-copy'}]);
       if (path.endsWith('/dependabot/alerts')) return response([{number:7}]);
       if (path.endsWith('/pulls')) return response([]);
       if (path.endsWith('/assignees')) return response([]);
@@ -46,6 +46,8 @@ test('security reconciliation paginates, deduplicates and delegates without disc
     assert.ok(calls.some(c=>c.path.endsWith('/issues')&&c.method==='GET'&&c.page===2), 'second issue page must be fetched');
     assert.ok(created.every(c=>c.payload.body.includes('Never copy secrets')));
     assert.ok(created.some(c=>c.payload.body.includes('code-scanning:2')));
+    assert.ok(created.some(c=>c.payload.body.includes('https://github.com/Avkroken/example/security/code-scanning/2')));
+    assert.ok(created.every(c=>!c.payload.body.includes('do-not-copy')), 'alert URL query must not leak');
     assert.ok(created.some(c=>c.payload.body.includes('dependabot:7')));
     assert.equal(calls.filter(c=>c.payload?.agent_assignment).length,0,
       'Actions installation token must never attempt unsupported Copilot delegation');
