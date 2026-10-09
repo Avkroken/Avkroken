@@ -13,14 +13,13 @@ def normalized(value, pattern, fallback="unknown"):
     return text if re.fullmatch(pattern, text) else fallback
 
 
-def closure_marker(number, sha, closed_at, run_id):
+def closure_marker(number, sha, closed_at):
     """Identify one closure occurrence, even across reopen/close cycles."""
     if not isinstance(number, int) or number <= 0:
         return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
     safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
     safe_time = normalized(closed_at, r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
-    safe_run = normalized(run_id, r"[0-9]+")
-    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_time}:{safe_run} -->"
+    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_time} -->"
 
 
 def has_existing_audit_comment(comments, marker):
@@ -28,6 +27,7 @@ def has_existing_audit_comment(comments, marker):
     prefix = marker + "\n### GitHub closure audit (unmerged PR)\n"
     return any(
         ((comment or {}).get("user") or {}).get("login") == "github-actions[bot]"
+        and ((comment or {}).get("user") or {}).get("type") == "Bot"
         and str((comment or {}).get("body") or "").startswith(prefix)
         for comment in comments
     )
@@ -51,7 +51,7 @@ def closure_comment(event, repository, run_id):
     closed_at = normalized(pr.get("closed_at"), r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
     sha = normalized(((pr.get("head") or {}).get("sha")), r"[0-9a-fA-F]{40}")
     run = normalized(run_id, r"[0-9]+")
-    marker = closure_marker(number, sha, closed_at, run_id)
+    marker = closure_marker(number, sha, closed_at)
     return (
         f"{marker}\n"
         "### GitHub closure audit (unmerged PR)\n\n"
@@ -120,7 +120,7 @@ def main():
         raise RuntimeError("GITHUB_TOKEN absent for same-repository closure audit")
 
     try:
-        marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"), pr.get("closed_at"), os.environ["GITHUB_RUN_ID"])
+        marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"), pr.get("closed_at"))
         if existing_comment(repository, pr["number"], token, marker):
             print("Closure audit comment already exists; skipping duplicate publication.")
             return

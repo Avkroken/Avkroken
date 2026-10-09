@@ -132,7 +132,7 @@ def reconcile(api, repository, now):
             if not isinstance(body, str):
                 continue
             marker = re.fullmatch(
-                re.escape(marker_prefix) + r"([1-9][0-9]*)(?::([1-9][0-9]*))? -->",
+                re.escape(marker_prefix) + r"([1-9][0-9]*)(?:[:-]([1-9][0-9]*))? -->",
                 body.splitlines()[0] if body else "",
             )
             if not marker:
@@ -160,8 +160,10 @@ def reconcile(api, repository, now):
         raise RuntimeError("Commit comment pagination bound reached")
 
     if attempt_key in attempts_by_key:
-        print(f"Dispatch already reserved by run {run_id} attempt {run_attempt}; avoiding duplicate.")
-        return False
+        raise RuntimeError(
+            f"Dispatch attempt {run_id}:{run_attempt} is already reserved but "
+            "required workflows remain missing; ambiguous previous dispatch."
+        )
     attempts = len(attempts_by_key)
     if attempts >= 3:
         raise RuntimeError(
@@ -172,7 +174,7 @@ def reconcile(api, repository, now):
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
     if last is not None and now - last < delay:
         print(
-            f"Waiting for missing {', '.join(missing)} on {head_sha}; "
+            f"::notice::Waiting for missing {', '.join(missing)} on {head_sha}; "
             f"retry backoff active after {attempts} actual dispatch reservations."
         )
         return False

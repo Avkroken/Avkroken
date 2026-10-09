@@ -5,9 +5,6 @@ import os
 import unittest
 from unittest.mock import patch
 
-os.environ.setdefault('GITHUB_RUN_ID', '12345')
-os.environ.setdefault('GITHUB_RUN_ATTEMPT', '1')
-
 from automation_post_merge import has_target_run, is_trusted_merge, reconcile
 
 
@@ -81,6 +78,15 @@ def matching_run(event="push", sha=SHA, status="completed", conclusion="success"
 
 
 class AutomationPostMergeTests(unittest.TestCase):
+    def setUp(self):
+        # Isolate workflow identity from Actions runner state in every test.
+        runner_env = patch.dict(os.environ, {
+            "GITHUB_RUN_ID": "12345",
+            "GITHUB_RUN_ATTEMPT": "1",
+        })
+        runner_env.start()
+        self.addCleanup(runner_env.stop)
+
     def test_only_trusted_same_repository_default_branch_merge(self):
         self.assertTrue(is_trusted_merge(merged_pr(), REPO, "main", SHA))
         # A provider-confirmed merge can be checked without inventing bot
@@ -212,7 +218,8 @@ class AutomationPostMergeTests(unittest.TestCase):
         fake = FakeApi(commit_comments=[
             self.attempt_comment("12345:2", "2026-10-08T10:00:00Z")
         ])
-        self.assertFalse(reconcile(fake, REPO, TIME))
+        with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
+            reconcile(fake, REPO, TIME)
         self.assertEqual(fake.posts, [])
 
     @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"})
@@ -220,7 +227,8 @@ class AutomationPostMergeTests(unittest.TestCase):
         fake = FakeApi(commit_comments=[
             self.attempt_comment("12345", "2026-10-08T10:00:00Z"),
         ])
-        self.assertFalse(reconcile(fake, REPO, TIME))
+        with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
+            reconcile(fake, REPO, TIME)
         with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
             self.assertTrue(reconcile(fake, REPO, TIME))
         fake.commit_comments.extend([
@@ -233,6 +241,15 @@ class AutomationPostMergeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "retry limit"):
                 reconcile(fake, REPO, TIME)
         self.assertEqual(fake.posts, [])
+
+    @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "2"})
+    def test_legacy_and_new_markers_same_attempt_count_once(self):
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment(k, "2026-10-08T10:00:00Z")
+            for k in ("12345", "12345-1", "12345:1")
+        ])
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual([kind for kind, _ in fake.posts], ["reservation", "dispatch"])
 
     def test_invalid_run_attempt_fails_before_reservation(self):
         for attempt in ("", "0", "-1", "invalid"):
@@ -295,6 +312,46 @@ class AutomationPostMergeTests(unittest.TestCase):
     def test_fresh_merge_waits_for_native_registration(self):
         fake = FakeApi(pr={**merged_pr(), "merged_at": "2026-10-08T11:59:30Z"})
         self.assertFalse(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts, [])
+
+
+    def test_rerun_attempt_can_retry_after_backoff(self):
+        earlier = self.attempt_comment("12345-1", "2026-10-08T10:30:00Z")
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       commit_comments=[earlier])
+        original = os.environ.get("GITHUB_RUN_ATTEMPT")
+        try:
+            os.environ["GITHUB_RUN_ATTEMPT"] = "2"
+            self.assertTrue(reconcile(fake, REPO, TIME))
+        finally:
+            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
+            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
+        self.assertIn("12345:2 -->", fake.posts[0][1]["body"])
+        self.assertEqual(fake.posts[-1][0], "dispatch")
+
+    def test_same_attempt_ambiguous_reservation_is_not_reported_success(self):
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       commit_comments=[self.attempt_comment("12345-1", "2026-10-08T10:30:00Z")])
+        original = os.environ.get("GITHUB_RUN_ATTEMPT")
+        try:
+            os.environ["GITHUB_RUN_ATTEMPT"] = "1"
+            with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
+                reconcile(fake, REPO, TIME)
+        finally:
+            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
+            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
+        self.assertEqual(fake.posts, [])
+
+    def test_invalid_run_attempt_never_reserves(self):
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()])
+        original = os.environ.get("GITHUB_RUN_ATTEMPT")
+        try:
+            os.environ["GITHUB_RUN_ATTEMPT"] = "not-valid"
+            with self.assertRaisesRegex(RuntimeError, "GITHUB_RUN_ATTEMPT"):
+                reconcile(fake, REPO, TIME)
+        finally:
+            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
+            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
         self.assertEqual(fake.posts, [])
 
 

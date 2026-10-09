@@ -248,6 +248,48 @@ test('private repositories do not read secret-scanning alerts without an authori
   }
 });
 
+
+test('expected 100-issue write cap defers overflow without failing the run', async () => {
+  const oldFetch=globalThis.fetch;
+  const oldWarn=console.warn;
+  const saved={...process.env};
+  const notices=[];
+  let created=0;
+  const reply=value=>({ok:true,status:200,json:async()=>value});
+  try {
+    Object.assign(process.env, {GITHUB_REPOSITORY:'Avkroken/example',
+      GH_TOKEN:'test-only',GITHUB_EVENT_NAME:'schedule'});
+    console.warn=(...args)=>notices.push(args.join(' '));
+    globalThis.fetch=async(url,opts)=>{
+      const u=new URL(url);
+      const path=u.pathname;
+      const page=Number(u.searchParams.get('page'));
+      if(path==='/repos/Avkroken/example')return reply({private:false,default_branch:'main'});
+      if(path.endsWith('/issues') && opts.method==='GET')return reply([]);
+      if(path.endsWith('/code-scanning/alerts'))return reply(
+        page===1 ? Array.from({length:100},(_,i)=>({number:i+1})) :
+        page===2 ? [{number:101}] : []);
+      if(path.endsWith('/dependabot/alerts'))return reply([]);
+      if(path.endsWith('/pulls'))return reply([]);
+      if(path.endsWith('/issues') && opts.method==='POST'){
+        created++;
+        return reply({number:created+1000,state:'open',user:{login:'github-actions[bot]'},
+          assignees:[{login:'Avkroken'}]});
+      }
+      throw Error('Unexpected '+opts.method+' '+path);
+    };
+    await import('./security-reconcile.mjs?test=budget-cap');
+    assert.equal(created,100);
+    assert.ok(notices.some(x=>x.includes('::notice::Issue write budget reached; 1 tracking issues deferred')));
+  } finally {
+    globalThis.fetch=oldFetch;
+    console.warn=oldWarn;
+    for(const k of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']){
+      if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];
+    }
+  }
+});
+
 test('write budget defers creations and reopenings, resumes next run and preserves API errors', async () => {
   const originalFetch=globalThis.fetch;
   const originalWarn=console.warn;
