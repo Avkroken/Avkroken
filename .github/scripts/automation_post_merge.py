@@ -87,8 +87,10 @@ def reconcile(api, repository, now):
 
     ci = api("GET", f"actions/workflows/ci.yml/runs?head_sha={head_sha}&per_page=100")
     release = api("GET", f"actions/workflows/release.yml/runs?head_sha={head_sha}&per_page=100")
-    if has_target_run(ci, head_sha) and has_target_run(release, head_sha):
-        print(f"Both CI and release runs already registered for {head_sha}.")
+    codeql = api("GET", f"actions/workflows/codeql.yml/runs?head_sha={head_sha}&per_page=100")
+    if (has_target_run(ci, head_sha) and has_target_run(release, head_sha)
+            and has_target_run(codeql, head_sha)):
+        print(f"CI, CodeQL, and release runs already registered for {head_sha}.")
         return False
 
     api("POST", "dispatches", {
@@ -100,7 +102,7 @@ def reconcile(api, repository, now):
             "merged_at": pr["merged_at"],
         },
     })
-    print(f"Reconciled missing CI/release registration for {head_sha}.")
+    print(f"Reconciled missing CI/CodeQL/release registration for {head_sha}.")
     return True
 
 
