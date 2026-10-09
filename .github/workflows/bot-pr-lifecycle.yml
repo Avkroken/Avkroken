@@ -40,18 +40,17 @@ jobs:
           }
 
           review_gate() {
-            local number="$1"
-            local review_json unresolved changes_requested review_decision
-            # GraphQL variables must remain literal inside the query string.
+            local number="$1" head_sha="$2" review_json
+            # Called in a conditional: explicitly handle failures instead of
+            # relying on errexit, which Bash disables in this context.
             # shellcheck disable=SC2016
-            review_json="$(gh api graphql \
-              -F owner="$owner" \
-              -F name="$repo_name" \
-              -F number="$number" \
+            if ! review_json="$(gh api graphql \
+              -F owner="${REPOSITORY%%/*}" -F name="${REPOSITORY#*/}" -F number="$number" \
               -f query='
                 query($owner:String!, $name:String!, $number:Int!) {
                   repository(owner:$owner, name:$name) {
                     pullRequest(number:$number) {
+                      headRefOid
                       reviewDecision
                       reviewThreads(first:100) {
                         nodes { isResolved }
@@ -63,28 +62,37 @@ jobs:
                       }
                     }
                   }
-                }'
-            )"
-
-            if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"$review_json")" == "true" ||
-                  "$(jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage' <<<"$review_json")" == "true" ]]; then
-              log "PR #$number has more than 100 review items; leaving it for manual review."
+                }')"; then
+              echo "::warning::PR #${number} review state could not be read."
               return 1
             fi
 
-            unresolved="$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' <<<"$review_json")"
-            changes_requested="$(jq '
-              [.data.repository.pullRequest.reviews.nodes[] | select(.author.login != null)]
-              | group_by(.author.login)
-              | map(sort_by(.submittedAt) | last)
-              | map(select(.state == "CHANGES_REQUESTED"))
-              | length
-            ' <<<"$review_json")"
-            review_decision="$(jq -r '.data.repository.pullRequest.reviewDecision // ""' <<<"$review_json")"
-
-            (( unresolved == 0 )) || { log "PR #$number has unresolved review threads."; return 1; }
-            (( changes_requested == 0 )) || { log "PR #$number has an active changes-requested review."; return 1; }
-            [[ "$review_decision" == "APPROVED" ]] || { log "PR #$number has no current, valid approving review."; return 1; }
+            # Include every thread, including outdated threads. Incomplete or
+            # paginated responses cannot establish that the review work is done.
+            # Comments and pending reviews do not supersede a submitted decision.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == "APPROVED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; .isResolved == true) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login)
+                    | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
+            ' <<<"$review_json" >/dev/null; then
+              echo "PR #${number} has pending or unverifiable review work."
+              return 1
+            fi
           }
 
           reconcile_pr() {
@@ -122,7 +130,7 @@ jobs:
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
-            if ! review_gate "${number}"; then
+            if ! review_gate "${number}" "${head_sha}"; then
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
@@ -145,7 +153,7 @@ jobs:
               return 1
             fi
 
-            gh pr merge --auto "${method}" "${url}"
+            gh pr merge --auto "${method}" --match-head-commit "${head_sha}" "${url}"
           }
 
           failures=0
