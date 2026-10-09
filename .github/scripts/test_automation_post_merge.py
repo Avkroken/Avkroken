@@ -48,8 +48,13 @@ class FakeApi:
         raise AssertionError(path)
 
 
-def matching_run(event="push", sha=SHA):
-    return {"head_sha": sha, "event": event, "status": "completed"}
+def matching_run(event="push", sha=SHA, status="completed", conclusion="success"):
+    return {
+        "head_sha": sha,
+        "event": event,
+        "status": status,
+        "conclusion": conclusion,
+    }
 
 
 class AutomationPostMergeTests(unittest.TestCase):
@@ -80,6 +85,21 @@ class AutomationPostMergeTests(unittest.TestCase):
         self.assertFalse(has_target_run({"workflow_runs": [matching_run(sha="older")]}, SHA))
         self.assertFalse(has_target_run({"workflow_runs": [matching_run(event="pull_request")]}, SHA))
         self.assertTrue(has_target_run({"workflow_runs": [matching_run(event="repository_dispatch")]}, SHA))
+
+    def test_cancelled_startup_failure_and_skipped_runs_do_not_count_as_registered(self):
+        for conclusion in ("cancelled", "startup_failure", "skipped"):
+            self.assertFalse(has_target_run(
+                {"workflow_runs": [matching_run(conclusion=conclusion)]},
+                SHA,
+            ))
+        self.assertTrue(has_target_run(
+            {"workflow_runs": [matching_run(status="queued", conclusion=None)]},
+            SHA,
+        ))
+        self.assertTrue(has_target_run(
+            {"workflow_runs": [matching_run(status="in_progress", conclusion=None)]},
+            SHA,
+        ))
 
     def test_no_duplicate_when_both_required_workflows_registered(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()])
