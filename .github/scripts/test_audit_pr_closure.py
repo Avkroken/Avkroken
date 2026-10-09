@@ -2,7 +2,7 @@
 """Regression tests for unmerged PR closure attribution."""
 import unittest
 
-from audit_pr_closure import closure_comment
+from audit_pr_closure import closure_comment, closure_marker, has_existing_audit_comment
 
 REPO = "Avkroken/Avkroken"
 SHA = "a" * 40
@@ -39,6 +39,20 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIsNone(closure_comment(event(merged=True), REPO, "12"))
         self.assertIsNone(closure_comment(event(action="reopened"), REPO, "12"))
         self.assertIsNone(closure_comment(event(action="synchronize"), REPO, "12"))
+
+    def test_bot_actor_login_is_preserved(self):
+        comment = closure_comment(event(actor="dependabot[bot]"), REPO, "3")
+        self.assertIn("GitHub actor: `dependabot[bot]`", comment)
+
+    def test_closure_comment_has_stable_marker_and_deduplicates(self):
+        marker = closure_marker(214, SHA)
+        comment = closure_comment(event(), REPO, "12345")
+        self.assertIn(marker, comment)
+        self.assertTrue(has_existing_audit_comment(
+            [{"body": "older"}, {"body": comment}],
+            marker,
+        ))
+        self.assertFalse(has_existing_audit_comment([{"body": "older"}], marker))
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)
