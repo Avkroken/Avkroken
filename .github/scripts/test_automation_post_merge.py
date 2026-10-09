@@ -3,8 +3,7 @@
 import datetime as dt
 import os
 import unittest
-
-os.environ.setdefault('GITHUB_RUN_ID', '12345')
+from unittest.mock import patch
 
 from automation_post_merge import has_target_run, is_trusted_merge, reconcile
 
@@ -79,6 +78,12 @@ def matching_run(event="push", sha=SHA, status="completed", conclusion="success"
 
 
 class AutomationPostMergeTests(unittest.TestCase):
+    def setUp(self):
+        """Keep workflow identity independent of the runner executing tests."""
+        env = patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"})
+        env.start()
+        self.addCleanup(env.stop)
+
     def test_only_trusted_same_repository_default_branch_merge(self):
         self.assertTrue(is_trusted_merge(merged_pr(), REPO, "main", SHA))
         # A provider-confirmed merge can be checked without inventing bot
@@ -181,6 +186,84 @@ class AutomationPostMergeTests(unittest.TestCase):
             "body": f"<!-- avkroken-dispatch-attempt:{SHA}:{run_id} -->",
             "created_at": timestamp,
         }
+
+    def test_failed_dispatch_can_recover_on_later_workflow_attempt(self):
+        """A persisted reservation must not permanently suppress a workflow rerun."""
+        fake = FakeApi()
+
+        def failing_dispatch(method, path, payload=None):
+            """Model a dispatch failure after the reservation was accepted."""
+            if method == "POST" and path == "dispatches":
+                raise RuntimeError("dispatch unavailable")
+            return fake(method, path, payload)
+
+        with self.assertRaisesRegex(RuntimeError, "dispatch unavailable"):
+            reconcile(failing_dispatch, REPO, TIME)
+        self.assertEqual(len(fake.posts), 1)
+        fake.commit_comments.append({
+            "user": {"login": "github-actions[bot]"},
+            "body": fake.posts[0][1]["body"],
+            "created_at": TIME.isoformat(),
+        })
+        fake.posts.clear()
+        later = TIME + dt.timedelta(minutes=30)
+        self.assertFalse(reconcile(fake, REPO, later))
+        self.assertEqual(fake.posts, [])
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
+            self.assertTrue(reconcile(fake, REPO, later))
+        self.assertEqual([kind for kind, _ in fake.posts], ["reservation", "dispatch"])
+        self.assertIn(f"{SHA}:12345-2 -->", fake.posts[0][1]["body"])
+
+    def test_rerun_still_observes_reservation_backoff(self):
+        """Changing attempt number cannot bypass the per-SHA retry delay."""
+        fake = FakeApi(commit_comments=[self.attempt_comment("12345-1", TIME.isoformat())])
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
+            self.assertFalse(reconcile(fake, REPO, TIME + dt.timedelta(minutes=29)))
+        self.assertEqual(fake.posts, [])
+
+    def test_reruns_count_toward_retry_limit_with_legacy_history(self):
+        """Old markers and distinct attempts of the same run share one budget."""
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment(key, "2026-10-08T10:00:00Z")
+            for key in ("12345", "12345-2", "12345-3")
+        ])
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "4"}):
+            with self.assertRaisesRegex(RuntimeError, "retry limit"):
+                reconcile(fake, REPO, TIME)
+        self.assertEqual(fake.posts, [])
+
+    def test_legacy_reservation_deduplicates_first_attempt_only(self):
+        """Pre-upgrade reservations represent attempt one and permit later reruns."""
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment("12345", "2026-10-08T10:00:00Z"),
+        ])
+        self.assertFalse(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts, [])
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
+            self.assertTrue(reconcile(fake, REPO, TIME))
+
+    def test_equivalent_legacy_and_new_markers_count_once(self):
+        """Representations of the same reservation cannot exhaust the budget."""
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment(key, "2026-10-08T10:00:00Z")
+            for key in ("8", "8-1", "8-2")
+        ])
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts[-1][0], "dispatch")
+
+    def test_invalid_workflow_identity_fails_before_writes(self):
+        """Reject absent or malformed run IDs and attempt numbers before reserving."""
+        for variable in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"):
+            for value in (None, "", "0", "-1", "1-2", "01", "1\n"):
+                with self.subTest(variable=variable, value=value), patch.dict(os.environ):
+                    if value is None:
+                        os.environ.pop(variable, None)
+                    else:
+                        os.environ[variable] = value
+                    fake = FakeApi()
+                    with self.assertRaisesRegex(RuntimeError, variable):
+                        reconcile(fake, REPO, TIME)
+                    self.assertEqual(fake.posts, [])
 
     def test_dispatch_stops_after_three_actual_attempts_for_sha(self):
         comments = [
