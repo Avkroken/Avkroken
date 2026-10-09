@@ -45,6 +45,8 @@ test('security reconciliation paginates, deduplicates and delegates without disc
     assert.equal(created.length,2, 'old CodeQL alert must not create a duplicate');
     assert.ok(calls.some(c=>c.path.endsWith('/issues')&&c.method==='GET'&&c.page===2), 'second issue page must be fetched');
     assert.ok(created.every(c=>c.payload.body.includes('Never copy secrets')));
+    assert.ok(created.every(c=>c.payload.body.includes('pending manual Copilot assignment')));
+    assert.ok(created.every(c=>!c.payload.body.includes('Copilot is requested')));
     assert.ok(created.some(c=>c.payload.body.includes('code-scanning:2')));
     const alertIssue=created.find(c=>c.payload.body.includes('code-scanning:2'));
     const alertLine=alertIssue.payload.body.split('\n').find(x=>x.startsWith('GitHub Security alert: '));
