@@ -34,6 +34,18 @@ if (!/^[-\w.]+\/[-\w.]+$/.test(repo || '') || !token) {
   throw Error('Missing GITHUB_REPOSITORY or GH_TOKEN');
 }
 const root = 'repos/' + repo;
+const safeAlertUrl = alert => {
+  // Provider-supplied links are untrusted. Restrict navigation to this
+  // repository on GitHub and never copy a query string into a public issue.
+  try {
+    const u = new URL(alert.html_url);
+    if(u.protocol === 'https:' && u.hostname === 'github.com' &&
+       u.pathname.startsWith('/' + repo + '/')) {
+      return u.origin + u.pathname;
+    }
+  } catch {}
+  return 'https://github.com/' + repo + '/security';
+};
 const errors = [];
 let writes = 0;
 async function api(path,method='GET',data) {
@@ -105,7 +117,7 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
         } else if(writes<100) {
           const body=[
             'An open '+label+' alert requires remediation.',
-            'GitHub Security alert: https://github.com/'+repo+'/security/'+kind+'/'+number,
+            'GitHub Security alert: '+safeAlertUrl(alert),
             'See Security and quality in this repository for the original alert. Never copy secrets, token values, private security payloads, or exploit details into public issues or PRs.',
             'Acceptance: verify the alert, implement and test the smallest safe fix, link this issue in the PR and respect AGENTS.md, CI and branch protections.',
             'Owner: Avkroken. Copilot is requested as coding agent where supported. Codex, Claude and CodeRabbit require separately installed integrations for agent execution or review.',
