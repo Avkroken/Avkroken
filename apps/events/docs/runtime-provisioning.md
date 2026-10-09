@@ -126,6 +126,13 @@ Cutover requires, at minimum:
 - otherwise at least seven days;
 - zero observed events never qualifies as sufficient evidence.
 
+Event, Queue and read counts must be explicit non-negative safe integers (at most
+`Number.MAX_SAFE_INTEGER`); canonical events and read comparisons must be positive.
+Missing, fractional or unsafe counts cannot establish parity even when their
+totals match. `backlogKnown=true` still requires an explicit `backlogMessages`
+count. Queue age is a duration and may include fractional seconds within the
+existing 60-second bound.
+
 A gate failure leaves Skvallerbyttan canonical and leaves provider destinations unchanged.
 
 ## Production cutover order

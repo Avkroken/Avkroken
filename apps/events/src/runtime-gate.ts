@@ -122,6 +122,10 @@ function finiteNonNegative(value: number): boolean {
   return Number.isFinite(value) && value >= 0;
 }
 
+function nonNegativeSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
 function parseIso(value: string, field: string, reasons: string[]): number {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) {
@@ -236,8 +240,14 @@ export function evaluateShadowCutoverGateV1(
     reasons.push(`shadow window must be at least ${requiredShadowHours} hours for this volume`);
   }
 
-  for (const [field, value] of Object.entries(evidence.parity)) {
-    if (!finiteNonNegative(value)) reasons.push(`parity.${field} must be a non-negative finite number`);
+  // Enumerate required fields so omitted runtime evidence cannot bypass validation.
+  for (const field of [
+    "canonicalCount", "shadowCount", "matched", "missingInShadow", "extraInShadow",
+    "contentMismatches", "idempotencyConflicts", "mirrorFailures",
+  ] as const) {
+    if (!nonNegativeSafeInteger(evidence.parity[field])) {
+      reasons.push(`parity.${field} must be a non-negative safe integer`);
+    }
   }
   requireEqual(evidence.parity.shadowCount, canonicalCount, "parity.shadowCount", reasons);
   requireEqual(evidence.parity.matched, canonicalCount, "parity.matched", reasons);
@@ -286,9 +296,12 @@ export function evaluateShadowCutoverGateV1(
     reasons,
   );
 
-  for (const [field, value] of Object.entries(evidence.queue)) {
-    if (field === "backlogKnown" || field === "oldestMessageAgeSeconds") continue;
-    if (!finiteNonNegative(value as number)) reasons.push(`queue.${field} must be a non-negative finite number`);
+  for (const field of [
+    "accepted", "inserted", "duplicates", "unresolvedRetries", "dlqCount", "backlogMessages",
+  ] as const) {
+    if (!nonNegativeSafeInteger(evidence.queue[field])) {
+      reasons.push(`queue.${field} must be a non-negative safe integer`);
+    }
   }
   requireEqual(evidence.queue.backlogKnown, true, "queue.backlogKnown", reasons);
   requireEqual(evidence.queue.unresolvedRetries, 0, "queue.unresolvedRetries", reasons);
@@ -326,8 +339,8 @@ export function evaluateShadowCutoverGateV1(
     }
   }
 
-  if (!finiteNonNegative(evidence.reads.comparisons) || evidence.reads.comparisons <= 0) {
-    reasons.push("reads.comparisons must be greater than zero");
+  if (!nonNegativeSafeInteger(evidence.reads.comparisons) || evidence.reads.comparisons <= 0) {
+    reasons.push("reads.comparisons must be a positive safe integer");
   }
   requireEqual(evidence.reads.comparisons, canonicalCount, "reads.comparisons", reasons);
   requireEqual(evidence.reads.mismatches, 0, "reads.mismatches", reasons);

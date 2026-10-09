@@ -138,6 +138,70 @@ test("zero traffic never produces cutover confidence", async () => {
   assert.ok(result.reasons.some((reason) => /reads.comparisons/.test(reason)));
 });
 
+test("matching fractional or unsafe event totals cannot establish full parity", async () => {
+  const target = await plan();
+  for (const count of [0.5, 20.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const value = evidence();
+    value.window.to = "2026-10-14T12:00:00.000Z";
+    value.generatedAt = "2026-10-14T12:05:00.000Z";
+    value.parity.canonicalCount = count;
+    value.parity.shadowCount = count;
+    value.parity.matched = count;
+    value.queue.accepted = count;
+    value.queue.inserted = count;
+    value.reads.comparisons = count;
+
+    const result = evaluateShadowCutoverGateV1(target, value);
+    assert.equal(result.pass, false, `event count ${count}`);
+    for (const field of ["parity.canonicalCount", "parity.shadowCount", "parity.matched", "queue.accepted", "queue.inserted", "reads.comparisons"]) {
+      assert.ok(result.reasons.some((reason) => reason.includes(field)), field);
+    }
+  }
+});
+
+test("balanced Queue totals still require whole, safe duplicate counts", async () => {
+  const target = await plan();
+  for (const duplicates of [0.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const value = evidence();
+    value.queue.duplicates = duplicates;
+    value.queue.accepted = value.queue.inserted + duplicates;
+
+    const result = evaluateShadowCutoverGateV1(target, value);
+    assert.equal(result.pass, false, `duplicate count ${duplicates}`);
+    assert.ok(result.reasons.some((reason) => reason.includes("queue.duplicates")));
+  }
+});
+
+test("known backlog requires an explicit non-negative safe integer message count", async () => {
+  const target = await plan();
+  for (const count of [undefined, null, "0", -1, 0.5, Number.MAX_SAFE_INTEGER + 1, Infinity, NaN]) {
+    const value = evidence();
+    // A fresh age must not let an omitted or malformed runtime count pass.
+    value.queue.oldestMessageAgeSeconds = 0;
+    if (count === undefined) {
+      Reflect.deleteProperty(value.queue, "backlogMessages");
+    } else {
+      Reflect.set(value.queue, "backlogMessages", count);
+    }
+
+    const result = evaluateShadowCutoverGateV1(target, value);
+    assert.equal(result.pass, false, `backlog count ${String(count)}`);
+    assert.ok(result.reasons.some((reason) => reason.includes("queue.backlogMessages")));
+  }
+});
+
+test("whole duplicate and backlog counts preserve valid evidence with fractional age", async () => {
+  const value = evidence();
+  value.queue.duplicates = 3;
+  value.queue.accepted = value.queue.inserted + value.queue.duplicates;
+  value.queue.backlogMessages = 1;
+  value.queue.oldestMessageAgeSeconds = 0.5;
+
+  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  assert.equal(result.pass, true);
+  assert.deepEqual(result.reasons, []);
+});
+
 test("parity, DLQ, backlog and isolation failures block cutover", async () => {
   const value = evidence();
   value.parity.missingInShadow = 1;
