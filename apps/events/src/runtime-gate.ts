@@ -2,6 +2,8 @@ export const MIN_STANDARD_SHADOW_HOURS = 72;
 export const MIN_LOW_VOLUME_SHADOW_HOURS = 168;
 export const STANDARD_VOLUME_EVENTS = 20;
 export const MAX_QUEUE_BACKLOG_AGE_SECONDS = 60;
+export const MAX_SHADOW_CUTOVER_EVIDENCE_AGE_MS = 15 * 60 * 1000;
+const CLOCK_SKEW_MS = 60 * 1000;
 
 export type RuntimeProvisioningPlanV1 = {
   schemaVersion: number;
@@ -205,9 +207,11 @@ export function validateRuntimeProvisioningPlanV1(plan: RuntimeProvisioningPlanV
   return reasons;
 }
 
+/** Evaluate parity and freshness against the operator's current clock before cutover. */
 export function evaluateShadowCutoverGateV1(
   plan: RuntimeProvisioningPlanV1,
   evidence: ShadowParityEvidenceV1,
+  now = Date.now(),
 ): ShadowGateResultV1 {
   const reasons = validateRuntimeProvisioningPlanV1(plan);
   if (evidence.schemaVersion !== 1) reasons.push("evidence.schemaVersion must be 1");
@@ -215,6 +219,15 @@ export function evaluateShadowCutoverGateV1(
   const from = parseIso(evidence.window.from, "window.from", reasons);
   const to = parseIso(evidence.window.to, "window.to", reasons);
   const generatedAt = parseIso(evidence.generatedAt, "generatedAt", reasons);
+  if (!Number.isFinite(now)) {
+    reasons.push("now must be a valid timestamp");
+  } else {
+    for (const [field, timestamp] of [["generatedAt", generatedAt], ["window.to", to]] as const) {
+      if (!Number.isFinite(timestamp)) continue;
+      if (timestamp > now + CLOCK_SKEW_MS) reasons.push(`${field} is in the future`);
+      if (now - timestamp > MAX_SHADOW_CUTOVER_EVIDENCE_AGE_MS) reasons.push(`${field} is stale`);
+    }
+  }
 
   const actualShadowHours = Number.isFinite(from) && Number.isFinite(to)
     ? Math.max(0, (to - from) / 3_600_000)

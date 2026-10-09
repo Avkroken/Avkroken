@@ -107,6 +107,8 @@ This prevents overlap from creating two identity paths and is enforced by the ex
 
 Cutover requires, at minimum:
 
+- both report generation and shadow window end are no more than 15 minutes old at evaluation;
+- neither timestamp is more than one minute ahead of the evaluation clock;
 - all planned staging resources match exact names/settings;
 - D1 jurisdiction is EU;
 - migrations applied and no pending migration;
@@ -127,6 +129,12 @@ Cutover requires, at minimum:
 - zero observed events never qualifies as sufficient evidence.
 
 A gate failure leaves Skvallerbyttan canonical and leaves provider destinations unchanged.
+
+The gate uses `Date.now()` by default. Its optional third argument is the operator's
+evaluation time in epoch milliseconds, for deterministic validation; never derive
+that clock from the submitted evidence. Refreshing `generatedAt` alone cannot make
+an expired shadow window qualify. Recollect and re-evaluate evidence immediately
+before cutover; an archived passing result is not current authorization.
 
 ## Production cutover order
 

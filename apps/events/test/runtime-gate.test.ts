@@ -8,6 +8,8 @@ import {
   type ShadowParityEvidenceV1,
 } from "../src/runtime-gate.ts";
 
+const EVALUATED_AT = Date.parse("2026-10-10T12:05:00.000Z");
+
 async function plan(): Promise<RuntimeProvisioningPlanV1> {
   return JSON.parse(
     await readFile(new URL("../runtime-provisioning.v1.json", import.meta.url), "utf8"),
@@ -94,7 +96,7 @@ test("runtime provisioning plan locks isolated EU D1 and Queue contracts", async
 });
 
 test("standard-volume 72-hour evidence passes the cutover gate", async () => {
-  const result = evaluateShadowCutoverGateV1(await plan(), evidence());
+  const result = evaluateShadowCutoverGateV1(await plan(), evidence(), EVALUATED_AT);
   assert.deepEqual(result, {
     pass: true,
     reasons: [],
@@ -112,14 +114,14 @@ test("low-volume evidence requires a seven-day window", async () => {
   value.queue.inserted = 5;
   value.reads.comparisons = 5;
 
-  const short = evaluateShadowCutoverGateV1(await plan(), value);
+  const short = evaluateShadowCutoverGateV1(await plan(), value, EVALUATED_AT);
   assert.equal(short.pass, false);
   assert.equal(short.requiredShadowHours, 168);
   assert.ok(short.reasons.some((reason) => /168 hours/.test(reason)));
 
   value.window.to = "2026-10-14T12:00:00.000Z";
   value.generatedAt = "2026-10-14T12:05:00.000Z";
-  const longEnough = evaluateShadowCutoverGateV1(await plan(), value);
+  const longEnough = evaluateShadowCutoverGateV1(await plan(), value, Date.parse("2026-10-14T12:05:00.000Z"));
   assert.equal(longEnough.pass, true);
 });
 
@@ -132,7 +134,7 @@ test("zero traffic never produces cutover confidence", async () => {
   value.queue.accepted = 0;
   value.queue.inserted = 0;
   value.reads.comparisons = 0;
-  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  const result = evaluateShadowCutoverGateV1(await plan(), value, EVALUATED_AT);
   assert.equal(result.pass, false);
   assert.ok(result.reasons.some((reason) => /at least one canonical event/.test(reason)));
   assert.ok(result.reasons.some((reason) => /reads.comparisons/.test(reason)));
@@ -153,7 +155,7 @@ test("parity, DLQ, backlog and isolation failures block cutover", async () => {
   value.provisioning.databaseReadReplication = "auto";
   value.reads.mismatches = 1;
 
-  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  const result = evaluateShadowCutoverGateV1(await plan(), value, EVALUATED_AT);
   assert.equal(result.pass, false);
   for (const fragment of [
     "missingInShadow",
@@ -174,7 +176,7 @@ test("parity, DLQ, backlog and isolation failures block cutover", async () => {
 test("partial read sampling cannot qualify as parity", async () => {
   const value = evidence();
   value.reads.comparisons = 24;
-  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  const result = evaluateShadowCutoverGateV1(await plan(), value, EVALUATED_AT);
   assert.equal(result.pass, false);
   assert.ok(result.reasons.some((reason) => reason.includes("reads.comparisons")));
 });
@@ -182,7 +184,7 @@ test("partial read sampling cannot qualify as parity", async () => {
 test("backfill boundary must end strictly before shadow traffic", async () => {
   const value = evidence();
   value.backfill.latestImportedReceivedAt = value.backfill.beforeExclusive;
-  const result = evaluateShadowCutoverGateV1(await plan(), value);
+  const result = evaluateShadowCutoverGateV1(await plan(), value, EVALUATED_AT);
   assert.equal(result.pass, false);
   assert.ok(result.reasons.some((reason) => /latestImportedReceivedAt/.test(reason)));
 });
@@ -194,4 +196,52 @@ test("provisioning drift from ADR values is rejected", async () => {
   const reasons = validateRuntimeProvisioningPlanV1(value);
   assert.ok(reasons.some((reason) => reason.includes("shadow.queue.maxRetries")));
   assert.ok(reasons.some((reason) => reason.includes("shadow.database.jurisdiction")));
+});
+
+test("expired cutover evidence fails even if its report timestamp is refreshed", async () => {
+  const target = await plan();
+  const now = EVALUATED_AT + 24 * 60 * 60 * 1000;
+  const value = evidence();
+  let result = evaluateShadowCutoverGateV1(target, value, now);
+  assert.equal(result.pass, false);
+  assert.ok(result.reasons.some((reason) => reason.includes("generatedAt is stale")));
+  assert.ok(result.reasons.some((reason) => reason.includes("window.to is stale")));
+
+  value.generatedAt = new Date(now).toISOString();
+  result = evaluateShadowCutoverGateV1(target, value, now);
+  assert.equal(result.pass, false);
+  assert.ok(result.reasons.some((reason) => reason.includes("window.to is stale")));
+});
+
+test("cutover freshness accepts the exact age limit and rejects one millisecond beyond", async () => {
+  const target = await plan();
+  const value = evidence();
+  value.generatedAt = value.window.to;
+  const limit = Date.parse(value.window.to) + 15 * 60 * 1000;
+  assert.equal(evaluateShadowCutoverGateV1(target, value, limit).pass, true);
+  assert.equal(evaluateShadowCutoverGateV1(target, value, limit + 1).pass, false);
+});
+
+test("future evidence and invalid evaluation clocks cannot pass cutover", async () => {
+  const target = await plan();
+  const value = evidence();
+  value.generatedAt = value.window.to;
+  const end = Date.parse(value.window.to);
+  assert.equal(evaluateShadowCutoverGateV1(target, value, end - 60_000).pass, true);
+  const future = evaluateShadowCutoverGateV1(target, value, end - 60_001);
+  assert.equal(future.pass, false);
+  assert.ok(future.reasons.some((reason) => reason.includes("generatedAt is in the future")));
+  assert.ok(future.reasons.some((reason) => reason.includes("window.to is in the future")));
+  for (const now of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const result = evaluateShadowCutoverGateV1(target, value, now);
+    assert.equal(result.pass, false);
+    assert.ok(result.reasons.some((reason) => reason.includes("now must be a valid timestamp")));
+  }
+});
+
+test("cutover uses the current clock when no evaluation time is supplied", async (t) => {
+  t.mock.method(Date, "now", () => EVALUATED_AT + 24 * 60 * 60 * 1000);
+  const result = evaluateShadowCutoverGateV1(await plan(), evidence());
+  assert.equal(result.pass, false);
+  assert.ok(result.reasons.some((reason) => reason.includes("generatedAt is stale")));
 });
