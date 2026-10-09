@@ -45,6 +45,20 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertNotIn('"dependabot[bot]"', text)
         self.assertNotIn('codex/*', text)
 
+    def test_agent_reconciler_aggregates_each_pr_failure(self):
+        text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
+        self.assertIn("failures=0", text)
+        self.assertIn("failures=$((failures + 1))", text)
+        self.assertIn('[[ "$failures" -eq 0 ]] || exit 1', text)
+
+    def test_bot_review_signal_includes_new_pushes_from_trusted_context(self):
+        text = (WORKFLOWS / "agent-lifecycle-signal.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", text)
+        self.assertIn("synchronize", text)
+        self.assertIn("converted_to_draft", text)
+        self.assertIn("permissions: {}", text)
+        self.assertNotIn("actions/checkout", text)
+
     def test_only_one_gated_dependabot_merge_path_exists(self):
         self.assertFalse(
             (WORKFLOWS / "dependabot-automerge.yml").exists(),
