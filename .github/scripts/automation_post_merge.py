@@ -67,6 +67,7 @@ def has_target_run(payload, head_sha, require_dispatch=False):
 
 
 def reconcile(api, repository, now):
+    """Recover missing target runs with bounded, attempt-specific reservations."""
     config = api("GET", "")
     branch = config["default_branch"]
     head_sha = api("GET", f"branches/{branch}")["commit"]["sha"]
@@ -105,12 +106,17 @@ def reconcile(api, repository, now):
     # distinguish a genuine dispatch from a no-op/backoff-only reconciliation.
     # A commit comment is append-only evidence visible to maintainers; no
     # token, new branch, external database or mutable cache is required.
-    # Re-running the same GITHUB_RUN_ID must not dispatch twice.
+    # Deduplicate each execution, but allow a later workflow attempt to recover
+    # a dispatch failure after reservation (within the same retry budget).
     run_id = os.environ.get("GITHUB_RUN_ID", "")
+    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "")
     if not re.fullmatch(r"[1-9][0-9]*", run_id):
         raise RuntimeError("Missing valid GITHUB_RUN_ID for dispatch reservation")
+    if not re.fullmatch(r"[1-9][0-9]*", run_attempt):
+        raise RuntimeError("Missing valid GITHUB_RUN_ATTEMPT for dispatch reservation")
+    attempt_key = (run_id, run_attempt)
     marker_prefix = f"<!-- avkroken-dispatch-attempt:{head_sha}:"
-    attempts_by_run = {}
+    attempts_by_execution = {}
     for page in range(1, 11):
         batch = api(
             "GET",
@@ -127,7 +133,7 @@ def reconcile(api, repository, now):
             if not isinstance(body, str):
                 continue
             marker = re.fullmatch(
-                re.escape(marker_prefix) + r"([1-9][0-9]*) -->",
+                re.escape(marker_prefix) + r"([1-9][0-9]*)(?:-([1-9][0-9]*))? -->",
                 body.splitlines()[0] if body else "",
             )
             if not marker:
@@ -144,24 +150,26 @@ def reconcile(api, repository, now):
             if reserved_at.tzinfo is None:
                 raise RuntimeError("Timezone missing from dispatch reservation")
             if reserved_at >= merged_at:
-                key = marker.group(1)
-                previous = attempts_by_run.get(key)
-                attempts_by_run[key] = max(previous, reserved_at) if previous else reserved_at
+                # Legacy run-only markers represent the first attempt. Keep
+                # their budget and backoff evidence across the format upgrade.
+                key = (marker.group(1), marker.group(2) or "1")
+                previous = attempts_by_execution.get(key)
+                attempts_by_execution[key] = max(previous, reserved_at) if previous else reserved_at
         if len(batch) < 100:
             break
     else:
         raise RuntimeError("Commit comment pagination bound reached")
 
-    if run_id in attempts_by_run:
-        print(f"Dispatch already reserved by this run {run_id}; avoiding duplicate.")
+    if attempt_key in attempts_by_execution:
+        print(f"Dispatch already reserved by run {run_id} attempt {run_attempt}; avoiding duplicate.")
         return False
-    attempts = len(attempts_by_run)
+    attempts = len(attempts_by_execution)
     if attempts >= 3:
         raise RuntimeError(
             f"Persistently missing {', '.join(missing)} for {head_sha}; "
             "post-merge dispatch retry limit reached (3)."
         )
-    last = max(attempts_by_run.values(), default=None)
+    last = max(attempts_by_execution.values(), default=None)
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
     if last is not None and now - last < delay:
         print(
@@ -181,7 +189,7 @@ def reconcile(api, repository, now):
         "POST",
         f"commits/{head_sha}/comments",
         {"body": (
-            f"{marker_prefix}{run_id} -->\n"
+            f"{marker_prefix}{run_id}-{run_attempt} -->\n"
             "Automation post-merge: durable dispatch attempt reservation. "
             "The canonical CI, CodeQL and Release runs remain authoritative."
         )},
