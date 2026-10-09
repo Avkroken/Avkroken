@@ -155,6 +155,15 @@ class BotReviewGateTests(unittest.TestCase):
         self.state['reviews']['nodes'] = [review('APPROVED', sha='b' * 40)]
         self.assert_blocked()
 
+    def test_dismissed_current_head_approval_does_not_count(self):
+        self.state['reviewDecision'] = 'APPROVED'
+        self.state['reviews']['nodes'] = [
+            review('APPROVED', 'reviewer', 1, SHA),
+            review('DISMISSED', 'reviewer', 2, SHA),
+            review('APPROVED', 'other', 3, 'b' * 40),
+        ]
+        self.assert_blocked()
+
     def test_missing_commit_identity_blocks_approval(self):
         self.state['reviews']['nodes'] = [
             {'author': {'login': 'reviewer'}, 'state': 'APPROVED',
