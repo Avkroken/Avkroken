@@ -35,6 +35,7 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("--match-head-commit", text)
         self.assertIn("remains in native auto-merge queue", text)
         self.assertIn('method="--squash"', text)
+        self.assertIn("auto-merge already queued; skipping duplicate request", text)
         self.assertIn("gh pr merge --auto", text)
         self.assertNotIn("disable_auto_merge()", text)
         self.assertNotIn('auto_merge.enabled_by.login', text)
