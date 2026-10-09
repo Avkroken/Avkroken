@@ -113,23 +113,26 @@ jobs:
               return 0
             fi
 
-            # Human authors are not verified automation principals.
-            # Even repository write permission does not attest AI origin.
-            # Native GitHub review/ruleset gates apply to allowlisted bots too.
+            # Native auto-merge queue membership is explicit authorization.
+            # Verify human collaborators' current GitHub write permission;
+            # bot principals are provider-resolved, not inferred from a fixed
+            # vendor login allowlist or a mutable branch prefix.
             case "$author_type" in
-              Bot)
-                case "$author" in
-                  "dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]") ;;
+              User)
+                permission_json="$(gh api "repos/${REPOSITORY}/collaborators/${author}/permission" 2>/dev/null)" || {
+                  log "Cannot verify PR #$number author permissions; skipping."
+                  return 0
+                }
+                permission="$(jq -r '.permission // "none"' <<<"$permission_json")"
+                case "$permission" in
+                  write|maintain|admin) ;;
                   *)
-                    log "PR #$number bot author is not allowlisted; skipping."
+                    log "PR #$number author lacks write permission; skipping."
                     return 0
                     ;;
                 esac
                 ;;
-              User)
-                log "Human authors are not verified automation principals; skipping PR #$number."
-                return 0
-                ;;
+              Bot) ;;
               *)
                 log "PR #$number author type is not supported; skipping."
                 return 0
