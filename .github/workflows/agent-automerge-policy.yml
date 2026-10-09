@@ -75,7 +75,7 @@ jobs:
 
             (( unresolved == 0 )) || { log "PR #$number has unresolved review threads."; return 1; }
             (( changes_requested == 0 )) || { log "PR #$number has an active changes-requested review."; return 1; }
-            [[ "$review_decision" != "CHANGES_REQUESTED" ]] || { log "PR #$number review decision requests changes."; return 1; }
+            [[ "$review_decision" == "APPROVED" ]] || { log "PR #$number has no current, valid approving review."; return 1; }
           }
 
           disable_auto_merge() {
