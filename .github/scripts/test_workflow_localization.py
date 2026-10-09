@@ -37,11 +37,18 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("disable_auto_merge \"$number\" \"$head_sha\"", text)
         self.assertIn('method="--squash"', text)
         self.assertIn("auto-merge already queued; skipping duplicate request", text)
-        self.assertIn("gh pr merge --auto", text)
+        self.assertNotIn("gh pr merge --auto", text)
+        self.assertIn("auto-merge was withdrawn; not re-enabling", text)
         self.assertNotIn('auto_merge.enabled_by.login', text)
         self.assertNotIn('"gamnacken[bot]"', text)
         self.assertNotIn('"dependabot[bot]"', text)
         self.assertNotIn('codex/*', text)
+
+    def test_only_one_gated_dependabot_merge_path_exists(self):
+        self.assertFalse(
+            (WORKFLOWS / "dependabot-automerge.yml").exists(),
+            "legacy Dependabot merger bypasses review gate"
+        )
 
     def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
