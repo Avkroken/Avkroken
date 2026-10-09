@@ -9,6 +9,10 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: bot-pr-lifecycle
+  cancel-in-progress: false
+
 jobs:
   reconcile:
     name: Update and auto-merge trusted bot PRs
@@ -28,6 +32,22 @@ jobs:
           set -euo pipefail
 
           default_branch="$(gh api "repos/${REPOSITORY}" --jq '.default_branch')"
+
+          workflow_matches_default() {
+            local workflow_path="$1"
+            local candidate_sha="$2"
+            local default_blob candidate_blob
+
+            if ! default_blob="$(gh api "repos/${REPOSITORY}/contents/${workflow_path}?ref=${default_branch}" --jq '.sha')"; then
+              echo "::warning::Unable to read trusted ${workflow_path} on ${default_branch}."
+              return 1
+            fi
+            if ! candidate_blob="$(gh api "repos/${REPOSITORY}/contents/${workflow_path}?ref=${candidate_sha}" --jq '.sha')"; then
+              echo "::warning::Unable to read candidate ${workflow_path} on ${candidate_sha}."
+              return 1
+            fi
+            [[ "${candidate_blob}" == "${default_blob}" ]]
+          }
 
           reconcile_pr() {
             local number="$1"
@@ -59,8 +79,11 @@ jobs:
 
             if [[ "${mergeable_state}" == "behind" ]]; then
               echo "Updating PR #${number} from ${default_branch}."
-              gh api --method PUT "repos/${REPOSITORY}/pulls/${number}/update-branch" \
-                -f "expected_head_sha=${head_sha}" >/dev/null || return 0
+              if ! gh api --method PUT "repos/${REPOSITORY}/pulls/${number}/update-branch" \
+                -f "expected_head_sha=${head_sha}" >/dev/null; then
+                echo "::warning::PR #${number} update-branch request failed; will retry on next run."
+                return 0
+              fi
 
               updated_sha="${head_sha}"
               for _ in $(seq 1 20); do
@@ -74,10 +97,23 @@ jobs:
               fi
 
               # GITHUB_TOKEN updates suppress ordinary pull_request workflow triggers.
-              # Dispatch both required analysis suites against the updated PR ref.
-              gh workflow run ci.yml --repo "${REPOSITORY}" --ref "${head_ref}"
-              gh workflow run codeql.yml --repo "${REPOSITORY}" --ref "${head_ref}"
-              echo "PR #${number} updated; CI and CodeQL dispatched on ${updated_sha}."
+              # Never execute bot-controlled workflow YAML. Dispatch against the PR
+              # ref only when both workflow definitions are byte-identical to the
+              # trusted default branch.
+              if ! workflow_matches_default ".github/workflows/ci.yml" "${updated_sha}" ||
+                 ! workflow_matches_default ".github/workflows/codeql.yml" "${updated_sha}"; then
+                echo "::warning::PR #${number} modifies trusted workflow definitions; checks were not dispatched automatically."
+                return 0
+              fi
+              if ! gh workflow run ci.yml --repo "${REPOSITORY}" --ref "${head_ref}"; then
+                echo "::error::PR #${number} CI dispatch failed."
+                return 1
+              fi
+              if ! gh workflow run codeql.yml --repo "${REPOSITORY}" --ref "${head_ref}"; then
+                echo "::error::PR #${number} CodeQL dispatch failed."
+                return 1
+              fi
+              echo "PR #${number} updated; trusted CI and CodeQL dispatched on ${updated_sha}."
               return 0
             fi
 
@@ -99,9 +135,11 @@ jobs:
             gh pr merge --auto "${method}" "${url}"
           }
 
+          failures=0
           while IFS= read -r number; do
-            [[ -z "${number}" ]] || reconcile_pr "${number}"
+            [[ -z "${number}" ]] || reconcile_pr "${number}" || failures=$((failures + 1))
           done < <(
             gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
               --jq '.[] | select(.user.login == "dependabot[bot]" or .user.login == "copilot-swe-agent[bot]") | .number'
           )
+          [[ "${failures}" -eq 0 ]] || exit 1
