@@ -115,6 +115,14 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("ref: main", text)
         self.assertNotIn("ref: ${{ github.event.pull_request.head", text)
 
+    def test_closure_audit_serializes_duplicate_delivery_safely(self):
+        workflow = (WORKFLOWS / "pr-closure-audit.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", workflow)
+        self.assertIn("ref: main", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
+        self.assertIn("github.event.pull_request.closed_at", workflow)
+
     def test_issue_tracker_requires_explicit_closure_decision(self):
         text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
         self.assertIn("concrete reason and explicit decision", text)

@@ -128,7 +128,7 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
           });
           issues.push(created); writes++;
           console.log('Created issue #'+created.number+' for '+kind+' #'+number);
-        } else {errors.push('Issue write budget hit; remaining alerts continue next schedule');break;}
+        } else {console.warn('::notice::Issue write budget hit; remaining alerts continue next schedule');break;}
       } catch(e) {errors.push(kind+' #'+number+': '+e.message);}
     }
   }

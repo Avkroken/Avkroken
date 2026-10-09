@@ -8,6 +8,11 @@ on:
 
 permissions: {}
 
+# Serialize repeated deliveries of one closure without dropping separate closures.
+concurrency:
+  group: pr-closure-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.closed_at }}
+  cancel-in-progress: false
+
 jobs:
   audit:
     name: Record GitHub closure actor and immutable run

@@ -105,10 +105,13 @@ def reconcile(api, repository, now):
     # distinguish a genuine dispatch from a no-op/backoff-only reconciliation.
     # A commit comment is append-only evidence visible to maintainers; no
     # token, new branch, external database or mutable cache is required.
-    # Re-running the same GITHUB_RUN_ID must not dispatch twice.
+    # A run attempt is a unique reservation; workflow reruns may retry after backoff.
     run_id = os.environ.get("GITHUB_RUN_ID", "")
-    if not re.fullmatch(r"[1-9][0-9]*", run_id):
-        raise RuntimeError("Missing valid GITHUB_RUN_ID for dispatch reservation")
+    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+    if (not re.fullmatch(r"[1-9][0-9]*", run_id)
+            or not re.fullmatch(r"[1-9][0-9]*", run_attempt)):
+        raise RuntimeError("Missing valid GITHUB_RUN_ID or GITHUB_RUN_ATTEMPT")
+    run_id = f"{run_id}-{run_attempt}"
     marker_prefix = f"<!-- avkroken-dispatch-attempt:{head_sha}:"
     attempts_by_run = {}
     for page in range(1, 11):
@@ -127,7 +130,7 @@ def reconcile(api, repository, now):
             if not isinstance(body, str):
                 continue
             marker = re.fullmatch(
-                re.escape(marker_prefix) + r"([1-9][0-9]*) -->",
+                re.escape(marker_prefix) + r"([1-9][0-9]*(?:-[1-9][0-9]*)?) -->",
                 body.splitlines()[0] if body else "",
             )
             if not marker:
@@ -153,8 +156,10 @@ def reconcile(api, repository, now):
         raise RuntimeError("Commit comment pagination bound reached")
 
     if run_id in attempts_by_run:
-        print(f"Dispatch already reserved by this run {run_id}; avoiding duplicate.")
-        return False
+        raise RuntimeError(
+            f"Dispatch attempt {run_id} was already reserved but required workflows "
+            "remain missing; refusing to report an ambiguous previous dispatch as success."
+        )
     attempts = len(attempts_by_run)
     if attempts >= 3:
         raise RuntimeError(
@@ -165,7 +170,7 @@ def reconcile(api, repository, now):
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
     if last is not None and now - last < delay:
         print(
-            f"Waiting for missing {', '.join(missing)} on {head_sha}; "
+            f"::notice::Waiting for missing {', '.join(missing)} on {head_sha}; "
             f"retry backoff active after {attempts} actual dispatch reservations."
         )
         return False
