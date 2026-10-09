@@ -9,10 +9,10 @@ credential is provisioned and no unsupported API write is attempted.
 It recognizes pre-existing
 `skvallerbyttan-alert` markers to avoid duplicate tracking issues.
 
-For public repositories, **secret-scanning findings remain private**:
-publishing them as public Issues would violate the security disclosure policy.
-They need a confidential tracker. The script does not copy secrets, raw
-findings, or exploit details into public issue bodies.
+**Secret-scanning reads are disabled for both public and private repositories**
+until an authorized credential and confidential tracking channel are verified.
+Public Issues must never disclose secret-scanning findings. The script does
+not copy secrets, raw findings, or exploit details into issue bodies.
 
 The owner `Avkroken` is requested as issue assignee. A coding agent
 may be assigned manually by an authorized user. This workflow does **not**
@@ -30,9 +30,11 @@ and manual/auto-merge policies are unchanged.
 The workflow uses the built-in `GITHUB_TOKEN` with contents read, issues write,
 pull requests read, security events read, and `vulnerability-alerts: read`
 (the latter is supported by GitHub Actions as of September 2026).
-Unsupported or forbidden alert reads fail visibly instead of being counted
-as a successful reconciliation. Secret-scanning alerts require an
-independent authorized provider credential and are not exposed in public issues.
+Unsupported or forbidden Code Scanning and Dependabot reads fail visibly
+instead of being counted as successful reconciliation. Secret-scanning reads
+are explicitly deferred (not attempted) and require separately verified
+provider credentials and confidential tracking; no secret-scanning capability
+is claimed by this workflow.
 
 The existing `COPILOT_GITHUB_TOKEN` is documented as **read-only** for
 release notes; it must not be used for agent assignment. GitHub's `GITHUB_TOKEN` is an installation token and cannot invoke
