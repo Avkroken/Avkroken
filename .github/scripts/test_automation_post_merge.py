@@ -23,18 +23,22 @@ def merged_pr(login="copilot-swe-agent[bot]", role="Bot", ref="copilot/trusted/2
 
 
 class FakeApi:
-    def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None):
+    def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None, commit_comments=None):
         self.pr = merged_pr() if pr is None else pr
         self.ci = [] if ci is None else ci
         self.release = [] if release is None else release
         self.codeql = [] if codeql is None else codeql
         self.recovery_runs = [] if recovery_runs is None else recovery_runs
+        self.commit_comments = [] if commit_comments is None else commit_comments
         self.posts = []
 
     def __call__(self, method, path, payload=None):
         if method == "POST" and path == "dispatches":
-            self.posts.append(payload)
+            self.posts.append(("dispatch", payload))
             return {}
+        if method == "POST" and path == f"commits/{SHA}/comments":
+            self.posts.append(("reservation", payload))
+            return {"id": 123}
         if method != "GET":
             raise AssertionError((method, path))
         if path == "":
@@ -49,6 +53,9 @@ class FakeApi:
             return {"workflow_runs": self.release}
         if path == f"actions/workflows/codeql.yml/runs?head_sha={SHA}&per_page=100":
             return {"workflow_runs": self.codeql}
+        if path.startswith(f"commits/{SHA}/comments?per_page=100&page="):
+            page = int(path.split("page=")[-1])
+            return self.commit_comments[(page-1)*100:page*100]
         if path == f"actions/workflows/automation-post-merge.yml/runs?head_sha={SHA}&per_page=100":
             return {"workflow_runs": self.recovery_runs}
         raise AssertionError(path)
@@ -116,51 +123,64 @@ class AutomationPostMergeTests(unittest.TestCase):
     def test_dispatch_if_ci_missing(self):
         fake = FakeApi(release=[matching_run()])
         self.assertTrue(reconcile(fake, REPO, TIME))
-        self.assertEqual(len(fake.posts), 1)
-        self.assertEqual(fake.posts[0]["event_type"], "agent-pr-merged")
-        self.assertEqual(fake.posts[0]["client_payload"]["merge_sha"], SHA)
+        self.assertEqual(len(fake.posts), 2)
+        self.assertEqual(fake.posts[-1][1]["event_type"], "agent-pr-merged")
+        self.assertEqual(fake.posts[-1][1]["client_payload"]["merge_sha"], SHA)
 
     def test_dispatch_if_release_missing(self):
         fake = FakeApi(ci=[matching_run()])
         self.assertTrue(reconcile(fake, REPO, TIME))
-        self.assertEqual(len(fake.posts), 1)
+        self.assertEqual(len(fake.posts), 2)
 
     def test_dispatch_if_codeql_missing(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()])
         self.assertTrue(reconcile(fake, REPO, TIME))
-        self.assertEqual(fake.posts[0]["event_type"], "agent-pr-merged")
+        self.assertEqual(fake.posts[-1][1]["event_type"], "agent-pr-merged")
 
 
-    def test_dispatch_stops_after_three_prior_reconciliation_attempts_for_sha(self):
-        recorded = [
-            {"id": i, "head_sha": SHA, "event": "schedule",
-             "status": "completed", "created_at": f"2026-10-08T{hour:02d}:30:00Z"}
+    def attempt_comment(self, run_id, timestamp):
+        return {
+            "user": {"login": "github-actions[bot]"},
+            "body": f"<!-- avkroken-dispatch-attempt:{SHA}:{run_id} -->",
+            "created_at": timestamp,
+        }
+
+    def test_dispatch_stops_after_three_actual_attempts_for_sha(self):
+        comments = [
+            self.attempt_comment(i, f"2026-10-08T{hour:02d}:30:00Z")
             for i, hour in enumerate((10, 11, 11), 1)
         ]
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
-                       recovery_runs=recorded)
+                       commit_comments=comments)
         with self.assertRaisesRegex(RuntimeError, "missing CodeQL.*retry limit"):
             reconcile(fake, REPO, TIME)
         self.assertEqual(fake.posts, [])
 
-    def test_dispatch_backoff_for_recent_attempt_on_same_sha(self):
-        recorded = [{"id": 1, "head_sha": SHA, "event": "schedule",
-                     "status": "completed", "created_at": "2026-10-08T11:50:00Z"}]
+    def test_backoff_only_runs_do_not_spend_attempts(self):
+        # Existing scheduled runs without reservation comments are not dispatches.
+        recorded = [
+            {"id": i, "head_sha": SHA, "event": "schedule",
+             "status": "completed", "created_at": "2026-10-08T11:20:00Z"}
+            for i in range(1, 15)
+        ]
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
-                       recovery_runs=recorded)
+                       recovery_runs=recorded,
+                       commit_comments=[self.attempt_comment(8, "2026-10-08T11:50:00Z")])
         self.assertFalse(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts, [])
 
-    def test_unrelated_sha_attempts_do_not_block_missing_run_recovery(self):
-        recorded = [
-            {"id": i, "head_sha": "f" * 40, "event": "schedule",
-             "status": "completed", "created_at": "2026-10-08T11:00:00Z"}
-            for i in range(1, 5)
-        ]
+    def test_unrelated_or_forged_comments_do_not_consume_retry_budget(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
-                       recovery_runs=recorded)
+            commit_comments=[
+                {"user": {"login": "untrusted-user"},
+                 "body": f"<!-- avkroken-dispatch-attempt:{SHA}:7 -->",
+                 "created_at": "2026-10-08T11:00:00Z"},
+                self.attempt_comment("forged", "2026-10-08T11:00:00Z"),
+            ])
         self.assertTrue(reconcile(fake, REPO, TIME))
-        self.assertEqual(len(fake.posts), 1)
+        self.assertEqual(len(fake.posts), 2)
+        self.assertEqual(fake.posts[0][0], "reservation")
+        self.assertEqual(fake.posts[1][0], "dispatch")
 
     def test_untrusted_tip_not_dispatched(self):
         forged = merged_pr("external", "User")
