@@ -80,11 +80,90 @@ def reconcile(api, repository, now):
     ci = api("GET", f"actions/workflows/ci.yml/runs?head_sha={head_sha}&per_page=100")
     release = api("GET", f"actions/workflows/release.yml/runs?head_sha={head_sha}&per_page=100")
     codeql = api("GET", f"actions/workflows/codeql.yml/runs?head_sha={head_sha}&per_page=100")
-    if (has_target_run(ci, head_sha) and has_target_run(release, head_sha)
-            and has_target_run(codeql, head_sha)):
+    missing = [
+        name for name, payload in (("CI", ci), ("Release", release), ("CodeQL", codeql))
+        if not has_target_run(payload, head_sha)
+    ]
+    if not missing:
         print(f"CI, CodeQL, and release runs already registered for {head_sha}.")
         return False
 
+    # The workflow-run history is GitHub's durable per-SHA retry ledger.
+    # Do not create Git commits, mutable cache keys, tokens or credentials
+    # simply to remember failed dispatches. Since a successful dispatch may
+    # produce runs for only some of the three targets, use the greatest
+    # count of repository_dispatch runs among them as the precise count.
+    # If none was registered, fall back conservatively to completed
+    # reconciliation executions after the initial native registration window.
+    history = api("GET", (
+        f"actions/workflows/automation-post-merge.yml/runs"
+        f"?head_sha={head_sha}&per_page=100"
+    ))
+    past = history.get("workflow_runs")
+    if not isinstance(past, list) or len(past) >= 100:
+        raise RuntimeError("Could not establish bounded post-merge retry history")
+
+    cutoff = merged_at + dt.timedelta(seconds=90)
+    current_run_id = str(os.environ.get("GITHUB_RUN_ID") or "")
+
+    def timestamp(run):
+        raw = run.get("created_at")
+        if not isinstance(raw, str):
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return parsed if parsed.tzinfo is not None else None
+        except ValueError:
+            return None
+
+    previous = [
+        run for run in past
+        if run.get("head_sha") == head_sha
+        and run.get("event") in {"schedule", "workflow_dispatch", "workflow_run"}
+        and run.get("status") == "completed"
+        and (not current_run_id or str(run.get("id")) != current_run_id)
+        and (timestamp(run) is not None and timestamp(run) >= cutoff)
+    ]
+    observed = []
+    for payload in (ci, release, codeql):
+        registrations = [
+            run for run in payload.get("workflow_runs", [])
+            if run.get("head_sha") == head_sha
+            and run.get("event") == "repository_dispatch"
+        ]
+        observed.append(registrations)
+    actual_attempts = max((len(runs) for runs in observed), default=0)
+    if actual_attempts:
+        attempts = actual_attempts
+        dispatch_times = [
+            timestamp(run) for group in observed for run in group
+            if timestamp(run) is not None
+        ]
+        last = max(dispatch_times, default=None)
+    else:
+        attempts = len(previous)
+        last = max((timestamp(run) for run in previous), default=None)
+
+    if attempts >= 3:
+        missing_label = ", ".join(missing)
+        raise RuntimeError(
+            f"Persistently missing {missing_label} for {head_sha}; "
+            "post-merge dispatch retry limit reached (3)."
+        )
+    # Avoid a retry storm if a provider accepts the event but is slow to
+    # register a target workflow. Backoff grows per observed dispatch.
+    delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
+    if attempts and last is not None and now - last < delay:
+        print(
+            f"Waiting for missing {', '.join(missing)} on {head_sha}; "
+            f"retry backoff active after {attempts} prior executions."
+        )
+        return False
+
+    print(
+        f"Post-merge dispatch for {head_sha}: missing {', '.join(missing)}, "
+        f"attempt {attempts + 1}/3."
+    )
     api("POST", "dispatches", {
         "event_type": "agent-pr-merged",
         "client_payload": {
