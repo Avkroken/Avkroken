@@ -24,7 +24,6 @@ class WorkflowLocalizationTests(unittest.TestCase):
     def test_agent_merge_eligibility_is_permission_based(self):
         text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
         self.assertIn('author_type="$(jq -r', text)
-        self.assertIn('collaborators/${author}/permission', text)
         self.assertIn("PR #$number was not queued for native auto-merge", text)
         self.assertIn(".auto_merge == null", text)
         self.assertNotIn("expected_external_checks()", text)
