@@ -115,6 +115,18 @@ jobs:
             [[ "${state}" == "open" && "${draft}" == "false" ]] || return 0
             [[ "${base_ref}" == "${default_branch}" && "${head_repo}" == "${REPOSITORY}" ]] || return 0
 
+            # Do not queue bot code while findings or approval requirements
+            # remain unresolved. GitHub's native ruleset remains authoritative.
+            if ! review_gate "${number}" "${head_sha}"; then
+              # A previously queued bot PR must not retain an auto-merge request
+              # while actionable reviews or unresolved threads are outstanding.
+              if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
+                gh pr merge --disable-auto "${url}" || return 1
+              fi
+              echo "::notice::PR #${number} review gate blocked auto-merge."
+              return 0
+            fi
+
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"${pr}")"
             if [[ "${mergeable_state}" == "dirty" ]]; then
               echo "PR #${number} has conflicts; manual resolution required."
@@ -128,17 +140,6 @@ jobs:
               return 0
             fi
 
-            # Do not queue bot code while findings or approval requirements
-            # remain unresolved. GitHub's native ruleset remains authoritative.
-            if ! review_gate "${number}" "${head_sha}"; then
-              # A previously queued bot PR must not retain an auto-merge request
-              # while actionable reviews or unresolved threads are outstanding.
-              if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
-                gh pr merge --disable-auto "${url}" || return 1
-              fi
-              echo "::notice::PR #${number} review gate blocked auto-merge."
-              return 0
-            fi
             # Only act after a real GitHub APPROVED review decision.
             auto_merge="$(jq -r 'if .auto_merge == null then "false" else "true" end' <<<"${pr}")"
             [[ "${auto_merge}" == "false" ]] || return 0
