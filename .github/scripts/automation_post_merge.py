@@ -49,13 +49,21 @@ def is_trusted_merge(pr, repository, default_branch, head_sha):
     return True
 
 
-def has_target_run(payload, head_sha):
-    return any(
-        run.get("head_sha") == head_sha
-        and run.get("event") in {"push", "repository_dispatch", "workflow_dispatch"}
-        and run.get("conclusion") not in {"cancelled", "startup_failure", "skipped"}
-        for run in payload.get("workflow_runs", [])
-    )
+def has_target_run(payload, head_sha, require_dispatch=False):
+    """Count only usable workflow runs; Dependabot needs a trusted dispatch."""
+    for run in payload.get("workflow_runs", []):
+        if run.get("head_sha") != head_sha:
+            continue
+        if run.get("event") not in {"push", "repository_dispatch", "workflow_dispatch"}:
+            continue
+        if require_dispatch and run.get("event") != "repository_dispatch":
+            continue
+        status = run.get("status")
+        if status == "completed" and run.get("conclusion") == "success":
+            return True
+        if status in {"queued", "in_progress", "waiting", "requested", "pending"}:
+            return True
+    return False
 
 
 def reconcile(api, repository, now):
@@ -81,9 +89,13 @@ def reconcile(api, repository, now):
     ci = api("GET", f"actions/workflows/ci.yml/runs?head_sha={head_sha}&per_page=100")
     release = api("GET", f"actions/workflows/release.yml/runs?head_sha={head_sha}&per_page=100")
     codeql = api("GET", f"actions/workflows/codeql.yml/runs?head_sha={head_sha}&per_page=100")
+    # Native Dependabot push workflows run with restricted permissions and
+    # may be unable to publish CodeQL results. Require trusted dispatch runs
+    # instead of treating native push registration as successful recovery.
+    dependabot_merge = (pr.get("user") or {}).get("login") == "dependabot[bot]"
     missing = [
         name for name, payload in (("CI", ci), ("Release", release), ("CodeQL", codeql))
-        if not has_target_run(payload, head_sha)
+        if not has_target_run(payload, head_sha, require_dispatch=dependabot_merge)
     ]
     if not missing:
         print(f"CI, CodeQL, and release runs already registered for {head_sha}.")
