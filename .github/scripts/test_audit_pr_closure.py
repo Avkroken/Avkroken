@@ -45,14 +45,34 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIn("GitHub actor: `dependabot[bot]`", comment)
 
     def test_closure_comment_has_stable_marker_and_deduplicates(self):
-        marker = closure_marker(214, SHA)
+        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z")
         comment = closure_comment(event(), REPO, "12345")
         self.assertIn(marker, comment)
+        trusted = {"user": {"login": "github-actions[bot]"}, "body": comment}
         self.assertTrue(has_existing_audit_comment(
-            [{"body": "older"}, {"body": comment}],
-            marker,
+            [{"body": "older"}, trusted], marker,
+        ))
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "attacker"}, "body": comment}], marker,
+        ))
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "github-actions[bot]"},
+              "body": "Quoted marker: " + comment}], marker,
         ))
         self.assertFalse(has_existing_audit_comment([{"body": "older"}], marker))
+
+    def test_repeated_closure_same_head_has_separate_audit_marker(self):
+        first = event()
+        second = event()
+        second["pull_request"]["closed_at"] = "2026-10-09T11:20:23Z"
+        first_comment = closure_comment(first, REPO, "123")
+        second_comment = closure_comment(second, REPO, "124")
+        self.assertNotEqual(first_comment.splitlines()[0], second_comment.splitlines()[0])
+        marker = closure_marker(214, SHA, second["pull_request"]["closed_at"])
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "github-actions[bot]"}, "body": first_comment}],
+            marker,
+        ))
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)
