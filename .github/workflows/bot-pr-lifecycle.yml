@@ -85,7 +85,12 @@ jobs:
                 (.reviewThreads.nodes | type == "array") and
                 (.reviews.nodes | type == "array") and
                 all(.reviewThreads.nodes[]; .isResolved == true) and
-                any(.reviews.nodes[]; .state == "APPROVED" and (.commit.oid // "") == $sha) and
+                ([.reviews.nodes[] | select(.state == "APPROVED" or
+                                            .state == "CHANGES_REQUESTED" or
+                                            .state == "DISMISSED")] |
+                  group_by(.author.login) |
+                  any(.[]; (sort_by(.submittedAt) | last |
+                    .state == "APPROVED" and (.commit.oid // "") == $sha))) and
                 all(.reviews.nodes[];
                   (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
                    .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
