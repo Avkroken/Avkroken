@@ -162,6 +162,13 @@ jobs:
                   "$draft" == "true" ]]; then
               return 0
             fi
+            # The human or authorized automation must explicitly place this
+            # PR in native GitHub auto-merge. Permission alone is not consent.
+            # Never queue arbitrary collaborator PRs from this privileged job.
+            if [[ "$(jq -r '.auto_merge == null' <<<"$pr_json")" == "true" ]]; then
+              log "PR #$number was not queued for native auto-merge; skipping."
+              return 0
+            fi
 
             # Do not infer trust from a login string or a branch prefix.
             # Human authors need current write permission. GitHub Apps/Bots that
@@ -205,21 +212,10 @@ jobs:
                 return 0
               fi
               if [[ "$mergeable_state" == "behind" ]]; then
-                log "PR #$number is behind $default_branch; updating the branch."
-                gh api --method PUT "repos/${REPOSITORY}/pulls/$number/update-branch" \
-                  -f expected_head_sha="$head_sha" >/dev/null || return 0
-                new_sha="$head_sha"
-                for _ in $(seq 1 20); do
-                  sleep 3
-                  new_sha="$(gh api "repos/${REPOSITORY}/pulls/$number" --jq '.head.sha')"
-                  [[ "$new_sha" != "$head_sha" ]] && break
-                done
-                [[ "$new_sha" != "$head_sha" ]] || { log "PR #$number branch update did not settle."; return 0; }
-                if ! review_gate "$number"; then
-                  disable_auto_merge "$pr_url"
-                  return 0
-                fi
-                continue
+                # A GITHUB_TOKEN update suppresses normal PR checks and can
+                # invalidate approvals. Leave the queue pending a trusted update.
+                log "PR #$number is behind $default_branch; no token-driven branch update."
+                return 0
               fi
               [[ "$mergeable_state" != "unknown" && "$mergeable" != "unknown" ]] && break
               sleep 3
@@ -234,10 +230,8 @@ jobs:
               disable_auto_merge "$pr_url"
               return 0
             fi
-            if ! external_check_gate "$head_sha"; then
-              disable_auto_merge "$pr_url"
-              return 0
-            fi
+            # Native GitHub rulesets and required checks own merge authorization.
+            # Cloudflare Workers Builds are not required GitHub status checks.
 
             repo_json="$(gh api "repos/${REPOSITORY}")"
             # main requires linear history; prefer the native squash strategy.
