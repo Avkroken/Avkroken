@@ -52,7 +52,7 @@ Canonical idempotency ägs av Events.
 
 ## Security
 
-- GitHub HMAC verifieras innan accepterad handoff;
+- GitHub HMAC verifieras innan payload-inspektion, accepterad handoff eller ignored-svar för retired GitHub App-webhooks; saknad/ogiltig signatur ger 401 även med retirement-markör;
 - Cloudflare auth verifieras innan känslig Workers Issues-body parse;
 - raw diagnostic `text`/`data`/stack/log/request-kontext skickas inte vidare;
 - inga provider writes;

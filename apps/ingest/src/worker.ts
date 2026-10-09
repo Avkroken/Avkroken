@@ -50,11 +50,12 @@ async function github(request: Request, env: IngestEnv): Promise<Response> {
   const deliveryId = request.headers.get("x-github-delivery")?.trim() || "";
   const hookTargetType = request.headers.get("x-github-hook-installation-target-type")?.trim() || "";
 
-  if (isRetiredGitHubAppWebhook(hookTargetType, body)) {
-    return json({ ok: true, ignored: "retired github app webhook" }, 202);
-  }
   if (!(await verifyGitHubSignature(body, request.headers.get("x-hub-signature-256"), secret))) {
     return json({ error: "invalid webhook signature" }, 401);
+  }
+  // Retirement markers are untrusted until the delivery body is authenticated.
+  if (isRetiredGitHubAppWebhook(hookTargetType, body)) {
+    return json({ ok: true, ignored: "retired github app webhook" }, 202);
   }
   if (!event || !deliveryId) return json({ error: "missing webhook headers" }, 400);
   if (!env.EVENTS_QUEUE) return json({ error: "event handoff not configured" }, 503);
