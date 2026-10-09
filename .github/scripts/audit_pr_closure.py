@@ -25,7 +25,7 @@ def has_existing_audit_comment(comments, marker):
     """Trust only a genuine GitHub Actions audit message, not user text."""
     prefix = marker + "\n### GitHub closure audit (unmerged PR)\n"
     return any(
-        (comment or {}).get("user", {}).get("login") == "github-actions[bot]"
+        ((comment or {}).get("user") or {}).get("login") == "github-actions[bot]"
         and str((comment or {}).get("body") or "").startswith(prefix)
         for comment in comments
     )
