@@ -23,10 +23,11 @@ def merged_pr(login="copilot-swe-agent[bot]", role="Bot", ref="copilot/trusted/2
 
 
 class FakeApi:
-    def __init__(self, pr=None, ci=None, release=None):
+    def __init__(self, pr=None, ci=None, release=None, codeql=None):
         self.pr = merged_pr() if pr is None else pr
         self.ci = [] if ci is None else ci
         self.release = [] if release is None else release
+        self.codeql = [] if codeql is None else codeql
         self.posts = []
 
     def __call__(self, method, path, payload=None):
@@ -45,6 +46,8 @@ class FakeApi:
             return {"workflow_runs": self.ci}
         if path == f"actions/workflows/release.yml/runs?head_sha={SHA}&per_page=100":
             return {"workflow_runs": self.release}
+        if path == f"actions/workflows/codeql.yml/runs?head_sha={SHA}&per_page=100":
+            return {"workflow_runs": self.codeql}
         raise AssertionError(path)
 
 
@@ -102,7 +105,7 @@ class AutomationPostMergeTests(unittest.TestCase):
         ))
 
     def test_no_duplicate_when_both_required_workflows_registered(self):
-        fake = FakeApi(ci=[matching_run()], release=[matching_run()])
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()], codeql=[matching_run()])
         self.assertFalse(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts, [])
 
@@ -117,6 +120,11 @@ class AutomationPostMergeTests(unittest.TestCase):
         fake = FakeApi(ci=[matching_run()])
         self.assertTrue(reconcile(fake, REPO, TIME))
         self.assertEqual(len(fake.posts), 1)
+
+    def test_dispatch_if_codeql_missing(self):
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()])
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts[0]["event_type"], "agent-pr-merged")
 
     def test_untrusted_tip_not_dispatched(self):
         fake = FakeApi(pr=merged_pr("external", "User"))
