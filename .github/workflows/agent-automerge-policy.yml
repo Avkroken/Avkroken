@@ -31,18 +31,17 @@ jobs:
           }
 
           review_gate() {
-            local number="$1"
-            local review_json unresolved changes_requested review_decision
-            # GraphQL variables must remain literal inside the query string.
+            local number="$1" head_sha="$2" review_json
+            # Called in a conditional: explicitly handle failures instead of
+            # relying on errexit, which Bash disables in this context.
             # shellcheck disable=SC2016
-            review_json="$(gh api graphql \
-              -F owner="$owner" \
-              -F name="$repo_name" \
-              -F number="$number" \
+            if ! review_json="$(gh api graphql \
+              -F owner="${REPOSITORY%%/*}" -F name="${REPOSITORY#*/}" -F number="$number" \
               -f query='
                 query($owner:String!, $name:String!, $number:Int!) {
                   repository(owner:$owner, name:$name) {
                     pullRequest(number:$number) {
+                      headRefOid
                       reviewDecision
                       reviewThreads(first:100) {
                         nodes { isResolved }
@@ -54,33 +53,37 @@ jobs:
                       }
                     }
                   }
-                }'
-            )"
-
-            if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"$review_json")" == "true" ||
-                  "$(jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage' <<<"$review_json")" == "true" ]]; then
-              log "PR #$number has more than 100 review items; leaving it for manual review."
+                }')"; then
+              log "PR #${number} review state could not be read."
               return 1
             fi
 
-            unresolved="$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' <<<"$review_json")"
-            changes_requested="$(jq '
-              [.data.repository.pullRequest.reviews.nodes[] | select(.author.login != null)]
-              | group_by(.author.login)
-              | map(sort_by(.submittedAt) | last)
-              | map(select(.state == "CHANGES_REQUESTED"))
-              | length
-            ' <<<"$review_json")"
-            review_decision="$(jq -r '.data.repository.pullRequest.reviewDecision // ""' <<<"$review_json")"
-
-            (( unresolved == 0 )) || { log "PR #$number has unresolved review threads."; return 1; }
-            (( changes_requested == 0 )) || { log "PR #$number has an active changes-requested review."; return 1; }
-            [[ "$review_decision" == "APPROVED" ]] || { log "PR #$number has no current, valid approving review."; return 1; }
-          }
-
-          disable_auto_merge() {
-            local pr_url="$1"
-            gh pr merge --disable-auto "$pr_url" >/dev/null 2>&1 || true
+            # Include every thread, including outdated threads. Incomplete or
+            # paginated responses cannot establish that the review work is done.
+            # Comments and pending reviews do not supersede a submitted decision.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == "APPROVED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; .isResolved == true) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login)
+                    | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} has pending or unverifiable review work."
+              return 1
+            fi
           }
 
           reconcile_pr() {
@@ -96,6 +99,7 @@ jobs:
             base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
             draft="$(jq -r '.draft' <<<"$pr_json")"
             pr_url="$(jq -r '.html_url' <<<"$pr_json")"
+            head_sha="$(jq -r '.head.sha // ""' <<<"$pr_json")"
 
             # Only automate ready same-repository PRs targeting the default branch.
             # Anyone with read access can propose a fork PR; such PRs remain manual.
@@ -157,8 +161,8 @@ jobs:
                 ;;
             esac
 
-            if ! review_gate "$number"; then
-              disable_auto_merge "$pr_url"
+            if ! review_gate "$number" "$head_sha"; then
+              log "PR #$number remains in native auto-merge queue until checks and review are complete."
               return 0
             fi
 
@@ -187,8 +191,8 @@ jobs:
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"$pr_json")"
             mergeable="$(jq -r 'if .mergeable == null then "unknown" else (.mergeable|tostring) end' <<<"$pr_json")"
             [[ "$mergeable_state" != "dirty" && "$mergeable" != "false" ]] || return 0
-            if ! review_gate "$number"; then
-              disable_auto_merge "$pr_url"
+            if ! review_gate "$number" "$head_sha"; then
+              log "PR #$number remains in native auto-merge queue until checks and review are complete."
               return 0
             fi
             # Native GitHub rulesets and required checks own merge authorization.
@@ -206,7 +210,7 @@ jobs:
             fi
 
             log "Enabling native auto-merge for PR #$number."
-            gh pr merge --auto "$method" "$pr_url"
+            gh pr merge --auto "$method" --match-head-commit "$head_sha" "$pr_url"
           }
 
           if [[ -n "$EVENT_PR_NUMBER" ]]; then
