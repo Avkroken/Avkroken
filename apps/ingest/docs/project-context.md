@@ -9,6 +9,10 @@
 
 Ingest är målarkitekturens provider-callback boundary. Den ska autentisera/signaturverifiera, reducera payloaden till en explicit allowlist och lämna över `IngressMessageV1` durably till Events.
 
+ING-100 och shadow-seamen ING-108 spåras i [arbetsissue #237](https://github.com/Avkroken/Avkroken/issues/237).
+[Observability-programmet](../../../docs/organization/observability-program.md) länkar
+masterissue och övriga appägda kontrakt.
+
 ## Current repository state
 
 Ingest är deploy-neutral:

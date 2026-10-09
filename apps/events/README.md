@@ -41,7 +41,8 @@ Den första seamen implementerar:
 
 ## Planerad storage
 
-ADR-namn:
+Planerade namn enligt storage/transport-ADR:n (extern Library-fil
+`08-ADR-STORAGE-TRANSPORT-V1.md`; se [repositoryts runtimekontrakt](docs/runtime-provisioning.md)):
 
 - production: `avkroken-events-eu`;
 - preview: `avkroken-events-preview-eu`.

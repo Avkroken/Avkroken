@@ -6,6 +6,10 @@ permalink: /architecture/
 
 # Arkitektur
 
+Den planerade uppdelningen i separata observationsmoduler spåras via
+[Observability-programmet](../../../docs/organization/observability-program.md).
+Arkitekturen nedan beskriver Skvallerbyttans repositorykontrakt.
+
 ## Mål
 
 Skvallerbyttan är repositoryts read-only observationslager och eventnav. Koden exponerar webhook-ingress för GitHub och Cloudflare, normaliserar provider-state, lagrar begränsad historik och exponerar samma normaliserade underlag till dashboard och auktoriserade maskinklienter. Faktisk webhookkonfiguration är extern providerstate. `Avkroken/Avkroken` och `avkroken.denied.se` är den centrala monorepo- och frontytan, inte ett separat provider-observationslager.
