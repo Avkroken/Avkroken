@@ -8,6 +8,7 @@ and semantic release covers all unreleased commits reachable from that tip.
 import datetime as dt
 import json
 import os
+import re
 import urllib.request
 
 
@@ -88,78 +89,86 @@ def reconcile(api, repository, now):
         print(f"CI, CodeQL, and release runs already registered for {head_sha}.")
         return False
 
-    # The workflow-run history is GitHub's durable per-SHA retry ledger.
-    # Do not create Git commits, mutable cache keys, tokens or credentials
-    # simply to remember failed dispatches. Since a successful dispatch may
-    # produce runs for only some of the three targets, use the greatest
-    # count of repository_dispatch runs among them as the precise count.
-    # If none was registered, fall back conservatively to completed
-    # reconciliation executions after the initial native registration window.
-    history = api("GET", (
-        f"actions/workflows/automation-post-merge.yml/runs"
-        f"?head_sha={head_sha}&per_page=100"
-    ))
-    past = history.get("workflow_runs")
-    if not isinstance(past, list) or len(past) >= 100:
-        raise RuntimeError("Could not establish bounded post-merge retry history")
-
-    cutoff = merged_at + dt.timedelta(seconds=90)
-    current_run_id = str(os.environ.get("GITHUB_RUN_ID") or "")
-
-    def timestamp(run):
-        raw = run.get("created_at")
-        if not isinstance(raw, str):
-            return None
-        try:
-            parsed = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            return parsed if parsed.tzinfo is not None else None
-        except ValueError:
-            return None
-
-    previous = [
-        run for run in past
-        if run.get("head_sha") == head_sha
-        and run.get("event") in {"schedule", "workflow_dispatch", "workflow_run"}
-        and run.get("status") == "completed"
-        and (not current_run_id or str(run.get("id")) != current_run_id)
-        and (timestamp(run) is not None and timestamp(run) >= cutoff)
-    ]
-    observed = []
-    for payload in (ci, release, codeql):
-        registrations = [
-            run for run in payload.get("workflow_runs", [])
-            if run.get("head_sha") == head_sha
-            and run.get("event") == "repository_dispatch"
-        ]
-        observed.append(registrations)
-    actual_attempts = max((len(runs) for runs in observed), default=0)
-    if actual_attempts:
-        attempts = actual_attempts
-        dispatch_times = [
-            timestamp(run) for group in observed for run in group
-            if timestamp(run) is not None
-        ]
-        last = max(dispatch_times, default=None)
+    # Reserve a durable attempt before dispatch. Workflow-run history cannot
+    # distinguish a genuine dispatch from a no-op/backoff-only reconciliation.
+    # A commit comment is append-only evidence visible to maintainers; no
+    # token, new branch, external database or mutable cache is required.
+    # Re-running the same GITHUB_RUN_ID must not dispatch twice.
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", run_id):
+        raise RuntimeError("Missing valid GITHUB_RUN_ID for dispatch reservation")
+    marker_prefix = f"<!-- avkroken-dispatch-attempt:{head_sha}:"
+    attempts_by_run = {}
+    for page in range(1, 11):
+        batch = api(
+            "GET",
+            f"commits/{head_sha}/comments?per_page=100&page={page}",
+        )
+        if not isinstance(batch, list):
+            raise RuntimeError("Commit comment history is invalid")
+        for comment in batch:
+            if not isinstance(comment, dict):
+                raise RuntimeError("Commit comment shape is invalid")
+            if (comment.get("user") or {}).get("login") != "github-actions[bot]":
+                continue
+            body = comment.get("body")
+            if not isinstance(body, str):
+                continue
+            marker = re.fullmatch(
+                re.escape(marker_prefix) + r"([1-9][0-9]*) -->",
+                body.splitlines()[0] if body else "",
+            )
+            if not marker:
+                continue
+            raw_time = comment.get("created_at")
+            if not isinstance(raw_time, str):
+                raise RuntimeError("Dispatch reservation timestamp unavailable")
+            try:
+                reserved_at = dt.datetime.fromisoformat(
+                    raw_time.replace("Z", "+00:00")
+                )
+            except ValueError as exc:
+                raise RuntimeError("Invalid dispatch reservation timestamp") from exc
+            if reserved_at.tzinfo is None:
+                raise RuntimeError("Timezone missing from dispatch reservation")
+            if reserved_at >= merged_at:
+                key = marker.group(1)
+                previous = attempts_by_run.get(key)
+                attempts_by_run[key] = max(previous, reserved_at) if previous else reserved_at
+        if len(batch) < 100:
+            break
     else:
-        attempts = len(previous)
-        last = max((timestamp(run) for run in previous), default=None)
+        raise RuntimeError("Commit comment pagination bound reached")
 
+    if run_id in attempts_by_run:
+        print(f"Dispatch already reserved by this run {run_id}; avoiding duplicate.")
+        return False
+    attempts = len(attempts_by_run)
     if attempts >= 3:
-        missing_label = ", ".join(missing)
         raise RuntimeError(
-            f"Persistently missing {missing_label} for {head_sha}; "
+            f"Persistently missing {', '.join(missing)} for {head_sha}; "
             "post-merge dispatch retry limit reached (3)."
         )
-    # Avoid a retry storm if a provider accepts the event but is slow to
-    # register a target workflow. Backoff grows per observed dispatch.
+    last = max(attempts_by_run.values(), default=None)
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
-    if attempts and last is not None and now - last < delay:
+    if last is not None and now - last < delay:
         print(
             f"Waiting for missing {', '.join(missing)} on {head_sha}; "
-            f"retry backoff active after {attempts} prior executions."
+            f"retry backoff active after {attempts} actual dispatch reservations."
         )
         return False
 
+    reservation = api(
+        "POST",
+        f"commits/{head_sha}/comments",
+        {"body": (
+            f"{marker_prefix}{run_id} -->\\n"
+            "Automation post-merge: durable dispatch attempt reservation. "
+            "The canonical CI, CodeQL and Release runs remain authoritative."
+        )},
+    )
+    if not isinstance(reservation, dict) or not isinstance(reservation.get("id"), int):
+        raise RuntimeError("Dispatch reservation could not be verified")
     print(
         f"Post-merge dispatch for {head_sha}: missing {', '.join(missing)}, "
         f"attempt {attempts + 1}/3."
