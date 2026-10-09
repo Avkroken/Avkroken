@@ -188,6 +188,13 @@ jobs:
             # Native GitHub rulesets and required checks own merge authorization.
             # Cloudflare Workers Builds are not required GitHub status checks.
 
+            # Leave existing native auto-merge requests untouched. Re-enabling
+            # can change or reject the actor/method and is not idempotent.
+            if [[ "$(jq -r '.auto_merge != null' <<<"$pr_json")" == "true" ]]; then
+              log "PR #$number auto-merge already queued; skipping duplicate request."
+              return 0
+            fi
+
             repo_json="$(gh api "repos/${REPOSITORY}")"
             # main requires linear history; prefer the native squash strategy.
             if [[ "$(jq -r '.allow_squash_merge' <<<"$repo_json")" == "true" ]]; then
