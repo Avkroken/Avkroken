@@ -170,6 +170,13 @@ def reconcile(api, repository, now):
         )
         return False
 
+    # A second merge can advance main while this reconciler is inspecting
+    # earlier runs. Never dispatch an event for a SHA that is no longer main.
+    current_tip = api("GET", f"branches/{branch}")["commit"]["sha"]
+    if current_tip != head_sha:
+        print(f"Default branch advanced to {current_tip}; skipping stale dispatch for {head_sha}.")
+        return False
+
     reservation = api(
         "POST",
         f"commits/{head_sha}/comments",
