@@ -73,6 +73,12 @@ class WorkflowLocalizationTests(unittest.TestCase):
         text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
         self.assertIn("concrete reason and explicit decision", text)
 
+    def test_security_reconciliation_pr_tests_cannot_displace_scheduled_reconcile(self):
+        text = (WORKFLOWS / "security-alert-issues.yml").read_text(encoding="utf-8")
+        self.assertIn("github.event_name == 'pull_request'", text)
+        self.assertIn("tests-", text)
+        self.assertIn("'reconcile'", text)
+
     def test_security_reconciliation_is_repository_local(self):
         text = (WORKFLOWS / "security-alert-issues.yml").read_text(encoding="utf-8")
         self.assertIn("issues:", text)
