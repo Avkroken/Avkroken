@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -33,20 +32,55 @@ jobs:
 
           default_branch="$(gh api "repos/${REPOSITORY}" --jq '.default_branch')"
 
-          workflow_matches_default() {
-            local workflow_path="$1"
-            local candidate_sha="$2"
-            local default_blob candidate_blob
+          owner="${REPOSITORY%%/*}"
+          repo_name="${REPOSITORY#*/}"
 
-            if ! default_blob="$(gh api "repos/${REPOSITORY}/contents/${workflow_path}?ref=${default_branch}" --jq '.sha')"; then
-              echo "::warning::Unable to read trusted ${workflow_path} on ${default_branch}."
+          review_gate() {
+            local number="$1"
+            local review_json unresolved changes_requested review_decision
+            # GraphQL variables must remain literal inside the query string.
+            # shellcheck disable=SC2016
+            review_json="$(gh api graphql \
+              -F owner="$owner" \
+              -F name="$repo_name" \
+              -F number="$number" \
+              -f query='
+                query($owner:String!, $name:String!, $number:Int!) {
+                  repository(owner:$owner, name:$name) {
+                    pullRequest(number:$number) {
+                      reviewDecision
+                      reviewThreads(first:100) {
+                        nodes { isResolved }
+                        pageInfo { hasNextPage }
+                      }
+                      reviews(first:100) {
+                        nodes { author { login } state submittedAt }
+                        pageInfo { hasNextPage }
+                      }
+                    }
+                  }
+                }'
+            )"
+
+            if [[ "$(jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' <<<"$review_json")" == "true" ||
+                  "$(jq -r '.data.repository.pullRequest.reviews.pageInfo.hasNextPage' <<<"$review_json")" == "true" ]]; then
+              log "PR #$number has more than 100 review items; leaving it for manual review."
               return 1
             fi
-            if ! candidate_blob="$(gh api "repos/${REPOSITORY}/contents/${workflow_path}?ref=${candidate_sha}" --jq '.sha')"; then
-              echo "::warning::Unable to read candidate ${workflow_path} on ${candidate_sha}."
-              return 1
-            fi
-            [[ "${candidate_blob}" == "${default_blob}" ]]
+
+            unresolved="$(jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length' <<<"$review_json")"
+            changes_requested="$(jq '
+              [.data.repository.pullRequest.reviews.nodes[] | select(.author.login != null)]
+              | group_by(.author.login)
+              | map(sort_by(.submittedAt) | last)
+              | map(select(.state == "CHANGES_REQUESTED"))
+              | length
+            ' <<<"$review_json")"
+            review_decision="$(jq -r '.data.repository.pullRequest.reviewDecision // ""' <<<"$review_json")"
+
+            (( unresolved == 0 )) || { log "PR #$number has unresolved review threads."; return 1; }
+            (( changes_requested == 0 )) || { log "PR #$number has an active changes-requested review."; return 1; }
+            [[ "$review_decision" != "CHANGES_REQUESTED" ]] || { log "PR #$number review decision requests changes."; return 1; }
           }
 
           reconcile_pr() {
@@ -56,10 +90,8 @@ jobs:
 
             pr="$(gh api "repos/${REPOSITORY}/pulls/${number}")"
             author="$(jq -r '.user.login' <<<"${pr}")"
-            case "${author}" in
-              "dependabot[bot]"|"copilot-swe-agent[bot]") ;;
-              *) return 0 ;;
-            esac
+            # GitHub-provided author type, never branch prefix or claimed name.
+            [[ "$(jq -r '.user.type // ""' <<<"${pr}")" == "Bot" ]] || return 0
 
             state="$(jq -r '.state' <<<"${pr}")"
             draft="$(jq -r '.draft' <<<"${pr}")"
@@ -78,45 +110,20 @@ jobs:
             fi
 
             if [[ "${mergeable_state}" == "behind" ]]; then
-              echo "Updating PR #${number} from ${default_branch}."
-              if ! gh api --method PUT "repos/${REPOSITORY}/pulls/${number}/update-branch" \
-                -f "expected_head_sha=${head_sha}" >/dev/null; then
-                echo "::warning::PR #${number} update-branch request failed; will retry on next run."
-                return 0
-              fi
-
-              updated_sha="${head_sha}"
-              for _ in $(seq 1 20); do
-                updated_sha="$(gh api "repos/${REPOSITORY}/pulls/${number}" --jq '.head.sha')"
-                [[ "${updated_sha}" != "${head_sha}" ]] && break
-                sleep 3
-              done
-              if [[ "${updated_sha}" == "${head_sha}" ]]; then
-                echo "::error::PR #${number} update was not observed; checks were not dispatched."
-                return 1
-              fi
-
-              # GITHUB_TOKEN updates suppress ordinary pull_request workflow triggers.
-              # Never execute bot-controlled workflow YAML. Dispatch against the PR
-              # ref only when both workflow definitions are byte-identical to the
-              # trusted default branch.
-              if ! workflow_matches_default ".github/workflows/ci.yml" "${updated_sha}" ||
-                 ! workflow_matches_default ".github/workflows/codeql.yml" "${updated_sha}"; then
-                echo "::warning::PR #${number} modifies trusted workflow definitions; checks were not dispatched automatically."
-                return 0
-              fi
-              if ! gh workflow run ci.yml --repo "${REPOSITORY}" --ref "${head_ref}"; then
-                echo "::error::PR #${number} CI dispatch failed."
-                return 1
-              fi
-              if ! gh workflow run codeql.yml --repo "${REPOSITORY}" --ref "${head_ref}"; then
-                echo "::error::PR #${number} CodeQL dispatch failed."
-                return 1
-              fi
-              echo "PR #${number} updated; trusted CI and CodeQL dispatched on ${updated_sha}."
+              # GITHUB_TOKEN update-branch suppresses PR checks. Never dispatch
+              # a mutable bot-controlled workflow revision to compensate.
+              echo "::warning::PR #${number} is behind ${default_branch}; a trusted PR update is needed before auto-merge."
               return 0
             fi
 
+            # Do not queue bot code while findings or approval requirements
+            # remain unresolved. GitHub's native ruleset remains authoritative.
+            if ! review_gate "${number}"; then
+              echo "::notice::PR #${number} review gate is not ready; auto-merge was not enabled."
+              return 0
+            fi
+            # Only act after a real GitHub APPROVED review decision.
+            [[ "$(gh api graphql -F owner="$owner" -F name="$repo_name" -F number="$number" -f query=\'query($owner:String!, $name:String!, $number:Int!) { repository(owner:$owner,name:$name) { pullRequest(number:$number) { reviewDecision } } }\' --jq '.data.repository.pullRequest.reviewDecision')" == "APPROVED" ]] || return 0
             auto_merge="$(jq -r 'if .auto_merge == null then "false" else "true" end' <<<"${pr}")"
             [[ "${auto_merge}" == "false" ]] || return 0
 
@@ -138,6 +145,6 @@ jobs:
             [[ -z "${number}" ]] || reconcile_pr "${number}" || failures=$((failures + 1))
           done < <(
             gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
-              --jq '.[] | select(.user.login == "dependabot[bot]" or .user.login == "copilot-swe-agent[bot]") | .number'
+              --jq '.[] | select(.user.type == "Bot") | .number'
           )
           [[ "${failures}" -eq 0 ]] || exit 1
