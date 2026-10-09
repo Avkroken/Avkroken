@@ -123,7 +123,12 @@ jobs:
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
             if ! review_gate "${number}"; then
-              echo "::notice::PR #${number} review gate is not ready; auto-merge was not enabled."
+              # A previously queued bot PR must not retain an auto-merge request
+              # while actionable reviews or unresolved threads are outstanding.
+              if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
+                gh pr merge --disable-auto "${url}" || return 1
+              fi
+              echo "::notice::PR #${number} review gate blocked auto-merge."
               return 0
             fi
             # Only act after a real GitHub APPROVED review decision.
