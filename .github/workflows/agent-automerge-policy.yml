@@ -48,7 +48,7 @@ jobs:
                         pageInfo { hasNextPage }
                       }
                       reviews(first:100) {
-                        nodes { author { login } state submittedAt }
+                        nodes { author { login } state submittedAt commit { oid } }
                         pageInfo { hasNextPage }
                       }
                     }
@@ -72,6 +72,7 @@ jobs:
                 (.reviewThreads.nodes | type == "array") and
                 (.reviews.nodes | type == "array") and
                 all(.reviewThreads.nodes[]; .isResolved == true) and
+                any(.reviews.nodes[]; .state == "APPROVED" and (.commit.oid // "") == $sha) and
                 all(.reviews.nodes[];
                   (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
                    .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
