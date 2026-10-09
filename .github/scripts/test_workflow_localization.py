@@ -25,6 +25,9 @@ class WorkflowLocalizationTests(unittest.TestCase):
         text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
         self.assertIn('author_type="$(jq -r', text)
         self.assertIn('collaborators/${author}/permission', text)
+        self.assertIn("PR #$number was not queued for native auto-merge", text)
+        self.assertIn(".auto_merge == null", text)
+        self.assertNotIn("expected_external_checks()", text)
         self.assertIn('write|maintain|admin)', text)
         self.assertIn('Bot) ;;', text)
         self.assertIn('"$head_repo" != "$REPOSITORY"', text)
@@ -44,11 +47,20 @@ class WorkflowLocalizationTests(unittest.TestCase):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
         self.assertIn("concurrency:", text)
         self.assertIn("group: bot-pr-lifecycle", text)
-        self.assertIn("workflow_matches_default", text)
-        self.assertIn("modifies trusted workflow definitions", text)
-        self.assertIn("update-branch request failed", text)
+        self.assertNotIn("gh workflow run ci.yml", text)
+        self.assertNotIn("gh workflow run codeql.yml", text)
+        self.assertNotIn("update-branch", text.replace("GITHUB_TOKEN update-branch", ""))
+        self.assertIn("review_gate()", text)
+        self.assertIn('"$review_decision" == "APPROVED"', text)
+        self.assertIn('.user.type == "Bot"', text)
         self.assertIn("failures=0", text)
         self.assertIn("failures=$((failures + 1))", text)
+
+    def test_closure_audit_uses_trusted_context_for_conflicting_prs(self):
+        text = (WORKFLOWS / "pr-closure-audit.yml").read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", text)
+        self.assertIn("ref: main", text)
+        self.assertNotIn("ref: ${{ github.event.pull_request.head", text)
 
     def test_issue_tracker_requires_explicit_closure_decision(self):
         text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
