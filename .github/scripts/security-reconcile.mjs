@@ -80,7 +80,6 @@ async function list(path) {
   throw Error('Pagination bound reached: '+path);
 }
 const metadata=await api(root);
-const isPrivate=metadata.private===true;
 const defaultBranch=metadata.default_branch || 'main';
 const issues=(await list(root+'/issues?state=all')).filter(isIssue);
 async function assignOwner(issue) {
@@ -92,8 +91,8 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
   for(const [kind,endpoint,label] of sources) {
     // Public GitHub issues cannot contain private secret-scanning findings.
     // Keep security-restricted alert details in GitHub's Security interface.
-    if(kind==='secret-scanning' && !isPrivate) {
-      console.warn('::notice::Public repository: secret-scanning issue mirroring disabled; use private security tracking.');
+    if(kind==='secret-scanning') {
+      console.warn('::notice::Secret-scanning issue mirroring disabled until an authorized credential and confidential tracking channel are configured.');
       continue;
     }
     let alerts;
