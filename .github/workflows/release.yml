@@ -22,6 +22,11 @@ on:
       - ".github/scripts/test_automation_post_merge.py"
       - ".github/scripts/audit_pr_closure.py"
       - ".github/scripts/test_audit_pr_closure.py"
+      - ".github/scripts/test_workflow_localization.py"
+      - ".github/workflows/agent-automerge.yml"
+      - ".github/workflows/security-alert-issues.yml"
+      - ".github/scripts/security-reconcile.mjs"
+      - ".github/scripts/security-reconcile.test.mjs"
       - ".github/release-baseline"
       - ".github/release-required-checks"
   push:
@@ -75,11 +80,14 @@ jobs:
             .github/scripts/automation_post_merge.py \
             .github/scripts/test_automation_post_merge.py \
             .github/scripts/audit_pr_closure.py \
-            .github/scripts/test_audit_pr_closure.py
+            .github/scripts/test_audit_pr_closure.py \
+            .github/scripts/test_workflow_localization.py
           python3 .github/scripts/test_publish_release.py
           python3 .github/scripts/test_wait_for_checks.py
           python3 .github/scripts/test_automation_post_merge.py
           python3 .github/scripts/test_audit_pr_closure.py
+          python3 .github/scripts/test_workflow_localization.py
+          node --test .github/scripts/security-reconcile.test.mjs
           python3 .github/scripts/semantic_release.py \
             --forced-bump auto \
             --channel stable \
