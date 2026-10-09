@@ -37,6 +37,8 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('method="--squash"', text)
         self.assertNotIn('method="--merge"', text)
         self.assertIn('gh pr merge --auto', text)
+        self.assertIn('"$review_decision" == "APPROVED"', text)
+        self.assertNotIn('"$review_decision" != "CHANGES_REQUESTED"', text)
 
     def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
