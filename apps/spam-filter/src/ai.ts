@@ -181,18 +181,21 @@ export async function classifyWithAi(
     },
   });
 
-  const raw =
+  const raw: unknown =
     typeof result === "string"
       ? result
       : result && typeof result === "object" && "response" in result
-        ? String(result.response)
-        : "";
+        ? result.response
+        : null;
 
-  let decoded: unknown = null;
-  try {
-    decoded = JSON.parse(raw);
-  } catch {
-    return null;
+  // JSON schema output may already be decoded by Workers AI.
+  let decoded: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      decoded = JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
 
   const parsed = parseClassification(decoded);
