@@ -194,26 +194,13 @@ jobs:
             # Native GitHub rulesets and required checks own merge authorization.
             # Cloudflare Workers Builds are not required GitHub status checks.
 
-            # Leave existing native auto-merge requests untouched. Re-enabling
-            # can change or reject the actor/method and is not idempotent.
-            if [[ "$(jq -r '.auto_merge != null' <<<"$pr_json")" == "true" ]]; then
-              log "PR #$number auto-merge already queued; skipping duplicate request."
-              return 0
-            fi
-
-            repo_json="$(gh api "repos/${REPOSITORY}")"
-            # main requires linear history; prefer the native squash strategy.
-            if [[ "$(jq -r '.allow_squash_merge' <<<"$repo_json")" == "true" ]]; then
-              method="--squash"
-            elif [[ "$(jq -r '.allow_rebase_merge' <<<"$repo_json")" == "true" ]]; then
-              method="--rebase"
+            # Never create or restore a queue request; consent belongs to the initiator.
+            if [[ "$(jq -r '.auto_merge == null' <<<"$pr_json")" == "true" ]]; then
+              log "PR #$number auto-merge was withdrawn; not re-enabling."
             else
-              log "No linear-history-compatible merge method is enabled."
-              return 0
+              log "PR #$number remains queued and passes the review gate."
             fi
-
-            log "Enabling native auto-merge for PR #$number."
-            gh pr merge --auto "$method" --match-head-commit "$head_sha" "$pr_url"
+            return 0
           }
 
           if [[ -n "$EVENT_PR_NUMBER" ]]; then
