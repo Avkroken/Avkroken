@@ -1,6 +1,9 @@
 name: Bot PR lifecycle
 
 on:
+  workflow_run:
+    workflows: ["Agent lifecycle signal"]
+    types: [completed]
   push:
     branches: [main]
   schedule:
@@ -16,6 +19,7 @@ concurrency:
 jobs:
   reconcile:
     name: Update and auto-merge trusted bot PRs
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
