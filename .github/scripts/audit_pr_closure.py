@@ -12,6 +12,19 @@ def normalized(value, pattern, fallback="unknown"):
     return text if re.fullmatch(pattern, text) else fallback
 
 
+def closure_marker(number, sha):
+    """Return a stable non-rendered marker for one PR closure/head pair."""
+    if not isinstance(number, int) or number <= 0:
+        return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
+    safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
+    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha} -->"
+
+
+def has_existing_audit_comment(comments, marker):
+    """Return whether a previously published issue comment contains the marker."""
+    return any(marker in str((comment or {}).get("body") or "") for comment in comments)
+
+
 def closure_comment(event, repository, run_id):
     """Build a sanitized, deterministic comment; no PR title or body is trusted."""
     if event.get("action") != "closed":
@@ -23,11 +36,16 @@ def closure_comment(event, repository, run_id):
     number = pr.get("number")
     if not isinstance(number, int) or number <= 0 or repo == "unknown":
         return None
-    actor = normalized((event.get("sender") or {}).get("login"), r"[A-Za-z0-9-]{1,39}")
+    actor = normalized(
+        (event.get("sender") or {}).get("login"),
+        r"[A-Za-z0-9-]{1,100}(?:\[bot\])?",
+    )
     closed_at = normalized(pr.get("closed_at"), r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
     sha = normalized(((pr.get("head") or {}).get("sha")), r"[0-9a-fA-F]{40}")
     run = normalized(run_id, r"[0-9]+")
+    marker = closure_marker(number, sha)
     return (
+        f"{marker}\n"
         "### GitHub closure audit (unmerged PR)\n\n"
         f"- GitHub actor: `{actor}` (account identity; not verified agent/session identity)\n"
         f"- Closed at: `{closed_at}`\n"
@@ -38,6 +56,33 @@ def closure_comment(event, repository, run_id):
         "complete checks and review. An OAuth account login cannot establish which "
         "AI session, if any, initiated the action."
     )
+
+
+def existing_comment(repository, number, token, marker):
+    """Check existing PR issue comments with bounded pagination."""
+    for page in range(1, 11):
+        url = (
+            f"https://api.github.com/repos/{repository}/issues/{number}/comments"
+            f"?per_page=100&page={page}"
+        )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "avkroken-pr-closure-audit",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            comments = json.load(response)
+        if not isinstance(comments, list):
+            raise RuntimeError("Closure audit comments response was not a list")
+        if has_existing_audit_comment(comments, marker):
+            return True
+        if len(comments) < 100:
+            return False
+    raise RuntimeError("Closure audit comment pagination bound reached")
 
 
 def main():
@@ -64,6 +109,12 @@ def main():
     token = os.environ.get("GITHUB_TOKEN", "")
     if not token:
         raise RuntimeError("GITHUB_TOKEN absent for same-repository closure audit")
+
+    marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"))
+    if existing_comment(repository, pr["number"], token, marker):
+        print("Closure audit comment already exists; skipping duplicate publication.")
+        return
+
     payload = json.dumps({"body": comment}).encode("utf-8")
     url = f"https://api.github.com/repos/{repository}/issues/{pr['number']}/comments"
     request = urllib.request.Request(
