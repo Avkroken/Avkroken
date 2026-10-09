@@ -20,6 +20,15 @@ async function plan(): Promise<RuntimeProvisioningPlanV1> {
 
 function proxy(overrides: Partial<CloudflareStagingInventoryProxyV1> = {}): CloudflareStagingInventoryProxyV1 {
   return {
+    getAccountIdentity: async () => ({ id: "account-1" }),
+    getActiveWorkerDeployment: async () => ({
+      versions: [{
+        version_id: "version-default",
+        percentage: 100,
+        commit_sha: "a".repeat(40),
+        bindings: [],
+      }],
+    }),
     listD1Databases: async () => [],
     getD1Database: async () => { throw new Error("unexpected detail"); },
     listQueues: async () => [],
@@ -188,16 +197,20 @@ test("planned worker inspection maps bindings/routes without exposing values", a
             }],
           },
         },
-        settings: {
-          annotations: { "workers/commit_sha": "a".repeat(40) },
-          bindings: [
-            { type: "d1", name: "EVENTS_DB", database_id: "staging-db" },
-            { type: "plain_text", name: "SHOULD_BLOCK", text: "must-not-leak" },
-            { type: "secret_text", name: "SECRET", text: "must-not-leak-secret" },
-          ],
-        },
         schedules: { schedules: [] },
         routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [
+            { type: "d1", name: "EVENTS_DB", database_id: "staging-db" },
+            { type: "plain_text", name: "SHOULD_BLOCK" },
+            { type: "secret_text", name: "SECRET" },
+          ],
+        }],
       }),
     }),
   );
@@ -233,7 +246,6 @@ test("public workers.dev, preview URLs, domains, routes and cron are surfaced as
             queues: [],
           },
         },
-        settings: { annotations: {}, bindings: [] },
         schedules: { schedules: [{ cron: "*/5 * * * *" }] },
         routes: ["example.test/ingest/*"],
       }),
@@ -283,12 +295,16 @@ test("unknown provider shape fails closed through collector coverage without pro
           subdomain: { enabled: false, previews_enabled: false },
           references: { domains: [], queues: [] },
         },
-        settings: {
-          annotations: {},
-          bindings: [{ name: "UNKNOWN_WITH_SECRET", value: "provider-secret" }],
-        },
         schedules: { schedules: [] },
         routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [{ name: "UNKNOWN_WITH_SECRET", value: "provider-secret" }],
+        }],
       }),
     }),
   );
@@ -325,4 +341,71 @@ test("D1 detail identity mismatch fails closed", async () => {
     () => reader.listDatabases(),
     (error: unknown) => error instanceof CloudflareInventoryShapeError && error.field === "d1.detail.identity",
   );
+});
+
+
+test("deployment commit requires every active version to agree", async () => {
+  const activePayload = {
+    worker: {
+      name: "events-staging",
+      subdomain: { enabled: false, previews_enabled: false },
+      references: { domains: [], queues: [] },
+    },
+    settings: {
+      annotations: { "workers/commit_sha": "b".repeat(40) },
+      bindings: [],
+    },
+    schedules: { schedules: [] },
+    routes: [],
+  };
+
+  const reader = new CloudflareStagingInventoryReaderV1(
+    await plan(),
+    proxy({
+      listD1Databases: async () => [],
+      listQueues: async () => [],
+      inspectPlannedWorker: async () => activePayload,
+      getActiveWorkerDeployment: async () => ({
+        versions: [
+          { version_id: "version-old", percentage: 50, commit_sha: "a".repeat(40), bindings: [] },
+          { version_id: "version-new", percentage: 50, commit_sha: "b".repeat(40), bindings: [] },
+        ],
+      }),
+    }),
+  );
+
+  const inspected = await reader.inspectWorker("events-staging");
+  assert.equal(inspected.deploymentCommitSha, null);
+});
+
+
+test("worker bindings are read from the single active deployment version", async () => {
+  const reader = new CloudflareStagingInventoryReaderV1(
+    await plan(),
+    proxy({
+      listD1Databases: async () => [],
+      listQueues: async () => [],
+      inspectPlannedWorker: async () => ({
+        worker: {
+          name: "events-staging",
+          subdomain: { enabled: false, previews_enabled: false },
+          references: { domains: [], queues: [] },
+        },
+        schedules: { schedules: [] },
+        routes: [],
+      }),
+      getActiveWorkerDeployment: async () => ({
+        versions: [{
+          version_id: "active-version",
+          percentage: 100,
+          commit_sha: "a".repeat(40),
+          bindings: [{ type: "secret_text", name: "ACTIVE_SECRET" }],
+        }],
+      }),
+    }),
+  );
+
+  const inspected = await reader.inspectWorker("events-staging");
+  assert.deepEqual(inspected.plainTextVars, []);
+  assert.deepEqual(inspected.secretBindings, ["ACTIVE_SECRET"]);
 });

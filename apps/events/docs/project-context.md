@@ -1,6 +1,6 @@
 # Events — project context
 
-**Senast verifierad:** 2026-10-07  
+**Senast verifierad:** 2026-10-08  
 **Repository:** `Avkroken/Avkroken`  
 **App path:** `apps/events`  
 **Default branch:** `main`
@@ -77,7 +77,9 @@ The evaluator itself performs no provider/API call and no mutation.
 The next preflight slice uses a read-only inventory port to build
 `StagingInventorySnapshotV1`. Provider read failures degrade coverage to
 `partial`/`unavailable`; they are never interpreted as proof that a resource is absent.
-The collector exposes no create/update/delete/deploy operation.
+The collector exposes no create/update/delete/deploy operation. The snapshot account
+identity is read through the provider-backed read port; caller-supplied account
+evidence cannot override the account actually queried.
 
 
 ## Cloudflare staging inventory adapter
@@ -86,7 +88,10 @@ The collector exposes no create/update/delete/deploy operation.
 shapes into `StagingInventoryReadPortV1` through a named server-side proxy
 contract. Worker detail inspection is allowlisted to `events-staging` and
 `ingest-staging`; the adapter never receives a token or exposes a generic
-Cloudflare API proxy.
+Cloudflare API proxy. Existing Worker reuse is bound to the active deployment:
+every serving version is resolved. Reuse is allowed only for a single active
+version whose commit matches the expected repository commit; bindings are read
+from that active version rather than from independently mutable script settings.
 
 
 ## Staging inventory control-plane proxy
@@ -96,3 +101,32 @@ The W1-backed preflight proxy is a separate operator/control-plane seam under
 surface is named GET-only inventory operations, and it sanitizes Cloudflare
 responses before returning them to the Events inventory adapter. No runtime
 binding/deployment exists yet.
+
+
+## Operator staging preflight runner
+
+`control-plane/staging-preflight-runner.ts` composes the named Cloudflare proxy,
+`CloudflareStagingInventoryReaderV1`, the inventory collector and
+`evaluateStagingProvisioningPreflightV1` into one operator-only read path.
+
+The runner owns the observation timestamp, binds the report to the provider-read
+account identity and returns only sanitized decisions, coverage, counts and
+evidence metadata. Production resource ID lists and credential values are not
+returned by the report. It has no provider-write, deploy or provisioning method.
+
+No control-plane Worker/binding has been deployed yet; live read-only execution
+remains a separate operational gate.
+
+
+## Live preflight deployment gate
+
+`live-preflight-deployment.v1.json` now locks the smallest allowed temporary
+topology for the first provider-backed staging inventory run: a private
+`events-staging-inventory-proxy` with W1 bound server-side from the existing
+Secrets Store, GET-only provider access, no runtime resource bindings and no
+public route/workers.dev/preview URL.
+
+The operator remains local and may reach only the named
+`CloudflareStagingInventoryProxyEntrypoint` through a remote Service Binding.
+Deployment and teardown are separate provider-write operations and have not been
+performed by this repository slice.

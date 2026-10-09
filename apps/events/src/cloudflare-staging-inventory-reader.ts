@@ -12,12 +12,15 @@ type UnknownRecord = Record<string, unknown>;
 
 export type CloudflareWorkerInspectionPayloadV1 = {
   worker: unknown;
-  settings: unknown;
   schedules: unknown;
   routes: unknown;
 };
 
 export interface CloudflareStagingInventoryProxyV1 {
+  getAccountIdentity(): Promise<unknown>;
+  getActiveWorkerDeployment(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<unknown>;
   listD1Databases(): Promise<unknown>;
   getD1Database(databaseId: string): Promise<unknown>;
   listQueues(): Promise<unknown>;
@@ -92,15 +95,59 @@ function plannedWorkerName(
   throw new CloudflareInventoryShapeError("worker.name");
 }
 
-function annotationCommitSha(settings: UnknownRecord): string | null {
-  const annotations = settings.annotations;
-  if (annotations == null) return null;
-  const values = record(annotations, "worker.settings.annotations");
-  const commit = optionalString(values["workers/commit_sha"], "worker.settings.annotations.workers/commit_sha");
-  if (commit !== null && !/^[0-9a-f]{40,64}$/i.test(commit)) {
-    throw new CloudflareInventoryShapeError("worker.settings.annotations.workers/commit_sha");
+function activeDeploymentVersions(value: unknown): UnknownRecord[] {
+  const deployment = record(value, "worker.deployment");
+  const versions = array(deployment.versions, "worker.deployment.versions");
+  if (versions.length < 1 || versions.length > 2) {
+    throw new CloudflareInventoryShapeError("worker.deployment.versions");
   }
-  return commit;
+  return versions.map((version, index) =>
+    record(version, `worker.deployment.versions[${index}]`)
+  );
+}
+
+function activeDeploymentCommitSha(value: unknown): string | null {
+  const versions = activeDeploymentVersions(value);
+
+  const commits = new Set<string>();
+  let percentageTotal = 0;
+  for (let index = 0; index < versions.length; index += 1) {
+    const version = versions[index];
+    requiredString(version.version_id, `worker.deployment.versions[${index}].version_id`);
+    const percentage = optionalNumber(
+      version.percentage,
+      `worker.deployment.versions[${index}].percentage`,
+    );
+    if (percentage === null || percentage <= 0 || percentage > 100) {
+      throw new CloudflareInventoryShapeError(
+        `worker.deployment.versions[${index}].percentage`,
+      );
+    }
+    percentageTotal += percentage;
+
+    const commit = optionalString(
+      version.commit_sha,
+      `worker.deployment.versions[${index}].commit_sha`,
+    );
+    if (commit === null) return null;
+    if (!/^[0-9a-f]{40,64}$/i.test(commit)) {
+      throw new CloudflareInventoryShapeError(
+        `worker.deployment.versions[${index}].commit_sha`,
+      );
+    }
+    commits.add(commit.toLowerCase());
+  }
+
+  if (Math.abs(percentageTotal - 100) > 0.000001) {
+    throw new CloudflareInventoryShapeError("worker.deployment.percentageTotal");
+  }
+  return versions.length === 1 && commits.size === 1 ? [...commits][0] : null;
+}
+
+function activeDeploymentBindings(value: unknown): unknown[] {
+  const versions = activeDeploymentVersions(value);
+  if (versions.length !== 1) return [];
+  return array(versions[0].bindings, "worker.deployment.versions[0].bindings");
 }
 
 export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadPortV1 {
@@ -111,6 +158,11 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
     private readonly plan: RuntimeProvisioningPlanV1,
     private readonly proxy: CloudflareStagingInventoryProxyV1,
   ) {}
+
+  async getAccountId(): Promise<string> {
+    const account = record(await this.proxy.getAccountIdentity(), "account.detail");
+    return requiredString(account.id, "account.detail.id");
+  }
 
   private async loadDatabases(): Promise<ProviderDatabaseInventoryV1[]> {
     if (this.databaseListPromise) return this.databaseListPromise;
@@ -243,15 +295,15 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
   async inspectWorker(name: string): Promise<ProviderWorkerInspectionV1> {
     const allowedName = plannedWorkerName(this.plan, name);
-    const payload = await this.proxy.inspectPlannedWorker(allowedName);
+    const [payload, activeDeployment] = await Promise.all([
+      this.proxy.inspectPlannedWorker(allowedName),
+      this.proxy.getActiveWorkerDeployment(allowedName),
+    ]);
     const worker = record(payload.worker, "worker.detail");
     const actualName = requiredString(worker.name, "worker.detail.name");
     if (actualName !== allowedName) throw new CloudflareInventoryShapeError("worker.detail.name");
 
-    const settings = record(payload.settings, "worker.settings");
-    const bindings = settings.bindings == null
-      ? []
-      : array(settings.bindings, "worker.settings.bindings");
+    const bindings = activeDeploymentBindings(activeDeployment);
     const databases = await this.loadDatabases();
     const queues = await this.loadQueues();
     const databaseById = new Map(databases.map((item) => [item.id, item.name]));
@@ -264,19 +316,19 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
     const queueProducerBindings: ProviderWorkerInspectionV1["queueProducerBindings"] = [];
 
     for (let index = 0; index < bindings.length; index += 1) {
-      const binding = record(bindings[index], `worker.settings.bindings[${index}]`);
-      const type = requiredString(binding.type, `worker.settings.bindings[${index}].type`);
-      const bindingName = requiredString(binding.name, `worker.settings.bindings[${index}].name`);
+      const binding = record(bindings[index], `worker.deployment.bindings[${index}]`);
+      const type = requiredString(binding.type, `worker.deployment.bindings[${index}].type`);
+      const bindingName = requiredString(binding.name, `worker.deployment.bindings[${index}].name`);
 
       if (type === "d1") {
         const databaseId = requiredString(
           binding.database_id ?? binding.id,
-          `worker.settings.bindings[${index}].database_id`,
+          `worker.deployment.bindings[${index}].database_id`,
         );
         const databaseName = databaseById.get(databaseId);
         if (!databaseName) {
           throw new CloudflareInventoryShapeError(
-            `worker.settings.bindings[${index}].database_id`,
+            `worker.deployment.bindings[${index}].database_id`,
           );
         }
         d1Bindings.push({ binding: bindingName, databaseId, databaseName });
@@ -286,12 +338,12 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
       if (type === "queue") {
         const queueName = requiredString(
           binding.queue_name,
-          `worker.settings.bindings[${index}].queue_name`,
+          `worker.deployment.bindings[${index}].queue_name`,
         );
         const queueId = queueByName.get(queueName);
         if (!queueId) {
           throw new CloudflareInventoryShapeError(
-            `worker.settings.bindings[${index}].queue_name`,
+            `worker.deployment.bindings[${index}].queue_name`,
           );
         }
         queueProducerBindings.push({ binding: bindingName, queueId, queueName });
@@ -382,7 +434,7 @@ export class CloudflareStagingInventoryReaderV1 implements StagingInventoryReadP
 
     return {
       name: allowedName,
-      deploymentCommitSha: annotationCommitSha(settings),
+      deploymentCommitSha: activeDeploymentCommitSha(activeDeployment),
       publicRoutes: [...new Set(publicRoutes)].sort(),
       secretBindings: [...new Set(secretBindings)].sort(),
       plainTextVars: [...new Set(plainTextVars)].sort(),

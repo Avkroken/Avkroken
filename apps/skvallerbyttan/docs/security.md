@@ -67,6 +67,10 @@ Observationskoden får inte använda W1/O1 som fallback vid 403. En saknad provi
 
 Skvallerbyttan läser inte D1-tabellinnehåll, KV values eller R2 object content som del av observationsinventeringen.
 
+## Access policy posture
+
+Den privata endpointen `/api/v1/cloudflare/zero-trust/access-posture` gör endast befintliga R3-baserade GET-anrop för apppolicys och den separata account-listan med återanvändbara policys (`/access/policies`). Den returnerar endast selektortyper och policy-/MFA-metadata som leverantören exponerar, aldrig e-postadresser, IP-regelvärden eller credentialmaterial. `reviewRequired` är en granskningssignal när en Allow- eller Bypass-policy innehåller Everyone men saknar Require — **inte** bevis för en publik tjänst eller att MFA saknas. Vid 401/403, partiell paginering eller annat läsfel visas ofullständig evidens och aldrig ett falskt godkännande. Driftregler kan inte ändras från observationslagret.
+
 ## Raw-data-policy
 
 Provideradapters får läsa providerresponser internt men externa modeller minimeras.

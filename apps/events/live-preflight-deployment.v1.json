@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "planned",
+  "proxy": {
+    "workerName": "events-staging-inventory-proxy",
+    "main": "control-plane/cloudflare-staging-inventory-proxy-entrypoint.ts",
+    "compatibilityDate": "2026-10-08",
+    "accountId": "b74f8c0c6a92f3006483840cf27372fd",
+    "workersDev": false,
+    "previewUrls": false,
+    "routes": [],
+    "secret": {
+      "binding": "CLOUDFLARE_API_TOKEN_W1",
+      "storeId": "293e79006fa649b8b182ef105a6b46d1",
+      "secretName": "CLOUDFLARE_API_TOKEN_W1"
+    },
+    "providerMethods": [
+      "GET"
+    ],
+    "resourceBindings": {
+      "d1": [],
+      "queues": [],
+      "kv": [],
+      "r2": [],
+      "services": []
+    }
+  },
+  "operator": {
+    "mode": "local_remote_service_binding",
+    "serviceBinding": {
+      "binding": "CLOUDFLARE_STAGING_INVENTORY",
+      "service": "events-staging-inventory-proxy",
+      "entrypoint": "CloudflareStagingInventoryProxyEntrypoint",
+      "remote": true
+    }
+  },
+  "providerMutationAllowed": false,
+  "providerDestinationsMayChange": false,
+  "teardown": {
+    "required": true,
+    "deleteProxyWorker": true,
+    "verifyNoRoutes": true,
+    "verifyNoResidualBindings": true
+  }
+}

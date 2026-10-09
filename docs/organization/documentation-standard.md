@@ -47,7 +47,7 @@ Wiki är presentation/navigation. Den får inte bli enda platsen för teknisk cu
 
 ## Samlad organisationsvy
 
-`Avkroken/.github` kan automatiskt spegla dokumentation från repositories och deras Wikis. Spegeln ska alltid länka till ursprungskällan och får aldrig bli canonical.
+Ingen central dokumentationsspegel används. Dokumentation, Wiki och tekniska instruktioner ska ligga i det repository som äger systemet eller komponenten.
 
 ## Säkerhet
 

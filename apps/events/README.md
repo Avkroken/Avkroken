@@ -59,7 +59,15 @@ See `docs/runtime-provisioning.md`.
 
 ## Staging provisioning preflight
 
-The read-only inventory evaluator is `src/staging-preflight.ts`.
-Its contract and stop conditions are documented in
-[`docs/staging-preflight.md`](docs/staging-preflight.md). A passing preflight
-does not authorize Cloudflare writes.
+The pure read-only inventory evaluator is `src/staging-preflight.ts`.
+The operator-only composition seam is
+`control-plane/staging-preflight-runner.ts`; it executes named read operations
+only and returns a sanitized preflight report. Its contract and stop conditions
+are documented in [`docs/staging-preflight.md`](docs/staging-preflight.md).
+A passing preflight does not authorize Cloudflare writes.
+
+The next provider-write boundary is described by
+`live-preflight-deployment.v1.json` and
+[`docs/live-preflight-deployment-gate.md`](docs/live-preflight-deployment-gate.md).
+It is a machine-validated deployment plan only; no proxy Worker is deployed by
+the repository contract.

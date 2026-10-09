@@ -51,6 +51,7 @@ function evidence(): StagingInventoryEvidenceV1 {
 
 function reader(overrides: Partial<StagingInventoryReadPortV1> = {}): StagingInventoryReadPortV1 {
   return {
+    getAccountId: async () => "account-1",
     listDatabases: async () => [],
     listQueues: async () => [],
     listQueueConsumers: async () => [],
@@ -263,4 +264,41 @@ test("planned worker inspection failure degrades worker coverage and blocks abse
   );
   assert.equal(decision.ready, false);
   assert.ok(decision.reasons.some((reason) => reason.includes("coverage.workers")));
+});
+
+
+test("snapshot account is bound to the reader account identity", async () => {
+  const currentPlan = await plan();
+  const currentEvidence = evidence();
+  currentEvidence.accountId = "claimed-account";
+
+  const boundReader = {
+    getAccountId: async () => "queried-account",
+    listDatabases: async () => [],
+    listQueues: async () => [],
+    listQueueConsumers: async () => [],
+    listWorkers: async () => [],
+    inspectWorker: async (name: string) => ({
+      name,
+      deploymentCommitSha: null,
+      publicRoutes: [],
+      secretBindings: [],
+      plainTextVars: [],
+      otherBindings: [],
+      triggers: [],
+      d1Bindings: [],
+      queueProducerBindings: [],
+      queueConsumerBindings: [],
+    }),
+  };
+
+  const result = await collectStagingInventorySnapshotV1(
+    currentPlan,
+    boundReader,
+    currentEvidence,
+  );
+
+  assert.equal(result.snapshot.accountId, "queried-account");
+  assert.equal(result.snapshot.coverage.controlPlane, "partial");
+  assert.deepEqual(result.errors, ["account:evidence_mismatch"]);
 });

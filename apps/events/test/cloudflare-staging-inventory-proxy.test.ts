@@ -200,20 +200,6 @@ test("worker inspection is named, complete, and sanitizes binding values", async
         ignored: TOKEN,
       });
     }
-    if (path.endsWith("/workers/scripts/events-staging/settings")) {
-      return success({
-        annotations: {
-          "workers/commit_sha": "b".repeat(40),
-          "workers/message": TOKEN,
-        },
-        bindings: [
-          { type: "d1", name: "EVENTS_DB", database_id: "stage-db", secret: TOKEN },
-          { type: "plain_text", name: "PLAIN", text: TOKEN },
-          { type: "secret_text", name: "SECRET", text: TOKEN },
-          { type: "service", name: "UNPLANNED", service: TOKEN },
-        ],
-      });
-    }
     if (path.endsWith("/workers/scripts/events-staging/schedules")) {
       return success({ schedules: [{ cron: "*/5 * * * *", ignored: TOKEN }] });
     }
@@ -254,15 +240,6 @@ test("worker inspection is named, complete, and sanitizes binding values", async
           queue_name: "avkroken-ingest-events-preview-v1",
         }],
       },
-    },
-    settings: {
-      annotations: { "workers/commit_sha": "b".repeat(40) },
-      bindings: [
-        { type: "d1", name: "EVENTS_DB", database_id: "stage-db" },
-        { type: "plain_text", name: "PLAIN" },
-        { type: "secret_text", name: "SECRET" },
-        { type: "service", name: "UNPLANNED" },
-      ],
     },
     schedules: { schedules: [{ cron: "*/5 * * * *" }] },
     routes: ["example.test/events/*"],
@@ -322,15 +299,13 @@ test("request timeout is bounded and sanitized", async () => {
 
 test("timeout remains active while reading a hanging response body", async () => {
   const proxy = service(
-    async (_input, init) => {
-      const response = new Response(null, { status: 200 });
-      Object.defineProperty(response, "text", {
-        value: () => new Promise<string>((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () => reject(new Error(`body ${TOKEN}`)));
-        }),
-      });
-      return response;
-    },
+    async (_input, init) => new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        init?.signal?.addEventListener("abort", () => {
+          controller.error(new Error(`body ${TOKEN}`));
+        }, { once: true });
+      },
+    }), { status: 200 }),
     5,
   );
 
@@ -386,4 +361,156 @@ test("credential lookup failures are sanitized before network access", async () 
       && !String(error).includes(TOKEN),
   );
   assert.equal(called, false);
+});
+
+
+test("Worker pagination fails closed when provider count metadata is inconsistent", async () => {
+  const proxy = service(async () => success(
+    [{ id: "worker-id", name: "events-staging" }],
+    { page: 1, per_page: 100, total_count: 2, total_pages: 1 },
+  ));
+
+  await assert.rejects(
+    () => proxy.listWorkers(),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "pagination_incomplete",
+  );
+});
+
+
+test("missing schedule inventory fails closed", async () => {
+  const proxy = service(async (input, init) => {
+    const request = new Request(input, init);
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (path.endsWith("/workers/workers")) {
+      return success([{ id: "worker-id", name: "events-staging" }]);
+    }
+    if (path.endsWith("/workers/workers/worker-id")) {
+      return success({ name: "events-staging", references: {} });
+    }
+    if (path.endsWith("/workers/scripts/events-staging/schedules")) {
+      return success({});
+    }
+    if (path.endsWith("/workers/domains")) {
+      return success([]);
+    }
+    if (path === "/client/v4/zones") {
+      return success([]);
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+
+  await assert.rejects(
+    () => proxy.inspectPlannedWorker("events-staging"),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "invalid_shape",
+  );
+});
+
+
+test("response body limit is enforced while streaming", async () => {
+  let pulls = 0;
+  const proxy = service(async () => new Response(new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulls += 1;
+      if (pulls === 1) {
+        controller.enqueue(new Uint8Array(2_000_001));
+        return;
+      }
+      throw new Error(`body should have been cancelled ${TOKEN}`);
+    },
+  }), { status: 200, headers: { "content-type": "application/json" } }));
+
+  await assert.rejects(
+    () => proxy.listWorkers(),
+    (error: unknown) =>
+      error instanceof CloudflareControlPlaneReadError
+      && error.code === "response_too_large"
+      && !String(error).includes(TOKEN),
+  );
+  assert.ok(pulls <= 2);
+});
+
+
+test("account identity is provider-bound and sanitized", async () => {
+  const proxy = service(async (input) => {
+    const url = new URL(String(input));
+    assert.equal(url.pathname, `/client/v4/accounts/${ACCOUNT_ID}`);
+    return success({ id: ACCOUNT_ID, name: TOKEN, settings: { secret: TOKEN } });
+  });
+
+  const identity = await proxy.getAccountIdentity();
+  assert.deepEqual(identity, { id: ACCOUNT_ID });
+  assert.equal(JSON.stringify(identity).includes(TOKEN), false);
+});
+
+test("active Worker deployment resolves every serving version without leaking metadata", async () => {
+  const proxy = service(async (input) => {
+    const url = new URL(String(input));
+    const path = url.pathname;
+    if (path.endsWith("/workers/workers")) {
+      return success(
+        [{ id: "worker-id", name: "events-staging" }],
+        { page: 1, per_page: 100, total_count: 1, total_pages: 1 },
+      );
+    }
+    if (path.endsWith("/workers/scripts/events-staging/deployments")) {
+      return success({
+        deployments: [{
+          id: "deployment-id",
+          versions: [
+            { version_id: "version-a", percentage: 60 },
+            { version_id: "version-b", percentage: 40 },
+          ],
+          annotations: { "workers/message": TOKEN },
+        }],
+      });
+    }
+    if (path.endsWith("/workers/workers/worker-id/versions/version-a")) {
+      return success({
+        id: "version-a",
+        annotations: {
+          "workers/commit_sha": "a".repeat(40),
+          "workers/message": TOKEN,
+        },
+        bindings: [{ type: "secret_text", name: "ACTIVE_SECRET", text: TOKEN }],
+        ignored: TOKEN,
+      });
+    }
+    if (path.endsWith("/workers/workers/worker-id/versions/version-b")) {
+      return success({
+        id: "version-b",
+        annotations: {
+          "workers/commit_sha": "b".repeat(40),
+          "workers/message": TOKEN,
+        },
+        bindings: [],
+        ignored: TOKEN,
+      });
+    }
+    throw new Error(`unexpected ${path}`);
+  });
+
+  const deployment = await proxy.getActiveWorkerDeployment("events-staging");
+  assert.deepEqual(deployment, {
+    versions: [
+      {
+        version_id: "version-a",
+        percentage: 60,
+        commit_sha: "a".repeat(40),
+        bindings: [{ type: "secret_text", name: "ACTIVE_SECRET" }],
+      },
+      {
+        version_id: "version-b",
+        percentage: 40,
+        commit_sha: "b".repeat(40),
+        bindings: [],
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(deployment).includes(TOKEN), false);
 });

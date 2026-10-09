@@ -36,6 +36,7 @@ test("capability keys are an explicit machine-consumed contract", () => {
     "cloudflare.avkroken.storage.kv",
     "cloudflare.avkroken.storage.r2",
     "cloudflare.avkroken.zero_trust.access",
+    "cloudflare.avkroken.zero_trust.policy_posture",
     "cloudflare.avkroken.zero_trust.tunnels",
     "cloudflare.avkroken.zero_trust",
     "cloudflare.avkroken.notifications",

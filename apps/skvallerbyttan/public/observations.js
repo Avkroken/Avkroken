@@ -300,12 +300,31 @@ function renderCloudflareStorage(d1, kvStorage, r2) {
   ]);
 }
 
-function renderCloudflareZeroTrust(access, tunnels) {
+function renderCloudflareZeroTrust(access, tunnels, posture) {
+  const postureStatus = posture.available === false
+    ? pathStatus(posture)
+    : posture.complete === true ? "available" : "partial";
+  const shared = posture.reusablePolicies || { policyCoverage: "unknown", items: [] };
   return `
     ${kv([
       ["Access applications", `${statusBadge(pathStatus(access))} ${access.available === false ? "—" : fmtInt(access.count)}`],
+      ["Access policy evidence", `${statusBadge(postureStatus)} ${posture.available === false ? "—" : fmtInt(posture.count)}`],
+      ["Reusable Access policies", `${statusBadge(shared.policyCoverage)} ${shared.count == null ? "—" : fmtInt(shared.count)}`],
       ["Tunnels", `${statusBadge(pathStatus(tunnels))} ${tunnels.available === false ? "—" : fmtInt(tunnels.count)}`],
     ])}
+    <p class="small">Policyer: sanerade Include/Require/Exclude-typer. Granskningssignal är inte bevis för offentlig åtkomst. Okänd/partiell täckning är aldrig ett godkännande.</p>
+    <p class="small">Återanvändbara policys: ${statusBadge(shared.policyCoverage)} · policyns appCount är provideruppgift, inte bevis för effektiv åtkomst.</p>
+    ${list((shared.items || []).slice(0, 20).map((policy) =>
+      `<li><strong>${esc(policy.name || "Reusable policy")}</strong> · ${policy.reviewRequired === null ? statusBadge("partial") : policy.reviewRequired ? statusBadge("review") : statusBadge("available")}
+      <span class="small">· kopplade appar: ${esc(policy.appCount ?? "—")} · ${esc(policy.decision || "unknown")} · Include: ${esc((policy.includeKinds || []).join(", ") || "—")} · Require: ${esc((policy.requireKinds || []).join(", ") || "—")}</span></li>`
+    ), "Inga återanvändbara policys observerade.")}
+    ${list((posture.items || []).slice(0, 15).map((item) => {
+      const flags = (item.policies || []).filter((policy) => policy.reviewRequired).length;
+      const includeKinds = [...new Set((item.policies || []).flatMap((policy) => policy.includeKinds || []))];
+      const requireKinds = [...new Set((item.policies || []).flatMap((policy) => policy.requireKinds || []))];
+      return `<li><strong>${esc(item.name || "Access application")}</strong> · ${statusBadge(item.policyCoverage || "unknown")}
+        <span class="small">· ${item.policyCoverage !== "available" ? "ofullständiga policysvar" : flags ? esc(flags) + " policy(er) kräver granskning" : "ingen bred Everyone-policy belagd"} · Include: ${esc(includeKinds.join(", ") || "—")} · Require: ${esc(requireKinds.join(", ") || "—")}</span></li>`;
+    }), "Ingen Access-policyinformation observerad.")}
     ${list((tunnels.items || []).slice(0, 12).map((tunnel) =>
       `<li><strong>${esc(tunnel.name || tunnel.id || "tunnel")}</strong> · ${statusBadge(tunnel.status || "unknown")}<br><span class="small">${esc(tunnel.type || "—")} · ${esc(tunnel.configSource || "—")}</span></li>`
     ), "Inga tunnels observerade.")}
@@ -332,7 +351,7 @@ async function loadCloudflare(force = false) {
   $("#cloudflare-status").className = "status-callout loading";
   $("#cloudflare-status").textContent = "Laddar Cloudflare-state…";
   try {
-    const [account, zones, workers, d1, kvStorage, r2, access, tunnels, audit] = await Promise.all([
+    const [account, zones, workers, d1, kvStorage, r2, access, posture, tunnels, audit] = await Promise.all([
       api(withRefresh("/api/v1/cloudflare/account", force), "cf-account"),
       api(withRefresh("/api/v1/cloudflare/zones", force), "cf-zones"),
       api(withRefresh("/api/v1/cloudflare/workers", force), "cf-workers"),
@@ -340,6 +359,7 @@ async function loadCloudflare(force = false) {
       api(withRefresh("/api/v1/cloudflare/storage/kv", force), "cf-storage-kv"),
       api(withRefresh("/api/v1/cloudflare/storage/r2", force), "cf-storage-r2"),
       api(withRefresh("/api/v1/cloudflare/zero-trust/access", force), "cf-zero-trust-access"),
+      api(withRefresh("/api/v1/cloudflare/zero-trust/access-posture", force), "cf-zero-trust-access-posture"),
       api(withRefresh("/api/v1/cloudflare/zero-trust/tunnels", force), "cf-zero-trust-tunnels"),
       api(withRefresh("/api/v1/cloudflare/audit?days=7", force), "cf-audit"),
     ]);
@@ -347,7 +367,7 @@ async function loadCloudflare(force = false) {
     $("#cloudflare-workers").innerHTML = renderCloudflareWorkers(workers);
     $("#cloudflare-zones").innerHTML = renderCloudflareZones(zones);
     $("#cloudflare-storage").innerHTML = renderCloudflareStorage(d1, kvStorage, r2);
-    $("#cloudflare-zero-trust").innerHTML = renderCloudflareZeroTrust(access, tunnels);
+    $("#cloudflare-zero-trust").innerHTML = renderCloudflareZeroTrust(access, tunnels, posture);
     $("#cloudflare-audit").innerHTML = renderCloudflareAudit(audit);
     $("#cloudflare-cards").innerHTML = [
       ["Account", account.available === false ? "—" : 1, pathStatus(account)],
@@ -359,8 +379,8 @@ async function loadCloudflare(force = false) {
     ].map(([label, value, hint]) =>
       `<article class="card"><p class="label">${esc(label)}</p><span class="value">${esc(value)}</span><span class="hint">${esc(hint)}</span></article>`
     ).join("");
-    const unavailable = [account, zones, workers, d1, kvStorage, r2, access, tunnels, audit]
-      .filter((item) => item.available === false).length;
+    const unavailable = [account, zones, workers, d1, kvStorage, r2, access, posture, tunnels, audit]
+      .filter((item) => item.available === false).length + (posture.available !== false && posture.complete === false ? 1 : 0);
     $("#cloudflare-status").className = "status-callout";
     $("#cloudflare-status").innerHTML = unavailable
       ? `${statusBadge("partial")} ${unavailable} capability-källor är inte tillgängliga.`

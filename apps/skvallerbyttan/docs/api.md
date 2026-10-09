@@ -71,6 +71,7 @@ Repository effective policy innehåller:
 - `GET /api/v1/cloudflare/storage/kv`
 - `GET /api/v1/cloudflare/storage/r2`
 - `GET /api/v1/cloudflare/zero-trust/access`
+- `GET /api/v1/cloudflare/zero-trust/access-posture` — R3 GET som kontrollerar både applikationspolicys och separat listade återanvändbara policys (`GET /access/policies`) och returnerar endast sanerade selektortyper (`includeKinds`, `requireKinds`, `excludeKinds`), `mfaDisabled` där det exponeras, policy-coverage och en **granskningssignal** för bred Include utan Require. Signalen bevisar inte offentlig åtkomst eller svagt MFA; `permission_denied`, `error` och `partial` får aldrig tolkas som säker konfiguration.
 - `GET /api/v1/cloudflare/zero-trust/tunnels`
 - `GET /api/v1/cloudflare/audit?days=7`
 

@@ -82,6 +82,47 @@ function resultInfo(value: unknown): UnknownRecord | null {
     : null;
 }
 
+async function readBoundedResponseBody(
+  response: Response,
+  operation: string,
+): Promise<string> {
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let body = "";
+  let receivedBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > MAX_RESPONSE_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Preserve the bounded-response classification.
+        }
+        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+    body += decoder.decode();
+    return body;
+  } catch (error) {
+    if (error instanceof CloudflareControlPlaneReadError) throw error;
+    throw new CloudflareControlPlaneReadError(operation, "body_read");
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function sanitizeAccountIdentity(value: unknown): UnknownRecord {
+  const account = record(value, "account.detail");
+  return { id: account.id };
+}
+
 function sanitizeD1ListItem(value: unknown): UnknownRecord {
   const item = record(value, "d1.list");
   return {
@@ -194,31 +235,12 @@ function sanitizeWorkerDetail(
   };
 }
 
-function sanitizeSettings(value: unknown): UnknownRecord {
-  const settings = record(value, "worker.settings");
-  const annotations = settings.annotations == null
-    ? {}
-    : record(settings.annotations, "worker.settings.annotations");
-  const bindings = settings.bindings == null
-    ? []
-    : array(settings.bindings, "worker.settings.bindings").map(sanitizeBinding);
-
-  return {
-    annotations: {
-      "workers/commit_sha": annotations["workers/commit_sha"] ?? null,
-    },
-    bindings,
-  };
-}
-
 function sanitizeSchedules(value: unknown): UnknownRecord {
   const schedule = record(value, "worker.schedules");
-  const schedules = schedule.schedules == null
-    ? []
-    : array(schedule.schedules, "worker.schedules.schedules").map((value) => {
-        const item = record(value, "worker.schedules.schedules[]");
-        return { cron: item.cron ?? null };
-      });
+  const schedules = array(schedule.schedules, "worker.schedules.schedules").map((value) => {
+    const item = record(value, "worker.schedules.schedules[]");
+    return { cron: item.cron ?? null };
+  });
   return { schedules };
 }
 
@@ -295,15 +317,7 @@ implements CloudflareStagingInventoryProxyV1 {
         throw new CloudflareControlPlaneReadError(operation, "response_too_large");
       }
 
-      let body: string;
-      try {
-        body = await response.text();
-      } catch {
-        throw new CloudflareControlPlaneReadError(operation, "body_read");
-      }
-      if (new TextEncoder().encode(body).byteLength > MAX_RESPONSE_BYTES) {
-        throw new CloudflareControlPlaneReadError(operation, "response_too_large");
-      }
+      const body = await readBoundedResponseBody(response, operation);
 
       let parsed: UnknownRecord;
       try {
@@ -346,7 +360,12 @@ implements CloudflareStagingInventoryProxyV1 {
       const totalPages = number(info?.total_pages);
       const totalCount = number(info?.total_count);
       if (totalPages !== null) {
-        if (page >= totalPages) return collected;
+        if (page >= totalPages) {
+          if (totalCount !== null && collected.length !== totalCount) {
+            throw new CloudflareControlPlaneReadError(operation, "pagination_incomplete");
+          }
+          return collected;
+        }
       } else if (totalCount !== null) {
         if (collected.length >= totalCount) return collected;
       } else if (items.length < perPage) {
@@ -401,6 +420,20 @@ implements CloudflareStagingInventoryProxyV1 {
       throw new CloudflareControlPlaneReadError(operation, "pagination_incomplete");
     }
     return collected;
+  }
+
+  async getAccountIdentity(): Promise<unknown> {
+    const token = await this.token("account.detail");
+    const envelope = await this.getEnvelope(
+      token,
+      "account.detail",
+      `/accounts/${encodeURIComponent(this.accountId)}`,
+    );
+    const account = sanitizeAccountIdentity(envelope.result);
+    if (string(account.id) !== this.accountId) {
+      throw new CloudflareControlPlaneReadError("account.detail", "identity_mismatch");
+    }
+    return account;
   }
 
   private async listD1WithToken(token: string): Promise<unknown[]> {
@@ -481,6 +514,109 @@ implements CloudflareStagingInventoryProxyV1 {
     return this.listWorkersWithToken(await this.token("workers.list"));
   }
 
+  async getActiveWorkerDeployment(
+    workerName: "events-staging" | "ingest-staging",
+  ): Promise<unknown> {
+    if (!PLANNED_WORKER_NAMES.has(workerName)) {
+      throw new CloudflareControlPlaneReadError("worker.deployment", "not_allowlisted");
+    }
+
+    const token = await this.token("worker.deployment");
+    const workers = await this.listWorkersWithToken(token);
+    const workerSummary = workers
+      .map((value) => record(value, "workers.list"))
+      .find((value) => string(value.name) === workerName);
+    const workerId = string(workerSummary?.id);
+    if (!workerId) {
+      throw new CloudflareControlPlaneReadError("worker.deployment", "not_found");
+    }
+
+    const account = encodeURIComponent(this.accountId);
+    const script = encodeURIComponent(workerName);
+    const deploymentsEnvelope = await this.getEnvelope(
+      token,
+      "worker.deployments",
+      `/accounts/${account}/workers/scripts/${script}/deployments`,
+    );
+    const deploymentContainer = record(
+      deploymentsEnvelope.result,
+      "worker.deployments",
+    );
+    const deployments = array(
+      deploymentContainer.deployments,
+      "worker.deployments.deployments",
+    );
+    if (deployments.length < 1) {
+      throw new CloudflareControlPlaneReadError("worker.deployments", "not_found");
+    }
+
+    const active = record(deployments[0], "worker.deployments.active");
+    const versions = array(
+      active.versions,
+      "worker.deployments.active.versions",
+    );
+    if (versions.length < 1 || versions.length > 2) {
+      throw new CloudflareControlPlaneReadError(
+        "worker.deployments",
+        "invalid_shape",
+      );
+    }
+
+    let percentageTotal = 0;
+    const resolved = await Promise.all(versions.map(async (value, index) => {
+      const item = record(value, `worker.deployments.active.versions[${index}]`);
+      const versionId = string(item.version_id);
+      const percentage = number(item.percentage);
+      if (!versionId || percentage === null || percentage <= 0 || percentage > 100) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.deployments",
+          "invalid_shape",
+        );
+      }
+      percentageTotal += percentage;
+
+      const versionEnvelope = await this.getEnvelope(
+        token,
+        "worker.version",
+        `/accounts/${account}/workers/workers/${encodeURIComponent(workerId)}/versions/${encodeURIComponent(versionId)}`,
+      );
+      const version = record(versionEnvelope.result, "worker.version");
+      if (string(version.id) !== versionId) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.version",
+          "identity_mismatch",
+        );
+      }
+      const annotations = version.annotations == null
+        ? {}
+        : record(version.annotations, "worker.version.annotations");
+      const commitSha = string(annotations["workers/commit_sha"]);
+      if (commitSha !== null && !/^[0-9a-f]{40,64}$/i.test(commitSha)) {
+        throw new CloudflareControlPlaneReadError(
+          "worker.version",
+          "invalid_commit_sha",
+        );
+      }
+      const bindings = array(version.bindings, "worker.version.bindings")
+        .map(sanitizeBinding);
+      return {
+        version_id: versionId,
+        percentage,
+        commit_sha: commitSha,
+        bindings,
+      };
+    }));
+
+    if (Math.abs(percentageTotal - 100) > 0.000001) {
+      throw new CloudflareControlPlaneReadError(
+        "worker.deployments",
+        "invalid_percentage_total",
+      );
+    }
+
+    return { versions: resolved };
+  }
+
   private async listDomainsWithToken(token: string): Promise<unknown[]> {
     return this.singlePageArray(
       token,
@@ -559,17 +695,12 @@ implements CloudflareStagingInventoryProxyV1 {
 
     const account = encodeURIComponent(this.accountId);
     const script = encodeURIComponent(workerName);
-    const [detailEnvelope, settingsEnvelope, schedulesEnvelope, domains, routes] =
+    const [detailEnvelope, schedulesEnvelope, domains, routes] =
       await Promise.all([
         this.getEnvelope(
           token,
           "worker.detail",
           `/accounts/${account}/workers/workers/${encodeURIComponent(workerId)}`,
-        ),
-        this.getEnvelope(
-          token,
-          "worker.settings",
-          `/accounts/${account}/workers/scripts/${script}/settings`,
         ),
         this.getEnvelope(
           token,
@@ -587,7 +718,6 @@ implements CloudflareStagingInventoryProxyV1 {
 
     return {
       worker: sanitizeWorkerDetail(detailEnvelope.result, domainReferences),
-      settings: sanitizeSettings(settingsEnvelope.result),
       schedules: sanitizeSchedules(schedulesEnvelope.result),
       routes,
     };
