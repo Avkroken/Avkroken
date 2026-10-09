@@ -204,3 +204,44 @@ test('failed PR read and open agent issue both block new assignments',async()=>{
     }
   }
 });
+
+
+test('private repositories do not read secret-scanning alerts without an authorized credential', async () => {
+  const originalFetch = globalThis.fetch;
+  const original = {...process.env};
+  const requests = [];
+  const reply = value => ({ok:true, status:200, json:async()=>value});
+  try {
+    Object.assign(process.env, {
+      GITHUB_REPOSITORY:'Avkroken/private-test',
+      GH_TOKEN:'test-only',
+      GITHUB_EVENT_NAME:'schedule'
+    });
+    globalThis.fetch = async (url, options) => {
+      const path = new URL(url).pathname;
+      requests.push({path,method:options.method});
+      if (path === '/repos/Avkroken/private-test') {
+        return reply({private:true,default_branch:'main'});
+      }
+      if (path.endsWith('/issues') || path.endsWith('/pulls')) return reply([]);
+      if (path.endsWith('/code-scanning/alerts') ||
+          path.endsWith('/dependabot/alerts')) return reply([]);
+      if (path.endsWith('/secret-scanning/alerts')) {
+        return {ok:false,status:403};
+      }
+      throw Error('Unexpected request ' + path);
+    };
+    await import('./security-reconcile.mjs?test=private-secret-read');
+    assert.equal(
+      requests.filter(r=>r.path.endsWith('/secret-scanning/alerts')).length,
+      0,
+      'private secret-scanning reads must be deferred rather than failing reconciliation'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const key of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+  }
+});
