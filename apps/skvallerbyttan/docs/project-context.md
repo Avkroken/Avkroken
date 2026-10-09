@@ -175,6 +175,10 @@ Skvallerbyttan har för närvarande ingen AI/LLM- eller Workers AI-anropsväg. I
 
 ## Deploy-neutral Events shadow caller
 
+Programkontext och appägare finns i [Observability-programmet](../../../docs/organization/observability-program.md).
+Shadow/extraction-arbetet spåras i [ING-100 #237](https://github.com/Avkroken/Avkroken/issues/237)
+och [EVT-200 #238](https://github.com/Avkroken/Avkroken/issues/238).
+
 Koden har en optional fail-soft shadow caller för redan verifierade webhookleveranser.
 `AVKROKEN_INGEST_SHADOW` är **inte** deklarerad i `wrangler.jsonc`; utan binding är vägen no-op.
 

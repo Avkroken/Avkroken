@@ -9,6 +9,10 @@
 
 Events är målarkitekturens canonical ägare för normaliserade provider-/observationshändelser.
 
+EVT-200 och runtime/preflight-arbetet EVT-210 spåras i [arbetsissue #238](https://github.com/Avkroken/Avkroken/issues/238).
+[Observability-programmet](../../../docs/organization/observability-program.md) länkar
+masterissue och övriga appägda kontrakt.
+
 Bootstrap-läget är deploy-neutralt. Appen har ingen `wrangler.jsonc`, ingen provisionerad D1 och ingen Queue-consumer. Skvallerbyttans `STATS_DB.observation_events` förblir canonical tills Events har schema, live shadow ingest, dedup/parity och read-adapter parity.
 
 ## Contract
@@ -49,6 +53,12 @@ Provider IDs och bindings är extern/runtime state och får inte antas från det
 ## Migration
 
 Current `observation_events` förblir source of truth tills cutover-gaten i storage/transport-ADR:n är uppfylld. Ingen distributed dual-write correctness antas.
+
+ADR:n är den externa Library-filen `08-ADR-STORAGE-TRANSPORT-V1.md`, som
+masterissuet hänvisar till; den är inte incheckad i repositoryt. Repositorykontraktet
+finns i [runtime-provisioning.md](runtime-provisioning.md) och
+[runtime-provisioning.v1.json](../runtime-provisioning.v1.json), med exekverbar
+cutover-validering i [runtime-gate.ts](../src/runtime-gate.ts).
 
 
 ## Runtime preparation

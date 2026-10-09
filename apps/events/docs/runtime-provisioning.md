@@ -6,6 +6,14 @@
 
 This document converts the storage/transport ADR into an executable provisioning and cutover contract for the first Ingest → Events extraction.
 
+The ADR is the external Library document `08-ADR-STORAGE-TRANSPORT-V1.md`
+referenced by the [observability program](../../../docs/organization/observability-program.md);
+it is not checked into this repository. This document and
+[`runtime-provisioning.v1.json`](../runtime-provisioning.v1.json) define the repository's
+planned contract, validated by [`runtime-gate.ts`](../src/runtime-gate.ts).
+EVT-200/EVT-210 work and acceptance evidence are tracked in
+[issue #238](https://github.com/Avkroken/Avkroken/issues/238).
+
 The repository remains read-only toward GitHub and Cloudflare provider APIs. Creating D1/Queue/Worker infrastructure is an operator/control-plane action and is deliberately separated from the observations runtime.
 
 ## Platform constraints reverified 2026-10-07
