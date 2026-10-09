@@ -60,6 +60,7 @@ def has_target_run(payload, head_sha):
     return any(
         run.get("head_sha") == head_sha
         and run.get("event") in {"push", "repository_dispatch", "workflow_dispatch"}
+        and run.get("conclusion") not in {"cancelled", "startup_failure", "skipped"}
         for run in payload.get("workflow_runs", [])
     )
 
