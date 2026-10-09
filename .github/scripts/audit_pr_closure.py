@@ -6,23 +6,36 @@ import re
 import urllib.request
 from pathlib import Path
 
+AUDIT_HEADING = "### GitHub closure audit (unmerged PR)"
+TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
+
 
 def normalized(value, pattern, fallback="unknown"):
     text = str(value or "")
     return text if re.fullmatch(pattern, text) else fallback
 
 
-def closure_marker(number, sha):
-    """Return a stable non-rendered marker for one PR closure/head pair."""
+def closure_marker(number, sha, closed_at):
+    """Identify one closure occurrence, independently of workflow reruns."""
     if not isinstance(number, int) or number <= 0:
         return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
     safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
-    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha} -->"
+    safe_time = normalized(closed_at, TIMESTAMP_PATTERN)
+    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_time} -->"
 
 
 def has_existing_audit_comment(comments, marker):
-    """Return whether a previously published issue comment contains the marker."""
-    return any(marker in str((comment or {}).get("body") or "") for comment in comments)
+    """Only a GitHub Actions audit can suppress publication, not a copied marker."""
+    prefix = f"{marker}\n{AUDIT_HEADING}\n\n"
+    for comment in comments:
+        user = (comment or {}).get("user") or {}
+        if (
+            user.get("login") == "github-actions[bot]"
+            and user.get("type") == "Bot"
+            and str((comment or {}).get("body") or "").startswith(prefix)
+        ):
+            return True
+    return False
 
 
 def closure_comment(event, repository, run_id):
@@ -40,13 +53,13 @@ def closure_comment(event, repository, run_id):
         (event.get("sender") or {}).get("login"),
         r"[A-Za-z0-9-]{1,100}(?:\[bot\])?",
     )
-    closed_at = normalized(pr.get("closed_at"), r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+    closed_at = normalized(pr.get("closed_at"), TIMESTAMP_PATTERN)
     sha = normalized(((pr.get("head") or {}).get("sha")), r"[0-9a-fA-F]{40}")
     run = normalized(run_id, r"[0-9]+")
-    marker = closure_marker(number, sha)
+    marker = closure_marker(number, sha, closed_at)
     return (
         f"{marker}\n"
-        "### GitHub closure audit (unmerged PR)\n\n"
+        f"{AUDIT_HEADING}\n\n"
         f"- GitHub actor: `{actor}` (account identity; not verified agent/session identity)\n"
         f"- Closed at: `{closed_at}`\n"
         f"- Pull request: #{number}\n"
@@ -94,8 +107,7 @@ def main():
         print("Not an unmerged PR closure; no audit comment.")
         return
 
-    # A workflow summary is retained even when the PR came from a fork, where
-    # GITHUB_TOKEN permissions may be read-only.
+    # Fork closures remain summary-only even in the privileged target context.
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with Path(summary).open("a", encoding="utf-8") as handle:
@@ -110,7 +122,9 @@ def main():
     if not token:
         raise RuntimeError("GITHUB_TOKEN absent for same-repository closure audit")
 
-    marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"))
+    marker = closure_marker(
+        pr["number"], (pr.get("head") or {}).get("sha"), pr.get("closed_at")
+    )
     if existing_comment(repository, pr["number"], token, marker):
         print("Closure audit comment already exists; skipping duplicate publication.")
         return
