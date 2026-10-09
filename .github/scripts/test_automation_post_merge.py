@@ -26,7 +26,7 @@ def merged_pr(login="copilot-swe-agent[bot]", role="Bot", ref="copilot/trusted/2
 
 
 class FakeApi:
-    def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None, commit_comments=None):
+    def __init__(self, pr=None, ci=None, release=None, codeql=None, recovery_runs=None, commit_comments=None, tip_after_first_read=None):
         self.pr = merged_pr('Avkroken', 'User') if pr is None else pr
         self.ci = [] if ci is None else ci
         self.release = [] if release is None else release
@@ -34,6 +34,8 @@ class FakeApi:
         self.recovery_runs = [] if recovery_runs is None else recovery_runs
         self.commit_comments = [] if commit_comments is None else commit_comments
         self.posts = []
+        self.tip_after_first_read = tip_after_first_read
+        self.branch_reads = 0
 
     def __call__(self, method, path, payload=None):
         if method == "POST" and path == "dispatches":
@@ -47,6 +49,9 @@ class FakeApi:
         if path == "":
             return {"default_branch": "main"}
         if path == "branches/main":
+            self.branch_reads += 1
+            if self.branch_reads > 1 and self.tip_after_first_read:
+                return {"commit": {"sha": self.tip_after_first_read}}
             return {"commit": {"sha": SHA}}
         if path == f"commits/{SHA}/pulls?per_page=100":
             return [self.pr]
@@ -213,6 +218,12 @@ class AutomationPostMergeTests(unittest.TestCase):
         self.assertEqual(len(fake.posts), 2)
         self.assertEqual(fake.posts[0][0], "reservation")
         self.assertEqual(fake.posts[1][0], "dispatch")
+
+    def test_new_default_branch_tip_aborts_dispatch_without_reservation(self):
+        fake = FakeApi(ci=[matching_run()], release=[matching_run()],
+                       tip_after_first_read="b" * 40)
+        self.assertFalse(reconcile(fake, REPO, TIME))
+        self.assertEqual(fake.posts, [])
 
     def test_untrusted_tip_not_dispatched(self):
         forged = merged_pr("external", "User")
