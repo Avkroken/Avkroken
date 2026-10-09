@@ -67,6 +67,13 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("permissions: {}", text)
         self.assertNotIn("actions/checkout", text)
 
+    def test_pr_inventory_read_failure_is_explicitly_reported(self):
+        for workflow in ("agent-automerge-policy.yml", "bot-pr-lifecycle.yml"):
+            text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+            self.assertIn('if ! candidates="$(gh api --paginate', text)
+            self.assertIn("Could not list open PRs", text)
+            self.assertNotIn("done < <(", text)
+
     def test_only_one_gated_dependabot_merge_path_exists(self):
         self.assertFalse(
             (WORKFLOWS / "dependabot-automerge.yml").exists(),
