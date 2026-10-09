@@ -162,7 +162,7 @@ def reconcile(api, repository, now):
         "POST",
         f"commits/{head_sha}/comments",
         {"body": (
-            f"{marker_prefix}{run_id} -->\\n"
+            f"{marker_prefix}{run_id} -->\n"
             "Automation post-merge: durable dispatch attempt reservation. "
             "The canonical CI, CodeQL and Release runs remain authoritative."
         )},
