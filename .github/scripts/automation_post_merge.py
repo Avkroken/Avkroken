@@ -105,15 +105,17 @@ def reconcile(api, repository, now):
     # distinguish a genuine dispatch from a no-op/backoff-only reconciliation.
     # A commit comment is append-only evidence visible to maintainers; no
     # token, new branch, external database or mutable cache is required.
-    # A run attempt is a unique reservation; workflow reruns may retry after backoff.
+    # Each workflow attempt may reserve once; a rerun can recover a failed
+    # dispatch after backoff, within the same per-SHA retry budget.
     run_id = os.environ.get("GITHUB_RUN_ID", "")
-    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
-    if (not re.fullmatch(r"[1-9][0-9]*", run_id)
-            or not re.fullmatch(r"[1-9][0-9]*", run_attempt)):
-        raise RuntimeError("Missing valid GITHUB_RUN_ID or GITHUB_RUN_ATTEMPT")
-    run_id = f"{run_id}-{run_attempt}"
+    if not re.fullmatch(r"[1-9][0-9]*", run_id):
+        raise RuntimeError("Missing valid GITHUB_RUN_ID for dispatch reservation")
+    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    if not re.fullmatch(r"[1-9][0-9]*", run_attempt):
+        raise RuntimeError("Missing valid GITHUB_RUN_ATTEMPT for dispatch reservation")
+    attempt_key = (run_id, run_attempt)
     marker_prefix = f"<!-- avkroken-dispatch-attempt:{head_sha}:"
-    attempts_by_run = {}
+    attempts_by_key = {}
     for page in range(1, 11):
         batch = api(
             "GET",
@@ -130,7 +132,7 @@ def reconcile(api, repository, now):
             if not isinstance(body, str):
                 continue
             marker = re.fullmatch(
-                re.escape(marker_prefix) + r"([1-9][0-9]*(?:-[1-9][0-9]*)?) -->",
+                re.escape(marker_prefix) + r"([1-9][0-9]*)(?:[:-]([1-9][0-9]*))? -->",
                 body.splitlines()[0] if body else "",
             )
             if not marker:
@@ -147,26 +149,28 @@ def reconcile(api, repository, now):
             if reserved_at.tzinfo is None:
                 raise RuntimeError("Timezone missing from dispatch reservation")
             if reserved_at >= merged_at:
-                key = marker.group(1)
-                previous = attempts_by_run.get(key)
-                attempts_by_run[key] = max(previous, reserved_at) if previous else reserved_at
+                # Older reservations contain only the run ID. Treat them as
+                # attempt 1 so migration neither duplicates nor erases budget.
+                key = (marker.group(1), marker.group(2) or "1")
+                previous = attempts_by_key.get(key)
+                attempts_by_key[key] = max(previous, reserved_at) if previous else reserved_at
         if len(batch) < 100:
             break
     else:
         raise RuntimeError("Commit comment pagination bound reached")
 
-    if run_id in attempts_by_run:
+    if attempt_key in attempts_by_key:
         raise RuntimeError(
-            f"Dispatch attempt {run_id} was already reserved but required workflows "
-            "remain missing; refusing to report an ambiguous previous dispatch as success."
+            f"Dispatch attempt {run_id}:{run_attempt} is already reserved but "
+            "required workflows remain missing; ambiguous previous dispatch."
         )
-    attempts = len(attempts_by_run)
+    attempts = len(attempts_by_key)
     if attempts >= 3:
         raise RuntimeError(
             f"Persistently missing {', '.join(missing)} for {head_sha}; "
             "post-merge dispatch retry limit reached (3)."
         )
-    last = max(attempts_by_run.values(), default=None)
+    last = max(attempts_by_key.values(), default=None)
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
     if last is not None and now - last < delay:
         print(
@@ -186,7 +190,7 @@ def reconcile(api, repository, now):
         "POST",
         f"commits/{head_sha}/comments",
         {"body": (
-            f"{marker_prefix}{run_id} -->\n"
+            f"{marker_prefix}{run_id}:{run_attempt} -->\n"
             "Automation post-merge: durable dispatch attempt reservation. "
             "The canonical CI, CodeQL and Release runs remain authoritative."
         )},

@@ -48,6 +48,7 @@ const safeAlertUrl = alert => {
 };
 const errors = [];
 let writes = 0;
+let deferred = 0;
 async function api(path,method='GET',data) {
   const url = path.startsWith('https://') ? path : 'https://api.github.com/' + path;
   for(let attempt=0; attempt<4; attempt++) {
@@ -106,14 +107,18 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
       const number=Number(alert.number);
       if(!Number.isInteger(number)||number<1) {errors.push('Invalid '+kind+' alert');continue;}
       const existing=issues.find(x=>isTrackingIssue(x,kind,number,owner));
+      if((!existing || existing.state!=='open') && writes>=100) {
+        deferred++;
+        continue;
+      }
       try {
         if(existing) {
-          if(existing.state!=='open' && writes<100) {
+          if(existing.state!=='open') {
             await api(root+'/issues/'+existing.number,'PATCH',{state:'open'});
             existing.state='open'; writes++;
           }
           if(existing.state==='open') await assignOwner(existing);
-        } else if(writes<100) {
+        } else {
           const body=[
             'An open '+label+' alert requires remediation.',
             'GitHub Security alert: '+safeAlertUrl(alert),
@@ -128,7 +133,7 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
           });
           issues.push(created); writes++;
           console.log('Created issue #'+created.number+' for '+kind+' #'+number);
-        } else {console.warn('::notice::Issue write budget hit; remaining alerts continue next schedule');break;}
+        }
       } catch(e) {errors.push(kind+' #'+number+': '+e.message);}
     }
   }
@@ -155,5 +160,6 @@ if(candidates.length) {
 } else {
   console.log('No eligible pending agent assignment, or work already in progress.');
 }
-console.log('Security reconciliation: issue writes='+writes+', agent assignments=0, errors='+errors.length);
+if(deferred) console.warn('::notice::Issue write budget reached; '+deferred+' tracking issues deferred until the next scheduled run.');
+console.log('Security reconciliation: issue writes='+writes+', deferred='+deferred+', agent assignments=0, errors='+errors.length);
 if(errors.length) throw Error(errors.join('; '));

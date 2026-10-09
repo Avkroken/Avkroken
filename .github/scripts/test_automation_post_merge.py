@@ -79,8 +79,7 @@ def matching_run(event="push", sha=SHA, status="completed", conclusion="success"
 
 class AutomationPostMergeTests(unittest.TestCase):
     def setUp(self):
-        # GitHub Actions provides its own RUN_ID; tests must be deterministic
-        # without mutating runner-wide environment or relying on local defaults.
+        # Isolate workflow identity from Actions runner state in every test.
         runner_env = patch.dict(os.environ, {
             "GITHUB_RUN_ID": "12345",
             "GITHUB_RUN_ATTEMPT": "1",
@@ -191,6 +190,75 @@ class AutomationPostMergeTests(unittest.TestCase):
             "created_at": timestamp,
         }
 
+    @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "2"})
+    def test_rerun_recovers_after_reserved_dispatch_fails(self):
+        fake = FakeApi()
+        def failing_dispatch(method, path, payload=None):
+            if method == "POST" and path == "dispatches":
+                raise RuntimeError("dispatch unavailable")
+            return fake(method, path, payload)
+
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "1"}):
+            with self.assertRaisesRegex(RuntimeError, "dispatch unavailable"):
+                reconcile(failing_dispatch, REPO, TIME)
+        fake.commit_comments.append({
+            "user": {"login": "github-actions[bot]"},
+            "body": fake.posts[0][1]["body"],
+            "created_at": TIME.isoformat(),
+        })
+        fake.posts.clear()
+        self.assertFalse(reconcile(fake, REPO, TIME + dt.timedelta(minutes=29)))
+        self.assertEqual(fake.posts, [])
+        self.assertTrue(reconcile(fake, REPO, TIME + dt.timedelta(minutes=30)))
+        self.assertIn(f"{SHA}:12345:2 -->", fake.posts[0][1]["body"])
+        self.assertEqual(fake.posts[-1][0], "dispatch")
+
+    @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "2"})
+    def test_same_attempt_does_not_dispatch_twice(self):
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment("12345:2", "2026-10-08T10:00:00Z")
+        ])
+        with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
+            reconcile(fake, REPO, TIME)
+        self.assertEqual(fake.posts, [])
+
+    @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"})
+    def test_legacy_marker_is_first_attempt_and_counts_toward_budget(self):
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment("12345", "2026-10-08T10:00:00Z"),
+        ])
+        with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
+            reconcile(fake, REPO, TIME)
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
+            self.assertTrue(reconcile(fake, REPO, TIME))
+        fake.commit_comments.extend([
+            self.attempt_comment("12345:1", "2026-10-08T10:00:00Z"),
+            self.attempt_comment("12345:2", "2026-10-08T10:30:00Z"),
+            self.attempt_comment("12345:3", "2026-10-08T11:30:00Z"),
+        ])
+        fake.posts.clear()
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "4"}):
+            with self.assertRaisesRegex(RuntimeError, "retry limit"):
+                reconcile(fake, REPO, TIME)
+        self.assertEqual(fake.posts, [])
+
+    @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "2"})
+    def test_legacy_and_new_markers_same_attempt_count_once(self):
+        fake = FakeApi(commit_comments=[
+            self.attempt_comment(k, "2026-10-08T10:00:00Z")
+            for k in ("12345", "12345-1", "12345:1")
+        ])
+        self.assertTrue(reconcile(fake, REPO, TIME))
+        self.assertEqual([kind for kind, _ in fake.posts], ["reservation", "dispatch"])
+
+    def test_invalid_run_attempt_fails_before_reservation(self):
+        for attempt in ("", "0", "-1", "invalid"):
+            with self.subTest(attempt=attempt), patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": attempt}):
+                fake = FakeApi()
+                with self.assertRaisesRegex(RuntimeError, "GITHUB_RUN_ATTEMPT"):
+                    reconcile(fake, REPO, TIME)
+                self.assertEqual(fake.posts, [])
+
     def test_dispatch_stops_after_three_actual_attempts_for_sha(self):
         comments = [
             self.attempt_comment(i, f"2026-10-08T{hour:02d}:30:00Z")
@@ -258,7 +326,7 @@ class AutomationPostMergeTests(unittest.TestCase):
         finally:
             if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
             else: os.environ["GITHUB_RUN_ATTEMPT"] = original
-        self.assertIn("12345-2 -->", fake.posts[0][1]["body"])
+        self.assertIn("12345:2 -->", fake.posts[0][1]["body"])
         self.assertEqual(fake.posts[-1][0], "dispatch")
 
     def test_same_attempt_ambiguous_reservation_is_not_reported_success(self):

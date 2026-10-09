@@ -280,12 +280,82 @@ test('expected 100-issue write cap defers overflow without failing the run', asy
     };
     await import('./security-reconcile.mjs?test=budget-cap');
     assert.equal(created,100);
-    assert.ok(notices.some(x=>x.includes('::notice::Issue write budget hit')));
+    assert.ok(notices.some(x=>x.includes('::notice::Issue write budget reached; 1 tracking issues deferred')));
   } finally {
     globalThis.fetch=oldFetch;
     console.warn=oldWarn;
     for(const k of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']){
       if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];
+    }
+  }
+});
+
+test('write budget defers creations and reopenings, resumes next run and preserves API errors', async () => {
+  const originalFetch=globalThis.fetch;
+  const originalWarn=console.warn;
+  const originalLog=console.log;
+  const saved={...process.env};
+  const notices=[];
+  const summaries=[];
+  const calls=[];
+  const issues=[{
+    number:500,state:'closed',user:{login:'github-actions[bot]'},
+    body:'<!-- avkroken-security-alert:dependabot:1 -->',assignees:[{login:'Avkroken'}]
+  }];
+  const alerts=Array.from({length:101},(_,i)=>({number:i+1}));
+  const reply=value=>({ok:true,status:200,json:async()=>structuredClone(value)});
+  let failPullRead=false;
+  try {
+    Object.assign(process.env,{GITHUB_REPOSITORY:'Avkroken/example',GH_TOKEN:'test-only',GITHUB_EVENT_NAME:'schedule'});
+    console.warn=message=>notices.push(message);
+    console.log=message=>summaries.push(message);
+    globalThis.fetch=async(url,options)=>{
+      const u=new URL(url);
+      const path=u.pathname;
+      const payload=options.body ? JSON.parse(options.body):null;
+      const page=Number(u.searchParams.get('page')) || 1;
+      calls.push({path,method:options.method});
+      if(path==='/repos/Avkroken/example') return reply({default_branch:'main'});
+      if(path.endsWith('/issues') && options.method==='GET') return reply(issues.slice((page-1)*100,page*100));
+      if(path.endsWith('/code-scanning/alerts')) return reply(alerts.slice((page-1)*100,page*100));
+      if(path.endsWith('/dependabot/alerts')) return reply([{number:1}]);
+      if(path.endsWith('/issues') && options.method==='POST') {
+        const issue={number:issues.length+1,state:'open',user:{login:'github-actions[bot]'},
+          body:payload.body,assignees:[{login:'Avkroken'}]};
+        issues.push(issue);
+        return reply(issue);
+      }
+      if(path.endsWith('/issues/500') && options.method==='PATCH') {
+        issues[0].state=payload.state;
+        return reply(issues[0]);
+      }
+      if(path.endsWith('/pulls')) return failPullRead ? {ok:false,status:403} : reply([]);
+      throw Error('Unexpected '+options.method+' '+path);
+    };
+    await import('./security-reconcile.mjs?test=budget-first');
+    assert.equal(calls.filter(c=>c.method==='POST').length,100);
+    assert.equal(calls.filter(c=>c.method==='PATCH').length,0);
+    assert.equal(issues[0].state,'closed');
+    assert.ok(notices.some(n=>n.includes('::notice::') && n.includes('2') && n.includes('deferred')));
+    assert.ok(summaries.some(n=>n.includes('deferred=2') && n.includes('errors=0')));
+    calls.length=0;
+    await import('./security-reconcile.mjs?test=budget-resume');
+    assert.equal(calls.filter(c=>c.method==='POST').length,1);
+    assert.equal(calls.filter(c=>c.method==='PATCH').length,1);
+    assert.equal(issues[0].state,'open');
+    assert.equal(issues.length,102);
+    // Expected batching must not hide a real API failure in the same run.
+    issues.splice(1);
+    issues[0].state='closed';
+    failPullRead=true;
+    await assert.rejects(import('./security-reconcile.mjs?test=budget-error'),/PR list.*HTTP 403/);
+    assert.ok(summaries.some(n=>n.includes('deferred=2') && n.includes('errors=1')));
+  } finally {
+    globalThis.fetch=originalFetch;
+    console.warn=originalWarn;
+    console.log=originalLog;
+    for(const k of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']){
+      if(saved[k]===undefined) delete process.env[k]; else process.env[k]=saved[k];
     }
   }
 });
