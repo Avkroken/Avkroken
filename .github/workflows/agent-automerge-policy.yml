@@ -207,7 +207,10 @@ jobs:
           if [[ -n "$EVENT_PR_NUMBER" ]]; then
             candidates="$EVENT_PR_NUMBER"
           else
-            candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" --jq '.[].number')"
+            if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" --jq '.[].number')"; then
+              log "Could not list open PRs; reconciliation failed."
+              exit 1
+            fi
           fi
 
           [[ -n "$candidates" ]] || { log "No open pull requests need reconciliation."; exit 0; }
