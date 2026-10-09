@@ -119,7 +119,7 @@ if(process.env.GITHUB_EVENT_NAME !== 'issues') {
             'GitHub Security alert: '+safeAlertUrl(alert),
             'See Security and quality in this repository for the original alert. Never copy secrets, token values, private security payloads, or exploit details into public issues or PRs.',
             'Acceptance: verify the alert, implement and test the smallest safe fix, link this issue in the PR and respect AGENTS.md, CI and branch protections.',
-            'Owner: Avkroken. Copilot is requested as coding agent where supported. Codex, Claude and CodeRabbit require separately installed integrations for agent execution or review.',
+            'Owner: Avkroken. Coding-agent work is pending manual Copilot assignment by an authorized user; no assignment was requested by this automation. Codex, Claude and CodeRabbit require separately installed integrations for agent execution or review.',
             marker(kind,number)
           ].join('\n\n');
           const created=await api(root+'/issues','POST',{
