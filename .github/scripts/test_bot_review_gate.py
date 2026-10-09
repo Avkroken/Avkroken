@@ -45,8 +45,9 @@ raise SystemExit('Unexpected gh call: ' + repr(args))
 '''
 
 
-def review(state, author='reviewer', order=1):
+def review(state, author='reviewer', order=1, sha=SHA):
     return {'author': {'login': author}, 'state': state,
+            'commit': {'oid': sha},
             'submittedAt': f'2026-10-09T00:00:{order:02d}Z'}
 
 
@@ -62,7 +63,7 @@ class BotReviewGateTests(unittest.TestCase):
             'review': {'data': {'repository': {'pullRequest': {
                 'headRefOid': SHA, 'reviewDecision': 'APPROVED',
                 'reviewThreads': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
-                'reviews': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
+                'reviews': {'nodes': [review('APPROVED')], 'pageInfo': {'hasNextPage': False}},
             }}}},
         }
         self.state = self.fixture['review']['data']['repository']['pullRequest']
@@ -117,7 +118,11 @@ class BotReviewGateTests(unittest.TestCase):
     def test_later_approval_or_dismissal_clears_same_reviewer_request(self):
         for state in ('APPROVED', 'DISMISSED'):
             with self.subTest(state=state):
-                self.state['reviews']['nodes'] = [review('CHANGES_REQUESTED'), review(state, order=2)]
+                self.state['reviews']['nodes'] = [
+                    review('APPROVED', 'other', 1),
+                    review('CHANGES_REQUESTED'),
+                    review(state, order=2),
+                ]
                 result, calls = self.run_workflow()
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(any('--auto' in call for call in calls), calls)
@@ -144,6 +149,27 @@ class BotReviewGateTests(unittest.TestCase):
                 self.fixture['review'] = payload
                 self.fixture['review_exit'] = exit_code
                 self.assert_blocked()
+
+    def test_stale_commit_approval_cannot_authorize_current_head(self):
+        self.state['reviewDecision'] = 'APPROVED'
+        self.state['reviews']['nodes'] = [review('APPROVED', sha='b' * 40)]
+        self.assert_blocked()
+
+    def test_missing_commit_identity_blocks_approval(self):
+        self.state['reviews']['nodes'] = [
+            {'author': {'login': 'reviewer'}, 'state': 'APPROVED',
+             'submittedAt': '2026-10-09T00:00:01Z'}
+        ]
+        self.assert_blocked()
+
+    def test_latest_commit_approval_permits_gated_bot_queue(self):
+        self.state['reviews']['nodes'] = [
+            review('APPROVED', 'reviewer', sha='b' * 40),
+            review('APPROVED', 'reviewer', 2, SHA),
+        ]
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('--auto' in call for call in calls), calls)
 
     def test_changed_head_blocks(self):
         self.state['headRefOid'] = 'b' * 40
