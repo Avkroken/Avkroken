@@ -131,8 +131,22 @@ jobs:
                     return 0
                     ;;
                 esac
+                # A collaborator's permission is not proof of agent identity.
+                # Only accept a human PR if that author explicitly queued it.
+                if [[ "$(jq -r '.auto_merge.enabled_by.login // ""' <<<"$pr_json")" != "$author" ]]; then
+                  log "PR #$number was not explicitly queued by its author; skipping."
+                  return 0
+                fi
                 ;;
-              Bot) ;;
+              Bot)
+                case "$author" in
+                  "dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]") ;;
+                  *)
+                    log "PR #$number bot author is not allowlisted; skipping."
+                    return 0
+                    ;;
+                esac
+                ;;
               *)
                 log "PR #$number author type is not supported; skipping."
                 return 0
