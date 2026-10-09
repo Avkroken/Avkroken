@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """Regression tests for unmerged PR closure attribution."""
+import io
+import json
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
 
-from audit_pr_closure import closure_comment, closure_marker, has_existing_audit_comment
+from audit_pr_closure import closure_comment, closure_marker, has_existing_audit_comment, main
 
 REPO = "Avkroken/Avkroken"
 SHA = "a" * 40
@@ -96,6 +103,60 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIsNone(closure_comment(event(), "evil/path/extra", "2"))
         comment = closure_comment(event(), REPO, "bad-run-id")
         self.assertIn("actions/runs/unknown", comment)
+
+    def test_fork_closure_publishes_audit_or_retains_summary_on_denied_write(self):
+        fork_event = event()
+        fork_event["pull_request"]["head"]["repo"]["full_name"] = "contributor/fork"
+        for denied in (False, True):
+            with self.subTest(denied=denied), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)
+                event_file = path / "event.json"
+                summary_file = path / "summary.md"
+                event_file.write_text(json.dumps(fork_event), encoding="utf-8")
+                calls = []
+
+                def urlopen(request, timeout=20):
+                    calls.append(request.get_method())
+                    if request.get_method() == "GET":
+                        return io.BytesIO(b"[]")
+                    if denied:
+                        raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
+                    response = io.BytesIO(b"{}")
+                    response.status = 201
+                    return response
+
+                with patch.dict(os.environ, {
+                    "GITHUB_EVENT_PATH": str(event_file),
+                    "GITHUB_REPOSITORY": REPO,
+                    "GITHUB_RUN_ID": "12345",
+                    "GITHUB_STEP_SUMMARY": str(summary_file),
+                    "GITHUB_TOKEN": "test-placeholder",
+                }), patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+                    main()
+
+                self.assertEqual(calls, ["GET", "POST"])
+                self.assertIn("GitHub closure audit", summary_file.read_text(encoding="utf-8"))
+
+    def test_same_repository_write_denial_does_not_silently_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            event_file = path / "event.json"
+            event_file.write_text(json.dumps(event()), encoding="utf-8")
+
+            def urlopen(request, timeout=20):
+                if request.get_method() == "GET":
+                    return io.BytesIO(b"[]")
+                raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
+
+            with patch.dict(os.environ, {
+                "GITHUB_EVENT_PATH": str(event_file),
+                "GITHUB_REPOSITORY": REPO,
+                "GITHUB_RUN_ID": "12345",
+                "GITHUB_STEP_SUMMARY": str(path / "summary.md"),
+                "GITHUB_TOKEN": "test-placeholder",
+            }), patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+                with self.assertRaises(HTTPError):
+                    main()
 
 
 if __name__ == "__main__":
