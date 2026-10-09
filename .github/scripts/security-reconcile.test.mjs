@@ -46,8 +46,13 @@ test('security reconciliation paginates, deduplicates and delegates without disc
     assert.ok(calls.some(c=>c.path.endsWith('/issues')&&c.method==='GET'&&c.page===2), 'second issue page must be fetched');
     assert.ok(created.every(c=>c.payload.body.includes('Never copy secrets')));
     assert.ok(created.some(c=>c.payload.body.includes('code-scanning:2')));
-    assert.ok(created.some(c=>c.payload.body.includes('https://github.com/Avkroken/example/security/code-scanning/2')));
-    assert.ok(created.every(c=>!c.payload.body.includes('do-not-copy')), 'alert URL query must not leak');
+    const alertIssue=created.find(c=>c.payload.body.includes('code-scanning:2'));
+    const alertLine=alertIssue.payload.body.split('\n').find(x=>x.startsWith('GitHub Security alert: '));
+    const alertLink=new URL(alertLine.slice('GitHub Security alert: '.length));
+    assert.equal(alertLink.protocol,'https:');
+    assert.equal(alertLink.hostname,'github.com');
+    assert.equal(alertLink.pathname,'/Avkroken/example/security/code-scanning/2');
+    assert.equal(alertLink.search,'','alert URL query must not leak');
     assert.ok(created.some(c=>c.payload.body.includes('dependabot:7')));
     assert.equal(calls.filter(c=>c.payload?.agent_assignment).length,0,
       'Actions installation token must never attempt unsupported Copilot delegation');
