@@ -75,6 +75,8 @@ class WorkflowLocalizationTests(unittest.TestCase):
             self.assertNotIn("done < <(", text)
 
     def test_only_one_gated_dependabot_merge_path_exists(self):
+        post = (WORKFLOWS / "automation-post-merge.yml").read_text(encoding="utf-8")
+        self.assertNotIn('"Dependabot auto-merge"', post)
         self.assertFalse(
             (WORKFLOWS / "dependabot-automerge.yml").exists(),
             "legacy Dependabot merger bypasses review gate"
