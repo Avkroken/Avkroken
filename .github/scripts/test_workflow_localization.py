@@ -34,6 +34,7 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('reviewDecision == "APPROVED"', text)
         self.assertIn("--match-head-commit", text)
         self.assertIn("gh pr merge --disable-auto", text)
+        self.assertIn("disable_auto_merge \"$number\" \"$head_sha\"", text)
         self.assertIn('method="--squash"', text)
         self.assertIn("auto-merge already queued; skipping duplicate request", text)
         self.assertIn("gh pr merge --auto", text)
