@@ -61,6 +61,10 @@ provisioning has been explicitly approved and verified live.
 failures, unresolved retries/DLQ, unknown/old backlog, migration drift, production-resource leakage or read mismatch
 all keep Skvallerbyttan canonical.
 
+Cutover evidence also expires after 15 minutes: both report generation and the
+shadow window end are checked against the evaluation clock, with at most one
+minute of future clock skew. Retimestamping an old report cannot refresh its window.
+
 
 ## Staging preflight
 
