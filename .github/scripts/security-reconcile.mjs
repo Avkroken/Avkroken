@@ -138,8 +138,16 @@ for(const issue of (pulls===null || pulls.length || activeAgentIssue ? [] : targ
   .filter(x=>x.state==='open' && isTrustedForAgent(x,owner))
   .sort((a,b)=>b.number-a.number)) {
   if(delegated>=1) break;
-  if((issue.assignees||[]).some(x=>x.login==='copilot-swe-agent[bot]')) continue;
+  if((issue.assignees||[]).some(x=>x.login?.toLowerCase()==='copilot-swe-agent[bot]')) continue;
   if(pulls.some(p=>(p.body||'').match(new RegExp('(?:fixes|closes|resolves)\\s+(?:[-\\w.]+\\/[-\\w.]+)?#'+issue.number+'\\b','i')))) continue;
+  // Copilot agent_assignment rejects the Actions installation GITHUB_TOKEN.
+  // The existing read-only COPILOT_GITHUB_TOKEN must not be repurposed.
+  // Keep the trusted issue in the queue, report the unconfigured capability,
+  // and let alert reconciliation continue without issuing an invalid write.
+  console.warn('::notice::Copilot delegation unavailable: a user-to-server GitHub token is required; issue #'+issue.number+' remains queued.');
+  break;
+  /* Delegation can only be re-enabled with an explicitly approved
+     user-to-server authorization flow, not an installation token.
   try {
     await assignOwner(issue);
     await api(root+'/issues/'+issue.number+'/assignees','POST',{
@@ -153,6 +161,7 @@ for(const issue of (pulls===null || pulls.length || activeAgentIssue ? [] : targ
     delegated++;
     console.log('Delegated issue #'+issue.number+' to Copilot.');
   } catch(e) {errors.push('Copilot delegation #'+issue.number+': '+e.message);}
+  */
 }
 console.log('Security reconciliation: issue writes='+writes+', delegated='+delegated+', errors='+errors.length);
 if(errors.length) throw Error(errors.join('; '));
