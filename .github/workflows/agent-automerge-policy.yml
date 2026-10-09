@@ -140,7 +140,11 @@ jobs:
                 ;;
               Bot)
                 case "$author" in
-                  "dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]") ;;
+                  "dependabot[bot]"|"copilot-swe-agent[bot]")
+                    log "PR #$number belongs to the specialized bot lifecycle; skipping generic reconciliation."
+                    return 0
+                    ;;
+                  "gamnacken[bot]") ;;
                   *)
                     log "PR #$number bot author is not allowlisted; skipping."
                     return 0
