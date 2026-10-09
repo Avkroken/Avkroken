@@ -47,7 +47,8 @@ test('security reconciliation paginates, deduplicates and delegates without disc
     assert.ok(created.every(c=>c.payload.body.includes('Never copy secrets')));
     assert.ok(created.some(c=>c.payload.body.includes('code-scanning:2')));
     assert.ok(created.some(c=>c.payload.body.includes('dependabot:7')));
-    assert.ok(calls.some(c=>c.payload?.agent_assignment), 'agent delegation is part of the same run');
+    assert.equal(calls.filter(c=>c.payload?.agent_assignment).length,0,
+      'Actions installation token must never attempt unsupported Copilot delegation');
     assert.equal(calls.filter(c=>c.path.endsWith('/pulls')&&c.method==='POST').length,0);
     assert.ok(!calls.some(c=>c.path.endsWith('/secret-scanning/alerts')), 'public secret scanning must stay private');
   } finally {
