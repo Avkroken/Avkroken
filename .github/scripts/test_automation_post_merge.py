@@ -3,8 +3,7 @@
 import datetime as dt
 import os
 import unittest
-
-os.environ.setdefault('GITHUB_RUN_ID', '12345')
+from unittest.mock import patch
 
 from automation_post_merge import has_target_run, is_trusted_merge, reconcile
 
@@ -79,6 +78,16 @@ def matching_run(event="push", sha=SHA, status="completed", conclusion="success"
 
 
 class AutomationPostMergeTests(unittest.TestCase):
+    def setUp(self):
+        # GitHub Actions provides its own RUN_ID; tests must be deterministic
+        # without mutating runner-wide environment or relying on local defaults.
+        runner_env = patch.dict(os.environ, {
+            "GITHUB_RUN_ID": "12345",
+            "GITHUB_RUN_ATTEMPT": "1",
+        })
+        runner_env.start()
+        self.addCleanup(runner_env.stop)
+
     def test_only_trusted_same_repository_default_branch_merge(self):
         self.assertTrue(is_trusted_merge(merged_pr(), REPO, "main", SHA))
         # A provider-confirmed merge can be checked without inventing bot
