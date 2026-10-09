@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Regression tests for same-SHA post-merge automation reconciliation."""
 import datetime as dt
+import os
 import unittest
+
+os.environ.setdefault('GITHUB_RUN_ID', '12345')
 
 from automation_post_merge import has_target_run, is_trusted_merge, reconcile
 
