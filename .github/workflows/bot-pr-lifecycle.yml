@@ -162,11 +162,13 @@ jobs:
             gh pr merge --auto "${method}" --match-head-commit "${head_sha}" "${url}"
           }
 
+          if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
+              --jq '.[] | select(.user.type == "Bot") | .number')"; then
+            echo "::error::Could not list open PRs; bot reconciliation failed."
+            exit 1
+          fi
           failures=0
           while IFS= read -r number; do
             [[ -z "${number}" ]] || reconcile_pr "${number}" || failures=$((failures + 1))
-          done < <(
-            gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
-              --jq '.[] | select(.user.type == "Bot") | .number'
-          )
+          done <<<"$candidates"
           [[ "${failures}" -eq 0 ]] || exit 1
