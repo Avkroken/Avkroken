@@ -27,11 +27,11 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("PR #$number was not queued for native auto-merge", text)
         self.assertIn(".auto_merge == null", text)
         self.assertNotIn("expected_external_checks()", text)
-        self.assertNotIn('write|maintain|admin)', text)
-        self.assertIn('Human authors are not verified automation principals', text)
-        self.assertIn('Bot)', text)
-        self.assertIn('"dependabot[bot]"|"copilot-swe-agent[bot]"|"gamnacken[bot]"', text)
-        self.assertNotIn('Bot) ;;', text)
+        # Queuing is an explicit native GitHub action, not an inference from
+        # a contributor name, branch prefix, or fixed vendor-bot allowlist.
+        self.assertIn('write|maintain|admin)', text)
+        self.assertIn('Bot) ;;', text)
+        self.assertNotIn('Human authors are not verified automation principals', text)
         self.assertIn('"$head_repo" != "$REPOSITORY"', text)
         self.assertIn('"$draft" == "true"', text)
         self.assertNotIn('"gamnacken[bot]"', text)
