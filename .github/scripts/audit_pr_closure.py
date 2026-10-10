@@ -101,11 +101,9 @@ def existing_comment(repository, number, token, marker, closed_at=None):
     raise RuntimeError("Closure audit comment pagination bound (100 pages) reached")
 
 
-def main():
-    with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as handle:
-        event = json.load(handle)
-    repository = os.environ["GITHUB_REPOSITORY"]
-    comment = closure_comment(event, repository, os.environ["GITHUB_RUN_ID"])
+def audit_closure(event, repository, run_id):
+    """Publish the same evidence for an event or a trusted scheduled recovery."""
+    comment = closure_comment(event, repository, run_id)
     if comment is None:
         print("Not an unmerged PR closure; no audit comment.")
         return
@@ -159,6 +157,114 @@ def main():
             return
         raise
 
+
+def github_get(repository, token, path):
+    """Read only GitHub API metadata, never untrusted pull-request code."""
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/{repository}/{path}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "avkroken-pr-closure-audit",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
+
+
+def github_time(value):
+    if not isinstance(value, str):
+        raise RuntimeError("GitHub audit timestamp missing or invalid")
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as error:
+        raise RuntimeError("GitHub audit timestamp missing or invalid") from error
+
+
+def closure_actor(repository, number, closed_at, token):
+    """Attribute the exact closure to its GitHub issue-event actor."""
+    matched = None
+    for page in range(1, 101):
+        events = github_get(
+            repository, token, f"issues/{number}/events?per_page=100&page={page}"
+        )
+        if not isinstance(events, list):
+            raise RuntimeError(f"Invalid provider events for PR #{number}")
+        for item in events:
+            if not isinstance(item, dict):
+                raise RuntimeError(f"Invalid provider event for PR #{number}")
+            if item.get("event") != "closed" or item.get("created_at") != closed_at:
+                continue
+            actor = (item.get("actor") or {}).get("login")
+            if normalized(actor, r"[A-Za-z0-9-]{1,100}(?:\\[bot\\])?") == "unknown":
+                raise RuntimeError(f"Missing verified closure actor for PR #{number}")
+            if matched is not None and matched != actor:
+                raise RuntimeError(f"Ambiguous provider closure actor for PR #{number}")
+            matched = actor
+        if len(events) < 100:
+            if matched is None:
+                raise RuntimeError(f"No matching provider closure event for PR #{number}")
+            return matched
+    raise RuntimeError(f"Provider event pagination bound reached for PR #{number}")
+
+
+def reconcile_recent_closures(repository, token, run_id, now=None):
+    """Backstop SHA-like branches whose pull_request_target close event is suppressed."""
+    if not token:
+        raise RuntimeError("GITHUB_TOKEN required for scheduled closure audit")
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=48)
+    for page in range(1, 101):
+        pulls = github_get(
+            repository, token,
+            f"pulls?state=closed&sort=updated&direction=desc&per_page=100&page={page}",
+        )
+        if not isinstance(pulls, list):
+            raise RuntimeError("Closed PR inventory response was not a list")
+        for pr in pulls:
+            if not isinstance(pr, dict):
+                raise RuntimeError("Closed PR inventory contained invalid item")
+            # GitHub returns this list in descending order of updated_at.
+            if github_time(pr.get("updated_at")) < cutoff:
+                return
+            closed_at = pr.get("closed_at")
+            if pr.get("merged_at") is not None or closed_at is None:
+                continue
+            if github_time(closed_at) < cutoff:
+                continue
+            number = pr.get("number")
+            if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
+                raise RuntimeError("Invalid closed pull request number")
+            marker = closure_marker(
+                number, (pr.get("head") or {}).get("sha"), closed_at
+            )
+            if existing_comment(repository, number, token, marker, closed_at):
+                continue
+            actor = closure_actor(repository, number, closed_at, token)
+            audit_closure(
+                {"action": "closed", "sender": {"login": actor},
+                 "pull_request": {**pr, "merged": False}},
+                repository, run_id,
+            )
+        if len(pulls) < 100:
+            return
+    raise RuntimeError("Closed PR inventory pagination bound reached")
+
+
+def main():
+    repository = os.environ["GITHUB_REPOSITORY"]
+    run_id = os.environ["GITHUB_RUN_ID"]
+    if os.environ.get("GITHUB_EVENT_NAME") == "schedule":
+        reconcile_recent_closures(
+            repository, os.environ.get("GITHUB_TOKEN", ""), run_id
+        )
+        return
+    with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as handle:
+        event = json.load(handle)
+    audit_closure(event, repository, run_id)
 
 if __name__ == "__main__":
     main()

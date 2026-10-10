@@ -10,7 +10,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 from urllib.error import HTTPError
 
-from audit_pr_closure import closure_comment, closure_marker, existing_comment, has_existing_audit_comment, main
+from audit_pr_closure import closure_comment, closure_marker, existing_comment, has_existing_audit_comment, main, reconcile_recent_closures
 
 REPO = "Avkroken/Avkroken"
 SHA = "a" * 40
@@ -132,6 +132,99 @@ class ClosureAuditTests(unittest.TestCase):
             self.assertFalse(existing_comment(REPO, 214, "test-only", marker,
                                               "2026-10-08T10:20:23Z"))
         self.assertEqual(len(calls), 1)
+
+
+    def test_scheduled_recovery_audits_sha_named_branch_once_using_provider_actor(self):
+        from datetime import datetime, timezone
+        pr = event(actor="ignored-scheduler")["pull_request"]
+        pr["head"]["ref"] = "e" * 40  # GitHub can suppress this event.
+        pr.update({"updated_at": "2026-10-08T10:20:24Z",
+                   "merged_at": None, "state": "closed"})
+        merged = {**pr, "number": 215, "merged_at": "2026-10-08T10:21:00Z"}
+        closure_event = {
+            "event": "closed", "created_at": pr["closed_at"],
+            "actor": {"login": "actual-closer"},
+        }
+        calls = []
+        posted = []
+        now = datetime(2026, 10, 8, 11, tzinfo=timezone.utc)
+
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary.md"
+
+            def urlopen(request, timeout=20):
+                parsed = urlsplit(request.full_url)
+                calls.append((request.get_method(), parsed.path))
+                if request.get_method() == "POST":
+                    posted.append(json.loads(request.data)["body"])
+                    response = io.BytesIO(b"{}")
+                    response.status = 201
+                    return response
+                if parsed.path.endswith("/pulls"):
+                    result = [pr, merged]
+                elif parsed.path.endswith("/issues/214/comments"):
+                    result = ([{"user": {"login": "github-actions[bot]", "type": "Bot"},
+                                "body": posted[0]}] if posted else [])
+                elif parsed.path.endswith("/issues/214/events"):
+                    result = [closure_event]
+                else:
+                    raise AssertionError(parsed.path)
+                return io.BytesIO(json.dumps(result).encode("utf-8"))
+
+            with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary),
+                                       "GITHUB_TOKEN": "test-only"}), \\
+                    patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+                reconcile_recent_closures(REPO, "test-only", "456", now=now)
+                reconcile_recent_closures(REPO, "test-only", "457", now=now)
+            self.assertIn("GitHub closure audit", summary.read_text(encoding="utf-8"))
+        self.assertEqual(len(posted), 1)
+        self.assertIn("GitHub actor: `actual-closer`", posted[0])
+        self.assertIn("actions/runs/456", posted[0])
+        self.assertEqual(sum(path.endswith("/issues/214/events")
+                             for _, path in calls), 1)
+        self.assertFalse(any(path.endswith("/issues/215/events")
+                             for _, path in calls))
+
+    def test_scheduled_recovery_fails_without_matching_actor_evidence(self):
+        from datetime import datetime, timezone
+        pr = event()["pull_request"]
+        pr.update({"updated_at": "2026-10-08T10:20:24Z", "merged_at": None})
+        posts = []
+
+        def urlopen(request, timeout=20):
+            parsed = urlsplit(request.full_url)
+            if request.get_method() == "POST":
+                posts.append(request.full_url)
+                raise AssertionError("Must not publish without provider actor")
+            if parsed.path.endswith("/pulls"):
+                result = [pr]
+            elif parsed.path.endswith("/issues/214/comments"):
+                result = []
+            elif parsed.path.endswith("/issues/214/events"):
+                result = [{"event": "closed",
+                           "created_at": "2026-10-07T10:20:23Z",
+                           "actor": {"login": "wrong-closer"}}]
+            else:
+                raise AssertionError(parsed.path)
+            return io.BytesIO(json.dumps(result).encode("utf-8"))
+
+        with patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+            with self.assertRaisesRegex(RuntimeError, "No matching provider closure event"):
+                reconcile_recent_closures(
+                    REPO, "test-only", "456",
+                    now=datetime(2026, 10, 8, 11, tzinfo=timezone.utc),
+                )
+        self.assertEqual(posts, [])
+
+    def test_schedule_entrypoint_uses_backstop_not_webhook_payload(self):
+        from unittest.mock import ANY
+        with patch.dict(os.environ, {
+            "GITHUB_EVENT_NAME": "schedule", "GITHUB_REPOSITORY": REPO,
+            "GITHUB_RUN_ID": "987", "GITHUB_TOKEN": "test-only",
+            "GITHUB_EVENT_PATH": "/does/not/exist",
+        }), patch("audit_pr_closure.reconcile_recent_closures") as reconcile:
+            main()
+        reconcile.assert_called_once_with(REPO, "test-only", "987")
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)

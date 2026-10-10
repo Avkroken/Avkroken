@@ -5,23 +5,29 @@ on:
   # Never check out or execute the PR head under this write-capable token.
   pull_request_target:
     types: [closed]
+  # Backstop closures when GitHub suppresses pull_request_target for a SHA-like
+  # source branch name. Only default-branch scripts execute in this workflow.
+  schedule:
+    - cron: "17 * * * *"
 
 permissions: {}
 
-# Serialize repeated deliveries of one closure without dropping separate closures.
+# Serialize event and scheduled recovery so both cannot publish one audit twice.
+# Reconciliation recovers events that GitHub discards while another run is queued.
 concurrency:
-  group: pr-closure-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.closed_at }}
+  group: pr-closure-audit-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   audit:
     name: Record GitHub closure actor and immutable run
-    if: ${{ github.event.pull_request.merged == false }}
+    if: ${{ github.event_name == 'schedule' || github.event.pull_request.merged == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     steps:
       # Never execute PR head code with a write-capable token.
       - name: Checkout trusted default branch scripts
@@ -32,5 +38,6 @@ jobs:
       - name: Audit unmerged closure
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: python3 .github/scripts/audit_pr_closure.py

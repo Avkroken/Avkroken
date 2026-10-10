@@ -128,6 +128,14 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("failures=0", text)
         self.assertIn("failures=$((failures + 1))", text)
 
+    def test_closure_audit_schedules_trusted_reconciliation(self):
+        text = (WORKFLOWS / "pr-closure-audit.yml").read_text(encoding="utf-8")
+        self.assertIn('cron: "17 * * * *"', text)
+        self.assertIn("github.event_name == 'schedule'", text)
+        self.assertIn("group: pr-closure-audit-${{ github.repository }}", text)
+        self.assertIn("GITHUB_EVENT_NAME: ${{ github.event_name }}", text)
+        self.assertIn("pull-requests: read", text)
+
     def test_closure_audit_uses_trusted_context_for_conflicting_prs(self):
         text = (WORKFLOWS / "pr-closure-audit.yml").read_text(encoding="utf-8")
         self.assertIn("pull_request_target:", text)
@@ -140,7 +148,7 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("ref: main", workflow)
         self.assertIn("persist-credentials: false", workflow)
         self.assertIn("cancel-in-progress: false", workflow)
-        self.assertIn("github.event.pull_request.closed_at", workflow)
+        self.assertIn("group: pr-closure-audit-${{ github.repository }}", workflow)
 
     def test_issue_tracker_requires_explicit_closure_decision(self):
         text = (ROOT / "docs" / "agents" / "issue-tracker.md").read_text(encoding="utf-8")
