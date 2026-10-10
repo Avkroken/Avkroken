@@ -201,8 +201,10 @@ class BotReviewGateTests(unittest.TestCase):
                 self.assert_retry()
 
     def test_invalid_json_and_unknown_decision_preserve_consent(self):
-        self.fixture['review_raw'] = '{'
-        self.assert_retry()
+        for raw in ('', '<html>Bad Gateway</html>', '{'):
+            with self.subTest(raw=raw):
+                self.fixture['review_raw'] = raw
+                self.assert_retry()
         del self.fixture['review_raw']
         self.state['reviewDecision'] = 'UNKNOWN'
         self.assert_retry()
@@ -215,8 +217,19 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertTrue(any('number=18' in call for call in calls), calls)
         self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
+    def test_network_failure_preserves_consent(self):
+        self.fixture['review_raw'] = 'network timeout'
+        self.fixture['review_exit'] = 1
+        self.assert_retry()
+
+    def test_withdrawal_during_failed_review_does_not_requeue(self):
+        self.fixture['withdraw_queue_during_review'] = True
+        self.fixture['review_exit'] = 1
+        self.assert_retry()
+
     def test_successful_retry_on_same_pr_does_not_requeue(self):
         self.fixture['review_exit'] = 1
+        self.assert_retry()
         self.assert_retry()
         self.fixture['review_exit'] = 0
         result, calls = self.run_workflow()
