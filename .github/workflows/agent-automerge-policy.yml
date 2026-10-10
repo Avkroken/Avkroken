@@ -55,11 +55,37 @@ jobs:
                   }
                 }')"; then
               log "PR #${number} review state could not be read."
-              return 1
+              log "PR #${number} retry on the next lifecycle event or scheduled reconciliation; preserving auto-merge consent."
+              return 2
+            fi
+
+            # Exit 2 means unknown, not a negative review. Never mutate consent
+            # from API errors, partial pages, malformed data or a racing push.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == null or .reviewDecision == "APPROVED" or
+                 .reviewDecision == "REVIEW_REQUIRED" or .reviewDecision == "CHANGES_REQUESTED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; (.isResolved | type == "boolean")) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string"))))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} review state is incomplete or stale; retry on the next lifecycle event or scheduled reconciliation, preserving auto-merge consent."
+              return 2
             fi
 
             # Include every thread, including outdated threads. Incomplete or
-            # paginated responses cannot establish that the review work is done.
+            # paginated responses above cannot establish a review decision.
             # Comments and pending reviews do not supersede a submitted decision.
             if ! jq -e --arg sha "$head_sha" '
               ((.errors // []) | length == 0) and
@@ -87,7 +113,7 @@ jobs:
                   (group_by(.author.login)
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
-              log "PR #${number} has pending or unverifiable review work."
+              log "PR #${number} has pending review work."
               return 1
             fi
           }
@@ -101,7 +127,7 @@ jobs:
           reconcile_pr() {
             local number="$1"
             local pr_json state author author_type permission_json permission head_repo base_ref draft
-            local head_sha mergeable mergeable_state new_sha repo_json method pr_url
+            local head_sha mergeable mergeable_state new_sha repo_json method pr_url review_status
 
             pr_json="$(gh api "repos/${REPOSITORY}/pulls/$number")"
             state="$(jq -r '.state' <<<"$pr_json")"
@@ -163,7 +189,11 @@ jobs:
                 ;;
             esac
 
-            if ! review_gate "$number" "$head_sha"; then
+            if review_gate "$number" "$head_sha"; then
+              :
+            else
+              review_status=$?
+              [[ "$review_status" -eq 1 ]] || return 1
               disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
               return 0
             fi
@@ -193,7 +223,11 @@ jobs:
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"$pr_json")"
             mergeable="$(jq -r 'if .mergeable == null then "unknown" else (.mergeable|tostring) end' <<<"$pr_json")"
             [[ "$mergeable_state" != "dirty" && "$mergeable" != "false" ]] || return 0
-            if ! review_gate "$number" "$head_sha"; then
+            if review_gate "$number" "$head_sha"; then
+              :
+            else
+              review_status=$?
+              [[ "$review_status" -eq 1 ]] || return 1
               disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
               return 0
             fi

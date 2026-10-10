@@ -68,11 +68,37 @@ jobs:
                   }
                 }')"; then
               echo "::warning::PR #${number} review state could not be read."
-              return 1
+              log "PR #${number} retry on the next lifecycle event or scheduled reconciliation; preserving auto-merge consent."
+              return 2
+            fi
+
+            # Exit 2 means unknown, not a negative review. Never mutate consent
+            # from API errors, partial pages, malformed data or a racing push.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == null or .reviewDecision == "APPROVED" or
+                 .reviewDecision == "REVIEW_REQUIRED" or .reviewDecision == "CHANGES_REQUESTED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; (.isResolved | type == "boolean")) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string"))))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} review state is incomplete or stale; retry on the next lifecycle event or scheduled reconciliation, preserving auto-merge consent."
+              return 2
             fi
 
             # Include every thread, including outdated threads. Incomplete or
-            # paginated responses cannot establish that the review work is done.
+            # paginated responses above cannot establish a review decision.
             # Comments and pending reviews do not supersede a submitted decision.
             if ! jq -e --arg sha "$head_sha" '
               ((.errors // []) | length == 0) and
@@ -100,7 +126,7 @@ jobs:
                   (group_by(.author.login)
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
-              echo "PR #${number} has pending or unverifiable review work."
+              echo "PR #${number} has pending review work."
               return 1
             fi
           }
@@ -108,7 +134,7 @@ jobs:
           reconcile_pr() {
             local number="$1"
             local pr author draft state base_ref head_repo head_ref head_sha mergeable_state
-            local method url auto_merge repo_json updated_sha
+            local method url auto_merge repo_json updated_sha review_status
 
             pr="$(gh api "repos/${REPOSITORY}/pulls/${number}")"
             author="$(jq -r '.user.login' <<<"${pr}")"
@@ -127,7 +153,11 @@ jobs:
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
-            if ! review_gate "${number}" "${head_sha}"; then
+            if review_gate "${number}" "${head_sha}"; then
+              :
+            else
+              review_status=$?
+              [[ "$review_status" -eq 1 ]] || return 1
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then

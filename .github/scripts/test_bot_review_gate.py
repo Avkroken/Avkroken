@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute the bot lifecycle shell against a local, mutation-recording GitHub stub."""
+"""Execute both lifecycle shells against a local, mutation-recording GitHub stub."""
 import copy
 import json
 import os
@@ -24,10 +24,13 @@ fixture = json.loads(Path(os.environ['FIXTURE']).read_text())
 with open(os.environ['CALLS'], 'a') as log:
     log.write(json.dumps(args) + '\n')
 if args[:2] == ['api', 'graphql']:
+    if fixture.get('review_exits'):
+        fixture['review_exit'] = fixture['review_exits'].pop(0)
+        Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
     if fixture.get('withdraw_queue_during_review'):
         fixture['pr']['auto_merge'] = None
         Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
-    print(json.dumps(fixture['review']))
+    print(fixture.get('review_raw', json.dumps(fixture['review'])))
     sys.exit(fixture.get('review_exit', 0))
 if args[:2] == ['pr', 'merge']:
     sys.exit(fixture.get('disable_exit', 0) if '--disable-auto' in args else 0)
@@ -36,8 +39,10 @@ if args[0] == 'api':
     if endpoint.endswith('/update-branch'):
         sys.exit(1)  # Do not enter the polling loop in a unit test.
     if '/pulls?' in endpoint:
-        print(17)
-    elif endpoint.endswith('/pulls/17'):
+        print('\n'.join(map(str, fixture.get('candidates', [17]))))
+    elif endpoint.endswith('/permission'):
+        print(json.dumps({'permission': 'write'}))
+    elif endpoint.endswith(('/pulls/17', '/pulls/18')):
         print(json.dumps(fixture['pr']))
     elif '--jq' in args:
         print('main')
@@ -55,6 +60,8 @@ def review(state, author='reviewer', order=1, sha=SHA):
 
 
 class BotReviewGateTests(unittest.TestCase):
+    workflow = WORKFLOW
+
     def setUp(self):
         self.fixture = {
             'pr': {'user': {'login': 'dependabot[bot]', 'type': 'Bot'}, 'state': 'open',
@@ -62,7 +69,7 @@ class BotReviewGateTests(unittest.TestCase):
                    'head': {'repo': {'full_name': 'Avkroken/Avkroken'},
                             'ref': 'dependabot/example', 'sha': SHA},
                    'html_url': 'https://github.com/Avkroken/Avkroken/pull/17',
-                   'mergeable_state': 'clean', 'auto_merge': {'enabled_by': {'login': 'maintainer'}}},
+                   'mergeable': True, 'mergeable_state': 'clean', 'auto_merge': {'enabled_by': {'login': 'maintainer'}}},
             'review': {'data': {'repository': {'pullRequest': {
                 'headRefOid': SHA, 'reviewDecision': 'APPROVED',
                 'reviewThreads': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
@@ -72,7 +79,7 @@ class BotReviewGateTests(unittest.TestCase):
         self.state = self.fixture['review']['data']['repository']['pullRequest']
 
     def run_workflow(self):
-        script = textwrap.dedent(WORKFLOW.read_text().split('        run: |\n', 1)[1])
+        script = textwrap.dedent(self.workflow.read_text().split('        run: |\n', 1)[1])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             stub = root / 'gh'
@@ -83,7 +90,8 @@ class BotReviewGateTests(unittest.TestCase):
             calls = root / 'calls.jsonl'
             env = {**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
                    'FIXTURE': str(fixture), 'CALLS': str(calls),
-                   'REPOSITORY': 'Avkroken/Avkroken', 'GH_TOKEN': 'test-only'}
+                   'REPOSITORY': 'Avkroken/Avkroken', 'GH_TOKEN': 'test-only',
+                   'EVENT_PR_NUMBER': ''}
             result = subprocess.run(['bash'], input=script, text=True, env=env,
                                     capture_output=True, timeout=10)
             return result, [json.loads(line) for line in calls.read_text().splitlines()]
@@ -95,6 +103,13 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertFalse(any(any('/update-branch' in arg for arg in call) for call in calls), calls)
         if self.fixture['pr'].get('auto_merge') is not None:
             self.assertTrue(any('--disable-auto' in call for call in calls), calls)
+
+    def assert_retry(self):
+        result, calls = self.run_workflow()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+        self.assertFalse(any('/update-branch' in arg for call in calls for arg in call), calls)
+        self.assertIn('retry', result.stdout)
 
     def test_clean_queued_reviews_never_resubmit_auto_merge(self):
         result, calls = self.run_workflow()
@@ -156,19 +171,19 @@ class BotReviewGateTests(unittest.TestCase):
                 self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_required_or_negative_aggregate_review_blocks(self):
-        for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'UNKNOWN'):
+        for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED'):
             with self.subTest(decision=decision):
                 self.state['reviewDecision'] = decision
                 self.assert_blocked()
 
-    def test_truncated_review_connections_block(self):
+    def test_truncated_review_connections_preserve_consent(self):
         for connection in ('reviews', 'reviewThreads'):
             with self.subTest(connection=connection):
                 self.state[connection]['pageInfo']['hasNextPage'] = True
-                self.assert_blocked()
+                self.assert_retry()
                 self.state[connection]['pageInfo']['hasNextPage'] = False
 
-    def test_api_failure_and_incomplete_responses_block(self):
+    def test_api_failure_and_incomplete_responses_preserve_consent(self):
         valid = copy.deepcopy(self.fixture['review'])
         for payload, exit_code in ((valid, 1), ({}, 0),
                                    ({'data': {'repository': {'pullRequest': None}}}, 0),
@@ -176,7 +191,38 @@ class BotReviewGateTests(unittest.TestCase):
             with self.subTest(payload=payload, exit_code=exit_code):
                 self.fixture['review'] = payload
                 self.fixture['review_exit'] = exit_code
-                self.assert_blocked()
+                self.assert_retry()
+
+    def test_http_errors_preserve_consent(self):
+        for status in (403, 429, 500, 502, 503):
+            with self.subTest(status=status):
+                self.fixture['review_exit'] = 1
+                self.fixture['review_raw'] = f'HTTP {status}'
+                self.assert_retry()
+
+    def test_invalid_json_and_unknown_decision_preserve_consent(self):
+        self.fixture['review_raw'] = '{'
+        self.assert_retry()
+        del self.fixture['review_raw']
+        self.state['reviewDecision'] = 'UNKNOWN'
+        self.assert_retry()
+
+    def test_review_failure_does_not_skip_remaining_prs(self):
+        self.fixture['candidates'] = [17, 18]
+        self.fixture['review_exits'] = [1, 0, 0]
+        result, calls = self.run_workflow()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertTrue(any('number=18' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+
+    def test_successful_retry_on_same_pr_does_not_requeue(self):
+        self.fixture['review_exit'] = 1
+        self.assert_retry()
+        self.fixture['review_exit'] = 0
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('remains queued', result.stdout)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_stale_commit_approval_cannot_authorize_current_head(self):
         self.state['reviewDecision'] = 'APPROVED'
@@ -208,11 +254,11 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
-    def test_changed_head_blocks(self):
+    def test_changed_head_requires_retry(self):
         self.state['headRefOid'] = 'b' * 40
-        self.assert_blocked()
+        self.assert_retry()
 
-    def test_malformed_review_fields_block(self):
+    def test_malformed_review_fields_preserve_consent(self):
         valid = copy.deepcopy(self.state)
         variants = [
             {'reviews': {'nodes': [], 'pageInfo': {}}},
@@ -226,11 +272,11 @@ class BotReviewGateTests(unittest.TestCase):
             with self.subTest(fields=fields):
                 self.state.clear()
                 self.state.update({**valid, **fields})
-                self.assert_blocked()
+                self.assert_retry()
         self.state.clear()
         self.state.update(valid)
         del self.state['reviewDecision']
-        self.assert_blocked()
+        self.assert_retry()
 
     def test_resolved_outdated_thread_still_requires_real_approval(self):
         self.state['reviewDecision'] = None
@@ -239,7 +285,9 @@ class BotReviewGateTests(unittest.TestCase):
 
     def test_draft_fork_and_other_authors_remain_excluded(self):
         valid = copy.deepcopy(self.fixture['pr'])
-        for fields in ({'draft': True}, {'user': {'login': 'another-user', 'type': 'User'}},
+        for fields in ({'draft': True}, {'state': 'closed'},
+                       {'user': {'login': 'another-user',
+                                 'type': 'User' if valid['user']['type'] == 'Bot' else 'Bot'}},
                        {'head': {**valid['head'], 'repo': {'full_name': 'other/fork'}}}):
             with self.subTest(fields=fields):
                 self.fixture['pr'] = {**valid, **fields}
@@ -260,6 +308,18 @@ class BotReviewGateTests(unittest.TestCase):
         result, calls = self.run_workflow()
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(any('--auto' in call for call in calls), calls)
+
+
+class AgentReviewGateTests(BotReviewGateTests):
+    workflow = ROOT / '.github/workflows/agent-automerge-policy.yml'
+
+    def setUp(self):
+        super().setUp()
+        self.fixture['pr']['user'] = {'login': 'collaborator', 'type': 'User'}
+
+    def test_final_review_read_failure_preserves_consent(self):
+        self.fixture['review_exits'] = [0, 1]
+        self.assert_retry()
 
 
 if __name__ == '__main__':
