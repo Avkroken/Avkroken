@@ -66,6 +66,22 @@ test("validates the App identity and current owner installation before secret sy
   assert.match(seen[0].auth, /^Bearer [^.]+\.[^.]+\.[^.]+$/);
 });
 
+
+test("rejects missing installation repository rather than falling back to an old slug", async () => {
+  const { privatePem } = fixtureKey();
+  const fetchImpl = async () => new Response(JSON.stringify({ client_id: "Iv-test-client" }), { status: 200 });
+  await assert.rejects(
+    () => verifyGitHubAppSource({
+      clientId: "Iv-test-client",
+      privateKeyPem: privatePem,
+      owner: "ExampleOrg",
+      fetchImpl,
+      nowSeconds: 1_790_000_000,
+    }),
+    /repository name is missing or invalid/,
+  );
+});
+
 test("fails closed before secret mutation when GitHub rejects the source credential", async () => {
   const { privatePem } = fixtureKey();
   const fetchImpl = async () => new Response(

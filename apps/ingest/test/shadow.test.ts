@@ -16,6 +16,26 @@ class QueueCapture implements QueueProducerLike<IngressMessageV1> {
   }
 }
 
+
+test("unconfigured GitHub owner rejects preverified shadow before handoff", async () => {
+  const queue = new QueueCapture();
+  await assert.rejects(
+    () => acceptVerifiedShadowDelivery({ EVENTS_QUEUE: queue }, {
+      schemaVersion: 1,
+      kind: "github",
+      deliveryId: "portable-owner-shadow",
+      event: "push",
+      receivedAt: "2026-10-07T12:00:00.000Z",
+      body: JSON.stringify({
+        organization: { login: "ExampleOrg" },
+        repository: { name: ".github", owner: { login: "ExampleOrg" } },
+      }),
+    }),
+    InvalidVerifiedShadowDeliveryError,
+  );
+  assert.equal(queue.messages.length, 0);
+});
+
 test("preverified GitHub shadow preserves identity and receivedAt without provider secrets", async () => {
   const queue = new QueueCapture();
   const env: IngestEnv = {

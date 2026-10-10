@@ -37,6 +37,27 @@ async function githubSignature(body: string, secret = "It's a Secret to Everybod
   return `sha256=${[...digest].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
 }
 
+
+test("unconfigured GitHub owner fails closed without queue mutation", async () => {
+  const current = env();
+  delete current.SKVALLERBYTTAN_GITHUB_OWNER;
+  const body = JSON.stringify({
+    organization: { login: "ExampleOrg" },
+    repository: { name: ".github", owner: { login: "ExampleOrg" } },
+  });
+  const response = await handleIngestRequest(new Request("https://ingest.invalid/github", {
+    method: "POST",
+    headers: {
+      "x-github-event": "push",
+      "x-github-delivery": "portable-owner-test",
+      "x-hub-signature-256": await githubSignature(body),
+    },
+    body,
+  }), current);
+  assert.equal(response.status, 503);
+  assert.equal(current.EVENTS_QUEUE.messages.length, 0);
+});
+
 test("preserves GitHub's documented HMAC test vector", async () => {
   assert.equal(await verifyGitHubSignature(
     "Hello, World!",
