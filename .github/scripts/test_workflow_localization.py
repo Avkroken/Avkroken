@@ -82,11 +82,12 @@ class WorkflowLocalizationTests(unittest.TestCase):
             "legacy Dependabot merger bypasses review gate"
         )
 
-    def test_bot_lifecycle_uses_linear_history_compatible_merge(self):
+    def test_bot_lifecycle_never_submits_or_restores_native_queue(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
-        self.assertIn('method="--squash"', text)
-        self.assertIn('method="--squash"', text)
+        self.assertNotIn('gh pr merge --auto', text)
         self.assertNotIn('method="--merge"', text)
+        self.assertIn('.auto_merge == null', text)
+        self.assertIn('return 0', text)
 
     def test_bot_lifecycle_serializes_and_dispatches_only_trusted_workflows(self):
         text = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text(encoding="utf-8")
@@ -104,7 +105,8 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('all(.reviewThreads.nodes[]; .isResolved == true)', text)
         self.assertIn('commit { oid }', text)
         self.assertIn('(.commit.oid // "") == $sha', text)
-        self.assertIn('--match-head-commit "${head_sha}"', text)
+        self.assertNotIn('gh pr merge --auto', text)
+        self.assertIn('.auto_merge == null', text)
         self.assertIn('.user.type == "Bot"', text)
         self.assertIn("failures=0", text)
         self.assertIn("failures=$((failures + 1))", text)

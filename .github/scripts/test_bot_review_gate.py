@@ -24,6 +24,9 @@ fixture = json.loads(Path(os.environ['FIXTURE']).read_text())
 with open(os.environ['CALLS'], 'a') as log:
     log.write(json.dumps(args) + '\n')
 if args[:2] == ['api', 'graphql']:
+    if fixture.get('withdraw_queue_during_review'):
+        fixture['pr']['auto_merge'] = None
+        Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
     print(json.dumps(fixture['review']))
     sys.exit(fixture.get('review_exit', 0))
 if args[:2] == ['pr', 'merge']:
@@ -93,13 +96,12 @@ class BotReviewGateTests(unittest.TestCase):
         if self.fixture['pr'].get('auto_merge') is not None:
             self.assertTrue(any('--disable-auto' in call for call in calls), calls)
 
-    def test_clean_reviews_enable_squash_for_observed_head(self):
+    def test_clean_queued_reviews_never_resubmit_auto_merge(self):
         result, calls = self.run_workflow()
         self.assertEqual(result.returncode, 0, result.stderr)
-        merge = next(call for call in calls if '--auto' in call)
-        self.assertIn('--squash', merge)
-        self.assertIn('--match-head-commit', merge)
-        self.assertIn(SHA, merge)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+        self.assertIn('remains queued', result.stdout)
 
     def test_unqueued_bot_pr_never_enables_auto_merge(self):
         # A GitHub approval is not user consent to enter the native queue.
@@ -115,7 +117,17 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertIsNotNone(self.fixture['pr']['auto_merge'])
         result, calls = self.run_workflow()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(any('--auto' in call for call in calls), calls)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+
+    def test_withdrawal_during_review_does_not_requeue(self):
+        # An earlier PR snapshot still says queued; the user revokes consent
+        # while the independent review lookup is running.
+        self.fixture['withdraw_queue_during_review'] = True
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_unresolved_threads_including_outdated_block(self):
         for outdated in (False, True):
@@ -141,7 +153,7 @@ class BotReviewGateTests(unittest.TestCase):
                 ]
                 result, calls = self.run_workflow()
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertTrue(any('--auto' in call for call in calls), calls)
+                self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_required_or_negative_aggregate_review_blocks(self):
         for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'UNKNOWN'):
@@ -194,7 +206,7 @@ class BotReviewGateTests(unittest.TestCase):
         ]
         result, calls = self.run_workflow()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(any('--auto' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_changed_head_blocks(self):
         self.state['headRefOid'] = 'b' * 40

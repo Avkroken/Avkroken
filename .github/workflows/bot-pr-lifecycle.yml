@@ -150,21 +150,16 @@ jobs:
               return 0
             fi
 
-            # Only act after a real GitHub APPROVED review decision.
-            auto_merge="$(jq -r 'if .auto_merge == null then "false" else "true" end' <<<"${pr}")"
-            [[ "${auto_merge}" == "true" ]] || return 0
-
-            repo_json="$(gh api "repos/${REPOSITORY}")"
-            if [[ "$(jq -r '.allow_squash_merge' <<<"${repo_json}")" == "true" ]]; then
-              method="--squash"
-            elif [[ "$(jq -r '.allow_rebase_merge' <<<"${repo_json}")" == "true" ]]; then
-              method="--rebase"
+            # Native GitHub auto-merge is already queued by its initiator.
+            # Never resubmit an auto-merge request: the queue can be withdrawn
+            # while this workflow checks the review state. Re-enqueueing from
+            # stale PR data would override that withdrawal.
+            if [[ "$(jq -r '.auto_merge == null' <<<"${pr}")" == "true" ]]; then
+              echo "PR #${number} is not queued for native auto-merge; skipping."
             else
-              echo "::error::No repository merge method is enabled."
-              return 1
+              echo "PR #${number} remains queued and passes the review gate."
             fi
-
-            gh pr merge --auto "${method}" --match-head-commit "${head_sha}" "${url}"
+            return 0
           }
 
           if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
