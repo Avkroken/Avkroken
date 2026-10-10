@@ -74,6 +74,31 @@ jobs:
               return 2
             fi
 
+            # Statuses: 0 approved, 1 negative, 2 unavailable, 3 pending.
+            # A changed head must be reconciled again before acting on reviews.
+            if ! jq -e --arg sha "$head_sha" '
+              .data.repository.pullRequest.headRefOid == $sha
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} head changed; review gate pending."
+              return 3
+            fi
+
+            # Only explicit negative review evidence revokes the native queue.
+            # Comments and pending reviews do not supersede submitted decisions.
+            if jq -e '
+              .data.repository.pullRequest |
+                .reviewDecision == "CHANGES_REQUESTED" or
+                any(.reviewThreads.nodes[]; .isResolved == false) or
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] |
+                  all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login) |
+                    any(.[]; (sort_by(.submittedAt) | last | .state) == "CHANGES_REQUESTED")))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} has changes requested or unresolved review threads."
+              return 1
+            fi
+
             # Include every thread, including outdated threads. Incomplete or
             # paginated responses cannot establish that the review work is done.
             # Comments and pending reviews do not supersede a submitted decision.
@@ -104,7 +129,7 @@ jobs:
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
               log "PR #${number} has pending or unverifiable review work."
-              return 1
+              return 3
             fi
           }
 
@@ -187,6 +212,10 @@ jobs:
                 disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
                 return 0
                 ;;
+              3)
+                log "PR #$number review gate pending; retaining native auto-merge request."
+                return 0
+                ;;
               *)
                 log "PR #$number review state unavailable; retaining native auto-merge request for retry."
                 return 1
@@ -224,6 +253,10 @@ jobs:
               0) ;;
               1)
                 disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
+                return 0
+                ;;
+              3)
+                log "PR #$number review gate pending; retaining native auto-merge request."
                 return 0
                 ;;
               *)

@@ -27,7 +27,11 @@ if args[:2] == ['api', 'graphql']:
     if fixture.get('withdraw_queue_during_review'):
         fixture['pr']['auto_merge'] = None
         Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
-    print(json.dumps(fixture['review']))
+    response = fixture['review']
+    if 'review_after_first' in fixture:
+        fixture['review'] = fixture.pop('review_after_first')
+        Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
+    print(json.dumps(response))
     sys.exit(fixture.get('review_exit', 0))
 if args[:2] == ['pr', 'merge']:
     sys.exit(fixture.get('disable_exit', 0) if '--disable-auto' in args else 0)
@@ -39,6 +43,8 @@ if args[0] == 'api':
         print(17)
     elif endpoint.endswith('/pulls/17'):
         print(json.dumps(fixture['pr']))
+    elif endpoint.endswith('/permission'):
+        print(json.dumps({'permission': 'write'}))
     elif '--jq' in args:
         print('main')
     else:
@@ -71,8 +77,8 @@ class BotReviewGateTests(unittest.TestCase):
         }
         self.state = self.fixture['review']['data']['repository']['pullRequest']
 
-    def run_workflow(self):
-        script = textwrap.dedent(WORKFLOW.read_text().split('        run: |\n', 1)[1])
+    def run_workflow(self, workflow=WORKFLOW):
+        script = textwrap.dedent(workflow.read_text().split('        run: |\n', 1)[1])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             stub = root / 'gh'
@@ -83,7 +89,8 @@ class BotReviewGateTests(unittest.TestCase):
             calls = root / 'calls.jsonl'
             env = {**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
                    'FIXTURE': str(fixture), 'CALLS': str(calls),
-                   'REPOSITORY': 'Avkroken/Avkroken', 'GH_TOKEN': 'test-only'}
+                   'REPOSITORY': 'Avkroken/Avkroken', 'GH_TOKEN': 'test-only',
+                   'EVENT_PR_NUMBER': '', 'BASH_ENV': '/dev/null'}
             result = subprocess.run(['bash'], input=script, text=True, env=env,
                                     capture_output=True, timeout=10)
             return result, [json.loads(line) for line in calls.read_text().splitlines()]
@@ -95,6 +102,13 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertFalse(any(any('/update-branch' in arg for arg in call) for call in calls), calls)
         if self.fixture['pr'].get('auto_merge') is not None:
             self.assertTrue(any('--disable-auto' in call for call in calls), calls)
+
+    def assert_pending(self):
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+        self.assertFalse(any('/update-branch' in arg for call in calls for arg in call), calls)
+        self.assertIn('review gate pending', result.stdout)
 
     def test_clean_queued_reviews_never_resubmit_auto_merge(self):
         result, calls = self.run_workflow()
@@ -155,11 +169,21 @@ class BotReviewGateTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
-    def test_required_or_negative_aggregate_review_blocks(self):
-        for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'UNKNOWN'):
+    def test_negative_aggregate_review_blocks(self):
+        self.state['reviewDecision'] = 'CHANGES_REQUESTED'
+        self.assert_blocked()
+
+    def test_pending_or_unknown_aggregate_review_preserves_queue(self):
+        for decision in ('REVIEW_REQUIRED', 'UNKNOWN', None):
             with self.subTest(decision=decision):
                 self.state['reviewDecision'] = decision
-                self.assert_blocked()
+                self.assert_pending()
+
+    def test_missing_or_pending_approval_preserves_queue(self):
+        for reviews in ([], [review('PENDING')], [review('COMMENTED')]):
+            with self.subTest(reviews=reviews):
+                self.state['reviews']['nodes'] = reviews
+                self.assert_pending()
 
     def test_truncated_review_connections_preserve_queue(self):
         for connection in ('reviews', 'reviewThreads'):
@@ -186,7 +210,7 @@ class BotReviewGateTests(unittest.TestCase):
     def test_stale_commit_approval_cannot_authorize_current_head(self):
         self.state['reviewDecision'] = 'APPROVED'
         self.state['reviews']['nodes'] = [review('APPROVED', sha='b' * 40)]
-        self.assert_blocked()
+        self.assert_pending()
 
     def test_dismissed_current_head_approval_does_not_count(self):
         self.state['reviewDecision'] = 'APPROVED'
@@ -195,14 +219,14 @@ class BotReviewGateTests(unittest.TestCase):
             review('DISMISSED', 'reviewer', 2, SHA),
             review('APPROVED', 'other', 3, 'b' * 40),
         ]
-        self.assert_blocked()
+        self.assert_pending()
 
-    def test_missing_commit_identity_blocks_approval(self):
+    def test_missing_commit_identity_preserves_queue(self):
         self.state['reviews']['nodes'] = [
             {'author': {'login': 'reviewer'}, 'state': 'APPROVED',
              'submittedAt': '2026-10-09T00:00:01Z'}
         ]
-        self.assert_blocked()
+        self.assert_pending()
 
     def test_latest_commit_approval_permits_gated_bot_queue(self):
         self.state['reviews']['nodes'] = [
@@ -213,11 +237,11 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
-    def test_changed_head_blocks(self):
+    def test_changed_head_preserves_queue(self):
         self.state['headRefOid'] = 'b' * 40
-        self.assert_blocked()
+        self.assert_pending()
 
-    def test_malformed_review_fields_block_or_preserve_queue(self):
+    def test_malformed_review_fields_preserve_queue(self):
         valid = copy.deepcopy(self.state)
         variants = [
             ({'reviews': {'nodes': [], 'pageInfo': {}}}, True),
@@ -236,7 +260,7 @@ class BotReviewGateTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(any('--disable-auto' in call for call in calls), calls)
                 else:
-                    self.assert_blocked()
+                    self.assert_pending()
         self.state.clear()
         self.state.update(valid)
         del self.state['reviewDecision']
@@ -247,7 +271,42 @@ class BotReviewGateTests(unittest.TestCase):
     def test_resolved_outdated_thread_still_requires_real_approval(self):
         self.state['reviewDecision'] = None
         self.state['reviewThreads']['nodes'] = [{'isResolved': True, 'isOutdated': True}]
-        self.assert_blocked()
+        self.assert_pending()
+
+    def test_agent_gate_statuses_at_both_call_sites(self):
+        self.fixture['pr']['user'] = {'login': 'maintainer', 'type': 'User'}
+        self.fixture['pr']['mergeable'] = True
+        valid = copy.deepcopy(self.state)
+        variants = [
+            ({'reviewDecision': 'CHANGES_REQUESTED'}, 0, True),
+            ({'reviewThreads': {'nodes': [{'isResolved': False}],
+                               'pageInfo': {'hasNextPage': False}}}, 0, True),
+            ({'reviewDecision': 'REVIEW_REQUIRED'}, 0, False),
+            ({'reviews': {'nodes': [], 'pageInfo': {'hasNextPage': False}}}, 0, False),
+            ({'reviews': {'nodes': [review('APPROVED', sha='b' * 40)],
+                         'pageInfo': {'hasNextPage': False}}}, 0, False),
+            ({'headRefOid': 'b' * 40}, 0, False),
+            ({'reviews': {'nodes': [], 'pageInfo': {'hasNextPage': True}}}, 1, False),
+        ]
+        workflow = WORKFLOW.with_name('agent-automerge-policy.yml')
+        for fields, exit_code, disable in variants:
+            for gate_call in (1, 2):
+                with self.subTest(fields=fields, gate_call=gate_call):
+                    payload = {'data': {'repository': {'pullRequest': {**valid, **fields}}}}
+                    self.fixture['review'] = copy.deepcopy(payload)
+                    self.fixture.pop('review_after_first', None)
+                    if gate_call == 2:
+                        self.fixture['review'] = {'data': {'repository': {'pullRequest': valid}}}
+                        self.fixture['review_after_first'] = payload
+                    result, calls = self.run_workflow(workflow)
+                    self.assertEqual(result.returncode, exit_code, result.stderr)
+                    self.assertEqual(sum('graphql' in call for call in calls), gate_call, calls)
+                    merges = [call for call in calls if call[:2] == ['pr', 'merge']]
+                    if disable:
+                        self.assertEqual(len(merges), 1, calls)
+                        self.assertIn('--disable-auto', merges[0])
+                    else:
+                        self.assertEqual(merges, [], calls)
 
     def test_draft_fork_and_other_authors_remain_excluded(self):
         valid = copy.deepcopy(self.fixture['pr'])

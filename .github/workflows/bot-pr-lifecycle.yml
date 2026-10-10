@@ -86,6 +86,31 @@ jobs:
               return 2
             fi
 
+            # Statuses: 0 approved, 1 negative, 2 unavailable, 3 pending.
+            # A changed head must be reconciled again before acting on reviews.
+            if ! jq -e --arg sha "$head_sha" '
+              .data.repository.pullRequest.headRefOid == $sha
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} head changed; review gate pending."
+              return 3
+            fi
+
+            # Only explicit negative review evidence revokes the native queue.
+            # Comments and pending reviews do not supersede submitted decisions.
+            if jq -e '
+              .data.repository.pullRequest |
+                .reviewDecision == "CHANGES_REQUESTED" or
+                any(.reviewThreads.nodes[]; .isResolved == false) or
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] |
+                  all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login) |
+                    any(.[]; (sort_by(.submittedAt) | last | .state) == "CHANGES_REQUESTED")))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} has changes requested or unresolved review threads."
+              return 1
+            fi
+
             # Include every thread, including outdated threads. Incomplete or
             # paginated responses cannot establish that the review work is done.
             # Comments and pending reviews do not supersede a submitted decision.
@@ -116,7 +141,7 @@ jobs:
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
               echo "PR #${number} has pending or unverifiable review work."
-              return 1
+              return 3
             fi
           }
 
@@ -144,11 +169,15 @@ jobs:
             # remain unresolved. GitHub's native ruleset remains authoritative.
             local review_status=0
             review_gate "${number}" "${head_sha}" || review_status=$?
-            if [[ "${review_status}" -eq 2 ]]; then
+            if [[ "${review_status}" -eq 3 ]]; then
+              log "PR #${number} review gate pending; retaining native auto-merge request."
+              return 0
+            fi
+            if [[ "${review_status}" -ne 0 && "${review_status}" -ne 1 ]]; then
               echo "::error::PR #${number} review state unavailable; preserving native auto-merge for retry."
               return 1
             fi
-            if [[ "${review_status}" -ne 0 ]]; then
+            if [[ "${review_status}" -eq 1 ]]; then
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
