@@ -217,25 +217,32 @@ class BotReviewGateTests(unittest.TestCase):
         self.state['headRefOid'] = 'b' * 40
         self.assert_blocked()
 
-    def test_malformed_review_fields_block(self):
+    def test_malformed_review_fields_block_or_preserve_queue(self):
         valid = copy.deepcopy(self.state)
         variants = [
-            {'reviews': {'nodes': [], 'pageInfo': {}}},
-            {'reviewThreads': {'nodes': None, 'pageInfo': {'hasNextPage': False}}},
-            {'reviewThreads': {'nodes': [{}], 'pageInfo': {'hasNextPage': False}}},
-            {'reviews': {'nodes': [review('UNKNOWN')], 'pageInfo': {'hasNextPage': False}}},
-            {'reviews': {'nodes': [review('CHANGES_REQUESTED', None)],
-                         'pageInfo': {'hasNextPage': False}}},
+            ({'reviews': {'nodes': [], 'pageInfo': {}}}, True),
+            ({'reviewThreads': {'nodes': None, 'pageInfo': {'hasNextPage': False}}}, True),
+            ({'reviewThreads': {'nodes': [{}], 'pageInfo': {'hasNextPage': False}}}, False),
+            ({'reviews': {'nodes': [review('UNKNOWN')], 'pageInfo': {'hasNextPage': False}}}, False),
+            ({'reviews': {'nodes': [review('CHANGES_REQUESTED', None)],
+                          'pageInfo': {'hasNextPage': False}}}, False),
         ]
-        for fields in variants:
+        for fields, unreadable in variants:
             with self.subTest(fields=fields):
                 self.state.clear()
                 self.state.update({**valid, **fields})
-                self.assert_blocked()
+                if unreadable:
+                    result, calls = self.run_workflow()
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(any('--disable-auto' in call for call in calls), calls)
+                else:
+                    self.assert_blocked()
         self.state.clear()
         self.state.update(valid)
         del self.state['reviewDecision']
-        self.assert_blocked()
+        result, calls = self.run_workflow()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any('--disable-auto' in call for call in calls), calls)
 
     def test_resolved_outdated_thread_still_requires_real_approval(self):
         self.state['reviewDecision'] = None
