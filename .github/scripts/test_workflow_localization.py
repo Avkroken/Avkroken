@@ -74,6 +74,16 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn('.user.type == "Bot" and .auto_merge != null and .draft == false', bot)
         self.assertIn('is not queued for native auto-merge; skipping.', bot)
 
+    def test_review_decision_queries_exclude_comment_only_reviews(self):
+        # Hundreds of inline replies must not paginate the decision connection.
+        for name in ("agent-automerge-policy.yml", "bot-pr-lifecycle.yml"):
+            with self.subTest(workflow=name):
+                text = (WORKFLOWS / name).read_text(encoding="utf-8")
+                self.assertIn(
+                    "reviews(first:100, states:[APPROVED, CHANGES_REQUESTED, DISMISSED])",
+                    text,
+                )
+
     def test_pr_inventory_read_failure_is_explicitly_reported(self):
         for workflow in ("agent-automerge-policy.yml", "bot-pr-lifecycle.yml"):
             text = (WORKFLOWS / workflow).read_text(encoding="utf-8")

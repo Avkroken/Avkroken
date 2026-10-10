@@ -238,8 +238,7 @@ class AutomationPostMergeTests(unittest.TestCase):
         ])
         fake.posts.clear()
         with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "4"}):
-            with self.assertRaisesRegex(RuntimeError, "retry limit"):
-                reconcile(fake, REPO, TIME)
+            self.assertFalse(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts, [])
 
     @patch.dict(os.environ, {"GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "2"})
@@ -266,9 +265,17 @@ class AutomationPostMergeTests(unittest.TestCase):
         ]
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
                        commit_comments=comments)
-        with self.assertRaisesRegex(RuntimeError, "missing CodeQL.*retry limit"):
-            reconcile(fake, REPO, TIME)
+        with patch("builtins.print") as log:
+            for _ in range(2):
+                self.assertFalse(reconcile(fake, REPO, TIME))
         self.assertEqual(fake.posts, [])
+        warnings = [
+            str(call.args[0]) for call in log.call_args_list
+            if call.args and "::warning::" in str(call.args[0])
+        ]
+        self.assertEqual(len(warnings), 2)
+        self.assertTrue(all("missing CodeQL" in item and "retry limit" in item
+                            and "manual intervention" in item for item in warnings))
 
     def test_backoff_only_runs_do_not_spend_attempts(self):
         # Existing scheduled runs without reservation comments are not dispatches.

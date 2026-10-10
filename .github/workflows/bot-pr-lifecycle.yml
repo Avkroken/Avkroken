@@ -56,7 +56,7 @@ jobs:
                         nodes { isResolved }
                         pageInfo { hasNextPage }
                       }
-                      reviews(first:100) {
+                      reviews(first:100, states:[APPROVED, CHANGES_REQUESTED, DISMISSED]) {
                         nodes { author { login } state submittedAt commit { oid } }
                         pageInfo { hasNextPage }
                       }

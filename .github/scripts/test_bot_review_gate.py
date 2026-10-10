@@ -117,6 +117,16 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
         self.assertIn('remains queued', result.stdout)
 
+    def test_graphql_request_filters_review_decisions(self):
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        queries = [' '.join(call) for call in calls if 'graphql' in call]
+        self.assertEqual(len(queries), 1)
+        self.assertIn(
+            'reviews(first:100, states:[APPROVED, CHANGES_REQUESTED, DISMISSED])',
+            queries[0],
+        )
+
     def test_unqueued_bot_pr_never_enables_auto_merge(self):
         # A GitHub approval is not user consent to enter the native queue.
         self.fixture['pr']['auto_merge'] = None

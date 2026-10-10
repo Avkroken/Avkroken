@@ -166,10 +166,13 @@ def reconcile(api, repository, now):
         )
     attempts = len(attempts_by_key)
     if attempts >= 3:
-        raise RuntimeError(
-            f"Persistently missing {', '.join(missing)} for {head_sha}; "
-            "post-merge dispatch retry limit reached (3)."
+        # Three durable reservations provide terminal operator evidence.
+        # Do not fail indefinitely on every schedule for this unchanged tip.
+        print(
+            f"::warning::Persistently missing {', '.join(missing)} for {head_sha}; "
+            "post-merge dispatch retry limit reached (3); manual intervention required."
         )
+        return False
     last = max(attempts_by_key.values(), default=None)
     delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
     if last is not None and now - last < delay:
