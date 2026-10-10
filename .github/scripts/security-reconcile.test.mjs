@@ -359,3 +359,109 @@ test('write budget defers creations and reopenings, resumes next run and preserv
     }
   }
 });
+
+test('owner assignment uses the same 100-write budget and defers overflow', async () => {
+  const oldFetch=globalThis.fetch;
+  const oldWarn=console.warn;
+  const saved={...process.env};
+  const warnings=[];
+  let assignments=0;
+  const reply=value=>({ok:true,status:200,json:async()=>structuredClone(value)});
+  const issues=Array.from({length:101},(_,i)=>({
+    number:i+1,state:'open',user:{login:'github-actions[bot]'},assignees:[],
+    body:'<!-- avkroken-security-alert:code-scanning:'+(i+1)+' -->'
+  }));
+  try {
+    Object.assign(process.env,{
+      GITHUB_REPOSITORY:'Avkroken/example',GH_TOKEN:'test-only',GITHUB_EVENT_NAME:'schedule'
+    });
+    console.warn=m=>warnings.push(m);
+    globalThis.fetch=async(url,opts)=>{
+      const u=new URL(url);
+      const path=u.pathname;
+      const page=Number(u.searchParams.get('page')) || 1;
+      if(path==='/repos/Avkroken/example')return reply({default_branch:'main'});
+      if(path.endsWith('/issues')&&opts.method==='GET')
+        return reply(issues.slice((page-1)*100,page*100));
+      if(path.endsWith('/code-scanning/alerts'))
+        return reply(Array.from({length:101},(_,i)=>({number:i+1}))
+          .slice((page-1)*100,page*100));
+      if(path.endsWith('/dependabot/alerts'))return reply([]);
+      if(path.endsWith('/pulls'))return reply([]);
+      if(path.endsWith('/assignees')&&opts.method==='POST'){
+        assignments++;
+        return reply({});
+      }
+      throw Error('Unexpected '+opts.method+' '+path);
+    };
+    await import('./security-reconcile.mjs?test=owner-assignment-budget');
+    assert.equal(assignments,100,'all assignment writes must count against the budget');
+    assert.ok(warnings.some(w=>w.includes('1 tracking issues deferred')),
+      'assignment overflow must be reported for next scheduled run');
+  } finally {
+    globalThis.fetch=oldFetch;
+    console.warn=oldWarn;
+    for(const key of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']){
+      if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];
+    }
+  }
+});
+
+test('reopen, owner assignment, and creation share one bounded write budget', async () => {
+  const oldFetch=globalThis.fetch;
+  const oldWarn=console.warn;
+  const saved={...process.env};
+  const notices=[];
+  let wrote=0;
+  let assignments=0;
+  let reopened=0;
+  let created=0;
+  const issues=Array.from({length:100},(_,i)=>({
+    number:i+1,state:i===99?'closed':'open',
+    user:{login:'github-actions[bot]'},assignees:[],
+    body:'<!-- avkroken-security-alert:code-scanning:'+(i+1)+' -->'
+  }));
+  const reply=value=>({ok:true,status:200,json:async()=>structuredClone(value)});
+  try{
+    Object.assign(process.env,{
+      GITHUB_REPOSITORY:'Avkroken/example',GH_TOKEN:'test-only',GITHUB_EVENT_NAME:'schedule'
+    });
+    console.warn=m=>notices.push(m);
+    globalThis.fetch=async(url,opts)=>{
+      const u=new URL(url);
+      const path=u.pathname;
+      const page=Number(u.searchParams.get('page'))||1;
+      if(path==='/repos/Avkroken/example')return reply({default_branch:'main'});
+      if(path.endsWith('/issues')&&opts.method==='GET')
+        return reply(issues.slice((page-1)*100,page*100));
+      if(path.endsWith('/code-scanning/alerts'))
+        return reply(Array.from({length:101},(_,i)=>({number:i+1}))
+          .slice((page-1)*100,page*100));
+      if(path.endsWith('/dependabot/alerts'))return reply([]);
+      if(path.endsWith('/pulls'))return reply([]);
+      if(path.endsWith('/assignees')&&opts.method==='POST'){
+        wrote++;assignments++;return reply({});
+      }
+      if(path.endsWith('/issues/100')&&opts.method==='PATCH'){
+        wrote++;reopened++;return reply({...issues[99],state:'open'});
+      }
+      if(path.endsWith('/issues')&&opts.method==='POST'){
+        wrote++;created++;return reply({number:101,state:'open'});
+      }
+      throw Error('Unexpected '+opts.method+' '+path);
+    };
+    await import('./security-reconcile.mjs?test=mixed-write-budget');
+    assert.equal(wrote,100);
+    assert.equal(assignments,99);
+    assert.equal(reopened,1);
+    assert.equal(created,0);
+    assert.ok(notices.some(n=>n.includes('2 tracking issues deferred')),
+      'deferred assignment and newly created issue must both be counted');
+  }finally{
+    globalThis.fetch=oldFetch;
+    console.warn=oldWarn;
+    for(const key of ['GITHUB_REPOSITORY','GH_TOKEN','GITHUB_EVENT_NAME']){
+      if(saved[key]===undefined)delete process.env[key];else process.env[key]=saved[key];
+    }
+  }
+});

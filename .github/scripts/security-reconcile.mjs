@@ -85,7 +85,11 @@ const defaultBranch=metadata.default_branch || 'main';
 const issues=(await list(root+'/issues?state=all')).filter(isIssue);
 async function assignOwner(issue) {
   if((issue.assignees||[]).some(x=>x.login?.toLowerCase()===owner.toLowerCase())) return;
+  // Assigning an existing tracking issue is a write, just like creation or
+  // reopening. Defer it rather than exceeding the bounded mutation budget.
+  if(writes>=100) {deferred++;return;}
   await api(root+'/issues/'+issue.number+'/assignees','POST',{assignees:[owner]});
+  writes++;
   issue.assignees=[...(issue.assignees||[]),{login:owner}];
 }
 if(process.env.GITHUB_EVENT_NAME !== 'issues') {
