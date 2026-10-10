@@ -279,7 +279,7 @@ jobs:
           if [[ -n "$EVENT_PR_NUMBER" ]]; then
             candidates="$EVENT_PR_NUMBER"
           else
-            if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" --jq '.[].number')"; then
+            if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" --jq '.[] | select(.auto_merge != null and .draft == false and .user.type == "User") | .number')"; then
               log "Could not list open PRs; reconciliation failed."
               exit 1
             fi

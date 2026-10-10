@@ -124,6 +124,7 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(any('--auto' in call for call in calls), calls)
         self.assertFalse(any('--disable-auto' in call for call in calls), calls)
+        self.assertFalse(any('graphql' in call for call in calls), calls)
         self.assertFalse(any('/update-branch' in arg
                              for call in calls for arg in call), calls)
 

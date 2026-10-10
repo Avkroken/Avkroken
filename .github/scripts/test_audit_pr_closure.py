@@ -7,9 +7,10 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 from urllib.error import HTTPError
 
-from audit_pr_closure import closure_comment, closure_marker, has_existing_audit_comment, main
+from audit_pr_closure import closure_comment, closure_marker, existing_comment, has_existing_audit_comment, main
 
 REPO = "Avkroken/Avkroken"
 SHA = "a" * 40
@@ -94,6 +95,43 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertTrue(has_existing_audit_comment([
             {"user": {"login": "github-actions[bot]", "type": "Bot"}, "body": first}
         ], second.splitlines()[0]))
+
+
+    def test_closure_lookup_paginates_past_ten_pages_with_since(self):
+        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z")
+        audit_body = marker + "\n### GitHub closure audit (unmerged PR)\n\nAudit"
+        pages = []
+
+        def urlopen(request, timeout=20):
+            query = parse_qs(urlsplit(request.full_url).query)
+            self.assertEqual(query["since"], ["2026-10-08T10:20:21Z"])
+            page = int(query["page"][0])
+            pages.append(page)
+            comments = ([{"body": "ordinary comment"}] * 100
+                        if page <= 11 else
+                        [{"body": audit_body, "user": {
+                            "login": "github-actions[bot]", "type": "Bot"}}])
+            return io.BytesIO(json.dumps(comments).encode("utf-8"))
+
+        with patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+            self.assertTrue(existing_comment(REPO, 214, "test-only", marker,
+                                             "2026-10-08T10:20:23Z"))
+        self.assertEqual(pages, list(range(1, 13)))
+
+    def test_closure_lookup_skips_prior_history(self):
+        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z")
+        calls = []
+
+        def urlopen(request, timeout=20):
+            query = parse_qs(urlsplit(request.full_url).query)
+            self.assertEqual(query["since"], ["2026-10-08T10:20:21Z"])
+            calls.append(query)
+            return io.BytesIO(b"[]")
+
+        with patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+            self.assertFalse(existing_comment(REPO, 214, "test-only", marker,
+                                              "2026-10-08T10:20:23Z"))
+        self.assertEqual(len(calls), 1)
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)

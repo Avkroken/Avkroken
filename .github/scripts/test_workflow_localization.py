@@ -67,6 +67,13 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertIn("permissions: {}", text)
         self.assertNotIn("actions/checkout", text)
 
+    def test_scheduled_reconcilers_filter_unqueued_prs(self):
+        policy = (WORKFLOWS / "agent-automerge-policy.yml").read_text()
+        bot = (WORKFLOWS / "bot-pr-lifecycle.yml").read_text()
+        self.assertIn('.auto_merge != null and .draft == false and .user.type == "User"', policy)
+        self.assertIn('.user.type == "Bot" and .auto_merge != null and .draft == false', bot)
+        self.assertIn('is not queued for native auto-merge; skipping.', bot)
+
     def test_pr_inventory_read_failure_is_explicitly_reported(self):
         for workflow in ("agent-automerge-policy.yml", "bot-pr-lifecycle.yml"):
             text = (WORKFLOWS / workflow).read_text(encoding="utf-8")

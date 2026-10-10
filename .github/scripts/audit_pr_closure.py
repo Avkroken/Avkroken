@@ -3,6 +3,8 @@
 import json
 import os
 import re
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -66,13 +68,19 @@ def closure_comment(event, repository, run_id):
     )
 
 
-def existing_comment(repository, number, token, marker):
-    """Check existing PR issue comments with bounded pagination."""
-    for page in range(1, 11):
-        url = (
-            f"https://api.github.com/repos/{repository}/issues/{number}/comments"
-            f"?per_page=100&page={page}"
-        )
+def existing_comment(repository, number, token, marker, closed_at=None):
+    """Scope comment search to the closure occurrence, with bounded pagination."""
+    params = {"per_page": 100}
+    if closed_at:
+        # Timestamps have second precision: include earlier seconds.
+        closed = datetime.strptime(closed_at, "%Y-%m-%dT%H:%M:%SZ")
+        since = (closed.replace(tzinfo=timezone.utc) -
+                 timedelta(seconds=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        params["since"] = since
+    for page in range(1, 101):
+        params["page"] = page
+        url = (f"https://api.github.com/repos/{repository}/issues/{number}/comments"
+               f"?{urlencode(params)}")
         request = urllib.request.Request(
             url,
             headers={
@@ -90,7 +98,7 @@ def existing_comment(repository, number, token, marker):
             return True
         if len(comments) < 100:
             return False
-    raise RuntimeError("Closure audit comment pagination bound reached")
+    raise RuntimeError("Closure audit comment pagination bound (100 pages) reached")
 
 
 def main():
@@ -121,7 +129,7 @@ def main():
 
     try:
         marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"), pr.get("closed_at"))
-        if existing_comment(repository, pr["number"], token, marker):
+        if existing_comment(repository, pr["number"], token, marker, pr.get("closed_at")):
             print("Closure audit comment already exists; skipping duplicate publication.")
             return
 

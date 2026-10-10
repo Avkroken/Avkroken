@@ -319,39 +319,24 @@ class AutomationPostMergeTests(unittest.TestCase):
         earlier = self.attempt_comment("12345-1", "2026-10-08T10:30:00Z")
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
                        commit_comments=[earlier])
-        original = os.environ.get("GITHUB_RUN_ATTEMPT")
-        try:
-            os.environ["GITHUB_RUN_ATTEMPT"] = "2"
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
             self.assertTrue(reconcile(fake, REPO, TIME))
-        finally:
-            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
-            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
         self.assertIn("12345:2 -->", fake.posts[0][1]["body"])
         self.assertEqual(fake.posts[-1][0], "dispatch")
 
     def test_same_attempt_ambiguous_reservation_is_not_reported_success(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()],
                        commit_comments=[self.attempt_comment("12345-1", "2026-10-08T10:30:00Z")])
-        original = os.environ.get("GITHUB_RUN_ATTEMPT")
-        try:
-            os.environ["GITHUB_RUN_ATTEMPT"] = "1"
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "1"}):
             with self.assertRaisesRegex(RuntimeError, "ambiguous previous dispatch"):
                 reconcile(fake, REPO, TIME)
-        finally:
-            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
-            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
         self.assertEqual(fake.posts, [])
 
     def test_invalid_run_attempt_never_reserves(self):
         fake = FakeApi(ci=[matching_run()], release=[matching_run()])
-        original = os.environ.get("GITHUB_RUN_ATTEMPT")
-        try:
-            os.environ["GITHUB_RUN_ATTEMPT"] = "not-valid"
+        with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "not-valid"}):
             with self.assertRaisesRegex(RuntimeError, "GITHUB_RUN_ATTEMPT"):
                 reconcile(fake, REPO, TIME)
-        finally:
-            if original is None: os.environ.pop("GITHUB_RUN_ATTEMPT", None)
-            else: os.environ["GITHUB_RUN_ATTEMPT"] = original
         self.assertEqual(fake.posts, [])
 
 

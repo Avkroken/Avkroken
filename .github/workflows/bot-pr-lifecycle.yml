@@ -35,9 +35,6 @@ jobs:
 
           default_branch="$(gh api "repos/${REPOSITORY}" --jq '.default_branch')"
 
-          owner="${REPOSITORY%%/*}"
-          repo_name="${REPOSITORY#*/}"
-
           log() {
             printf '[bot-pr-lifecycle] %s\n' "$*"
           }
@@ -147,11 +144,9 @@ jobs:
 
           reconcile_pr() {
             local number="$1"
-            local pr author draft state base_ref head_repo head_ref head_sha mergeable_state
-            local method url auto_merge repo_json updated_sha
+            local pr draft state base_ref head_repo head_sha mergeable_state url
 
             pr="$(gh api "repos/${REPOSITORY}/pulls/${number}")"
-            author="$(jq -r '.user.login' <<<"${pr}")"
             # GitHub-provided author type, never branch prefix or claimed name.
             [[ "$(jq -r '.user.type // ""' <<<"${pr}")" == "Bot" ]] || return 0
 
@@ -159,11 +154,16 @@ jobs:
             draft="$(jq -r '.draft' <<<"${pr}")"
             base_ref="$(jq -r '.base.ref' <<<"${pr}")"
             head_repo="$(jq -r '.head.repo.full_name // ""' <<<"${pr}")"
-            head_ref="$(jq -r '.head.ref' <<<"${pr}")"
             head_sha="$(jq -r '.head.sha' <<<"${pr}")"
             url="$(jq -r '.html_url' <<<"${pr}")"
             [[ "${state}" == "open" && "${draft}" == "false" ]] || return 0
             [[ "${base_ref}" == "${default_branch}" && "${head_repo}" == "${REPOSITORY}" ]] || return 0
+
+            # Never query reviews for PRs without explicit native queue consent.
+            if [[ "$(jq -r '.auto_merge == null' <<<"${pr}")" == "true" ]]; then
+              log "PR #${number} is not queued for native auto-merge; skipping."
+              return 0
+            fi
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
@@ -180,9 +180,7 @@ jobs:
             if [[ "${review_status}" -eq 1 ]]; then
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
-              if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
-                gh pr merge --disable-auto "${url}" || return 1
-              fi
+              gh pr merge --disable-auto "${url}" || return 1
               echo "::notice::PR #${number} review gate blocked auto-merge."
               return 0
             fi
@@ -204,16 +202,12 @@ jobs:
             # Never resubmit an auto-merge request: the queue can be withdrawn
             # while this workflow checks the review state. Re-enqueueing from
             # stale PR data would override that withdrawal.
-            if [[ "$(jq -r '.auto_merge == null' <<<"${pr}")" == "true" ]]; then
-              echo "PR #${number} is not queued for native auto-merge; skipping."
-            else
-              echo "PR #${number} remains queued and passes the review gate."
-            fi
+            log "PR #${number} remains queued and passes the review gate."
             return 0
           }
 
           if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
-              --jq '.[] | select(.user.type == "Bot") | .number')"; then
+              --jq '.[] | select(.user.type == "Bot" and .auto_merge != null and .draft == false) | .number')"; then
             echo "::error::Could not list open PRs; bot reconciliation failed."
             exit 1
           fi
