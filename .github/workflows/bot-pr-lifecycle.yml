@@ -152,7 +152,7 @@ jobs:
 
             # Only act after a real GitHub APPROVED review decision.
             auto_merge="$(jq -r 'if .auto_merge == null then "false" else "true" end' <<<"${pr}")"
-            [[ "${auto_merge}" == "false" ]] || return 0
+            [[ "${auto_merge}" == "true" ]] || return 0
 
             repo_json="$(gh api "repos/${REPOSITORY}")"
             if [[ "$(jq -r '.allow_squash_merge' <<<"${repo_json}")" == "true" ]]; then
