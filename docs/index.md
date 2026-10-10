@@ -18,6 +18,10 @@ Det här är dokumentationskartan för `Avkroken/Avkroken`.
 
 Den katalogen är inte source of truth för fristående Avkroken-repositories.
 
+## Operativ verifiering
+
+- [RDC-/VM-avveckling](operations/rdc-verification.md) — publik checklista och evidensmall för #254; ingen verifierad driftstatus eller avstängningsautomation.
+
 ## Fristående repositories
 
 Varje fristående repository äger själv:
