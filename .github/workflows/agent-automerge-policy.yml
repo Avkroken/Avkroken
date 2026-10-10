@@ -55,7 +55,23 @@ jobs:
                   }
                 }')"; then
               log "PR #${number} review state could not be read."
-              return 1
+              return 2
+            fi
+
+            # Unavailable, incomplete or paginated review state is not a negative review.
+            # Preserve an explicit native auto-merge request for the next reconciliation.
+            if ! jq -e '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest | type == "object") and
+              (.data.repository.pullRequest.headRefOid | type == "string") and
+              (.data.repository.pullRequest | has("reviewDecision")) and
+              (.data.repository.pullRequest.reviewThreads.nodes | type == "array") and
+              (.data.repository.pullRequest.reviews.nodes | type == "array") and
+              (.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage == false) and
+              (.data.repository.pullRequest.reviews.pageInfo.hasNextPage == false)
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} review state unavailable, incomplete or paginated."
+              return 2
             fi
 
             # Include every thread, including outdated threads. Incomplete or
@@ -163,10 +179,19 @@ jobs:
                 ;;
             esac
 
-            if ! review_gate "$number" "$head_sha"; then
-              disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
-              return 0
-            fi
+            local gate_status=0
+            review_gate "$number" "$head_sha" || gate_status=$?
+            case "$gate_status" in
+              0) ;;
+              1)
+                disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
+                return 0
+                ;;
+              *)
+                log "PR #$number review state unavailable; retaining native auto-merge request for retry."
+                return 1
+                ;;
+            esac
 
             for _ in 1 2 3; do
               pr_json="$(gh api "repos/${REPOSITORY}/pulls/$number")"
@@ -193,10 +218,19 @@ jobs:
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"$pr_json")"
             mergeable="$(jq -r 'if .mergeable == null then "unknown" else (.mergeable|tostring) end' <<<"$pr_json")"
             [[ "$mergeable_state" != "dirty" && "$mergeable" != "false" ]] || return 0
-            if ! review_gate "$number" "$head_sha"; then
-              disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
-              return 0
-            fi
+            local gate_status=0
+            review_gate "$number" "$head_sha" || gate_status=$?
+            case "$gate_status" in
+              0) ;;
+              1)
+                disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
+                return 0
+                ;;
+              *)
+                log "PR #$number review state unavailable; retaining native auto-merge request for retry."
+                return 1
+                ;;
+            esac
             # Native GitHub rulesets and required checks own merge authorization.
             # Cloudflare Workers Builds are not required GitHub status checks.
 

@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
       pull-requests: write
     steps:
       - name: Reconcile Dependabot and Copilot pull requests
@@ -68,7 +67,23 @@ jobs:
                   }
                 }')"; then
               echo "::warning::PR #${number} review state could not be read."
-              return 1
+              return 2
+            fi
+
+            # Unavailable, incomplete or paginated review state is not a negative review.
+            # Preserve an explicit native auto-merge request for the next reconciliation.
+            if ! jq -e '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest | type == "object") and
+              (.data.repository.pullRequest.headRefOid | type == "string") and
+              (.data.repository.pullRequest | has("reviewDecision")) and
+              (.data.repository.pullRequest.reviewThreads.nodes | type == "array") and
+              (.data.repository.pullRequest.reviews.nodes | type == "array") and
+              (.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage == false) and
+              (.data.repository.pullRequest.reviews.pageInfo.hasNextPage == false)
+            ' <<<"$review_json" >/dev/null; then
+              echo "::warning::PR #${number} review state unavailable, incomplete or paginated."
+              return 2
             fi
 
             # Include every thread, including outdated threads. Incomplete or
@@ -127,7 +142,13 @@ jobs:
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
-            if ! review_gate "${number}" "${head_sha}"; then
+            local review_status=0
+            review_gate "${number}" "${head_sha}" || review_status=$?
+            if [[ "${review_status}" -eq 2 ]]; then
+              echo "::error::PR #${number} review state unavailable; preserving native auto-merge for retry."
+              return 1
+            fi
+            if [[ "${review_status}" -ne 0 ]]; then
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then

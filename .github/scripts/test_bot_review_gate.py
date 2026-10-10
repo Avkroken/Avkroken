@@ -161,14 +161,16 @@ class BotReviewGateTests(unittest.TestCase):
                 self.state['reviewDecision'] = decision
                 self.assert_blocked()
 
-    def test_truncated_review_connections_block(self):
+    def test_truncated_review_connections_preserve_queue(self):
         for connection in ('reviews', 'reviewThreads'):
             with self.subTest(connection=connection):
                 self.state[connection]['pageInfo']['hasNextPage'] = True
-                self.assert_blocked()
+                result, calls = self.run_workflow()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(any('--disable-auto' in call for call in calls), calls)
                 self.state[connection]['pageInfo']['hasNextPage'] = False
 
-    def test_api_failure_and_incomplete_responses_block(self):
+    def test_api_failure_and_incomplete_responses_preserve_queue(self):
         valid = copy.deepcopy(self.fixture['review'])
         for payload, exit_code in ((valid, 1), ({}, 0),
                                    ({'data': {'repository': {'pullRequest': None}}}, 0),
@@ -176,7 +178,10 @@ class BotReviewGateTests(unittest.TestCase):
             with self.subTest(payload=payload, exit_code=exit_code):
                 self.fixture['review'] = payload
                 self.fixture['review_exit'] = exit_code
-                self.assert_blocked()
+                result, calls = self.run_workflow()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(any('--disable-auto' in call for call in calls), calls)
+                self.assertFalse(any('--auto' in call for call in calls), calls)
 
     def test_stale_commit_approval_cannot_authorize_current_head(self):
         self.state['reviewDecision'] = 'APPROVED'
