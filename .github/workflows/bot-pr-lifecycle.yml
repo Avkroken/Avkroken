@@ -70,19 +70,29 @@ jobs:
               return 2
             fi
 
-            # Unavailable, incomplete or paginated review state is not a negative review.
-            # Preserve an explicit native auto-merge request for the next reconciliation.
-            if ! jq -e '
+            # Gate results: 0 = clear, 1 = verified blocker, 2 = unknown/retry.
+            # Partial pages, malformed data and a changed head cannot justify a
+            # consent mutation. Native GitHub rulesets still govern merging.
+            if ! jq -e --arg sha "$head_sha" '
               ((.errors // []) | length == 0) and
-              (.data.repository.pullRequest | type == "object") and
-              (.data.repository.pullRequest.headRefOid | type == "string") and
-              (.data.repository.pullRequest | has("reviewDecision")) and
-              (.data.repository.pullRequest.reviewThreads.nodes | type == "array") and
-              (.data.repository.pullRequest.reviews.nodes | type == "array") and
-              (.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage == false) and
-              (.data.repository.pullRequest.reviews.pageInfo.hasNextPage == false)
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == null or .reviewDecision == "APPROVED" or
+                 .reviewDecision == "REVIEW_REQUIRED" or .reviewDecision == "CHANGES_REQUESTED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; (.isResolved | type) == "boolean") and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string"))))
             ' <<<"$review_json" >/dev/null; then
-              echo "::warning::PR #${number} review state unavailable, incomplete or paginated."
+              echo "::warning::PR #${number} review state is incomplete or stale; preserving consent for retry on the next reconciliation."
               return 2
             fi
 
