@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -12,17 +13,24 @@ def normalized(value, pattern, fallback="unknown"):
     return text if re.fullmatch(pattern, text) else fallback
 
 
-def closure_marker(number, sha):
-    """Return a stable non-rendered marker for one PR closure/head pair."""
+def closure_marker(number, sha, closed_at):
+    """Identify one closure occurrence, even across reopen/close cycles."""
     if not isinstance(number, int) or number <= 0:
         return "<!-- avkroken-pr-closure-audit:unknown:unknown -->"
     safe_sha = normalized(sha, r"[0-9a-fA-F]{40}")
-    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha} -->"
+    safe_time = normalized(closed_at, r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+    return f"<!-- avkroken-pr-closure-audit:{number}:{safe_sha}:{safe_time} -->"
 
 
 def has_existing_audit_comment(comments, marker):
-    """Return whether a previously published issue comment contains the marker."""
-    return any(marker in str((comment or {}).get("body") or "") for comment in comments)
+    """Trust only a genuine GitHub Actions audit message, not user text."""
+    prefix = marker + "\n### GitHub closure audit (unmerged PR)\n"
+    return any(
+        ((comment or {}).get("user") or {}).get("login") == "github-actions[bot]"
+        and ((comment or {}).get("user") or {}).get("type") == "Bot"
+        and str((comment or {}).get("body") or "").startswith(prefix)
+        for comment in comments
+    )
 
 
 def closure_comment(event, repository, run_id):
@@ -43,7 +51,7 @@ def closure_comment(event, repository, run_id):
     closed_at = normalized(pr.get("closed_at"), r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
     sha = normalized(((pr.get("head") or {}).get("sha")), r"[0-9a-fA-F]{40}")
     run = normalized(run_id, r"[0-9]+")
-    marker = closure_marker(number, sha)
+    marker = closure_marker(number, sha, closed_at)
     return (
         f"{marker}\n"
         "### GitHub closure audit (unmerged PR)\n\n"
@@ -103,36 +111,45 @@ def main():
     print("Unmerged PR closure recorded in run summary.")
 
     pr = event["pull_request"]
-    if ((pr.get("head") or {}).get("repo") or {}).get("full_name") != repository:
-        print("External fork: omit API write, retain workflow summary.")
-        return
+    external_fork = ((pr.get("head") or {}).get("repo") or {}).get("full_name") != repository
     token = os.environ.get("GITHUB_TOKEN", "")
     if not token:
+        if external_fork:
+            print("External fork without write token; retain workflow summary.")
+            return
         raise RuntimeError("GITHUB_TOKEN absent for same-repository closure audit")
 
-    marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"))
-    if existing_comment(repository, pr["number"], token, marker):
-        print("Closure audit comment already exists; skipping duplicate publication.")
-        return
+    try:
+        marker = closure_marker(pr["number"], (pr.get("head") or {}).get("sha"), pr.get("closed_at"))
+        if existing_comment(repository, pr["number"], token, marker):
+            print("Closure audit comment already exists; skipping duplicate publication.")
+            return
 
-    payload = json.dumps({"body": comment}).encode("utf-8")
-    url = f"https://api.github.com/repos/{repository}/issues/{pr['number']}/comments"
-    request = urllib.request.Request(
-        url,
-        data=payload,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github+json",
-            "Content-Type": "application/json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "avkroken-pr-closure-audit",
-        },
-    )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        if response.status != 201:
-            raise RuntimeError(f"Closure audit comment rejected: HTTP {response.status}")
-    print("Closure audit comment created by GitHub Actions identity.")
+        payload = json.dumps({"body": comment}).encode("utf-8")
+        url = f"https://api.github.com/repos/{repository}/issues/{pr['number']}/comments"
+        request = urllib.request.Request(
+            url,
+            data=payload,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "avkroken-pr-closure-audit",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status != 201:
+                raise RuntimeError(f"Closure audit comment rejected: HTTP {response.status}")
+        print("Closure audit comment created by GitHub Actions identity.")
+    except urllib.error.HTTPError as error:
+        # Fork closures retain their workflow summary if GitHub refuses a write.
+        # Same-repository permission failures must still fail visibly.
+        if external_fork and error.code in (403, 404):
+            print("External fork: audit comment denied; retained workflow summary.")
+            return
+        raise
 
 
 if __name__ == "__main__":

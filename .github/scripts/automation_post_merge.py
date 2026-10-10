@@ -8,6 +8,7 @@ and semantic release covers all unreleased commits reachable from that tip.
 import datetime as dt
 import json
 import os
+import re
 import urllib.request
 
 
@@ -37,32 +38,32 @@ def is_trusted_merge(pr, repository, default_branch, head_sha):
         return False
     base = pr.get("base") or {}
     head = pr.get("head") or {}
-    user = pr.get("user") or {}
     if base.get("ref") != default_branch:
         return False
     if (head.get("repo") or {}).get("full_name") != repository:
         return False
-    login = user.get("login")
-    role = user.get("type")
-    if login in {"dependabot[bot]", "copilot-swe-agent[bot]"}:
-        return role == "Bot"
-    # A user OAuth connection may act as Avkroken on a codex/* branch; a
-    # branch name is not an authenticated agent principal. Do not elevate it.
-    # OAuth-authored merges trigger native push workflows without this dispatch.
-    return (
-        login == "gamnacken[bot]"
-        and role == "Bot"
-        and str(head.get("ref") or "").startswith("codex/")
-    )
+    # We only act on a merge GitHub has already completed at the current main
+    # tip. Do not infer an agent identity from login, branch, or commit metadata.
+    # Re-running canonical checks on already-merged code is safe regardless
+    # of whether the merge was initiated by a GitHub App or a human collaborator.
+    return True
 
 
-def has_target_run(payload, head_sha):
-    return any(
-        run.get("head_sha") == head_sha
-        and run.get("event") in {"push", "repository_dispatch", "workflow_dispatch"}
-        and run.get("conclusion") not in {"cancelled", "startup_failure", "skipped"}
-        for run in payload.get("workflow_runs", [])
-    )
+def has_target_run(payload, head_sha, require_dispatch=False):
+    """Count only usable workflow runs; Dependabot needs a trusted dispatch."""
+    for run in payload.get("workflow_runs", []):
+        if run.get("head_sha") != head_sha:
+            continue
+        if run.get("event") not in {"push", "repository_dispatch", "workflow_dispatch"}:
+            continue
+        if require_dispatch and run.get("event") != "repository_dispatch":
+            continue
+        status = run.get("status")
+        if status == "completed" and run.get("conclusion") == "success":
+            return True
+        if status in {"queued", "in_progress", "waiting", "requested", "pending"}:
+            return True
+    return False
 
 
 def reconcile(api, repository, now):
@@ -76,7 +77,7 @@ def reconcile(api, repository, now):
         if is_trusted_merge(pr, repository, branch, head_sha)
     ]
     if not matches:
-        print("Default-branch tip is not a trusted automation merge; no dispatch.")
+        print("Default-branch tip is not a verified same-repository merge; no dispatch.")
         return False
 
     pr = max(matches, key=lambda item: item["merged_at"])
@@ -87,10 +88,119 @@ def reconcile(api, repository, now):
 
     ci = api("GET", f"actions/workflows/ci.yml/runs?head_sha={head_sha}&per_page=100")
     release = api("GET", f"actions/workflows/release.yml/runs?head_sha={head_sha}&per_page=100")
-    if has_target_run(ci, head_sha) and has_target_run(release, head_sha):
-        print(f"Both CI and release runs already registered for {head_sha}.")
+    codeql = api("GET", f"actions/workflows/codeql.yml/runs?head_sha={head_sha}&per_page=100")
+    # Native Dependabot push workflows run with restricted permissions and
+    # may be unable to publish CodeQL results. Require trusted dispatch runs
+    # instead of treating native push registration as successful recovery.
+    dependabot_merge = (pr.get("user") or {}).get("login") == "dependabot[bot]"
+    missing = [
+        name for name, payload in (("CI", ci), ("Release", release), ("CodeQL", codeql))
+        if not has_target_run(payload, head_sha, require_dispatch=dependabot_merge)
+    ]
+    if not missing:
+        print(f"CI, CodeQL, and release runs already registered for {head_sha}.")
         return False
 
+    # Reserve a durable attempt before dispatch. Workflow-run history cannot
+    # distinguish a genuine dispatch from a no-op/backoff-only reconciliation.
+    # A commit comment is append-only evidence visible to maintainers; no
+    # token, new branch, external database or mutable cache is required.
+    # Each workflow attempt may reserve once; a rerun can recover a failed
+    # dispatch after backoff, within the same per-SHA retry budget.
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]*", run_id):
+        raise RuntimeError("Missing valid GITHUB_RUN_ID for dispatch reservation")
+    run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "")
+    if not re.fullmatch(r"[1-9][0-9]*", run_attempt):
+        raise RuntimeError("Missing valid GITHUB_RUN_ATTEMPT for dispatch reservation")
+    attempt_key = (run_id, run_attempt)
+    marker_prefix = f"<!-- avkroken-dispatch-attempt:{head_sha}:"
+    attempts_by_key = {}
+    for page in range(1, 11):
+        batch = api(
+            "GET",
+            f"commits/{head_sha}/comments?per_page=100&page={page}",
+        )
+        if not isinstance(batch, list):
+            raise RuntimeError("Commit comment history is invalid")
+        for comment in batch:
+            if not isinstance(comment, dict):
+                raise RuntimeError("Commit comment shape is invalid")
+            if (comment.get("user") or {}).get("login") != "github-actions[bot]":
+                continue
+            body = comment.get("body")
+            if not isinstance(body, str):
+                continue
+            marker = re.fullmatch(
+                re.escape(marker_prefix) + r"([1-9][0-9]*)(?:[:-]([1-9][0-9]*))? -->",
+                body.splitlines()[0] if body else "",
+            )
+            if not marker:
+                continue
+            raw_time = comment.get("created_at")
+            if not isinstance(raw_time, str):
+                raise RuntimeError("Dispatch reservation timestamp unavailable")
+            try:
+                reserved_at = dt.datetime.fromisoformat(
+                    raw_time.replace("Z", "+00:00")
+                )
+            except ValueError as exc:
+                raise RuntimeError("Invalid dispatch reservation timestamp") from exc
+            if reserved_at.tzinfo is None:
+                raise RuntimeError("Timezone missing from dispatch reservation")
+            if reserved_at >= merged_at:
+                # Older reservations contain only the run ID. Treat them as
+                # attempt 1 so migration neither duplicates nor erases budget.
+                key = (marker.group(1), marker.group(2) or "1")
+                previous = attempts_by_key.get(key)
+                attempts_by_key[key] = max(previous, reserved_at) if previous else reserved_at
+        if len(batch) < 100:
+            break
+    else:
+        raise RuntimeError("Commit comment pagination bound reached")
+
+    if attempt_key in attempts_by_key:
+        raise RuntimeError(
+            f"Dispatch attempt {run_id}:{run_attempt} is already reserved but "
+            "required workflows remain missing; ambiguous previous dispatch."
+        )
+    attempts = len(attempts_by_key)
+    if attempts >= 3:
+        raise RuntimeError(
+            f"Persistently missing {', '.join(missing)} for {head_sha}; "
+            "post-merge dispatch retry limit reached (3)."
+        )
+    last = max(attempts_by_key.values(), default=None)
+    delay = dt.timedelta(minutes=30 * (2 ** max(0, attempts - 1)))
+    if last is not None and now - last < delay:
+        print(
+            f"::notice::Waiting for missing {', '.join(missing)} on {head_sha}; "
+            f"retry backoff active after {attempts} actual dispatch reservations."
+        )
+        return False
+
+    # A second merge can advance main while this reconciler is inspecting
+    # earlier runs. Never dispatch an event for a SHA that is no longer main.
+    current_tip = api("GET", f"branches/{branch}")["commit"]["sha"]
+    if current_tip != head_sha:
+        print(f"Default branch advanced to {current_tip}; skipping stale dispatch for {head_sha}.")
+        return False
+
+    reservation = api(
+        "POST",
+        f"commits/{head_sha}/comments",
+        {"body": (
+            f"{marker_prefix}{run_id}:{run_attempt} -->\n"
+            "Automation post-merge: durable dispatch attempt reservation. "
+            "The canonical CI, CodeQL and Release runs remain authoritative."
+        )},
+    )
+    if not isinstance(reservation, dict) or not isinstance(reservation.get("id"), int):
+        raise RuntimeError("Dispatch reservation could not be verified")
+    print(
+        f"Post-merge dispatch for {head_sha}: missing {', '.join(missing)}, "
+        f"attempt {attempts + 1}/3."
+    )
     api("POST", "dispatches", {
         "event_type": "agent-pr-merged",
         "client_payload": {
@@ -100,7 +210,7 @@ def reconcile(api, repository, now):
             "merged_at": pr["merged_at"],
         },
     })
-    print(f"Reconciled missing CI/release registration for {head_sha}.")
+    print(f"Reconciled missing CI/CodeQL/release registration for {head_sha}.")
     return True
 
 

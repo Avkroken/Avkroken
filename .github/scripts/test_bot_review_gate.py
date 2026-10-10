@@ -24,6 +24,9 @@ fixture = json.loads(Path(os.environ['FIXTURE']).read_text())
 with open(os.environ['CALLS'], 'a') as log:
     log.write(json.dumps(args) + '\n')
 if args[:2] == ['api', 'graphql']:
+    if fixture.get('withdraw_queue_during_review'):
+        fixture['pr']['auto_merge'] = None
+        Path(os.environ['FIXTURE']).write_text(json.dumps(fixture))
     print(json.dumps(fixture['review']))
     sys.exit(fixture.get('review_exit', 0))
 if args[:2] == ['pr', 'merge']:
@@ -45,24 +48,25 @@ raise SystemExit('Unexpected gh call: ' + repr(args))
 '''
 
 
-def review(state, author='reviewer', order=1):
+def review(state, author='reviewer', order=1, sha=SHA):
     return {'author': {'login': author}, 'state': state,
+            'commit': {'oid': sha},
             'submittedAt': f'2026-10-09T00:00:{order:02d}Z'}
 
 
 class BotReviewGateTests(unittest.TestCase):
     def setUp(self):
         self.fixture = {
-            'pr': {'user': {'login': 'dependabot[bot]'}, 'state': 'open',
+            'pr': {'user': {'login': 'dependabot[bot]', 'type': 'Bot'}, 'state': 'open',
                    'draft': False, 'base': {'ref': 'main'},
                    'head': {'repo': {'full_name': 'Avkroken/Avkroken'},
                             'ref': 'dependabot/example', 'sha': SHA},
                    'html_url': 'https://github.com/Avkroken/Avkroken/pull/17',
-                   'mergeable_state': 'clean', 'auto_merge': None},
+                   'mergeable_state': 'clean', 'auto_merge': {'enabled_by': {'login': 'maintainer'}}},
             'review': {'data': {'repository': {'pullRequest': {
                 'headRefOid': SHA, 'reviewDecision': 'APPROVED',
                 'reviewThreads': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
-                'reviews': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
+                'reviews': {'nodes': [review('APPROVED')], 'pageInfo': {'hasNextPage': False}},
             }}}},
         }
         self.state = self.fixture['review']['data']['repository']['pullRequest']
@@ -89,15 +93,41 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(any('--auto' in call for call in calls), calls)
         self.assertFalse(any(any('/update-branch' in arg for arg in call) for call in calls), calls)
-        self.assertTrue(any('--disable-auto' in call for call in calls), calls)
+        if self.fixture['pr'].get('auto_merge') is not None:
+            self.assertTrue(any('--disable-auto' in call for call in calls), calls)
 
-    def test_clean_reviews_enable_squash_for_observed_head(self):
+    def test_clean_queued_reviews_never_resubmit_auto_merge(self):
         result, calls = self.run_workflow()
         self.assertEqual(result.returncode, 0, result.stderr)
-        merge = next(call for call in calls if '--auto' in call)
-        self.assertIn('--squash', merge)
-        self.assertIn('--match-head-commit', merge)
-        self.assertIn(SHA, merge)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+        self.assertIn('remains queued', result.stdout)
+
+    def test_unqueued_bot_pr_never_enables_auto_merge(self):
+        # A GitHub approval is not user consent to enter the native queue.
+        self.fixture['pr']['auto_merge'] = None
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any('--auto' in call for call in calls), calls)
+        self.assertFalse(any('--disable-auto' in call for call in calls), calls)
+        self.assertFalse(any('/update-branch' in arg
+                             for call in calls for arg in call), calls)
+
+    def test_explicitly_queued_bot_pr_passes_review_gate(self):
+        self.assertIsNotNone(self.fixture['pr']['auto_merge'])
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
+
+    def test_withdrawal_during_review_does_not_requeue(self):
+        # An earlier PR snapshot still says queued; the user revokes consent
+        # while the independent review lookup is running.
+        self.fixture['withdraw_queue_during_review'] = True
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('graphql' in call for call in calls), calls)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_unresolved_threads_including_outdated_block(self):
         for outdated in (False, True):
@@ -116,10 +146,14 @@ class BotReviewGateTests(unittest.TestCase):
     def test_later_approval_or_dismissal_clears_same_reviewer_request(self):
         for state in ('APPROVED', 'DISMISSED'):
             with self.subTest(state=state):
-                self.state['reviews']['nodes'] = [review('CHANGES_REQUESTED'), review(state, order=2)]
+                self.state['reviews']['nodes'] = [
+                    review('APPROVED', 'other', 1),
+                    review('CHANGES_REQUESTED'),
+                    review(state, order=2),
+                ]
                 result, calls = self.run_workflow()
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertTrue(any('--auto' in call for call in calls), calls)
+                self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_required_or_negative_aggregate_review_blocks(self):
         for decision in ('REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'UNKNOWN'):
@@ -143,6 +177,36 @@ class BotReviewGateTests(unittest.TestCase):
                 self.fixture['review'] = payload
                 self.fixture['review_exit'] = exit_code
                 self.assert_blocked()
+
+    def test_stale_commit_approval_cannot_authorize_current_head(self):
+        self.state['reviewDecision'] = 'APPROVED'
+        self.state['reviews']['nodes'] = [review('APPROVED', sha='b' * 40)]
+        self.assert_blocked()
+
+    def test_dismissed_current_head_approval_does_not_count(self):
+        self.state['reviewDecision'] = 'APPROVED'
+        self.state['reviews']['nodes'] = [
+            review('APPROVED', 'reviewer', 1, SHA),
+            review('DISMISSED', 'reviewer', 2, SHA),
+            review('APPROVED', 'other', 3, 'b' * 40),
+        ]
+        self.assert_blocked()
+
+    def test_missing_commit_identity_blocks_approval(self):
+        self.state['reviews']['nodes'] = [
+            {'author': {'login': 'reviewer'}, 'state': 'APPROVED',
+             'submittedAt': '2026-10-09T00:00:01Z'}
+        ]
+        self.assert_blocked()
+
+    def test_latest_commit_approval_permits_gated_bot_queue(self):
+        self.state['reviews']['nodes'] = [
+            review('APPROVED', 'reviewer', sha='b' * 40),
+            review('APPROVED', 'reviewer', 2, SHA),
+        ]
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any(call[:2] == ['pr', 'merge'] for call in calls), calls)
 
     def test_changed_head_blocks(self):
         self.state['headRefOid'] = 'b' * 40
@@ -168,16 +232,14 @@ class BotReviewGateTests(unittest.TestCase):
         del self.state['reviewDecision']
         self.assert_blocked()
 
-    def test_resolved_outdated_thread_without_required_reviews_can_pass(self):
+    def test_resolved_outdated_thread_still_requires_real_approval(self):
         self.state['reviewDecision'] = None
         self.state['reviewThreads']['nodes'] = [{'isResolved': True, 'isOutdated': True}]
-        result, calls = self.run_workflow()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(any('--auto' in call for call in calls), calls)
+        self.assert_blocked()
 
     def test_draft_fork_and_other_authors_remain_excluded(self):
         valid = copy.deepcopy(self.fixture['pr'])
-        for fields in ({'draft': True}, {'user': {'login': 'another-user'}},
+        for fields in ({'draft': True}, {'user': {'login': 'another-user', 'type': 'User'}},
                        {'head': {**valid['head'], 'repo': {'full_name': 'other/fork'}}}):
             with self.subTest(fields=fields):
                 self.fixture['pr'] = {**valid, **fields}
@@ -193,6 +255,7 @@ class BotReviewGateTests(unittest.TestCase):
 
     def test_revocation_failure_is_reported(self):
         self.state['reviewDecision'] = 'CHANGES_REQUESTED'
+        self.fixture['pr']['auto_merge'] = {'enabled_by': {}}
         self.fixture['disable_exit'] = 1
         result, calls = self.run_workflow()
         self.assertNotEqual(result.returncode, 0)
