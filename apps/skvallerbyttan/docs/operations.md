@@ -83,6 +83,8 @@ Repositoryt deklarerar GitHub App-bindings med namnen:
 
 Faktisk GitHub App-installation, secret-/variable-provisionering och eventuell äldre App-state är extern GitHub/Cloudflare-state och dokumenteras inte här.
 
+**Portabel GitHub-installation:** Konfigurera `SKVALLERBYTTAN_GITHUB_REPOSITORY` i Workers Builds/Worker runtime som fullständigt `owner/repository` före deployment, samt `SKVALLERBYTTAN_GITHUB_OWNER` till samma ägare för webhook/ingest-scope. De värdena ska inte ligga hårdkodade i versionsstyrd Wrangler-konfiguration. GitHub App-tokenmintning verifierar att owner och repository stämmer överens och att Appen är installerad på just detta förråd. Buildverifieringen kan använda `GITHUB_REPOSITORY` när CI uttryckligen tillhandahåller den. Saknad/motsägande konfiguration avvisas, och ett klonat/forkat förråd får inte automatiskt återanvända originalets installation, credentials eller webhook-routing. Konfigurera miljöerna innan denna ändring får mergas/deployas till produktion.
+
 ### Runtime secrets
 
 GitHub Actions synkar inte längre Worker-runtime-secrets till Cloudflare. Runtime-secretvärden ägs på Cloudflare-sidan och ska inte dupliceras i GitHub.

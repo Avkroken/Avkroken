@@ -270,7 +270,11 @@ export async function handleGitHubWebhook(
 
   const repo = repoFromPayload(payload);
   const owner = ownerFromPayload(payload);
-  if (owner && owner.toLowerCase() !== organization(env).toLowerCase()) {
+  const configuredOwner = organization(env);
+  if (!configuredOwner) {
+    return response({ error: "GitHub owner is not configured" }, 503);
+  }
+  if (!owner || owner.toLowerCase() !== configuredOwner.toLowerCase()) {
     return response({ ok: true, ignored: "different owner" }, 202);
   }
 

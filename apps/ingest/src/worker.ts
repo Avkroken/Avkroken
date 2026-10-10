@@ -63,8 +63,9 @@ async function github(request: Request, env: IngestEnv): Promise<Response> {
   if (!payload) return json({ error: "invalid webhook payload" }, 400);
 
   const owner = githubOwner(payload);
-  const expectedOwner = env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || "Avkroken";
-  if (owner && owner.toLowerCase() !== expectedOwner.toLowerCase()) {
+  const expectedOwner = env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || "";
+  if (!expectedOwner) return json({ error: "GitHub owner is not configured" }, 503);
+  if (!owner || owner.toLowerCase() !== expectedOwner.toLowerCase()) {
     return json({ ok: true, ignored: "different owner" }, 202);
   }
 

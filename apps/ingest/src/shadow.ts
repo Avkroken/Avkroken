@@ -98,8 +98,9 @@ export async function acceptVerifiedShadowDelivery(
     ? (() => {
         if (isRetiredGitHubAppWebhook("", delivery.body)) throw new InvalidVerifiedShadowDeliveryError("github.retired_app");
         const owner = githubOwner(payload);
-        const expectedOwner = env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || "Avkroken";
-        if (owner && owner.toLowerCase() !== expectedOwner.toLowerCase()) {
+        const expectedOwner = env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || "";
+        if (!expectedOwner) throw new InvalidVerifiedShadowDeliveryError("github.owner_config");
+        if (!owner || owner.toLowerCase() !== expectedOwner.toLowerCase()) {
           throw new InvalidVerifiedShadowDeliveryError("github.owner");
         }
         return reduceGitHubWebhook({
