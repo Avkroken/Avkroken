@@ -172,7 +172,7 @@ class ClosureAuditTests(unittest.TestCase):
                 return io.BytesIO(json.dumps(result).encode("utf-8"))
 
             with patch.dict(os.environ, {"GITHUB_STEP_SUMMARY": str(summary),
-                                       "GITHUB_TOKEN": "test-only"}), \\
+                                       "GITHUB_TOKEN": "test-only"}), \
                     patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
                 reconcile_recent_closures(REPO, "test-only", "456", now=now)
                 reconcile_recent_closures(REPO, "test-only", "457", now=now)

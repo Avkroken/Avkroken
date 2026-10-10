@@ -199,7 +199,7 @@ def closure_actor(repository, number, closed_at, token):
             if item.get("event") != "closed" or item.get("created_at") != closed_at:
                 continue
             actor = (item.get("actor") or {}).get("login")
-            if normalized(actor, r"[A-Za-z0-9-]{1,100}(?:\\[bot\\])?") == "unknown":
+            if normalized(actor, r"[A-Za-z0-9-]{1,100}(?:\[bot\])?") == "unknown":
                 raise RuntimeError(f"Missing verified closure actor for PR #{number}")
             if matched is not None and matched != actor:
                 raise RuntimeError(f"Ambiguous provider closure actor for PR #{number}")
