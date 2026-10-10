@@ -37,6 +37,9 @@ via kontoinställningar; granska dessa separat och skriv aldrig ut deras värden
 Kör varje block från repositoryroten. Läs först appens `AGENTS.md` och
 `docs/project-context.md`. Kommandona följer [appgaterna i CI](../../.github/workflows/ci.yml).
 Apparnas egna paketfiler och driftdokumentation är canonical vid förändringar.
+Kör även CI:s dependency-kontroll för vald app, exempelvis
+`node scripts/check-sharp-security-floor.mjs dumpen` (motsvarande appnamn för
+Portal, Skvallerbyttan, Jobb eller Spam filter).
 
 ### Portal
 
