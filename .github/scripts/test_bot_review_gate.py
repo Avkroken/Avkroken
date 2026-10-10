@@ -59,7 +59,7 @@ class BotReviewGateTests(unittest.TestCase):
                    'head': {'repo': {'full_name': 'Avkroken/Avkroken'},
                             'ref': 'dependabot/example', 'sha': SHA},
                    'html_url': 'https://github.com/Avkroken/Avkroken/pull/17',
-                   'mergeable_state': 'clean', 'auto_merge': None},
+                   'mergeable_state': 'clean', 'auto_merge': {'enabled_by': {'login': 'maintainer'}}},
             'review': {'data': {'repository': {'pullRequest': {
                 'headRefOid': SHA, 'reviewDecision': 'APPROVED',
                 'reviewThreads': {'nodes': [], 'pageInfo': {'hasNextPage': False}},
@@ -100,6 +100,22 @@ class BotReviewGateTests(unittest.TestCase):
         self.assertIn('--squash', merge)
         self.assertIn('--match-head-commit', merge)
         self.assertIn(SHA, merge)
+
+    def test_unqueued_bot_pr_never_enables_auto_merge(self):
+        # A GitHub approval is not user consent to enter the native queue.
+        self.fixture['pr']['auto_merge'] = None
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(any('--auto' in call for call in calls), calls)
+        self.assertFalse(any('--disable-auto' in call for call in calls), calls)
+        self.assertFalse(any('/update-branch' in arg
+                             for call in calls for arg in call), calls)
+
+    def test_explicitly_queued_bot_pr_passes_review_gate(self):
+        self.assertIsNotNone(self.fixture['pr']['auto_merge'])
+        result, calls = self.run_workflow()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any('--auto' in call for call in calls), calls)
 
     def test_unresolved_threads_including_outdated_block(self):
         for outdated in (False, True):
