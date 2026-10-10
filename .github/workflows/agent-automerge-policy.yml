@@ -54,8 +54,34 @@ jobs:
                     }
                   }
                 }')"; then
-              log "PR #${number} review state could not be read."
-              return 1
+              log "PR #${number} review state could not be read; preserving consent for retry on the next reconciliation."
+              return 2
+            fi
+
+            # Gate results: 0 = clear, 1 = verified blocker, 2 = unknown/retry.
+            # Partial pages, malformed data and a changed head cannot justify a
+            # consent mutation. Native GitHub rulesets still govern merging.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == null or .reviewDecision == "APPROVED" or
+                 .reviewDecision == "REVIEW_REQUIRED" or .reviewDecision == "CHANGES_REQUESTED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; (.isResolved | type) == "boolean") and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string"))))
+            ' <<<"$review_json" >/dev/null; then
+              echo "::warning::PR #${number} review state is incomplete or stale; preserving consent for retry on the next reconciliation."
+              return 2
             fi
 
             # Include every thread, including outdated threads. Incomplete or
@@ -87,7 +113,7 @@ jobs:
                   (group_by(.author.login)
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
-              log "PR #${number} has pending or unverifiable review work."
+              log "PR #${number} has verified pending review work."
               return 1
             fi
           }
@@ -163,7 +189,11 @@ jobs:
                 ;;
             esac
 
-            if ! review_gate "$number" "$head_sha"; then
+            if review_gate "$number" "$head_sha"; then
+              :
+            else
+              # Only a verified blocker (1) may revoke native consent.
+              [[ "$?" -eq 1 ]] || return 1
               disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
               return 0
             fi
@@ -193,7 +223,11 @@ jobs:
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"$pr_json")"
             mergeable="$(jq -r 'if .mergeable == null then "unknown" else (.mergeable|tostring) end' <<<"$pr_json")"
             [[ "$mergeable_state" != "dirty" && "$mergeable" != "false" ]] || return 0
-            if ! review_gate "$number" "$head_sha"; then
+            if review_gate "$number" "$head_sha"; then
+              :
+            else
+              # Only a verified blocker (1) may revoke native consent.
+              [[ "$?" -eq 1 ]] || return 1
               disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
               return 0
             fi
