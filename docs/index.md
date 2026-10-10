@@ -18,6 +18,8 @@ Det här är dokumentationskartan för `Avkroken/Avkroken`.
 
 Den katalogen är inte source of truth för fristående Avkroken-repositories.
 
+- [Codespaces och lokal verifiering](organization/codespaces.md) — verktyg, appkommandon, portar och livscykel.
+
 ## Fristående repositories
 
 Varje fristående repository äger själv:

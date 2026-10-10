@@ -8,6 +8,7 @@
 | --- | --- |
 | [Dokumentationsmodell](documentation-standard.md) | README, app-docs och Wiki inom monorepot |
 | [Repository-integration](repository-documentation.md) | hur root och `apps/*` delar dokumentation |
+| [Codespaces](codespaces.md) | lokal Node 24-miljö, selektiv appverifiering och säker livscykel |
 | [Engineering context](engineering-context.md) | gemensam teknisk/CI-kontext för monorepot |
 | [Access inventory](access-inventory.md) | publik klassificeringsmodell för monorepots webbappar |
 | [Access path standard](access-path-standard.md) | accessprinciper för monorepots webbappar |
