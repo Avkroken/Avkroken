@@ -9,6 +9,7 @@
 | [Dokumentationsmodell](documentation-standard.md) | README, app-docs och Wiki inom monorepot |
 | [Repository-integration](repository-documentation.md) | hur root och `apps/*` delar dokumentation |
 | [Engineering context](engineering-context.md) | gemensam teknisk/CI-kontext för monorepot |
+| [Slack-aviseringar](slack-notifications.md) | kanalpolicy, appbegränsningar och verifiering för monorepots GitHub-larm |
 | [Access inventory](access-inventory.md) | publik klassificeringsmodell för monorepots webbappar |
 | [Access path standard](access-path-standard.md) | accessprinciper för monorepots webbappar |
 | [Cloudflare credential model](cloudflare-credential-standard.md) | stabil kod-/credentialmodell som används av monorepots berörda appar |
