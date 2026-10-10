@@ -1,14 +1,14 @@
 {
-  "name": "Avkroken",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "name": "Avkroken development",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24",
+      "pnpmVersion": "10.17.1"
+    },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "remoteUser": "node",
-  "containerEnv": {
-    "COREPACK_ENABLE_AUTO_PIN": "0"
-  },
-  "postCreateCommand": "corepack enable && corepack prepare pnpm@10.17.1 --activate",
+  "remoteUser": "vscode",
   "forwardPorts": [8787],
   "portsAttributes": {
     "8787": {
@@ -18,12 +18,5 @@
   },
   "otherPortsAttributes": {
     "onAutoForward": "ignore"
-  },
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "remote.autoForwardPorts": false
-      }
-    }
   }
 }

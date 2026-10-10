@@ -16,9 +16,9 @@ Det här är dokumentationskartan för `Avkroken/Avkroken`.
 
 [docs/organization/](organization/) innehåller endast dokumentation som faktiskt delas av flera appar i **detta repository** eller gäller rootens workflows/struktur.
 
-Den katalogen är inte source of truth för fristående Avkroken-repositories.
+- [Codespaces](organization/codespaces.md) — verktyg, selektiva appgater och miljöns livscykel.
 
-- [Codespaces och lokal verifiering](organization/codespaces.md) — verktyg, appkommandon, portar och livscykel.
+Den katalogen är inte source of truth för fristående Avkroken-repositories.
 
 ## Fristående repositories
 
