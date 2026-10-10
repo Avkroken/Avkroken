@@ -155,8 +155,16 @@ async function appJwt(env: Env): Promise<string> {
 async function mintInstallationToken(env: Env): Promise<InstallationToken> {
   const jwt = await appJwt(env);
   const owner = githubOwner(env);
+  const repository = env.SKVALLERBYTTAN_GITHUB_REPOSITORY?.trim() || "";
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    throw new Error("SKVALLERBYTTAN_GITHUB_REPOSITORY must identify the installed GitHub repository");
+  }
+  const [repoOwner, repoName] = repository.split("/");
+  if (!owner || repoOwner.toLowerCase() !== owner.toLowerCase()) {
+    throw new Error("Configured GitHub owner does not match installation repository owner");
+  }
   const installationResponse = await fetch(
-    `https://api.github.com/repos/${encodeURIComponent(owner)}/Avkroken/installation`,
+    `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}/installation`,
     {
       headers: {
         Accept: "application/vnd.github+json",

@@ -54,14 +54,15 @@ test("validates the App identity and current owner installation before secret sy
   await assert.doesNotReject(() => verifyGitHubAppSource({
     clientId: "Iv-test-client",
     privateKeyPem: privatePem,
-    owner: "Avkroken",
+    owner: "ExampleOrg",
+    repositoryName: ".github",
     fetchImpl,
     nowSeconds: 1_790_000_000,
   }));
 
   assert.equal(seen.length, 2);
   assert.equal(seen[0].url, "https://api.github.com/app");
-  assert.equal(seen[1].url, "https://api.github.com/repos/Avkroken/Avkroken/installation");
+  assert.equal(seen[1].url, "https://api.github.com/repos/ExampleOrg/.github/installation");
   assert.match(seen[0].auth, /^Bearer [^.]+\.[^.]+\.[^.]+$/);
 });
 
@@ -76,7 +77,8 @@ test("fails closed before secret mutation when GitHub rejects the source credent
     () => verifyGitHubAppSource({
       clientId: "Iv-test-client",
       privateKeyPem: privatePem,
-      owner: "Avkroken",
+      owner: "ExampleOrg",
+      repositoryName: ".github",
       fetchImpl,
       nowSeconds: 1_790_000_000,
     }),

@@ -85,6 +85,7 @@ export interface Env {
 
   SKVALLERBYTTAN_ALLOWED_GITHUB_IDS?: string;
   SKVALLERBYTTAN_GITHUB_OWNER?: string;
+  SKVALLERBYTTAN_GITHUB_REPOSITORY?: string;
   SKVALLERBYTTAN_ORG?: string;
 }
 
@@ -138,7 +139,11 @@ export async function cloudflareApiToken(
 }
 
 export function githubOwner(env: Env): string {
-  return env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || env.SKVALLERBYTTAN_ORG?.trim() || "Avkroken";
+  const fullName = env.SKVALLERBYTTAN_GITHUB_REPOSITORY?.trim() || "";
+  const repositoryOwner = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(fullName)
+    ? fullName.split("/")[0]
+    : "";
+  return env.SKVALLERBYTTAN_GITHUB_OWNER?.trim() || env.SKVALLERBYTTAN_ORG?.trim() || repositoryOwner;
 }
 
 // Compatibility alias while older callers and fixtures still use organization terminology.

@@ -44,6 +44,7 @@ export async function verifyGitHubAppSource({
   privateKeyPem,
   owner,
   organization,
+  repositoryName,
   fetchImpl = fetch,
   nowSeconds,
 }) {
@@ -61,15 +62,18 @@ export async function verifyGitHubAppSource({
 
   const accountOwner = owner?.trim() || organization?.trim();
   if (!accountOwner) throw new Error("GitHub owner is missing");
+  if (!/^[A-Za-z0-9_.-]+$/.test(repositoryName || "")) {
+    throw new Error("GitHub installation repository name is missing or invalid");
+  }
 
   const installationResponse = await githubGet(
     fetchImpl,
-    `/repos/${encodeURIComponent(accountOwner)}/Avkroken/installation`,
+    `/repos/${encodeURIComponent(accountOwner)}/${encodeURIComponent(repositoryName)}/installation`,
     jwt,
   );
   if (!installationResponse.ok) {
     throw new Error(
-      `GitHub App installation validation failed for ${accountOwner}/Avkroken (HTTP ${installationResponse.status})`,
+      `GitHub App installation validation failed for ${accountOwner}/${repositoryName} (HTTP ${installationResponse.status})`,
     );
   }
 
@@ -85,20 +89,33 @@ export async function verifyConfiguredGitHubAppSource() {
   const raw = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   const config = JSON.parse(raw);
   const clientId = String(process.env.GAMNACKEN_GITHUB_APP_CLIENT_ID || "").trim();
-  const owner = String(
+  const repository = String(
+    process.env.SKVALLERBYTTAN_GITHUB_REPOSITORY ||
+    process.env.GITHUB_REPOSITORY ||
+    ""
+  ).trim();
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    throw new Error("SKVALLERBYTTAN_GITHUB_REPOSITORY or GITHUB_REPOSITORY is required");
+  }
+  const [owner, repositoryName] = repository.split("/");
+  const configuredOwner = String(
     config?.vars?.SKVALLERBYTTAN_GITHUB_OWNER ||
     config?.vars?.SKVALLERBYTTAN_ORG ||
-    "Avkroken"
+    ""
   ).trim();
+  if (configuredOwner && configuredOwner.toLowerCase() !== owner.toLowerCase()) {
+    throw new Error("Configured GitHub owner conflicts with current repository identity");
+  }
   const privateKeyPem = String(process.env.GAMNACKEN_GITHUB_APP_PRIVATE_KEY || "");
 
   await verifyGitHubAppSource({
     clientId,
     privateKeyPem,
     owner,
+    repositoryName,
   });
 
-  console.log(`Gamnacken GitHub App source credential validated for ${owner}/Avkroken.`);
+  console.log(`GitHub App source credential validated for ${repository}.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
