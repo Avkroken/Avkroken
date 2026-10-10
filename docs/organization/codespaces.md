@@ -170,6 +170,8 @@ python3 .github/scripts/test_wait_for_checks.py
 ```
 
 Kör inte publicerings- eller releasescripten direkt som smoke-test.
+Utanför Codespaces kan lokal Worker bindas till `127.0.0.1` i stället för
+`0.0.0.0` och nås på `http://localhost:8787`; ingen publik port behövs.
 
 ## Acceptans och evidens
 
