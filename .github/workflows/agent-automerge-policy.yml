@@ -54,7 +54,7 @@ jobs:
                     }
                   }
                 }')"; then
-              log "PR #${number} review state could not be read; preserving consent for retry on the next reconciliation."
+              log "PR #${number} review state could not be read."
               return 2
             fi
 
@@ -113,7 +113,7 @@ jobs:
                   (group_by(.author.login)
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
-              log "PR #${number} has verified pending review work."
+              log "PR #${number} has pending or unverifiable review work."
               return 1
             fi
           }
@@ -189,14 +189,19 @@ jobs:
                 ;;
             esac
 
-            if review_gate "$number" "$head_sha"; then
-              :
-            else
-              # Only a verified blocker (1) may revoke native consent.
-              [[ "$?" -eq 1 ]] || return 1
-              disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
-              return 0
-            fi
+            local gate_status=0
+            review_gate "$number" "$head_sha" || gate_status=$?
+            case "$gate_status" in
+              0) ;;
+              1)
+                disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
+                return 0
+                ;;
+              *)
+                log "PR #$number review state unavailable; retaining native auto-merge request for retry."
+                return 1
+                ;;
+            esac
 
             for _ in 1 2 3; do
               pr_json="$(gh api "repos/${REPOSITORY}/pulls/$number")"
@@ -223,14 +228,19 @@ jobs:
             mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"$pr_json")"
             mergeable="$(jq -r 'if .mergeable == null then "unknown" else (.mergeable|tostring) end' <<<"$pr_json")"
             [[ "$mergeable_state" != "dirty" && "$mergeable" != "false" ]] || return 0
-            if review_gate "$number" "$head_sha"; then
-              :
-            else
-              # Only a verified blocker (1) may revoke native consent.
-              [[ "$?" -eq 1 ]] || return 1
-              disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
-              return 0
-            fi
+            local gate_status=0
+            review_gate "$number" "$head_sha" || gate_status=$?
+            case "$gate_status" in
+              0) ;;
+              1)
+                disable_auto_merge "$number" "$head_sha" "$pr_url" || return 1
+                return 0
+                ;;
+              *)
+                log "PR #$number review state unavailable; retaining native auto-merge request for retry."
+                return 1
+                ;;
+            esac
             # Native GitHub rulesets and required checks own merge authorization.
             # Cloudflare Workers Builds are not required GitHub status checks.
 

@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
       pull-requests: write
     steps:
       - name: Reconcile Dependabot and Copilot pull requests
@@ -67,7 +66,7 @@ jobs:
                     }
                   }
                 }')"; then
-              echo "::warning::PR #${number} review state could not be read; preserving consent for retry on the next reconciliation."
+              echo "::warning::PR #${number} review state could not be read."
               return 2
             fi
 
@@ -126,7 +125,7 @@ jobs:
                   (group_by(.author.login)
                     | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
             ' <<<"$review_json" >/dev/null; then
-              echo "PR #${number} has verified pending review work."
+              echo "PR #${number} has pending or unverifiable review work."
               return 1
             fi
           }
@@ -153,11 +152,13 @@ jobs:
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
-            if review_gate "${number}" "${head_sha}"; then
-              :
-            else
-              # Only a verified blocker (1) may revoke native consent.
-              [[ "$?" -eq 1 ]] || return 1
+            local review_status=0
+            review_gate "${number}" "${head_sha}" || review_status=$?
+            if [[ "${review_status}" -eq 2 ]]; then
+              echo "::error::PR #${number} review state unavailable; preserving native auto-merge for retry."
+              return 1
+            fi
+            if [[ "${review_status}" -ne 0 ]]; then
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then
