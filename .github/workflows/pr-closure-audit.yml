@@ -1,13 +1,14 @@
 name: Unmerged PR closure audit
 
 on:
-  # Target context also receives closures of PRs with merge conflicts.
+  # Run from the trusted default-branch context even if the PR has conflicts.
+  # Never check out or execute the PR head under this write-capable token.
   pull_request_target:
     types: [closed]
 
 permissions: {}
 
-# Serialize duplicate deliveries without dropping distinct closure occurrences.
+# Serialize repeated deliveries of one closure without dropping separate closures.
 concurrency:
   group: pr-closure-audit-${{ github.event.pull_request.number }}-${{ github.event.pull_request.closed_at }}
   cancel-in-progress: false

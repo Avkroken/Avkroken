@@ -14,7 +14,7 @@ on:
     types: [opened, reopened]
 
 concurrency:
-  group: security-remediation-${{ github.repository }}
+  group: security-remediation-${{ github.repository }}-${{ github.event_name == 'pull_request' && format('tests-{0}', github.event.pull_request.number) || 'reconcile' }}
   cancel-in-progress: false
 
 permissions: {}

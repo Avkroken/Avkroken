@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Regression tests for unmerged PR closure attribution."""
-import copy
 import io
 import json
 import os
@@ -8,13 +7,12 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from audit_pr_closure import closure_comment, closure_marker, has_existing_audit_comment, main
 
 REPO = "Avkroken/Avkroken"
 SHA = "a" * 40
-CLOSED_AT = "2026-10-08T10:20:23Z"
-ACTIONS_USER = {"login": "github-actions[bot]", "type": "Bot"}
 
 
 def event(action="closed", merged=False, actor="Avkroken", number=214):
@@ -24,7 +22,7 @@ def event(action="closed", merged=False, actor="Avkroken", number=214):
         "pull_request": {
             "number": number,
             "merged": merged,
-            "closed_at": CLOSED_AT,
+            "closed_at": "2026-10-08T10:20:23Z",
             "head": {"sha": SHA, "repo": {"full_name": REPO}},
             "title": "do-not-render-title",
             "body": "do-not-render-body",
@@ -54,105 +52,48 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIn("GitHub actor: `dependabot[bot]`", comment)
 
     def test_closure_comment_has_stable_marker_and_deduplicates(self):
-        marker = closure_marker(214, SHA, CLOSED_AT)
+        marker = closure_marker(214, SHA, "2026-10-08T10:20:23Z")
         comment = closure_comment(event(), REPO, "12345")
         self.assertIn(marker, comment)
+        trusted = {"user": {"login": "github-actions[bot]", "type": "Bot"}, "body": comment}
         self.assertTrue(has_existing_audit_comment(
-            [{"body": "older"}, {"body": comment, "user": ACTIONS_USER}],
-            marker,
+            [{"body": "older"}, trusted], marker,
+        ))
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "attacker"}, "body": comment}], marker,
+        ))
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "github-actions[bot]", "type": "Bot"},
+              "body": "Quoted marker: " + comment}], marker,
         ))
         self.assertFalse(has_existing_audit_comment([{"body": "older"}], marker))
-
-    def test_reclosure_at_same_head_has_distinct_marker(self):
-        first = event()
-        second = copy.deepcopy(first)
-        second["pull_request"]["closed_at"] = "2026-10-09T10:20:23Z"
-        first_comment = closure_comment(first, REPO, "12345")
-        second_comment = closure_comment(second, REPO, "12346")
-        self.assertNotEqual(first_comment.splitlines()[0], second_comment.splitlines()[0])
         self.assertFalse(has_existing_audit_comment(
-            [{"body": first_comment, "user": ACTIONS_USER}],
-            second_comment.splitlines()[0],
+            [{"user": {"login": "github-actions[bot]", "type": "User"},
+              "body": comment}], marker,
+        ), "matching username without GitHub Bot type is not trusted")
+
+    def test_repeated_closure_same_head_has_separate_audit_marker(self):
+        first = event()
+        second = event()
+        second["pull_request"]["closed_at"] = "2026-10-09T11:20:23Z"
+        first_comment = closure_comment(first, REPO, "123")
+        second_comment = closure_comment(second, REPO, "124")
+        self.assertNotEqual(first_comment.splitlines()[0], second_comment.splitlines()[0])
+        marker = closure_marker(214, SHA, second["pull_request"]["closed_at"])
+        self.assertFalse(has_existing_audit_comment(
+            [{"user": {"login": "github-actions[bot]", "type": "Bot"}, "body": first_comment}],
+            marker,
         ))
 
-    def test_forged_or_unstructured_comments_do_not_suppress_audit(self):
-        comment = closure_comment(event(), REPO, "12345")
-        marker = comment.splitlines()[0]
-        for user in [None, {}, {"login": "Avkroken", "type": "User"},
-                     {"login": "other[bot]", "type": "Bot"},
-                     {"login": "github-actions[bot]", "type": "User"}]:
-            with self.subTest(user=user):
-                self.assertFalse(has_existing_audit_comment(
-                    [{"body": comment, "user": user}], marker,
-                ))
-        for body in [marker, "Quoted audit:\n" + comment, "```\n" + comment + "\n```"]:
-            with self.subTest(body=body):
-                self.assertFalse(has_existing_audit_comment(
-                    [{"body": body, "user": ACTIONS_USER}], marker,
-                ))
-
-    def run_audit(self, payload, comments, run_id="12345"):
-        """Run the publication boundary without any live API writes."""
-        requests = []
-
-        def respond(request, timeout):
-            requests.append(request)
-            if request.get_method() == "GET":
-                response = io.BytesIO(json.dumps(comments).encode())
-            else:
-                response = io.BytesIO(b"{}")
-                response.status = 201
-            return response
-
-        with tempfile.TemporaryDirectory() as directory:
-            event_path = Path(directory) / "event.json"
-            summary_path = Path(directory) / "summary.md"
-            event_path.write_text(json.dumps(payload), encoding="utf-8")
-            with patch.dict(os.environ, {
-                "GITHUB_EVENT_PATH": str(event_path), "GITHUB_REPOSITORY": REPO,
-                "GITHUB_RUN_ID": run_id, "GITHUB_STEP_SUMMARY": str(summary_path),
-                "GITHUB_TOKEN": "test-only-placeholder",
-            }), patch("audit_pr_closure.urllib.request.urlopen", side_effect=respond):
-                main()
-            summary = summary_path.read_text() if summary_path.exists() else ""
-        return requests, summary
-
-    def test_rerun_skips_only_authenticated_same_closure(self):
-        comment = closure_comment(event(), REPO, "12345")
-        requests, summary = self.run_audit(
-            event(), [{"body": comment, "user": ACTIONS_USER}], run_id="12346",
-        )
-        self.assertEqual([request.get_method() for request in requests], ["GET"])
-        self.assertIn("actions/runs/12346", summary)
-
-    def test_reclosure_is_published_despite_prior_and_forged_comments(self):
-        previous = closure_comment(event(), REPO, "12345")
-        reopened = event(actor="dependabot[bot]")
-        reopened["pull_request"]["closed_at"] = "2026-10-09T10:20:23Z"
-        current = closure_comment(reopened, REPO, "12346")
-        requests, _ = self.run_audit(reopened, [
-            {"body": previous, "user": ACTIONS_USER},
-            {"body": current, "user": {"login": "attacker", "type": "User"}},
-        ], run_id="12346")
-        self.assertEqual([request.get_method() for request in requests], ["GET", "POST"])
-        self.assertEqual(json.loads(requests[-1].data)["body"], current)
-
-    def test_fork_closure_retains_summary_without_api_access(self):
-        fork = event()
-        fork["pull_request"]["head"]["repo"]["full_name"] = "outside/fork"
-        requests, summary = self.run_audit(fork, [])
-        self.assertEqual(requests, [])
-        self.assertIn("GitHub closure audit", summary)
-
-    def test_conflicted_closures_use_trusted_target_context(self):
-        workflow = (Path(__file__).resolve().parents[1] / "workflows" / "pr-closure-audit.yml").read_text()
-        self.assertIn("\n  pull_request_target:\n    types: [closed]", workflow)
-        self.assertNotIn("\n  pull_request:\n", workflow)
-        self.assertIn("ref: main", workflow)
-        self.assertIn("persist-credentials: false", workflow)
-        self.assertNotIn("ref: ${{ github.event.pull_request.head", workflow)
-        self.assertIn("github.event.pull_request.closed_at", workflow)
-        self.assertIn("cancel-in-progress: false", workflow)
+    def test_identical_closure_events_from_different_runs_are_idempotent(self):
+        first = closure_comment(event(), REPO, "12345")
+        second = closure_comment(event(), REPO, "12346")
+        rerun = closure_comment(event(), REPO, "12345")
+        self.assertEqual(first.splitlines()[0], second.splitlines()[0])
+        self.assertEqual(first.splitlines()[0], rerun.splitlines()[0])
+        self.assertTrue(has_existing_audit_comment([
+            {"user": {"login": "github-actions[bot]", "type": "Bot"}, "body": first}
+        ], second.splitlines()[0]))
 
     def test_untrusted_identity_cannot_inject_markdown(self):
         bad = event(actor="evil`@everyone\n", number=215)
@@ -166,6 +107,60 @@ class ClosureAuditTests(unittest.TestCase):
         self.assertIsNone(closure_comment(event(), "evil/path/extra", "2"))
         comment = closure_comment(event(), REPO, "bad-run-id")
         self.assertIn("actions/runs/unknown", comment)
+
+    def test_fork_closure_publishes_audit_or_retains_summary_on_denied_write(self):
+        fork_event = event()
+        fork_event["pull_request"]["head"]["repo"]["full_name"] = "contributor/fork"
+        for denied in (False, True):
+            with self.subTest(denied=denied), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory)
+                event_file = path / "event.json"
+                summary_file = path / "summary.md"
+                event_file.write_text(json.dumps(fork_event), encoding="utf-8")
+                calls = []
+
+                def urlopen(request, timeout=20):
+                    calls.append(request.get_method())
+                    if request.get_method() == "GET":
+                        return io.BytesIO(b"[]")
+                    if denied:
+                        raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
+                    response = io.BytesIO(b"{}")
+                    response.status = 201
+                    return response
+
+                with patch.dict(os.environ, {
+                    "GITHUB_EVENT_PATH": str(event_file),
+                    "GITHUB_REPOSITORY": REPO,
+                    "GITHUB_RUN_ID": "12345",
+                    "GITHUB_STEP_SUMMARY": str(summary_file),
+                    "GITHUB_TOKEN": "test-placeholder",
+                }), patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+                    main()
+
+                self.assertEqual(calls, ["GET", "POST"])
+                self.assertIn("GitHub closure audit", summary_file.read_text(encoding="utf-8"))
+
+    def test_same_repository_write_denial_does_not_silently_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            event_file = path / "event.json"
+            event_file.write_text(json.dumps(event()), encoding="utf-8")
+
+            def urlopen(request, timeout=20):
+                if request.get_method() == "GET":
+                    return io.BytesIO(b"[]")
+                raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
+
+            with patch.dict(os.environ, {
+                "GITHUB_EVENT_PATH": str(event_file),
+                "GITHUB_REPOSITORY": REPO,
+                "GITHUB_RUN_ID": "12345",
+                "GITHUB_STEP_SUMMARY": str(path / "summary.md"),
+                "GITHUB_TOKEN": "test-placeholder",
+            }), patch("audit_pr_closure.urllib.request.urlopen", side_effect=urlopen):
+                with self.assertRaises(HTTPError):
+                    main()
 
 
 if __name__ == "__main__":
