@@ -1,17 +1,13 @@
 name: Agent auto-merge
 
 on:
-  pull_request:
-    types: [opened, edited, reopened, synchronize, ready_for_review]
   workflow_run:
     workflows: ["Agent lifecycle signal"]
-    types: [completed]
-  check_run:
     types: [completed]
   push:
     branches: [main]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -19,7 +15,5 @@ permissions: {}
 jobs:
   agent-auto-merge:
     permissions:
-      checks: read
-      contents: write
       pull-requests: write
     uses: ./.github/workflows/agent-automerge-policy.yml

@@ -1,6 +1,8 @@
 name: Release
 
 on:
+  repository_dispatch:
+    types: [agent-pr-merged]
   pull_request:
     branches: [main]
     paths:
@@ -12,6 +14,19 @@ on:
       - ".github/scripts/test_publish_release.py"
       - ".github/scripts/wait_for_checks.py"
       - ".github/scripts/test_wait_for_checks.py"
+      - ".github/workflows/automation-post-merge.yml"
+      - ".github/workflows/bot-pr-lifecycle.yml"
+      - ".github/workflows/pr-closure-audit.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/scripts/automation_post_merge.py"
+      - ".github/scripts/test_automation_post_merge.py"
+      - ".github/scripts/audit_pr_closure.py"
+      - ".github/scripts/test_audit_pr_closure.py"
+      - ".github/scripts/test_workflow_localization.py"
+      - ".github/workflows/agent-automerge.yml"
+      - ".github/workflows/security-alert-issues.yml"
+      - ".github/scripts/security-reconcile.mjs"
+      - ".github/scripts/security-reconcile.test.mjs"
       - ".github/release-baseline"
       - ".github/release-required-checks"
   push:
@@ -61,9 +76,18 @@ jobs:
             .github/scripts/publish_release.py \
             .github/scripts/test_publish_release.py \
             .github/scripts/wait_for_checks.py \
-            .github/scripts/test_wait_for_checks.py
+            .github/scripts/test_wait_for_checks.py \
+            .github/scripts/automation_post_merge.py \
+            .github/scripts/test_automation_post_merge.py \
+            .github/scripts/audit_pr_closure.py \
+            .github/scripts/test_audit_pr_closure.py \
+            .github/scripts/test_workflow_localization.py
           python3 .github/scripts/test_publish_release.py
           python3 .github/scripts/test_wait_for_checks.py
+          python3 .github/scripts/test_automation_post_merge.py
+          python3 .github/scripts/test_audit_pr_closure.py
+          python3 .github/scripts/test_workflow_localization.py
+          node --test .github/scripts/security-reconcile.test.mjs
           python3 .github/scripts/semantic_release.py \
             --forced-bump auto \
             --channel stable \
@@ -117,7 +141,7 @@ jobs:
               active = sorted(
                   int(run["id"])
                   for run in data.get("workflow_runs", [])
-                  if run.get("event") in {"push", "workflow_dispatch"}
+                  if run.get("event") in {"push", "workflow_dispatch", "repository_dispatch"}
                   and run.get("status") in {"queued", "in_progress"}
                   and run.get("head_branch") == "main"
               )

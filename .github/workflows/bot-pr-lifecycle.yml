@@ -1,0 +1,218 @@
+name: Bot PR lifecycle
+
+on:
+  workflow_run:
+    workflows: ["Agent lifecycle signal"]
+    types: [completed]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "37 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: bot-pr-lifecycle
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Update and auto-merge trusted bot PRs
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Reconcile Dependabot and Copilot pull requests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          default_branch="$(gh api "repos/${REPOSITORY}" --jq '.default_branch')"
+
+          log() {
+            printf '[bot-pr-lifecycle] %s\n' "$*"
+          }
+
+          review_gate() {
+            local number="$1" head_sha="$2" review_json
+            # Called in a conditional: explicitly handle failures instead of
+            # relying on errexit, which Bash disables in this context.
+            # shellcheck disable=SC2016
+            if ! review_json="$(gh api graphql \
+              -F owner="${REPOSITORY%%/*}" -F name="${REPOSITORY#*/}" -F number="$number" \
+              -f query='
+                query($owner:String!, $name:String!, $number:Int!) {
+                  repository(owner:$owner, name:$name) {
+                    pullRequest(number:$number) {
+                      headRefOid
+                      reviewDecision
+                      reviewThreads(first:100) {
+                        nodes { isResolved }
+                        pageInfo { hasNextPage }
+                      }
+                      reviews(first:100, states:[APPROVED, CHANGES_REQUESTED, DISMISSED]) {
+                        nodes { author { login } state submittedAt commit { oid } }
+                        pageInfo { hasNextPage }
+                      }
+                    }
+                  }
+                }')"; then
+              echo "::warning::PR #${number} review state could not be read."
+              return 2
+            fi
+
+            # Unavailable, incomplete or paginated review state is not a negative review.
+            # Preserve an explicit native auto-merge request for the next reconciliation.
+            if ! jq -e '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest | type == "object") and
+              (.data.repository.pullRequest.headRefOid | type == "string") and
+              (.data.repository.pullRequest | has("reviewDecision")) and
+              (.data.repository.pullRequest.reviewThreads.nodes | type == "array") and
+              (.data.repository.pullRequest.reviews.nodes | type == "array") and
+              (.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage == false) and
+              (.data.repository.pullRequest.reviews.pageInfo.hasNextPage == false)
+            ' <<<"$review_json" >/dev/null; then
+              echo "::warning::PR #${number} review state unavailable, incomplete or paginated."
+              return 2
+            fi
+
+            # Statuses: 0 approved, 1 negative, 2 unavailable, 3 pending.
+            # A changed head must be reconciled again before acting on reviews.
+            if ! jq -e --arg sha "$head_sha" '
+              .data.repository.pullRequest.headRefOid == $sha
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} head changed; review gate pending."
+              return 3
+            fi
+
+            # Only explicit negative review evidence revokes the native queue.
+            # Comments and pending reviews do not supersede submitted decisions.
+            if jq -e '
+              .data.repository.pullRequest |
+                .reviewDecision == "CHANGES_REQUESTED" or
+                any(.reviewThreads.nodes[]; .isResolved == false) or
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] |
+                  all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login) |
+                    any(.[]; (sort_by(.submittedAt) | last | .state) == "CHANGES_REQUESTED")))
+            ' <<<"$review_json" >/dev/null; then
+              log "PR #${number} has changes requested or unresolved review threads."
+              return 1
+            fi
+
+            # Include every thread, including outdated threads. Incomplete or
+            # paginated responses cannot establish that the review work is done.
+            # Comments and pending reviews do not supersede a submitted decision.
+            if ! jq -e --arg sha "$head_sha" '
+              ((.errors // []) | length == 0) and
+              (.data.repository.pullRequest |
+                .headRefOid == $sha and
+                has("reviewDecision") and
+                (.reviewDecision == "APPROVED") and
+                .reviewThreads.pageInfo.hasNextPage == false and
+                .reviews.pageInfo.hasNextPage == false and
+                (.reviewThreads.nodes | type == "array") and
+                (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; .isResolved == true) and
+                ([.reviews.nodes[] | select(.state == "APPROVED" or
+                                            .state == "CHANGES_REQUESTED" or
+                                            .state == "DISMISSED")] |
+                  group_by(.author.login) |
+                  any(.[]; (sort_by(.submittedAt) | last |
+                    .state == "APPROVED" and (.commit.oid // "") == $sha))) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] |
+                  select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
+                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
+                  (group_by(.author.login)
+                    | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
+            ' <<<"$review_json" >/dev/null; then
+              echo "PR #${number} has pending or unverifiable review work."
+              return 3
+            fi
+          }
+
+          reconcile_pr() {
+            local number="$1"
+            local pr draft state base_ref head_repo head_sha mergeable_state url
+
+            pr="$(gh api "repos/${REPOSITORY}/pulls/${number}")"
+            # GitHub-provided author type, never branch prefix or claimed name.
+            [[ "$(jq -r '.user.type // ""' <<<"${pr}")" == "Bot" ]] || return 0
+
+            state="$(jq -r '.state' <<<"${pr}")"
+            draft="$(jq -r '.draft' <<<"${pr}")"
+            base_ref="$(jq -r '.base.ref' <<<"${pr}")"
+            head_repo="$(jq -r '.head.repo.full_name // ""' <<<"${pr}")"
+            head_sha="$(jq -r '.head.sha' <<<"${pr}")"
+            url="$(jq -r '.html_url' <<<"${pr}")"
+            [[ "${state}" == "open" && "${draft}" == "false" ]] || return 0
+            [[ "${base_ref}" == "${default_branch}" && "${head_repo}" == "${REPOSITORY}" ]] || return 0
+
+            # Never query reviews for PRs without explicit native queue consent.
+            if [[ "$(jq -r '.auto_merge == null' <<<"${pr}")" == "true" ]]; then
+              log "PR #${number} is not queued for native auto-merge; skipping."
+              return 0
+            fi
+
+            # Do not queue bot code while findings or approval requirements
+            # remain unresolved. GitHub's native ruleset remains authoritative.
+            local review_status=0
+            review_gate "${number}" "${head_sha}" || review_status=$?
+            if [[ "${review_status}" -eq 3 ]]; then
+              log "PR #${number} review gate pending; retaining native auto-merge request."
+              return 0
+            fi
+            if [[ "${review_status}" -ne 0 && "${review_status}" -ne 1 ]]; then
+              echo "::error::PR #${number} review state unavailable; preserving native auto-merge for retry."
+              return 1
+            fi
+            if [[ "${review_status}" -eq 1 ]]; then
+              # A previously queued bot PR must not retain an auto-merge request
+              # while actionable reviews or unresolved threads are outstanding.
+              gh pr merge --disable-auto "${url}" || return 1
+              echo "::notice::PR #${number} review gate blocked auto-merge."
+              return 0
+            fi
+
+            mergeable_state="$(jq -r '.mergeable_state // "unknown"' <<<"${pr}")"
+            if [[ "${mergeable_state}" == "dirty" ]]; then
+              echo "PR #${number} has conflicts; manual resolution required."
+              return 0
+            fi
+
+            if [[ "${mergeable_state}" == "behind" ]]; then
+              # GITHUB_TOKEN update-branch suppresses PR checks. Never dispatch
+              # a mutable bot-controlled workflow revision to compensate.
+              echo "::warning::PR #${number} is behind ${default_branch}; a trusted PR update is needed before auto-merge."
+              return 0
+            fi
+
+            # Native GitHub auto-merge is already queued by its initiator.
+            # Never resubmit an auto-merge request: the queue can be withdrawn
+            # while this workflow checks the review state. Re-enqueueing from
+            # stale PR data would override that withdrawal.
+            log "PR #${number} remains queued and passes the review gate."
+            return 0
+          }
+
+          if ! candidates="$(gh api --paginate "repos/${REPOSITORY}/pulls?state=open&base=${default_branch}&per_page=100" \
+              --jq '.[] | select(.user.type == "Bot" and .auto_merge != null and .draft == false) | .number')"; then
+            echo "::error::Could not list open PRs; bot reconciliation failed."
+            exit 1
+          fi
+          failures=0
+          while IFS= read -r number; do
+            [[ -z "${number}" ]] || reconcile_pr "${number}" || failures=$((failures + 1))
+          done <<<"$candidates"
+          [[ "${failures}" -eq 0 ]] || exit 1

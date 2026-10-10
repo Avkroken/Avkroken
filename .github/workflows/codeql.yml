@@ -1,10 +1,17 @@
 name: CodeQL
 
 on:
+  workflow_dispatch:
+  # GITHUB_TOKEN-driven auto-merges can suppress the ordinary push event.
+  # The trusted default-branch post-merge reconciler emits this event.
+  repository_dispatch:
+    types: [agent-pr-merged]
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   schedule:
     - cron: "41 15 * * 3"
 
