@@ -23,7 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: write
       pull-requests: write
     steps:
       - name: Reconcile Dependabot and Copilot pull requests
@@ -67,23 +66,43 @@ jobs:
                     }
                   }
                 }')"; then
-              echo "::warning::PR #${number} review state could not be read."
-              return 1
+              echo "::warning::PR #${number} review state could not be read; retry on next scheduled reconciliation. Native auto-merge consent unchanged."
+              return 2
             fi
 
-            # Include every thread, including outdated threads. Incomplete or
-            # paginated responses cannot establish that the review work is done.
-            # Comments and pending reviews do not supersede a submitted decision.
+            # Return 2 for an indeterminate snapshot, 1 only for a verified
+            # review blocker, and 0 for approval. Read errors are not revocations
+            # of the initiator's consent; the native GitHub ruleset still applies.
             if ! jq -e --arg sha "$head_sha" '
               ((.errors // []) | length == 0) and
               (.data.repository.pullRequest |
                 .headRefOid == $sha and
                 has("reviewDecision") and
-                (.reviewDecision == "APPROVED") and
+                (.reviewDecision == null or .reviewDecision == "APPROVED" or
+                 .reviewDecision == "CHANGES_REQUESTED" or .reviewDecision == "REVIEW_REQUIRED") and
                 .reviewThreads.pageInfo.hasNextPage == false and
                 .reviews.pageInfo.hasNextPage == false and
                 (.reviewThreads.nodes | type == "array") and
                 (.reviews.nodes | type == "array") and
+                all(.reviewThreads.nodes[]; (.isResolved | type == "boolean")) and
+                all(.reviews.nodes[];
+                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
+                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
+                ([.reviews.nodes[] | select(.state == "APPROVED" or
+                                           .state == "CHANGES_REQUESTED" or .state == "DISMISSED")] |
+                  all(.[]; (.author.login | type == "string" and length > 0) and
+                           (.submittedAt | type == "string" and length > 0) and
+                           (.commit.oid | type == "string" and test("^[0-9a-f]{40}$")))))
+            ' <<<"$review_json" >/dev/null; then
+              echo "::warning::PR #${number} review snapshot is incomplete or stale; retry on next scheduled reconciliation. Native auto-merge consent unchanged."
+              return 2
+            fi
+
+            # Include outdated threads. Comments and pending reviews do not
+            # supersede a submitted decision; approval must match this head.
+            if ! jq -e --arg sha "$head_sha" '
+              (.data.repository.pullRequest |
+                (.reviewDecision == "APPROVED") and
                 all(.reviewThreads.nodes[]; .isResolved == true) and
                 ([.reviews.nodes[] | select(.state == "APPROVED" or
                                             .state == "CHANGES_REQUESTED" or
@@ -91,22 +110,18 @@ jobs:
                   group_by(.author.login) |
                   any(.[]; (sort_by(.submittedAt) | last |
                     .state == "APPROVED" and (.commit.oid // "") == $sha))) and
-                all(.reviews.nodes[];
-                  (.state == "APPROVED" or .state == "CHANGES_REQUESTED" or
-                   .state == "DISMISSED" or .state == "COMMENTED" or .state == "PENDING")) and
                 ([.reviews.nodes[] |
                   select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED")]
-                  | all(.[]; (.author.login | type == "string") and (.submittedAt | type == "string")) and
-                  (group_by(.author.login)
-                    | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED"))))
+                  | group_by(.author.login)
+                  | all(.[]; (sort_by(.submittedAt) | last | .state) != "CHANGES_REQUESTED")))
             ' <<<"$review_json" >/dev/null; then
-              echo "PR #${number} has pending or unverifiable review work."
+              echo "PR #${number} has pending review work."
               return 1
             fi
           }
 
           reconcile_pr() {
-            local number="$1"
+            local number="$1" review_status
             local pr author draft state base_ref head_repo head_ref head_sha mergeable_state
             local method url auto_merge repo_json updated_sha
 
@@ -127,7 +142,13 @@ jobs:
 
             # Do not queue bot code while findings or approval requirements
             # remain unresolved. GitHub's native ruleset remains authoritative.
-            if ! review_gate "${number}" "${head_sha}"; then
+            if review_gate "${number}" "${head_sha}"; then
+              :
+            else
+              review_status=$?
+              # Unknown review state must fail the run for a visible retry,
+              # without mutating the existing native auto-merge request.
+              [[ "$review_status" -eq 1 ]] || return 1
               # A previously queued bot PR must not retain an auto-merge request
               # while actionable reviews or unresolved threads are outstanding.
               if [[ "$(jq -r '.auto_merge != null' <<<"${pr}")" == "true" ]]; then

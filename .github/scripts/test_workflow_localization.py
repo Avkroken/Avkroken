@@ -53,6 +53,14 @@ class WorkflowLocalizationTests(unittest.TestCase):
         self.assertNotIn('"dependabot[bot]"', text)
         self.assertNotIn('codex/*', text)
 
+    def test_review_reconcilers_have_only_pull_request_write_permission(self):
+        for name in ('agent-automerge.yml', 'bot-pr-lifecycle.yml'):
+            text = (WORKFLOWS / name).read_text(encoding='utf-8')
+            self.assertIn('permissions: {}', text)
+            self.assertIn('pull-requests: write', text)
+            self.assertNotIn('contents:', text)
+            self.assertNotIn('checks:', text)
+
     def test_agent_reconciler_aggregates_each_pr_failure(self):
         text = (WORKFLOWS / "agent-automerge-policy.yml").read_text(encoding="utf-8")
         self.assertIn("failures=0", text)
