@@ -1,7 +1,8 @@
 # Codespaces — lokal utveckling i monorepot
 
 [Devcontainer-konfigurationen](../../.devcontainer/devcontainer.json) ger en
-Debian Bookworm-miljö med Node 24, npm, pnpm 10.17.1 och GitHub CLI. Node 24
+Debian Bookworm-miljö med Git, Node 24, npm, pnpm 10.17.1, GitHub CLI
+och Python 3.11 för repositoryts Python-scripts (utan extra Pythonverktyg). Node 24
 innehåller även Corepack; Jobbs `packageManager` är fortsatt `pnpm@10.17.1`.
 Miljön är tillfällig utvecklingskapacitet. Cloudflare äger applikationernas runtime.
 
@@ -20,6 +21,8 @@ Miljön är tillfällig utvecklingskapacitet. Cloudflare äger applikationernas 
    pnpm --version       # 10.17.1
    corepack --version
    gh --version
+   git --version
+   python3 --version    # 3.11.x
    git rev-parse HEAD
    ```
 
@@ -136,18 +139,47 @@ till arbetsgrenen och spara nödvändiga lokala testartefakter på godkänd plat
 Kontrollera även ignorerade filer och lokal Wrangler-state: de finns inte i en
 push och raderas med miljön. Spara inte privata data eller secrets i Git.
 Stoppa och radera därefter exakt den avsedda miljön via Codespaces-menyn.
-Använd aldrig keep-alive för att göra en Codespace till permanent runtime.
+Använd aldrig keep-alive för att göra en Codespace till permanent runtime eller
+konsument av produktionsköer.
+
+## Säker fallback vid startfel
+
+Om containerbygget misslyckas: öppna creation log och välj Codespaces recovery
+container om GitHub erbjuder den. Kontrollera `git status` och spara eget arbete
+innan **Rebuild Container**; radera inte en miljö som innehåller osparade filer.
+Recovery containern är en felsökningsmiljö och bevisar inte att verktygskontraktet
+ovan fungerar. Ändra inte apparnas lockfiler eller tillför produktionssecrets för
+att kringgå ett byggfel.
+
+Om Codespaces saknas eller inte kan starta: använd samma arbetsgren lokalt med
+Node 24, Git, GitHub CLI och Python 3.11. Kör `corepack enable` och
+`corepack prepare pnpm@10.17.1 --activate` för Jobb, verifiera versionerna ovan
+och kör endast den berörda appens bootstrap/gate. En lokal Dev Containers-miljö
+kräver en fungerande Docker-daemon. CI kan verifiera appkontrakten, men ersätter
+inte faktisk Codespace-boot eller privat portforwarding. Låt PR:en vara draft
+tills dessa acceptanskontroller har dokumenterats.
+
+Python-scriptens isolerade regressionstester kan köras utan GitHub-writes:
+
+```bash
+python3 .github/scripts/test_publish_release.py
+python3 .github/scripts/test_wait_for_checks.py
+```
+
+Kör inte publicerings- eller releasescripten direkt som smoke-test.
 
 ## Acceptans och evidens
 
 Repo-konfiguration, lokal sandboxvalidering och en faktisk Codespace-boot är
 separata kontroller. Denna baseline är **inte boot-verifierad i Codespaces**.
-Innan den kontrollen accepteras i [programissue #250](https://github.com/Avkroken/Avkroken/issues/250):
+Innan [Codespaces-issue #252](https://github.com/Avkroken/Avkroken/issues/252)
+kan accepteras inom [programissue #250](https://github.com/Avkroken/Avkroken/issues/250):
 
 - bygg/starta en ny Codespace på PR:ens exakta commit;
 - notera commit-SHA, verktygsversioner och bootresultat;
 - kör minst en appgate ovan och verifiera privat portforwarding med lokal Worker;
 - länka relevant GitHub Actions-run på samma SHA, med apparnas ordinarie checks;
+- dokumentera PR-review mot samma SHA och prova recovery/lokal fallback;
 - notera eventuella begränsningar och stoppa/radera testmiljön efteråt.
 
 Ingen Codespace, Project, Cloudflare-resurs eller VM-migrering skapas av dessa
